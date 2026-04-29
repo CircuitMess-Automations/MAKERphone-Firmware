@@ -3,6 +3,7 @@
 #include "../Fonts/font.h"
 #include "../Services/SleepService.h"
 #include "../Elements/BatteryElement.h"
+#include "../Elements/PhoneStatusBar.h"
 #include <Input/Input.h>
 #include <Pins.hpp>
 
@@ -22,9 +23,10 @@ LockScreen::LockScreen() : LVScreen(){
 	lv_obj_set_scrollbar_mode(container, LV_SCROLLBAR_MODE_OFF);
 	lv_obj_set_style_pad_all(container, 3, 0);
 
-	auto bat = new BatteryElement(obj);
-	lv_obj_add_flag(bat->getLvObj(), LV_OBJ_FLAG_IGNORE_LAYOUT);
-	lv_obj_set_pos(bat->getLvObj(), 3, 2);
+	// MAKERphone retro status bar (signal | clock | battery) anchored to the top.
+	// Pushes the unread-message list down so it does not overlap the bar.
+	new PhoneStatusBar(obj);
+	lv_obj_set_style_pad_top(container, 13, 0);
 
 	slide = new UnlockSlide(obj, [this](){
 		stop();
