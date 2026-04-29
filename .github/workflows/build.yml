@@ -1,0 +1,60 @@
+name: Build MAKERphone Firmware
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-flash-local:
+    runs-on: [self-hosted, bit-flash]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Ensure arduino-cli is available
+        run: |
+          if ! command -v arduino-cli &> /dev/null; then
+            echo "Installing arduino-cli..."
+            brew install arduino-cli || curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s -- --dest /usr/local/bin
+          fi
+          arduino-cli version
+
+      - name: Install CircuitMess board package
+        run: |
+          # Add CircuitMess board manager URL if not already present
+          arduino-cli config init --overwrite 2>/dev/null || true
+          arduino-cli config add board_manager.additional_urls "https://raw.githubusercontent.com/CircuitMess/Arduino-ESP32/main/package_cm_esp32_index.json" 2>/dev/null || true
+          arduino-cli core update-index
+          arduino-cli core install cm:esp32 || echo "Board package may already be installed"
+
+      - name: Install required libraries
+        run: |
+          # Install libraries that may not be bundled with the board package
+          arduino-cli lib install "RadioLib" || true
+          # Copy the local Chatter-Library to the Arduino libraries folder
+          ARDUINO_LIBS=$(arduino-cli config dump | grep -A1 "directories:" | grep "data:" | awk '{print $2}' || echo "$HOME/Arduino/libraries")
+          # The Chatter-Library is included locally in the repo under libraries/
+          echo "Using local libraries/ directory for Chatter-Library"
+
+      - name: Compile firmware
+        run: |
+          arduino-cli compile \
+            --fqbn cm:esp32:chatter \
+            --libraries ./libraries \
+            --warnings default \
+            --output-dir ./build \
+            MAKERphone-Firmware.ino
+
+      - name: Flash to device (if connected)
+        continue-on-error: true
+        run: |
+          PORT=$(ls /dev/tty.usbmodem* /dev/tty.usbserial* /dev/tty.SLAB* 2>/dev/null | head -1)
+          if [ -n "$PORT" ]; then
+            echo "Flashing to $PORT..."
+            arduino-cli upload --fqbn cm:esp32:chatter -p "$PORT" --input-dir ./build
+          else
+            echo "No device connected — skipping flash"
+          fi
