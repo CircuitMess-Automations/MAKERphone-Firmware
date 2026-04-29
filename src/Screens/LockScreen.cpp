@@ -4,6 +4,7 @@
 #include "../Services/SleepService.h"
 #include "../Elements/BatteryElement.h"
 #include "../Elements/PhoneStatusBar.h"
+#include "../Elements/PhoneSoftKeyBar.h"
 #include <Input/Input.h>
 #include <Pins.hpp>
 
@@ -28,6 +29,16 @@ LockScreen::LockScreen() : LVScreen(){
 	new PhoneStatusBar(obj);
 	lv_obj_set_style_pad_top(container, 13, 0);
 
+	// MAKERphone retro softkey bar anchored to the bottom. The lock screen
+	// has no real left/right actions yet, but the labels foreshadow the
+	// future Phase 3-4 wiring (BTN_LEFT -> phone, BTN_RIGHT -> menu) and
+	// give the screen the unmistakable Sony-Ericsson silhouette.
+	auto softkeys = new PhoneSoftKeyBar(obj);
+	softkeys->setLeft("CALL");
+	softkeys->setRight("MENU");
+	// Reserve the bottom 10 px so unread-message rows do not slip behind the bar.
+	lv_obj_set_style_pad_bottom(container, PhoneSoftKeyBar::BarHeight + 1, 0);
+
 	slide = new UnlockSlide(obj, [this](){
 		stop();
 		instance = nullptr;
@@ -42,6 +53,8 @@ LockScreen::LockScreen() : LVScreen(){
 
 	lv_obj_add_flag(slide->getLvObj(), LV_OBJ_FLAG_IGNORE_LAYOUT);
 	lv_obj_set_align(slide->getLvObj(), LV_ALIGN_BOTTOM_MID);
+	// Lift the unlock slide just above the softkey bar so the two do not overlap.
+	lv_obj_set_y(slide->getLvObj(), -PhoneSoftKeyBar::BarHeight);
 
 	instance = this;
 }
