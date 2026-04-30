@@ -10,6 +10,7 @@
 #include "../Screens/PhoneDialerScreen.h"
 #include "../Screens/InboxScreen.h"
 #include "../Screens/FriendsScreen.h"
+#include "../Screens/PhoneContactsScreen.h"
 #include "../Screens/SettingsScreen.h"
 #include "../Screens/GamesScreen.h"
 #include "../Interface/LVScreen.h"
@@ -45,12 +46,14 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 			break;
 
 		case PhoneIconTile::Icon::Contacts:
-			// "Contacts" maps to the existing Friends list - same data
-			// model (the LoRa peers the user has paired with). Phase F
-			// (S35-S38) replaces this with a phone-style contacts screen
-			// built on top of the Friends storage; for now FriendsScreen
-			// is what the icon launches.
-			dest = new FriendsScreen();
+			// S36: phone-style contacts screen built on the S35
+			// PhoneContacts data model. Walks Storage.Friends.all()
+			// and renders the paired peers as an alphabetised
+			// phone-book with an A-Z scroll-strip on the right. Falls
+			// back to a representative sample list when no peers are
+			// paired yet, so the screen reads as a real phone-book on
+			// first boot. The detail / open handler is wired by S37.
+			dest = new PhoneContactsScreen();
 			break;
 
 		case PhoneIconTile::Icon::Games:
