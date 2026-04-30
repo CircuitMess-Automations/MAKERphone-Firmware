@@ -5,6 +5,7 @@
 #include "../Elements/BatteryElement.h"
 #include "../Elements/PhoneStatusBar.h"
 #include "../Elements/PhoneSoftKeyBar.h"
+#include "../Elements/PhoneClockFace.h"
 #include <Input/Input.h>
 #include <Pins.hpp>
 
@@ -27,7 +28,14 @@ LockScreen::LockScreen() : LVScreen(){
 	// MAKERphone retro status bar (signal | clock | battery) anchored to the top.
 	// Pushes the unread-message list down so it does not overlap the bar.
 	new PhoneStatusBar(obj);
-	lv_obj_set_style_pad_top(container, 13, 0);
+
+	// Big retro clock face directly under the status bar - the third
+	// foundational MAKERphone widget. Always visible on the lock screen so
+	// the device feels like a phone even before the user unlocks.
+	new PhoneClockFace(obj);
+
+	// 11 px (status bar + 1 px separator) + clock face height + 2 px gap.
+	lv_obj_set_style_pad_top(container, 11 + PhoneClockFace::FaceHeight + 2, 0);
 
 	// MAKERphone retro softkey bar anchored to the bottom. The lock screen
 	// has no real left/right actions yet, but the labels foreshadow the
