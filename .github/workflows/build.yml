@@ -70,11 +70,16 @@ jobs:
             MAKERphone-Firmware.ino
 
       - name: Flash to device (if connected)
-        continue-on-error: true
         run: |
-          PORT=$(ls /dev/tty.usbmodem* /dev/tty.usbserial* /dev/tty.SLAB* 2>/dev/null | head -1)
+          # Prefer /dev/cu.* on macOS - the /dev/tty.* variants block on DCD
+          # and can hang esptool. Fall back to /dev/tty.* for completeness.
+          PORT=$(ls /dev/cu.usbmodem* /dev/cu.usbserial* /dev/cu.SLAB* \
+                    /dev/tty.usbmodem* /dev/tty.usbserial* /dev/tty.SLAB* \
+                    2>/dev/null | head -1)
           if [ -n "$PORT" ]; then
             echo "Flashing to $PORT..."
+            # No continue-on-error: a real upload failure should turn the
+            # build red so we notice instead of silently skipping.
             arduino-cli upload --fqbn cm:esp32:chatter -p "$PORT" --input-dir ./build
           else
             echo "No device connected — skipping flash"
