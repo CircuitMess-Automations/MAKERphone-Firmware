@@ -2,11 +2,24 @@
 #include <misc/lv_gc.h>
 #include <extra/widgets/msgbox/lv_msgbox.h>
 #include "ChatterTheme.h"
+#include "MakerphonePalette.h"
 
-#define MODE_DARK 0
-
-#define LIGHT_COLOR_TEXT       lv_palette_darken(LV_PALETTE_GREY, 4)
-#define DARK_COLOR_TEXT        lv_palette_lighten(LV_PALETTE_GREY, 5)
+// MAKERphone 2.0 theme.
+//
+// S13: replaces the old chatter-blue + grey scheme with the retro
+// feature-phone palette defined in MakerphonePalette.h. Keeps the same
+// public API (chatterThemeInit / chatterThemeGet / chatterThemeInited)
+// so callers in MAKERphone-Firmware.ino do not change.
+//
+// theme.color_primary   -> MP_ACCENT     (sunset orange)
+// theme.color_secondary -> MP_HIGHLIGHT  (cyan)
+// color_text            -> MP_TEXT       (warm cream)
+// color_card / grey     -> MP_DIM        (muted purple)
+// color_scr             -> MP_BG_DARK    (deep purple)
+//
+// All legacy LVGL widgets (lv_slider, lv_switch, lv_textarea, ...) keep
+// working because we only rewire the colour sources; the style-application
+// graph in theme_apply is untouched.
 
 #define OUTLINE_WIDTH           lv_disp_dpx(theme.disp, 3)
 #define TRANSITION_TIME         80
@@ -122,8 +135,11 @@ static lv_color_t color_grey;
  **********************/
 static lv_color_t grey_filter_cb(const lv_color_filter_dsc_t* f, lv_color_t color, lv_opa_t opa){
 	LV_UNUSED(f);
-	if(theme.flags & MODE_DARK) return lv_color_mix(lv_palette_darken(LV_PALETTE_GREY, 2), color, opa);
-	else return lv_color_mix(lv_palette_lighten(LV_PALETTE_GREY, 2), color, opa);
+	// Disabled-state filter: blend the widget colour toward the muted
+	// purple "card" tone instead of toward grey, so disabled controls
+	// still feel like part of the MAKERphone surface rather than a
+	// foreign element.
+	return lv_color_mix(MP_DIM, color, opa);
 }
 
 static void style_init(void){
@@ -133,7 +149,6 @@ static void style_init(void){
 			LV_STYLE_TRANSLATE_Y, LV_STYLE_TRANSLATE_X,
 			LV_STYLE_TRANSFORM_ZOOM, LV_STYLE_TRANSFORM_ANGLE,
 			LV_STYLE_COLOR_FILTER_OPA, LV_STYLE_COLOR_FILTER_DSC,
-
 	};
 
 	static lv_color_filter_dsc_t grey_filter;
@@ -142,11 +157,17 @@ static void style_init(void){
 	static lv_style_transition_dsc_t trans_normal;
 	lv_style_transition_dsc_init(&trans_normal, trans_props, lv_anim_path_linear, TRANSITION_TIME, 0, NULL);
 
-	color_text = theme.flags & MODE_DARK ? DARK_COLOR_TEXT : LIGHT_COLOR_TEXT;
+	// Top-level screen style — every screen (LVScreen-derived or not)
+	// inherits this so legacy screens that don't paint their own
+	// background still come up in MAKERphone-deep-purple instead of
+	// LVGL's default light grey.
+	style_init_reset(&styles->scr);
+	lv_style_set_bg_opa(&styles->scr, LV_OPA_COVER);
+	lv_style_set_bg_color(&styles->scr, color_scr);
+	lv_style_set_text_color(&styles->scr, color_text);
 
 	style_init_reset(&styles->scrollbar);
-	lv_style_set_bg_color(&styles->scrollbar, (theme.flags & MODE_DARK) ? lv_palette_darken(LV_PALETTE_GREY, 2) : lv_palette_main(LV_PALETTE_GREY));
-
+	lv_style_set_bg_color(&styles->scrollbar, MP_DIM);
 	lv_style_set_radius(&styles->scrollbar, LV_RADIUS_CIRCLE);
 	lv_style_set_pad_right(&styles->scrollbar, lv_disp_dpx(theme.disp, 7));
 	lv_style_set_pad_top(&styles->scrollbar, lv_disp_dpx(theme.disp, 7));
@@ -161,7 +182,9 @@ static void style_init(void){
 	lv_style_set_line_width(&styles->card, lv_disp_dpx(theme.disp, 1));
 
 	style_init_reset(&styles->ta_cursor);
-	lv_style_set_border_color(&styles->ta_cursor, color_text);
+	// Cursor is sunset-orange so it pops on the deep-purple background;
+	// matches the focus halo used elsewhere in the MAKERphone widgets.
+	lv_style_set_border_color(&styles->ta_cursor, theme.color_primary);
 	lv_style_set_border_width(&styles->ta_cursor, lv_disp_dpx(theme.disp, 1));
 	lv_style_set_pad_left(&styles->ta_cursor, -lv_disp_dpx(theme.disp, 1));
 	lv_style_set_translate_y(&styles->ta_cursor, 1);
@@ -183,8 +206,8 @@ static void style_init(void){
 	lv_style_set_radius(&styles->knob, LV_RADIUS_CIRCLE);
 
 	style_init_reset(&styles->ta_placeholder);
-	lv_style_set_text_color(&styles->ta_placeholder, (theme.flags & MODE_DARK) ? lv_palette_darken(LV_PALETTE_GREY,
-																								   2) : lv_palette_lighten(LV_PALETTE_GREY, 1));
+	lv_style_set_text_color(&styles->ta_placeholder, MP_LABEL_DIM);
+
 	style_init_reset(&styles->outline_primary);
 	lv_style_set_outline_color(&styles->outline_primary, theme.color_primary);
 	lv_style_set_outline_width(&styles->outline_primary, OUTLINE_WIDTH);
@@ -198,7 +221,10 @@ static void style_init(void){
 
 	style_init_reset(&styles->bg_color_primary);
 	lv_style_set_bg_color(&styles->bg_color_primary, theme.color_primary);
-	lv_style_set_text_color(&styles->bg_color_primary, lv_color_white());
+	// Dark text on the orange primary fill — keeps slider/switch indicators
+	// readable. Cream-on-orange would shimmer; near-black on orange is what
+	// every other PhoneIconTile selected state uses.
+	lv_style_set_text_color(&styles->bg_color_primary, MP_BG_DARK);
 	lv_style_set_bg_opa(&styles->bg_color_primary, LV_OPA_COVER);
 
 	style_init_reset(&styles->bg_color_grey);
@@ -220,7 +246,9 @@ static void style_init(void){
 
 	style_init_reset(&styles->switch_knob);
 	lv_style_set_pad_all(&styles->switch_knob, -lv_disp_dpx(theme.disp, 4));
-	lv_style_set_bg_color(&styles->switch_knob, lv_color_white());
+	// Cream knob — pops against both the muted-purple track and the
+	// orange "checked" indicator without disappearing on either.
+	lv_style_set_bg_color(&styles->switch_knob, MP_TEXT);
 
 	style_init_reset(&styles->transition_normal);
 	lv_style_set_transition(&styles->transition_normal, &trans_normal); /*Go back to default state with delay*/
@@ -246,6 +274,19 @@ void chatterThemeInit(lv_disp_t* disp){
 	theme.disp = disp;
 	theme.apply_cb = theme_apply;
 
+	// Plumb the MAKERphone palette into LVGL's theme colour slots so that
+	// any LVGL primitive that reads theme.color_primary / color_secondary
+	// (sliders, switches, focus outlines, msgbox accents, ...) automatically
+	// picks up the retro look without needing per-widget overrides.
+	theme.color_primary   = MP_ACCENT;
+	theme.color_secondary = MP_HIGHLIGHT;
+
+	color_scr   = MP_BG_DARK;
+	color_text  = MP_TEXT;
+	color_card  = MP_DIM;
+	color_grey  = MP_DIM;
+	theme.flags = 0;
+
 	style_init();
 
 	inited = true;
@@ -254,7 +295,13 @@ void chatterThemeInit(lv_disp_t* disp){
 
 	disp->theme = &theme;
 
-	lv_disp_set_bg_image(disp, "S/bg.bin");
+	// S13: drop the SPIFFS "S/bg.bin" wallpaper at the disp level — every
+	// MAKERphone screen now either paints its own background (synthwave,
+	// menus, dialer) or inherits the cover-opacity scr style above. Using
+	// a flat MP_BG_DARK here means legacy screens that haven't been
+	// reskinned yet still come up in the new palette instead of the
+	// previous busy chatter wallpaper, and we save the SPIFFS read.
+	lv_disp_set_bg_color(disp, color_scr);
 	lv_disp_set_bg_opa(disp, LV_OPA_COVER);
 }
 
@@ -272,6 +319,15 @@ bool chatterThemeInited(void)
 static void theme_apply(lv_theme_t * th, lv_obj_t * obj)
 {
 	LV_UNUSED(th);
+
+	// Top-level screens (parent==NULL after lv_obj_create(NULL)) get the
+	// deep-purple MAKERphone default so legacy screens that don't paint
+	// their own background still come up in-palette. We still fall
+	// through to the regular widget rules below so screens that ARE
+	// lv_obj_class instances also pick up the scrollbar styling.
+	if(lv_obj_get_parent(obj) == NULL) {
+		lv_obj_add_style(obj, &styles->scr, 0);
+	}
 
 	if(lv_obj_check_type(obj, &lv_textarea_class)) {
 		lv_obj_add_style(obj, &styles->ta_cursor, LV_PART_CURSOR | LV_STATE_FOCUSED);
