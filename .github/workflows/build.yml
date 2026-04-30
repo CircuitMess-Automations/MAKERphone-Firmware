@@ -37,9 +37,13 @@ jobs:
         run: |
           # cm:esp32@1.7.5 bundles a patched RadioLib (with publicly accessible
           # SX126x/LLCC68 internals) under its libraries/ folder, which is what
-          # src/Services/LoRaService.cpp was written against. Do NOT install the
-          # upstream RadioLib here - it would shadow the bundled one and break
-          # the build (newer RadioLib makes those members truly private).
+          # src/Services/LoRaService.cpp was written against.
+          #
+          # Self-hosted runner caveat: a user-level RadioLib (from earlier runs
+          # or manual installs at ~/Documents/Arduino/libraries/RadioLib) takes
+          # priority over the platform-bundled one in the Arduino library
+          # resolver. Strip it so the bundled patched copy is the one that wins.
+          arduino-cli lib uninstall RadioLib 2>/dev/null || true
           echo "Using bundled RadioLib from cm:esp32@1.7.5 + local libraries/ for Chatter-Library"
 
       - name: Compile firmware
