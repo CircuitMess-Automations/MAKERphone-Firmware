@@ -31,7 +31,7 @@ Reusable LVGL widgets, no screens yet. Each widget is fully styled and self-cont
 Cross-cutting visual layer that every screen will inherit.
 
 - [x] **S13** — Restyle `ChatterTheme.cpp` with the MAKERphone palette (deep purple bg, sunset orange accent, cyan highlights, warm cream text). Audit existing screens for regressions.
-- [ ] **S14** — `PhoneSignalIcon` animated 4-bar signal indicator (LoRa link-strength as proxy).
+- [x] **S14** — `PhoneSignalIcon` animated 4-bar signal indicator (LoRa link-strength as proxy).
 - [ ] **S15** — `PhoneBatteryIcon` retro pixel battery (replace generic `BatteryElement` glyph).
 - [ ] **S16** — `PhoneNotificationToast` — slide-down, auto-dismiss toast (used by call/SMS arrivals later).
 
