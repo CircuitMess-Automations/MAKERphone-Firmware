@@ -1,0 +1,240 @@
+#include "PhoneSynthwaveBg.h"
+#include <stdio.h>
+
+// MAKERphone retro palette (kept consistent with PhoneStatusBar /
+// PhoneSoftKeyBar / PhoneClockFace).
+#define MP_BG_DARK     lv_color_make( 20,  12,  36)   // deep purple
+#define MP_PURPLE_MID  lv_color_make( 70,  40, 110)   // mid purple band
+#define MP_MAGENTA     lv_color_make(180,  40, 140)   // magenta near horizon
+#define MP_ACCENT      lv_color_make(255, 140,  30)   // sunset orange
+#define MP_SUN         lv_color_make(255, 170,  50)   // bright sun fill
+#define MP_HORIZON     lv_color_make(255, 200,  90)   // hot orange-yellow horizon line
+#define MP_GROUND_TOP  lv_color_make( 80,  20,  90)   // ground near horizon
+#define MP_GROUND_BOT  lv_color_make( 10,   5,  25)   // ground deep distance
+#define MP_GRID        lv_color_make(122, 232, 255)   // cyan grid
+#define MP_STAR        lv_color_make(255, 240, 220)   // warm white stars
+
+PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent) : LVObject(parent){
+	// Anchor to the full 160x128 display regardless of parent layout. Using
+	// IGNORE_LAYOUT keeps this widget a pure "wallpaper" - it does not get
+	// re-flowed by a flex/grid parent.
+	lv_obj_add_flag(obj, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(obj, BgWidth, BgHeight);
+	lv_obj_set_pos(obj, 0, 0);
+
+	// Container itself is transparent - the sky and ground children paint
+	// the actual background. This keeps the wallpaper trivially layerable
+	// on top of the screen's default bg without inheriting odd theme tints.
+	lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, 0);
+	lv_obj_set_style_radius(obj, 0, 0);
+	lv_obj_set_style_pad_all(obj, 0, 0);
+	lv_obj_set_style_border_width(obj, 0, 0);
+	lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+
+	buildSky();
+	buildSun();        // sun is a child of sky so it auto-clips at the horizon
+	buildGround();
+	buildRays();
+	buildHorizontals();
+	buildStars();
+}
+
+// ----- builders -----
+
+void PhoneSynthwaveBg::buildSky(){
+	sky = lv_obj_create(obj);
+	lv_obj_remove_style_all(sky);
+	lv_obj_clear_flag(sky, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(sky, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(sky, BgWidth, HorizonY);
+	lv_obj_set_pos(sky, 0, 0);
+
+	// Vertical gradient: deep purple at top -> magenta at the horizon.
+	// LVGL renders this in one pass on flush, no multi-stripe overdraw.
+	lv_obj_set_style_bg_color(sky, MP_BG_DARK, 0);
+	lv_obj_set_style_bg_grad_color(sky, MP_MAGENTA, 0);
+	lv_obj_set_style_bg_grad_dir(sky, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(sky, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(sky, 0, 0);
+	lv_obj_set_style_pad_all(sky, 0, 0);
+	lv_obj_set_style_border_width(sky, 0, 0);
+}
+
+void PhoneSynthwaveBg::buildSun(){
+	// Sun is a child of the sky band, so the parent's bounds clip the
+	// bottom half automatically - we get a perfect semicircle resting on
+	// the horizon without any manual masking work.
+	const uint16_t diameter = 56;
+	const int16_t  cx = (BgWidth - diameter) / 2;          // center horizontally
+	const int16_t  cy = HorizonY - (diameter / 2);         // half above horizon
+
+	sun = lv_obj_create(sky);
+	lv_obj_remove_style_all(sun);
+	lv_obj_clear_flag(sun, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(sun, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(sun, diameter, diameter);
+	lv_obj_set_pos(sun, cx, cy);
+	lv_obj_set_style_radius(sun, LV_RADIUS_CIRCLE, 0);
+
+	// Vertical gradient on the sun: bright yellow at top -> hot orange at
+	// horizon, gives the sun a glow without any extra widgets.
+	lv_obj_set_style_bg_color(sun, MP_SUN, 0);
+	lv_obj_set_style_bg_grad_color(sun, MP_ACCENT, 0);
+	lv_obj_set_style_bg_grad_dir(sun, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(sun, LV_OPA_COVER, 0);
+	lv_obj_set_style_border_width(sun, 0, 0);
+	lv_obj_set_style_pad_all(sun, 0, 0);
+
+	// Three classic dark scan lines across the sun. Each is a thin
+	// magenta-colored rectangle the same color as the surrounding sky
+	// gradient near the horizon, so they read as "missing" pixels rather
+	// than as overlay objects. Rows in screen-space terms are at y = 50,
+	// 60, 68 (i.e. progressively closer to the horizon and tighter).
+	const int16_t scanScreenY[ScanCount] = { 50, 60, 68 };
+	const uint8_t scanH[ScanCount]       = {  2,  2,  2 };
+	for(uint8_t i = 0; i < ScanCount; i++){
+		lv_obj_t* line = lv_obj_create(sun);
+		lv_obj_remove_style_all(line);
+		lv_obj_clear_flag(line, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(line, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		// Scan line spans the full sun width; the round parent bounds
+		// auto-clip the ends to a chord of the circle, which is exactly
+		// the look we want.
+		lv_obj_set_size(line, diameter, scanH[i]);
+		lv_obj_set_pos(line, 0, scanScreenY[i] - cy);
+		lv_obj_set_style_bg_color(line, MP_MAGENTA, 0);
+		lv_obj_set_style_bg_opa(line, LV_OPA_COVER, 0);
+		lv_obj_set_style_radius(line, 0, 0);
+		lv_obj_set_style_border_width(line, 0, 0);
+		scanLines[i] = line;
+	}
+
+	// Bright 1 px horizon line. Painted as a child of the sky (rather than
+	// of the parent obj) so it is unconditionally drawn on top of the sun
+	// even if the sun's circle math drifts by a pixel.
+	lv_obj_t* horizon = lv_obj_create(sky);
+	lv_obj_remove_style_all(horizon);
+	lv_obj_clear_flag(horizon, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(horizon, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(horizon, BgWidth, 1);
+	lv_obj_set_pos(horizon, 0, HorizonY - 1);
+	lv_obj_set_style_bg_color(horizon, MP_HORIZON, 0);
+	lv_obj_set_style_bg_opa(horizon, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(horizon, 0, 0);
+	lv_obj_set_style_border_width(horizon, 0, 0);
+}
+
+void PhoneSynthwaveBg::buildGround(){
+	const uint16_t groundH = BgHeight - HorizonY;
+
+	ground = lv_obj_create(obj);
+	lv_obj_remove_style_all(ground);
+	lv_obj_clear_flag(ground, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(ground, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(ground, BgWidth, groundH);
+	lv_obj_set_pos(ground, 0, HorizonY);
+
+	// Vertical gradient: warm purple at the horizon -> near-black at the
+	// bottom of the screen. Sells the depth of the perspective grid without
+	// requiring any per-pixel work.
+	lv_obj_set_style_bg_color(ground, MP_GROUND_TOP, 0);
+	lv_obj_set_style_bg_grad_color(ground, MP_GROUND_BOT, 0);
+	lv_obj_set_style_bg_grad_dir(ground, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(ground, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(ground, 0, 0);
+	lv_obj_set_style_pad_all(ground, 0, 0);
+	lv_obj_set_style_border_width(ground, 0, 0);
+}
+
+void PhoneSynthwaveBg::buildRays(){
+	const uint16_t groundH = BgHeight - HorizonY;
+	// Vanishing point in ground-local coords: top center.
+	const int16_t vx = BgWidth / 2;
+	const int16_t vy = 0;
+
+	// Bottom-edge x positions for each ray. Symmetric around the screen
+	// center; some endpoints are deliberately off-screen so the parent
+	// clipping keeps the rays parallel-feeling at the edges.
+	static const int16_t bottomX[RayCount] = { -50, -10, 30, 80, 130, 170, 210 };
+
+	for(uint8_t i = 0; i < RayCount; i++){
+		rayPoints[i][0].x = vx;
+		rayPoints[i][0].y = vy;
+		rayPoints[i][1].x = bottomX[i];
+		rayPoints[i][1].y = groundH;
+
+		lv_obj_t* line = lv_line_create(ground);
+		lv_line_set_points(line, rayPoints[i], 2);
+		lv_obj_set_style_line_color(line, MP_GRID, 0);
+		lv_obj_set_style_line_width(line, 1, 0);
+		lv_obj_set_style_line_opa(line, LV_OPA_70, 0);
+		// The center ray is the only one that perfectly aligns with the
+		// horizon's vanishing pixel; brighten it a touch.
+		if(bottomX[i] == vx){
+			lv_obj_set_style_line_opa(line, LV_OPA_COVER, 0);
+		}
+		rays[i] = line;
+	}
+}
+
+void PhoneSynthwaveBg::buildHorizontals(){
+	const uint16_t groundH = BgHeight - HorizonY;
+
+	// Horizontal grid lines spaced increasingly tighter near the horizon
+	// to fake perspective compression. Y values are in ground-local coords;
+	// last entry is just above the screen edge so it survives the 1-px row.
+	const int16_t yPositions[HLineCount] = { 10, 22, 36, 52 };
+	// Faint near horizon, brighter as the line approaches the viewer -
+	// matches how a real perspective grid would look in low-light.
+	const lv_opa_t opaLevels[HLineCount] = { LV_OPA_30, LV_OPA_50, LV_OPA_70, LV_OPA_COVER };
+
+	for(uint8_t i = 0; i < HLineCount; i++){
+		lv_obj_t* h = lv_obj_create(ground);
+		lv_obj_remove_style_all(h);
+		lv_obj_clear_flag(h, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(h, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(h, BgWidth, 1);
+		lv_obj_set_pos(h, 0, yPositions[i]);
+		lv_obj_set_style_bg_color(h, MP_GRID, 0);
+		lv_obj_set_style_bg_opa(h, opaLevels[i], 0);
+		lv_obj_set_style_radius(h, 0, 0);
+		lv_obj_set_style_border_width(h, 0, 0);
+
+		// Sanity clamp so a future tweak to yPositions can not wander off
+		// the ground band.
+		if(yPositions[i] < 0 || yPositions[i] >= (int16_t) groundH){
+			lv_obj_add_flag(h, LV_OBJ_FLAG_HIDDEN);
+		}
+		hGridLines[i] = h;
+	}
+}
+
+void PhoneSynthwaveBg::buildStars(){
+	// Static "twinkle" stars in the upper half of the sky. Positions are
+	// hand-picked to read well on a 160x72 sky band - clustered toward the
+	// top so they do not compete with the sun's halo.
+	struct Star { int16_t x; int16_t y; uint8_t size; lv_opa_t opa; };
+	static const Star starList[StarCount] = {
+			{  12,  6, 1, LV_OPA_COVER },
+			{  34, 14, 1, LV_OPA_70 },
+			{  58,  4, 2, LV_OPA_COVER },
+			{ 102, 10, 1, LV_OPA_50 },
+			{ 124,  3, 1, LV_OPA_COVER },
+			{ 144, 18, 2, LV_OPA_70 },
+			{  82, 24, 1, LV_OPA_30 },
+	};
+
+	for(uint8_t i = 0; i < StarCount; i++){
+		lv_obj_t* s = lv_obj_create(sky);
+		lv_obj_remove_style_all(s);
+		lv_obj_clear_flag(s, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(s, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(s, starList[i].size, starList[i].size);
+		lv_obj_set_pos(s, starList[i].x, starList[i].y);
+		lv_obj_set_style_bg_color(s, MP_STAR, 0);
+		lv_obj_set_style_bg_opa(s, starList[i].opa, 0);
+		lv_obj_set_style_radius(s, 0, 0);
+		lv_obj_set_style_border_width(s, 0, 0);
+		stars[i] = s;
+	}
+}

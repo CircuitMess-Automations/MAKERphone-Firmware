@@ -6,6 +6,7 @@
 #include "../Elements/PhoneStatusBar.h"
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Elements/PhoneClockFace.h"
+#include "../Elements/PhoneSynthwaveBg.h"
 #include <Input/Input.h>
 #include <Pins.hpp>
 
@@ -17,6 +18,11 @@ LockScreen::LockScreen() : LVScreen(){
 	lv_obj_set_size(obj, LV_PCT(100), LV_PCT(100));
 	lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
 
+	// Synthwave wallpaper - sits at the back of the z-order so every other
+	// widget on this screen overlays it. Constructed first so it is the
+	// first child of obj and therefore the bottom of LVGL's draw stack.
+	new PhoneSynthwaveBg(obj);
+
 	container = lv_obj_create(obj);
 	lv_obj_set_size(container, LV_PCT(100), LV_PCT(100));
 	lv_obj_set_layout(container, LV_LAYOUT_FLEX);
@@ -24,6 +30,8 @@ LockScreen::LockScreen() : LVScreen(){
 	lv_obj_set_flex_align(container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 	lv_obj_set_scrollbar_mode(container, LV_SCROLLBAR_MODE_OFF);
 	lv_obj_set_style_pad_all(container, 3, 0);
+	// Let the synthwave wallpaper show through behind the unread-message rows.
+	lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, 0);
 
 	// MAKERphone retro status bar (signal | clock | battery) anchored to the top.
 	// Pushes the unread-message list down so it does not overlap the bar.
