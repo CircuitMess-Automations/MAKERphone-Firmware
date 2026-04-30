@@ -25,7 +25,7 @@ Reusable LVGL widgets, no screens yet. Each widget is fully styled and self-cont
 - [x] **S09** — `PhoneDialerKey` element (36×20 numpad key with letters caption + press flash).
 - [x] **S10** — `PhoneDialerPad` composer (3×4 grid: 1–9, *, 0, # with cursor + onKeyPress).
 - [x] **S11** — `PhonePixelAvatar` element (32×32 retro avatar from a seed/index — no SPIFFS).
-- [ ] **S12** — `PhoneChatBubble` element (sent / received variants, optional tail + timestamp).
+- [x] **S12** — `PhoneChatBubble` element (sent / received variants, optional tail + timestamp).
 
 ## Phase B — Theme, Indicators, Toasts (S13–S16)
 Cross-cutting visual layer that every screen will inherit.
