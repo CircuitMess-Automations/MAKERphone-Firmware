@@ -2,6 +2,7 @@
 #define CHATTER_FIRMWARE_CONVOSCREEN_H
 
 #include <Arduino.h>
+#include "../MAKERphoneConfig.h"
 #include "../Interface/LVScreen.h"
 #include "../Elements/TextEntry.h"
 #include "../Types.hpp"
@@ -10,6 +11,9 @@
 #include "../Elements/ConvoBox.h"
 #include "../Modals/ContextMenu.h"
 #include "../Elements/PicMenu.h"
+#if MAKERPHONE_USE_T9_COMPOSER
+#include "../Elements/PhoneT9Input.h"
+#endif
 
 class ConvoScreen : public LVScreen, private InputListener{
 public:
@@ -39,7 +43,12 @@ private:
 	void buttonReleased(uint i) override;
 
 	ConvoBox* convoBox;
+#if MAKERPHONE_USE_T9_COMPOSER
+	PhoneT9Input* phoneT9 = nullptr;
+	bool t9Active = false;
+#else
 	TextEntry* textEntry;
+#endif
 	PicMenu* picMenu;
 	ContextMenu* menuMessage;
 
