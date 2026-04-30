@@ -80,7 +80,16 @@ jobs:
             echo "Flashing to $PORT..."
             # No continue-on-error: a real upload failure should turn the
             # build red so we notice instead of silently skipping.
-            arduino-cli upload --fqbn cm:esp32:chatter -p "$PORT" --input-dir ./build
+            # Drop the upload baud from the 921600 default to 460800. The
+            # CP210x/FT231X bridge on the Chatter loses frames at 921600
+            # over many USB cables/hubs ("Invalid head of packet" from
+            # esptool); 460800 is reliable in practice and only adds a
+            # second or two to the flash.
+            arduino-cli upload \
+              --fqbn cm:esp32:chatter \
+              -p "$PORT" \
+              --input-dir ./build \
+              --upload-property upload.speed=460800
           else
             echo "No device connected — skipping flash"
           fi
