@@ -6,6 +6,7 @@
 #include "../Model/Message.h"
 
 class PhoneChatBubble;
+class PhonePixelAvatar;
 
 class ConvoMessage : public LVObject{
 public:
@@ -23,7 +24,14 @@ private:
 	// Received for incoming). PIC messages keep their original
 	// alignment row to avoid touching the picture flow before the
 	// dedicated camera/gallery sessions land.
+	//
+	// S30 adds: a 32x32 PhonePixelAvatar pinned to the row's top-left
+	// for *received* TEXT messages so each incoming bubble visibly
+	// belongs to its sender. Outgoing rows and PIC rows are unchanged
+	// (no avatar) - "your own" messages don't need a self-avatar, and
+	// the camera/gallery flow gets its own decorations later.
 	PhoneChatBubble* bubble = nullptr;     // owned via LVGL parent->child cascade
+	PhonePixelAvatar* avatar = nullptr;    // received TEXT only; LVGL parent-owned
 	lv_obj_t*        picObj = nullptr;     // for PIC variant only
 	lv_obj_t*        focusTarget = nullptr;// what wears the focused outline
 

@@ -58,7 +58,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 ## Phase E — Messaging Restyle (S29–S34)
 
 - [x] **S29** — Restyle `ConvoScreen` with `PhoneChatBubble` (right-aligned sent, left-aligned received).
-- [ ] **S30** — Pixel avatars (`PhonePixelAvatar`) next to received bubbles in `ConvoScreen`.
+- [x] **S30** — Pixel avatars (`PhonePixelAvatar`) next to received bubbles in `ConvoScreen`.
 - [ ] **S31** — Restyle `InboxScreen` as phone-style message list (avatar + name + 1-line preview + time).
 - [ ] **S32** — `PhoneT9Input` element — multi-tap text entry with letter-cycle timer + cursor caret.
 - [ ] **S33** — Wire `PhoneT9Input` into `ConvoScreen` as the default text composer (legacy keyboard kept as fallback).

@@ -1,5 +1,6 @@
 #include "ConvoMessage.h"
 #include "PhoneChatBubble.h"
+#include "PhonePixelAvatar.h"
 #include <Arduino.h>
 #include "../Interface/Pics.h"
 
@@ -38,6 +39,68 @@ ConvoMessage::ConvoMessage(lv_obj_t* parent, const Message& msg, uint16_t bgColo
 											  : PhoneChatBubble::Variant::Received,
 									 msg.getText().c_str());
 		focusTarget = bubble->getBubbleObj();
+
+		// S30: received TEXT messages get a 32x32 pixel avatar pinned
+		// to the row's top-left so each incoming bubble visibly belongs
+		// to its sender. We do not change PhoneChatBubble itself --
+		// instead we (a) add the avatar as an IGNORE_LAYOUT child of
+		// the row (so it never participates in the flex pass that the
+		// bubble's outer container does internally), and (b) bump the
+		// bubble's outer container left padding so the bubble fill
+		// shifts right past the avatar. The bubble's own relayout()
+		// reads the bubble's actual x to anchor its tail / timestamp,
+		// so the indent propagates without further plumbing.
+		//
+		// The seed is derived from the conversation UID (which equals
+		// the friend's UID for received messages). PhonePixelAvatar
+		// internally hashes the seed into independent hair/skin/eyes/
+		// mouth/shirt salts, so the avatar is stable per-contact across
+		// reboots without needing any persistence layer of our own.
+		if(!outgoing){
+			const uint64_t u = static_cast<uint64_t>(msg.convo);
+			const uint8_t  seed = static_cast<uint8_t>(
+				(u      ) ^ (u >>  8) ^ (u >> 16) ^ (u >> 24) ^
+				(u >> 32) ^ (u >> 40) ^ (u >> 48) ^ (u >> 56));
+
+			avatar = new PhonePixelAvatar(obj, seed);
+			lv_obj_t* aObj = avatar->getLvObj();
+			lv_obj_add_flag(aObj, LV_OBJ_FLAG_IGNORE_LAYOUT);
+			// Pin at x = SideMargin to line up with the indent that the
+			// Received bubble would have had. y = 0 keeps the avatar
+			// top-aligned with the bubble (single-line bubbles are far
+			// shorter than 32 px, so center-aligning would just hide
+			// the avatar's hair behind a future status indicator).
+			lv_obj_align(aObj, LV_ALIGN_TOP_LEFT,
+						 PhoneChatBubble::SideMargin, 0);
+
+			// Push the bubble's content right of the avatar. The
+			// bubble's outer container already had pad_left = SideMargin
+			// (the Received indent); we replace it with
+			//   SideMargin + AvatarSize + AvatarBubbleGap
+			// so the inner bubble fill starts a few pixels past the
+			// avatar's right edge. Right pad is left untouched so long
+			// messages still wrap at MaxBubbleWidth.
+			constexpr uint8_t AvatarBubbleGap = 3;
+			lv_obj_set_style_pad_left(
+				bubble->getLvObj(),
+				PhoneChatBubble::SideMargin
+					+ PhonePixelAvatar::AvatarSize
+					+ AvatarBubbleGap,
+				0);
+			// Force the bubble to re-anchor its tail/timestamp now that
+			// the bubble's x has shifted. setText() with the same text
+			// is the cheapest way to retrigger relayout() without
+			// adding a public API to PhoneChatBubble.
+			bubble->setText(msg.getText().c_str());
+
+			// The avatar is 32 px tall; a one-line bubble is ~14 px.
+			// Without a min-height the row would clip to the bubble's
+			// height and the avatar would visibly bleed into the next
+			// message. Min-height keeps SIZE_CONTENT growth intact for
+			// long wrapped bubbles.
+			lv_obj_set_style_min_height(obj,
+				PhonePixelAvatar::AvatarSize, 0);
+		}
 
 	}else if(msg.getType() == Message::PIC){
 		// PIC messages keep their existing alignment behavior. The pic
