@@ -13,9 +13,14 @@ extern const uint32_t ShutdownSeconds[SHUTDOWN_STEPS];
 extern const char* ShutdownText[SHUTDOWN_STEPS];
 
 struct SettingsData {
-	bool sound = true;
-	uint8_t sleepTime = 1;
-	uint8_t shutdownTime = 1;
+	// MAKERphone prototype defaults: sound off, no auto-sleep, no auto-shutdown.
+	// sleepTime / shutdownTime are indices into SleepSeconds[] / ShutdownSeconds[];
+	// index 0 corresponds to "OFF" (0 seconds, which SleepService treats as
+	// "never auto-enter sleep"). Production Chatter previously defaulted to 30s
+	// sleep / 30 min shutdown; for MAKERphone we want a phone that stays on.
+	bool sound = false;
+	uint8_t sleepTime = 0;
+	uint8_t shutdownTime = 0;
 	uint8_t screenBrightness = 200;
 	bool tested = false;
 	uint32_t messagesSent = 0;

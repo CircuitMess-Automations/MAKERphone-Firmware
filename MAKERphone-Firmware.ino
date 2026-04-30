@@ -209,6 +209,23 @@ void setup(){
 		for(;;);
 	}
 
+	// MAKERphone prototype: keep sound muted and disable auto-sleep / auto-shutdown
+	// regardless of any previously stored Settings values. The Settings.h struct
+	// defaults already match these for fresh devices, but production Chatters that
+	// were running the original firmware have stored sound=true, sleepTime=1,
+	// shutdownTime=1 in NVS - this override + store migrates them once.
+	// If you ever want these user-tunable again from the Settings menu, remove
+	// this block (the on-disk defaults will then determine startup behaviour).
+	{
+		auto& cfg = Settings.get();
+		if(cfg.sound || cfg.sleepTime != 0 || cfg.shutdownTime != 0){
+			cfg.sound        = false;
+			cfg.sleepTime    = 0;  // SleepSeconds index 0 == "OFF" (never sleep)
+			cfg.shutdownTime = 0;  // ShutdownSeconds index 0 == "OFF" (never shutdown)
+			Settings.store();
+		}
+	}
+
 	Piezo.setMute(!Settings.get().sound);
 
 	lv_init();
