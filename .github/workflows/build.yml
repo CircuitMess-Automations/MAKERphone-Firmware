@@ -26,7 +26,7 @@ jobs:
         run: |
           # Add CircuitMess board manager URL if not already present
           arduino-cli config init --overwrite 2>/dev/null || true
-          arduino-cli config add board_manager.additional_urls "https://raw.githubusercontent.com/CircuitMess/Arduino-ESP32/main/package_cm_esp32_index.json" 2>/dev/null || true
+          arduino-cli config add board_manager.additional_urls "https://raw.githubusercontent.com/CircuitMess/Arduino-Packages/master/package_circuitmess.com_esp32_index.json" 2>/dev/null || true
           arduino-cli core update-index
           arduino-cli core install cm:esp32 || echo "Board package may already be installed"
 
