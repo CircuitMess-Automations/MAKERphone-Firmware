@@ -62,7 +62,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 - [x] **S31** — Restyle `InboxScreen` as phone-style message list (avatar + name + 1-line preview + time).
 - [x] **S32** — `PhoneT9Input` element — multi-tap text entry with letter-cycle timer + cursor caret.
 - [x] **S33** — Wire `PhoneT9Input` into `ConvoScreen` as the default text composer (legacy keyboard kept as fallback).
-- [ ] **S34** — Message status indicators (clock=pending, single-tick=sent, double-tick=delivered) on sent bubbles.
+- [x] **S34** — Message status indicators (clock=pending, single-tick=sent, double-tick=delivered) on sent bubbles.
 
 ## Phase F — Contacts / Phonebook (S35–S38)
 

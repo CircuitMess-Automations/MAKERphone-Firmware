@@ -59,6 +59,27 @@ public:
 	};
 
 	/**
+	 * Phase-E S34: per-message delivery status for outgoing bubbles.
+	 *
+	 *   None       - no indicator drawn (default; also forced for
+	 *                Received bubbles regardless of caller input).
+	 *   Pending    - small clock face. The message has been queued
+	 *                locally but not yet handed off to the LoRa radio.
+	 *   Sent       - single tick. The packet was transmitted; we have
+	 *                not yet seen an ACK from the recipient.
+	 *   Delivered  - double tick. We received an ACK from the peer
+	 *                (corresponds to `Message::received == true` for
+	 *                outgoing messages in the existing MessageService
+	 *                model).
+	 */
+	enum class Status : uint8_t {
+		None,
+		Pending,
+		Sent,
+		Delivered
+	};
+
+	/**
 	 * Build a chat bubble inside `parent`.
 	 *
 	 * @param parent     LVGL parent (typically a flex-column scroll list).
@@ -83,8 +104,18 @@ public:
 	/** Show/hide the small triangular tail at the bubble's bottom corner. */
 	void setShowTail(bool show);
 
+	/**
+	 * Set the delivery status indicator for a Sent bubble. Calls on a
+	 * Received bubble are accepted but render nothing - the indicator
+	 * is intentionally one-sided so a stray setStatus(Delivered) flowing
+	 * through ConvoBox::msgChanged() can't accidentally tag the peer's
+	 * bubbles too.
+	 */
+	void setStatus(Status status);
+
 	Variant getVariant() const { return variant; }
 	bool    hasTail()    const { return showTail; }
+	Status  getStatus()  const { return status; }
 
 	/**
 	 * Inner LVGL object that draws the rounded bubble fill. Exposed so
@@ -110,20 +141,57 @@ public:
 	// Vertical gap between the tail and the timestamp below it.
 	static constexpr uint8_t  TimestampGap = 1;
 
+	// Status indicator metrics (S34). Designed to fit in the existing
+	// "below the bubble's tail" line that already hosts the optional
+	// timestamp, so adding status doesn't grow the message row beyond
+	// what the timestamp variant already produces.
+	//   StatusBoxW - widest of the three glyph variants (the double
+	//                tick is 7 px wide; pending/single tick are 5 px
+	//                and centered inside the box).
+	//   StatusBoxH - 4 rows tall, exactly matching pixelbasic7's cap
+	//                height so the timestamp baseline lines up.
+	//   StatusGap  - horizontal gap between the timestamp and the
+	//                status icon when both are shown.
+	static constexpr uint8_t  StatusBoxW = 7;
+	static constexpr uint8_t  StatusBoxH = 5;
+	static constexpr uint8_t  StatusGap  = 2;
+
 private:
 	Variant   variant;
 	bool      showTail = true;
 	bool      hasTimestamp = false;
+	Status    status = Status::None;
 
 	lv_obj_t* bubble        = nullptr;
 	lv_obj_t* label         = nullptr;
 	lv_obj_t* tailRect[3]   = { nullptr, nullptr, nullptr };
 	lv_obj_t* timestampLabel = nullptr;
+	// Status indicator host. Children are wiped + rebuilt by
+	// renderStatus() each time the status changes; the box itself
+	// stays alive for the bubble's full lifetime so relayout() can
+	// reposition it without touching the icon contents.
+	lv_obj_t* statusBox     = nullptr;
 
 	void buildContainer();
 	void buildBubble();
 	void buildTail();
 	void buildTimestamp();
+	void buildStatus();
+
+	/**
+	 * Wipe the statusBox and re-render the glyph for the current
+	 * `status`. No-op for Received bubbles (the box stays hidden).
+	 * Called from setStatus() and from relayout() so the bubble's
+	 * indicator survives a text change that triggered a re-flow.
+	 */
+	void renderStatus();
+
+	/**
+	 * Helper used by renderStatus(): create a single 1x1 colored
+	 * "pixel" inside `parent` at (x, y). The statusBox uses these
+	 * to draw clock and tick glyphs without a canvas backing buffer.
+	 */
+	lv_obj_t* statusPixel(lv_obj_t* parent, int16_t x, int16_t y, lv_color_t color);
 
 	/**
 	 * Re-measure the bubble, then anchor the tail rectangles and the

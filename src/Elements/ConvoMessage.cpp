@@ -40,6 +40,21 @@ ConvoMessage::ConvoMessage(lv_obj_t* parent, const Message& msg, uint16_t bgColo
 									 msg.getText().c_str());
 		focusTarget = bubble->getBubbleObj();
 
+		// S34 - Reflect the message's current delivery state on the
+		// bubble immediately. Outgoing messages with `received==false`
+		// are "in the air" (single tick); once the LoRa ACK lands and
+		// MessageService bumps `received` to true, ConvoBox::msgChanged
+		// calls our setDelivered(true) and we flip to the double-tick
+		// (Delivered) glyph. Received bubbles are passed through as
+		// Status::None - PhoneChatBubble itself coerces non-Sent
+		// variants to None defensively, but we do it here too for
+		// clarity at the call site.
+		if(outgoing){
+			bubble->setStatus(msg.received
+				? PhoneChatBubble::Status::Delivered
+				: PhoneChatBubble::Status::Sent);
+		}
+
 		// S30: received TEXT messages get a 32x32 pixel avatar pinned
 		// to the row's top-left so each incoming bubble visibly belongs
 		// to its sender. We do not change PhoneChatBubble itself --
@@ -157,10 +172,16 @@ ConvoMessage::ConvoMessage(lv_obj_t* parent, const Message& msg, uint16_t bgColo
 void ConvoMessage::setDelivered(bool delivered){
 	if(!msg.outgoing) return;
 	msg.received = delivered;
-	// S34 will introduce real status indicators (clock=pending, single
-	// tick=sent, double tick=delivered) on PhoneChatBubble. S29 just
-	// stores the state - no visual change here so the bubble layout
-	// stays stable across the upcoming status-icon work.
+
+	// S34 - Surface the new delivery state on the bubble. PhoneChatBubble
+	// only renders the indicator on its Sent variant, so this is also
+	// safe for outgoing PIC messages (they don't own a bubble - the
+	// `bubble == nullptr` guard skips them).
+	if(bubble != nullptr){
+		bubble->setStatus(delivered
+			? PhoneChatBubble::Status::Delivered
+			: PhoneChatBubble::Status::Sent);
+	}
 }
 
 const Message& ConvoMessage::getMsg() const{

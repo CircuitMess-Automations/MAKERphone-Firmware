@@ -13,6 +13,7 @@
 #define MP_DIM         lv_color_make(70, 56, 100)    // muted purple (Received fill)
 #define MP_TEXT        lv_color_make(255, 220, 180)  // warm cream (Received text)
 #define MP_LABEL_DIM   lv_color_make(170, 140, 200)  // dim caption (timestamp)
+#define MP_HIGHLIGHT   lv_color_make(122, 232, 255)  // cyan (delivered double tick)
 
 // ---------------------------------------------------------------------------
 
@@ -24,6 +25,7 @@ PhoneChatBubble::PhoneChatBubble(lv_obj_t* parent, Variant variant,
 	buildBubble();
 	buildTail();
 	buildTimestamp();
+	buildStatus();
 
 	setText(text != nullptr ? text : "");
 	setTimestamp(timestamp);
@@ -114,6 +116,40 @@ void PhoneChatBubble::buildTimestamp(){
 	lv_obj_add_flag(timestampLabel, LV_OBJ_FLAG_HIDDEN);
 }
 
+void PhoneChatBubble::buildStatus(){
+	// S34 - Pre-built host for the delivery-status glyph (clock /
+	// single tick / double tick). Same layout philosophy as the tail
+	// and timestamp: an IGNORE_LAYOUT child of `obj` whose children
+	// are 1-px "pixel" rectangles. Hidden by default; renderStatus()
+	// shows it once a non-None status is assigned.
+	statusBox = lv_obj_create(obj);
+	lv_obj_remove_style_all(statusBox);
+	lv_obj_clear_flag(statusBox, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(statusBox, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_style_bg_opa(statusBox, LV_OPA_TRANSP, 0);
+	lv_obj_set_style_pad_all(statusBox, 0, 0);
+	lv_obj_set_style_border_width(statusBox, 0, 0);
+	lv_obj_set_size(statusBox, StatusBoxW, StatusBoxH);
+	lv_obj_add_flag(statusBox, LV_OBJ_FLAG_HIDDEN);
+}
+
+lv_obj_t* PhoneChatBubble::statusPixel(lv_obj_t* parent, int16_t x, int16_t y,
+									   lv_color_t color){
+	// Single 1x1 colored "pixel" - same primitive used to draw the
+	// stair-stepped tail. Cheaper than a canvas and renders crisply at
+	// the 160x128 native resolution because LVGL never anti-aliases a
+	// 1-px square.
+	lv_obj_t* px = lv_obj_create(parent);
+	lv_obj_remove_style_all(px);
+	lv_obj_clear_flag(px, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_set_size(px, 1, 1);
+	lv_obj_set_pos(px, x, y);
+	lv_obj_set_style_bg_color(px, color, 0);
+	lv_obj_set_style_bg_opa(px, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(px, 0, 0);
+	return px;
+}
+
 // ----- public mutators -----------------------------------------------------
 
 void PhoneChatBubble::setText(const char* text){
@@ -168,6 +204,105 @@ void PhoneChatBubble::setShowTail(bool show){
 	relayout();
 }
 
+void PhoneChatBubble::setStatus(Status next){
+	// Received bubbles always store None - the indicator is a
+	// Sent-only feature and we never want a stray Delivered call to
+	// tag a peer's incoming message with our local read state.
+	if(variant == Variant::Received){
+		next = Status::None;
+	}
+	if(status == next){
+		// Even on a no-op we re-anchor the box (cheap) so callers can
+		// nudge it to the right place after they manually move the
+		// bubble. Keeps the API forgiving.
+		relayout();
+		return;
+	}
+	status = next;
+	renderStatus();
+	relayout();
+}
+
+void PhoneChatBubble::renderStatus(){
+	if(statusBox == nullptr) return;
+
+	// Clear any previously-drawn glyph children. The container itself
+	// stays alive so relayout() can keep its (x, y) anchored even
+	// across status changes.
+	lv_obj_clean(statusBox);
+
+	const bool show = (variant == Variant::Sent) && (status != Status::None);
+	if(!show){
+		lv_obj_add_flag(statusBox, LV_OBJ_FLAG_HIDDEN);
+		return;
+	}
+	lv_obj_clear_flag(statusBox, LV_OBJ_FLAG_HIDDEN);
+
+	// Pending / Sent draw in the same dim caption color as the
+	// timestamp so both feel like the same "metadata" tier. Delivered
+	// flips to MP_HIGHLIGHT (cyan) so the user gets a clear visual
+	// "it landed" cue in their peripheral vision while typing.
+	const lv_color_t dimC  = MP_LABEL_DIM;
+	const lv_color_t goodC = MP_HIGHLIGHT;
+
+	if(status == Status::Pending){
+		// 5x5 hollow ring (radius=99 + 1px border, transparent fill)
+		// + two short hands inside. Placed centered in the 7x5 box.
+		const int16_t ox = (StatusBoxW - 5) / 2;
+		const int16_t oy = 0;
+		lv_obj_t* ring = lv_obj_create(statusBox);
+		lv_obj_remove_style_all(ring);
+		lv_obj_clear_flag(ring, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_set_size(ring, 5, 5);
+		lv_obj_set_pos(ring, ox, oy);
+		lv_obj_set_style_bg_opa(ring, LV_OPA_TRANSP, 0);
+		lv_obj_set_style_radius(ring, 99, 0);
+		lv_obj_set_style_border_width(ring, 1, 0);
+		lv_obj_set_style_border_color(ring, dimC, 0);
+		lv_obj_set_style_border_opa(ring, LV_OPA_COVER, 0);
+		// Two minute/hour hand "pixels" inside the ring. The center
+		// of the 5x5 ring (with 1px border) is at (2, 2); we put the
+		// 12 o'clock pixel at (2, 1) and the 3 o'clock pixel at
+		// (3, 2) for a recognizable analog-clock silhouette.
+		statusPixel(statusBox, ox + 2, oy + 1, dimC);
+		statusPixel(statusBox, ox + 3, oy + 2, dimC);
+		return;
+	}
+
+	// Tick glyph (5x4) used by both Sent and Delivered. The shape:
+	//   col: 0 1 2 3 4
+	//   r=0: .  .  .  .  X
+	//   r=1: .  .  .  X  .
+	//   r=2: X  .  X  .  .
+	//   r=3: .  X  .  .  .
+	// Vertex of the V is at (1, 3); the right wing climbs to (4, 0).
+	auto drawTick = [this](int16_t ox, int16_t oy, lv_color_t c){
+		statusPixel(statusBox, ox + 4, oy + 0, c);
+		statusPixel(statusBox, ox + 3, oy + 1, c);
+		statusPixel(statusBox, ox + 0, oy + 2, c);
+		statusPixel(statusBox, ox + 2, oy + 2, c);
+		statusPixel(statusBox, ox + 1, oy + 3, c);
+	};
+
+	if(status == Status::Sent){
+		// Single tick - draw left-aligned in the 7x5 box. The right
+		// 2 px column is empty padding so a Sent and Delivered icon
+		// share the same right edge for clean stacking.
+		drawTick(0, 1, dimC);
+		return;
+	}
+
+	if(status == Status::Delivered){
+		// Double tick - second tick shifted +2 px so the two V's
+		// overlap by 3 columns (col 2..4 of the first tick are also
+		// col 0..2 of the second). Total width = 7 px, exactly the
+		// status-box width.
+		drawTick(0, 1, goodC);
+		drawTick(2, 1, goodC);
+		return;
+	}
+}
+
 // ----- internal layout -----------------------------------------------------
 
 void PhoneChatBubble::relayout(){
@@ -205,27 +340,64 @@ void PhoneChatBubble::relayout(){
 	}
 
 	// Total occupied height = bubble + (tail if shown) + (timestamp gap +
-	// timestamp height if shown). Set explicitly so a flex-column parent
-	// stacks our row at exactly the right height.
+	// max(timestamp, status) line if either is shown). Set explicitly so
+	// a flex-column parent stacks our row at exactly the right height.
 	lv_coord_t totalH = bubbleH;
 	if(showTail) totalH += TailHeight;
 
-	if(hasTimestamp){
-		// Re-measure timestamp width so we can right-align it for Sent.
-		lv_obj_update_layout(timestampLabel);
-		const lv_coord_t tsW = lv_obj_get_width(timestampLabel);
-		const lv_coord_t tsH = lv_obj_get_height(timestampLabel);
-		const lv_coord_t tsY = totalH + TimestampGap;
+	const bool showStatus = (variant == Variant::Sent)
+							&& (status != Status::None);
 
+	// Pre-measure the bottom-line components so we can right-align the
+	// timestamp + status pair with a single shared baseline (matters
+	// when one is taller than the other - the timestamp label uses
+	// pixelbasic7 which is 7 px tall while the statusBox is 5 px).
+	lv_coord_t tsW = 0;
+	lv_coord_t tsH = 0;
+	if(hasTimestamp){
+		lv_obj_update_layout(timestampLabel);
+		tsW = lv_obj_get_width(timestampLabel);
+		tsH = lv_obj_get_height(timestampLabel);
+	}
+	const lv_coord_t stW = showStatus ? StatusBoxW : 0;
+	const lv_coord_t stH = showStatus ? StatusBoxH : 0;
+
+	const lv_coord_t lineY = totalH + TimestampGap;
+	const lv_coord_t lineH = (tsH > stH) ? tsH : stH;
+
+	if(hasTimestamp){
+		// Sent: status icon sits to the RIGHT of the timestamp, both
+		//       anchored to the bubble's right edge (matches the
+		//       "12:34 ✓✓" reading order most retro phones used).
+		// Received: timestamp left-aligned to the bubble's left edge;
+		//           no status icon is ever shown for Received variants.
 		lv_coord_t tsX;
+		const lv_coord_t tsY = lineY + (lineH - tsH);
+
 		if(sent){
-			tsX = bubbleX + bubbleW - tsW;
+			lv_coord_t rightEdge = bubbleX + bubbleW;
+			if(showStatus) rightEdge -= stW + StatusGap;
+			tsX = rightEdge - tsW;
 			if(tsX < SideMargin) tsX = SideMargin;
 		}else{
 			tsX = bubbleX;
 		}
 		lv_obj_set_pos(timestampLabel, tsX, tsY);
-		totalH = tsY + tsH;
+	}
+
+	if(showStatus){
+		// Anchor the status box's right edge to the bubble's right
+		// edge so the indicator hugs the same screen-edge column the
+		// bubble does. When a timestamp is shown it appears to the
+		// status box's left (handled above).
+		lv_coord_t stX = (bubbleX + bubbleW) - stW;
+		if(stX < SideMargin) stX = SideMargin;
+		const lv_coord_t stY = lineY + (lineH - stH);
+		lv_obj_set_pos(statusBox, stX, stY);
+	}
+
+	if(hasTimestamp || showStatus){
+		totalH = lineY + lineH;
 	}
 
 	lv_obj_set_height(obj, totalH);
