@@ -16,12 +16,13 @@
  *      .                .                  .          <- twinkling stars
  *           ___                                          (purple -> magenta
  *          (   )                                          -> orange sky)
- *         (_____)                                       <- sun (with three
- *      ====== H O R I Z O N ======                          dark scan lines)
- *       \    \   |   /    /                            <- vanishing-point
- *        \    \  |  /    /                                perspective rays
- *      ----------+----------                            <- ground horizontals
- *      ------------+----------
+ *         (_____)                                       <- pulsing sun (with
+ *      ====== H O R I Z O N ======                          three dark scan
+ *       \    \   |   /    /                                 lines + soft halo)
+ *        \    \  |  /    /                            <- vanishing-point
+ *      ----------+----------                                perspective rays
+ *      ------------+----------                          <- scrolling ground
+ *      ----------------+----------                         horizontals
  *
  * Implementation notes:
  *  - 100% code-only - no SPIFFS assets, no canvas backing buffers - so it
@@ -45,6 +46,16 @@
  *    organic noise rather than a synchronised pulse. The animations are
  *    owned by the star objects, so when this widget is destroyed LVGL
  *    auto-removes them on lv_obj_del - no manual teardown needed.
+ *  - The sun has a soft halo ring (drawn behind the sun in sky's child
+ *    list) whose opacity ping-pongs slowly to give the sun a subtle
+ *    "breathing" pulse, matching real synthwave wallpapers without
+ *    requiring transform/zoom support that some LVGL builds disable.
+ *  - The four ground horizontal lines scroll continuously toward the
+ *    viewer on independent ease-in animations, giving the synthwave
+ *    grid the trademark "racing into the camera" motion. Each line
+ *    fades up from a faint horizon glow to a solid cyan stroke as it
+ *    approaches the bottom of the screen, faking depth without any
+ *    per-pixel work.
  */
 class PhoneSynthwaveBg : public LVObject {
 public:
@@ -59,10 +70,20 @@ public:
 	static constexpr uint8_t  StarCount  = 7;        // twinkle stars in the sky
 	static constexpr uint8_t  ScanCount  = 3;        // dark scan lines across the sun
 
+	// Sun "breath" period (ms). Full ping-pong cycle = 2 * SunPulsePeriod.
+	// Long enough to feel like a calm pulse, short enough to be noticeable.
+	static constexpr uint16_t SunPulsePeriod   = 1800;
+
+	// Time it takes a horizontal grid line to traverse the ground from
+	// the horizon to the bottom of the screen. Smaller = faster scroll.
+	// 4000 ms feels close to the cadence of arcade synthwave scenes.
+	static constexpr uint16_t GridScrollPeriod = 4000;
+
 private:
 	lv_obj_t* sky;          // upper half: sky gradient
 	lv_obj_t* ground;       // lower half: ground gradient
 	lv_obj_t* sun;          // circle clipped to sky bottom
+	lv_obj_t* haloRing;     // soft halo behind the sun (opacity-pulsed)
 
 	lv_obj_t* scanLines[ScanCount];
 	lv_obj_t* hGridLines[HLineCount];
@@ -84,6 +105,13 @@ private:
 	// (matches LVGL's lv_anim_exec_xcb_t signature). Defined in the .cpp
 	// translation unit.
 	static void twinkleExec(void* var, int32_t v);
+
+	// Drives the halo's opacity ping-pong - the visible "sun pulse".
+	static void sunPulseExec(void* var, int32_t v);
+
+	// Drives a single horizontal grid line's y position + opacity ramp
+	// as it scrolls from the horizon toward the viewer.
+	static void gridScrollExec(void* var, int32_t v);
 };
 
 #endif //MAKERPHONE_PHONESYNTHWAVEBG_H

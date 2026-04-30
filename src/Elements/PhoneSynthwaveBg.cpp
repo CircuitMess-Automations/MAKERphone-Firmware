@@ -68,6 +68,43 @@ void PhoneSynthwaveBg::buildSun(){
 	const int16_t  cx = (BgWidth - diameter) / 2;          // center horizontally
 	const int16_t  cy = HorizonY - (diameter / 2);         // half above horizon
 
+	// ---- HALO (created BEFORE the sun so it draws underneath) ----
+	// A soft warm ring that breathes in opacity, giving the sun a subtle
+	// "sun pulse" without touching the sun itself. Sized 12 px wider than
+	// the sun in every direction; the parent sky's bottom edge auto-clips
+	// the lower half just like with the sun.
+	const uint16_t haloDiameter = diameter + 24;
+	const int16_t  hx = (BgWidth - haloDiameter) / 2;
+	const int16_t  hy = HorizonY - (haloDiameter / 2);
+	haloRing = lv_obj_create(sky);
+	lv_obj_remove_style_all(haloRing);
+	lv_obj_clear_flag(haloRing, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(haloRing, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(haloRing, haloDiameter, haloDiameter);
+	lv_obj_set_pos(haloRing, hx, hy);
+	lv_obj_set_style_radius(haloRing, LV_RADIUS_CIRCLE, 0);
+	lv_obj_set_style_bg_color(haloRing, MP_SUN, 0);
+	lv_obj_set_style_bg_opa(haloRing, LV_OPA_30, 0);
+	lv_obj_set_style_border_width(haloRing, 0, 0);
+	lv_obj_set_style_pad_all(haloRing, 0, 0);
+
+	// Phase-3 follow-up to the twinkle stars: animate the halo opacity
+	// in a slow ping-pong. Path is ease_in_out so the brightening and
+	// dimming feel breathy rather than mechanical. The animation is
+	// owned by the halo object, so destroying the wallpaper auto-cleans
+	// it up via lv_obj_del - no explicit teardown needed.
+	lv_anim_t pulse;
+	lv_anim_init(&pulse);
+	lv_anim_set_var(&pulse, haloRing);
+	lv_anim_set_values(&pulse, LV_OPA_10, LV_OPA_50);
+	lv_anim_set_time(&pulse, SunPulsePeriod);
+	lv_anim_set_playback_time(&pulse, SunPulsePeriod);
+	lv_anim_set_path_cb(&pulse, lv_anim_path_ease_in_out);
+	lv_anim_set_repeat_count(&pulse, LV_ANIM_REPEAT_INFINITE);
+	lv_anim_set_exec_cb(&pulse, sunPulseExec);
+	lv_anim_start(&pulse);
+
+	// ---- SUN ----
 	sun = lv_obj_create(sky);
 	lv_obj_remove_style_all(sun);
 	lv_obj_clear_flag(sun, LV_OBJ_FLAG_SCROLLABLE);
@@ -180,32 +217,44 @@ void PhoneSynthwaveBg::buildRays(){
 void PhoneSynthwaveBg::buildHorizontals(){
 	const uint16_t groundH = BgHeight - HorizonY;
 
-	// Horizontal grid lines spaced increasingly tighter near the horizon
-	// to fake perspective compression. Y values are in ground-local coords;
-	// last entry is just above the screen edge so it survives the 1-px row.
-	const int16_t yPositions[HLineCount] = { 10, 22, 36, 52 };
-	// Faint near horizon, brighter as the line approaches the viewer -
-	// matches how a real perspective grid would look in low-light.
-	const lv_opa_t opaLevels[HLineCount] = { LV_OPA_30, LV_OPA_50, LV_OPA_70, LV_OPA_COVER };
-
+	// Phase-3 follow-up to the static grid: every horizontal line now
+	// scrolls continuously from the horizon (y=0) toward the viewer
+	// (y=groundH-1) on its own ease-in animation. Stagger the start times
+	// across the period so HLineCount lines are evenly spaced at any
+	// instant - the field always looks "full" without ever showing two
+	// lines on top of each other.
 	for(uint8_t i = 0; i < HLineCount; i++){
 		lv_obj_t* h = lv_obj_create(ground);
 		lv_obj_remove_style_all(h);
 		lv_obj_clear_flag(h, LV_OBJ_FLAG_SCROLLABLE);
 		lv_obj_add_flag(h, LV_OBJ_FLAG_IGNORE_LAYOUT);
 		lv_obj_set_size(h, BgWidth, 1);
-		lv_obj_set_pos(h, 0, yPositions[i]);
+		// Initial y; the animation immediately overwrites it.
+		lv_obj_set_pos(h, 0, 0);
 		lv_obj_set_style_bg_color(h, MP_GRID, 0);
-		lv_obj_set_style_bg_opa(h, opaLevels[i], 0);
+		// Initial opacity matches the brightness-at-horizon that the
+		// gridScrollExec will set in its first tick.
+		lv_obj_set_style_bg_opa(h, LV_OPA_30, 0);
 		lv_obj_set_style_radius(h, 0, 0);
 		lv_obj_set_style_border_width(h, 0, 0);
-
-		// Sanity clamp so a future tweak to yPositions can not wander off
-		// the ground band.
-		if(yPositions[i] < 0 || yPositions[i] >= (int16_t) groundH){
-			lv_obj_add_flag(h, LV_OBJ_FLAG_HIDDEN);
-		}
 		hGridLines[i] = h;
+
+		// Per-line scroll animation. ease_in fakes perspective: the line
+		// crawls slowly near the horizon (where small screen-space deltas
+		// represent large world-space distance) and accelerates as it
+		// approaches the viewer. Repeat infinite, so the line wraps back
+		// to y=0 at the end of each period.
+		lv_anim_t a;
+		lv_anim_init(&a);
+		lv_anim_set_var(&a, h);
+		lv_anim_set_values(&a, 0, groundH - 1);
+		lv_anim_set_time(&a, GridScrollPeriod);
+		lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
+		lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+		lv_anim_set_exec_cb(&a, gridScrollExec);
+		// Stagger start times so the four lines look evenly spread.
+		lv_anim_set_delay(&a, (GridScrollPeriod / HLineCount) * i);
+		lv_anim_start(&a);
 	}
 }
 
@@ -279,4 +328,31 @@ void PhoneSynthwaveBg::twinkleExec(void* var, int32_t v){
 	// straight onto the star's bg_opa. Using a free static here keeps the
 	// callback ABI-compatible with lv_anim_exec_xcb_t.
 	lv_obj_set_style_bg_opa((lv_obj_t*) var, (lv_opa_t) v, 0);
+}
+
+void PhoneSynthwaveBg::sunPulseExec(void* var, int32_t v){
+	// Halo opacity ping-pong. v is in the [LV_OPA_10, LV_OPA_50] range -
+	// a soft band that reads as "breathing" rather than "blinking" against
+	// the magenta sky behind. ABI-compatible with lv_anim_exec_xcb_t so it
+	// can be passed straight to lv_anim_set_exec_cb.
+	lv_obj_set_style_bg_opa((lv_obj_t*) var, (lv_opa_t) v, 0);
+}
+
+void PhoneSynthwaveBg::gridScrollExec(void* var, int32_t v){
+	// v is in the [0, groundH-1] range. Drive both the line's y position
+	// (so it slides toward the viewer) and its opacity (so it fades in
+	// from the horizon). The opacity ramp keeps the freshly-spawned line
+	// from popping into existence at full brightness right under the
+	// horizon, which would otherwise read as a glitch.
+	const int32_t  groundHm1 = (PhoneSynthwaveBg::BgHeight - PhoneSynthwaveBg::HorizonY) - 1; // 55
+	lv_obj_t* line = (lv_obj_t*) var;
+	lv_obj_set_y(line, (lv_coord_t) v);
+
+	// Map y in [0, groundHm1] to opacity in [0x30, 0xFF]. Linear ramp; the
+	// motion is already non-linear (ease_in path), which gives the field
+	// the perspective compression near the horizon.
+	int32_t opa = 0x30 + (v * (0xFF - 0x30)) / (groundHm1 > 0 ? groundHm1 : 1);
+	if(opa < 0)    opa = 0;
+	if(opa > 0xFF) opa = 0xFF;
+	lv_obj_set_style_bg_opa(line, (lv_opa_t) opa, 0);
 }
