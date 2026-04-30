@@ -28,16 +28,19 @@ jobs:
           arduino-cli config init --overwrite 2>/dev/null || true
           arduino-cli config add board_manager.additional_urls "https://raw.githubusercontent.com/CircuitMess/Arduino-Packages/master/package_circuitmess.com_esp32_index.json" 2>/dev/null || true
           arduino-cli core update-index
-          arduino-cli core install cm:esp32 || echo "Board package may already be installed"
+          # Self-hosted runner: clear any other cm:esp32 versions so arduino-cli
+          # cannot pick a newer one over our pinned 1.7.5 (FQBN has no version qualifier).
+          arduino-cli core uninstall cm:esp32 2>/dev/null || true
+          arduino-cli core install cm:esp32@1.7.5
 
       - name: Install required libraries
         run: |
-          # Install libraries that may not be bundled with the board package
-          arduino-cli lib install "RadioLib" || true
-          # Copy the local Chatter-Library to the Arduino libraries folder
-          ARDUINO_LIBS=$(arduino-cli config dump | grep -A1 "directories:" | grep "data:" | awk '{print $2}' || echo "$HOME/Arduino/libraries")
-          # The Chatter-Library is included locally in the repo under libraries/
-          echo "Using local libraries/ directory for Chatter-Library"
+          # cm:esp32@1.7.5 bundles a patched RadioLib (with publicly accessible
+          # SX126x/LLCC68 internals) under its libraries/ folder, which is what
+          # src/Services/LoRaService.cpp was written against. Do NOT install the
+          # upstream RadioLib here - it would shadow the bundled one and break
+          # the build (newer RadioLib makes those members truly private).
+          echo "Using bundled RadioLib from cm:esp32@1.7.5 + local libraries/ for Chatter-Library"
 
       - name: Compile firmware
         run: |
