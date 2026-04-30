@@ -183,6 +183,14 @@ void PhoneMainMenu::setRightLabel(const char* label) {
 	if(softKeys) softKeys->setRight(label);
 }
 
+void PhoneMainMenu::flashLeftSoftKey() {
+	if(softKeys) softKeys->flashLeft();
+}
+
+void PhoneMainMenu::flashRightSoftKey() {
+	if(softKeys) softKeys->flashRight();
+}
+
 void PhoneMainMenu::buttonPressed(uint i) {
 	// Navigation primitives map directly onto PhoneMenuGrid::moveCursor:
 	//   BTN_LEFT  / BTN_4 -> dx = -1 (also wraps to previous row's last col)
@@ -211,22 +219,25 @@ void PhoneMainMenu::buttonPressed(uint i) {
 			break;
 
 		case BTN_ENTER:
-			// SELECT - dispatch to the host-supplied handler. The handler
-			// reads getSelectedIcon() to decide where to go. If no handler
-			// is wired (S19 default) we silently no-op so the screen is
-			// still navigable for visual / hardware testing.
+			// SELECT - flash the left softkey label (S21) so the user gets
+			// a visible "click" cue; then dispatch to the host-supplied
+			// handler. The handler reads getSelectedIcon() to decide where
+			// to go. If no handler is wired (S19 default) we silently no-op
+			// so the screen is still navigable for visual / hardware testing.
+			if(softKeys) softKeys->flashLeft();
 			if(selectCb) selectCb(this);
 			break;
 
 		case BTN_BACK:
-			// BACK - host override or default `pop()` to return to whoever
-			// pushed us. Same fall-back pattern as PhoneHomeScreen so an
-			// unwired call site (push(new PhoneMainMenu()) without setOnBack)
-			// still does the right thing.
+			// BACK - flash the right softkey (S21), then either run the
+			// host-supplied handler or fall back to a horizontal slide-
+			// right pop so the home<->menu transition mirrors visually
+			// (home->menu slides MOVE_LEFT, menu->home slides MOVE_RIGHT).
+			if(softKeys) softKeys->flashRight();
 			if(backCb){
 				backCb(this);
 			}else{
-				pop();
+				pop(LV_SCR_LOAD_ANIM_MOVE_RIGHT);
 			}
 			break;
 

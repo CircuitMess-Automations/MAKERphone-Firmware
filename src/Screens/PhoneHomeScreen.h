@@ -30,11 +30,10 @@ class PhoneSoftKeyBar;
  *   | <-CALL                          MENU-> | <- PhoneSoftKeyBar
  *   +----------------------------------------+
  *
- * This session (S17) only ships the screen *class*. It is intentionally not
- * routed into the boot flow yet - the existing IntroScreen -> MainMenu ->
- * LockScreen path is preserved untouched. S18 then promotes this screen as
- * the post-LockScreen default behind a build flag, and S19+ wire CALL/MENU
- * to their real destinations (dialer / phone-style main menu).
+ * S17 ships the screen *class*. S18 promotes it to the post-LockScreen
+ * default behind a build flag, S19/S20 wire MENU to PhoneMainMenu, and
+ * S21 layers the home<->menu transition (slide animation + softkey press
+ * flash) on top of the existing wiring.
  *
  * Implementation notes:
  *  - Code-only (no SPIFFS assets) so the data partition stays small.
@@ -50,6 +49,10 @@ class PhoneSoftKeyBar;
  *  - Hooks setOnLeftSoftKey / setOnRightSoftKey are exposed up-front so
  *    a future caller (e.g. main.ino once we wire S18) can route CALL
  *    and MENU without subclassing.
+ *  - S21 adds a press-feedback flash on the corresponding softkey label
+ *    *before* invoking the host's handler. The handler is then free to
+ *    push() with a horizontal slide; the flash and the slide overlap
+ *    visually for a satisfying "click + drill in" feel.
  */
 class PhoneHomeScreen : public LVScreen, private InputListener {
 public:
@@ -72,6 +75,15 @@ public:
 
 	/** Replace the visible label of the right softkey (default "MENU"). */
 	void setRightLabel(const char* label);
+
+	/**
+	 * S21: trigger the press-feedback flash on the left/right softkey.
+	 * Already invoked internally on BTN_LEFT / BTN_RIGHT; exposed publicly
+	 * so the host can also flash from outside (e.g. when programmatically
+	 * simulating a press during a transition).
+	 */
+	void flashLeftSoftKey();
+	void flashRightSoftKey();
 
 private:
 	PhoneSynthwaveBg* wallpaper;

@@ -31,12 +31,8 @@ class PhoneMenuGrid;
  *   | <-SELECT                       BACK->  | <- PhoneSoftKeyBar
  *   +----------------------------------------+
  *
- * This session (S19) ships the screen *class* only - it is intentionally not
- * routed into the boot flow yet. The existing IntroScreen / LockScreen /
- * PhoneHomeScreen / legacy MainMenu path is preserved untouched. S20 then
- * replaces the legacy main-menu push with this screen and wires each icon
- * to its current Chatter equivalent (or a placeholder for apps not yet
- * built - dialer, contacts, music, camera).
+ * S19 ships the screen *class*; S20 routes each icon; S21 layers the
+ * home<->menu transition (horizontal slide, soft-key press flash).
  *
  * Implementation notes:
  *  - Code-only - all visuals come from the existing Phase-A widgets
@@ -58,8 +54,8 @@ class PhoneMenuGrid;
  *    free space at the bottom. We render that here as a single pixelbasic7
  *    label that updates whenever the grid's cursor moves.
  *  - BTN_BACK fires the optional back callback; if no callback is set it
- *    falls back to `pop()` so a screen pushed on top of an existing parent
- *    (e.g. PhoneHomeScreen) still does the right thing without wiring.
+ *    falls back to `pop(LV_SCR_LOAD_ANIM_MOVE_RIGHT)` so the unwound slide
+ *    visually mirrors the home->menu push (S21).
  *  - Constructor takes no parameters - the icon list is hard-coded to the
  *    seven roadmap apps in the order specified by S19. If a future session
  *    needs a configurable list, lift it to a setter; for now the fixed
@@ -99,6 +95,14 @@ public:
 
 	/** Replace the visible label of the right softkey (default "BACK"). */
 	void setRightLabel(const char* label);
+
+	/**
+	 * S21: trigger the press-feedback flash on the left/right softkey.
+	 * Already invoked internally on BTN_ENTER / BTN_BACK; exposed publicly
+	 * so the host can also flash from outside.
+	 */
+	void flashLeftSoftKey();
+	void flashRightSoftKey();
 
 	static constexpr uint8_t IconCount = 7;
 	static constexpr uint8_t GridCols  = 4;

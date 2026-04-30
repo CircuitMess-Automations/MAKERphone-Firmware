@@ -70,13 +70,28 @@ void PhoneHomeScreen::setRightLabel(const char* label) {
 	if(softKeys) softKeys->setRight(label);
 }
 
+void PhoneHomeScreen::flashLeftSoftKey() {
+	if(softKeys) softKeys->flashLeft();
+}
+
+void PhoneHomeScreen::flashRightSoftKey() {
+	if(softKeys) softKeys->flashRight();
+}
+
 void PhoneHomeScreen::buttonPressed(uint i) {
 	switch(i) {
 		case BTN_LEFT:
+			// S21: flash before invoking the host handler so the user
+			// gets a "click" cue even if the handler immediately starts
+			// a screen transition - the old screen lives until the slide
+			// completes (lv_scr_load_anim with auto_del=false), so the
+			// flash is visible during the slide-out.
+			if(softKeys) softKeys->flashLeft();
 			if(leftCb) leftCb(this);
 			break;
 
 		case BTN_RIGHT:
+			if(softKeys) softKeys->flashRight();
 			if(rightCb) rightCb(this);
 			break;
 

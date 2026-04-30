@@ -22,6 +22,12 @@
  * "OK" on a confirmation dialog, etc.); leave it empty for the classic
  * two-label look.
  *
+ * S21 adds press-feedback flashes: flashLeft() / flashRight() briefly
+ * invert the label/arrow color (cyan <-> sunset orange) for ~180 ms,
+ * giving the feature-phone tactile "click" feel when the user taps a
+ * softkey. The reset is driven by a one-shot lv_timer that auto-deletes,
+ * so there is no per-frame work in the common (idle) case.
+ *
  * Implementation notes:
  *  - Code-only (no SPIFFS assets) so it adds zero data partition cost.
  *  - Uses LV_OBJ_FLAG_IGNORE_LAYOUT so it cooperates with parents that
@@ -36,7 +42,7 @@
 class PhoneSoftKeyBar : public LVObject {
 public:
 	PhoneSoftKeyBar(lv_obj_t* parent);
-	virtual ~PhoneSoftKeyBar() = default;
+	virtual ~PhoneSoftKeyBar();
 
 	/** Set the left softkey label (BTN_LEFT). Empty string hides it. */
 	void setLeft(const char* label);
@@ -50,9 +56,24 @@ public:
 	/** Hide the small triangular arrows next to each label. */
 	void setShowArrows(bool show);
 
-	static constexpr uint16_t BarHeight = 10;
-	static constexpr uint16_t ScreenWidth = 160;
+	/**
+	 * S21: briefly invert the left softkey label/arrow color (cyan ->
+	 * sunset orange) for FlashMs milliseconds. Used to give the user a
+	 * visible "click" cue when they press the corresponding hardware
+	 * button. Safe to call repeatedly - re-issuing during an active
+	 * flash simply restarts the timer.
+	 */
+	void flashLeft();
+
+	/** S21: same as flashLeft() but for the right softkey. */
+	void flashRight();
+
+	static constexpr uint16_t BarHeight  = 10;
+	static constexpr uint16_t ScreenWidth  = 160;
 	static constexpr uint16_t ScreenHeight = 128;
+
+	/** Duration of the press-feedback flash, in milliseconds. */
+	static constexpr uint32_t FlashMs = 180;
 
 private:
 	lv_obj_t* leftLabel;
@@ -64,10 +85,21 @@ private:
 
 	bool showArrows = true;
 
+	// Per-side flash timers (one-shot lv_timers). Pointers track the
+	// outstanding timer so a second flashLeft() during a still-active
+	// flash can cancel and reissue without leaving a dangling reset.
+	lv_timer_t* leftFlashTimer  = nullptr;
+	lv_timer_t* rightFlashTimer = nullptr;
+
 	void buildBackground();
 	void buildLabels();
 	void buildArrows();
 	void refreshArrows();
+
+	enum class Side : uint8_t { Left, Right };
+	void flashSide(Side side);
+	void resetSide(Side side);
+	static void flashTimerCb(lv_timer_t* timer);
 };
 
 #endif //MAKERPHONE_PHONESOFTKEYBAR_H

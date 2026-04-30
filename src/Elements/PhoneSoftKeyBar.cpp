@@ -8,12 +8,24 @@
 #define MP_HIGHLIGHT   lv_color_make(122, 232, 255)  // cyan (label text)
 #define MP_TEXT        lv_color_make(255, 220, 180)  // warm cream (center hint)
 
+// Per-flash user-data trampoline. We need to know both *which* bar is
+// flashing (so the timer can clear its own pointer + reset the colors)
+// and *which* side - the lv_timer user_data slot only holds one void*,
+// so a tiny POD on the heap is the cleanest answer. The trampoline is
+// freed inside the timer callback after the reset runs, exactly once.
+struct PhoneSoftKeyFlashCtx {
+	PhoneSoftKeyBar* bar;
+	uint8_t          side;  // 0 = left, 1 = right
+};
+
 PhoneSoftKeyBar::PhoneSoftKeyBar(lv_obj_t* parent) : LVObject(parent){
-	leftLabel   = nullptr;
-	rightLabel  = nullptr;
-	centerLabel = nullptr;
-	leftArrow   = nullptr;
-	rightArrow  = nullptr;
+	leftLabel       = nullptr;
+	rightLabel      = nullptr;
+	centerLabel     = nullptr;
+	leftArrow       = nullptr;
+	rightArrow      = nullptr;
+	leftFlashTimer  = nullptr;
+	rightFlashTimer = nullptr;
 
 	// Anchor to the bottom of the 160x128 display regardless of parent layout.
 	lv_obj_add_flag(obj, LV_OBJ_FLAG_IGNORE_LAYOUT);
@@ -24,6 +36,21 @@ PhoneSoftKeyBar::PhoneSoftKeyBar(lv_obj_t* parent) : LVObject(parent){
 	buildLabels();
 	buildArrows();
 	refreshArrows();
+}
+
+PhoneSoftKeyBar::~PhoneSoftKeyBar(){
+	// Cancel any outstanding flash timer so its callback does not run
+	// after this widget (and its labels) have been destroyed. The
+	// trampoline ctx leaks in that case which is acceptable - this only
+	// happens at screen teardown which itself is rare.
+	if(leftFlashTimer != nullptr){
+		lv_timer_del(leftFlashTimer);
+		leftFlashTimer = nullptr;
+	}
+	if(rightFlashTimer != nullptr){
+		lv_timer_del(rightFlashTimer);
+		rightFlashTimer = nullptr;
+	}
 }
 
 // ----- builders -----
@@ -138,6 +165,82 @@ void PhoneSoftKeyBar::setShowArrows(bool show){
 	if(showArrows == show) return;
 	showArrows = show;
 	refreshArrows();
+}
+
+// ----- S21: press-feedback flashes -----
+
+void PhoneSoftKeyBar::flashLeft(){
+	flashSide(Side::Left);
+}
+
+void PhoneSoftKeyBar::flashRight(){
+	flashSide(Side::Right);
+}
+
+void PhoneSoftKeyBar::flashSide(Side side){
+	lv_obj_t* label = (side == Side::Left)  ? leftLabel  : rightLabel;
+	lv_obj_t* arrow = (side == Side::Left)  ? leftArrow  : rightArrow;
+	lv_timer_t** slot = (side == Side::Left) ? &leftFlashTimer : &rightFlashTimer;
+
+	if(label == nullptr) return;
+
+	// If a previous flash is still in flight on this side, kill it first
+	// so we always end up in the "flashing" visual state for FlashMs more
+	// milliseconds rather than having two timers race to reset.
+	if(*slot != nullptr){
+		lv_timer_del(*slot);
+		*slot = nullptr;
+	}
+
+	// Press visual: label inverts to sunset orange, arrow inverts to cyan.
+	// The reverse of the resting palette - it reads as "this softkey just
+	// fired" without changing the layout one pixel.
+	lv_obj_set_style_text_color(label, MP_ACCENT, 0);
+	if(arrow != nullptr){
+		lv_obj_set_style_bg_color(arrow, MP_HIGHLIGHT, 0);
+	}
+
+	// Heap-allocate the trampoline ctx; freed in flashTimerCb after reset.
+	auto* ctx = new PhoneSoftKeyFlashCtx{ this, (uint8_t)((side == Side::Left) ? 0 : 1) };
+	lv_timer_t* t = lv_timer_create(flashTimerCb, FlashMs, ctx);
+	lv_timer_set_repeat_count(t, 1);
+	*slot = t;
+}
+
+void PhoneSoftKeyBar::resetSide(Side side){
+	lv_obj_t* label = (side == Side::Left)  ? leftLabel  : rightLabel;
+	lv_obj_t* arrow = (side == Side::Left)  ? leftArrow  : rightArrow;
+
+	if(label != nullptr){
+		lv_obj_set_style_text_color(label, MP_HIGHLIGHT, 0);
+	}
+	if(arrow != nullptr){
+		lv_obj_set_style_bg_color(arrow, MP_ACCENT, 0);
+	}
+}
+
+void PhoneSoftKeyBar::flashTimerCb(lv_timer_t* timer){
+	// We own this ctx (allocated in flashSide), so free it whether or not
+	// the bar is still alive. lv_timer_set_repeat_count(t, 1) means LVGL
+	// auto-deletes the timer after this callback returns - we just need
+	// to clear our pointer slot so a follow-up flashSide() does not try
+	// to lv_timer_del() an already-freed timer.
+	auto* ctx = static_cast<PhoneSoftKeyFlashCtx*>(timer->user_data);
+	if(ctx != nullptr){
+		PhoneSoftKeyBar* bar  = ctx->bar;
+		Side             side = (ctx->side == 0) ? Side::Left : Side::Right;
+
+		if(bar != nullptr){
+			bar->resetSide(side);
+			if(side == Side::Left){
+				bar->leftFlashTimer = nullptr;
+			}else{
+				bar->rightFlashTimer = nullptr;
+			}
+		}
+
+		delete ctx;
+	}
 }
 
 // ----- internal -----

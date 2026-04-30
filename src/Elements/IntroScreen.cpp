@@ -115,7 +115,13 @@ static void launchPhoneMainMenu(PhoneHomeScreen* self){
 	menu->setOnSelect(launchPhoneMainMenuIcon);
 	// Leave setOnBack unset so PhoneMainMenu's built-in default (pop()
 	// back to the home screen) is what BACK does - exactly what we want.
-	self->push(menu);
+	//
+	// S21: push the menu with a horizontal slide (new menu enters from
+	// the right, home slides off to the left) for the feature-phone
+	// "drill into menu" feel. PhoneMainMenu's default BTN_BACK then pops
+	// with LV_SCR_LOAD_ANIM_MOVE_RIGHT so the unwound transition is the
+	// visual mirror of this push - a signature SE-style flick.
+	self->push(menu, LV_SCR_LOAD_ANIM_MOVE_LEFT);
 }
 #endif
 

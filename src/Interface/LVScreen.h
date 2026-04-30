@@ -18,8 +18,13 @@ public:
 	void start(bool animate = false, lv_scr_load_anim_t animation = LV_SCR_LOAD_ANIM_MOVE_BOTTOM);
 	void stop();
 
-	void push(LVScreen* other);
-	void pop();
+	// S21: push/pop now accept an optional transition animation. Defaults
+	// preserve the legacy behavior (push slides up from bottom, pop slides
+	// back down to top), so every existing call site keeps working.
+	// PhoneHomeScreen <-> PhoneMainMenu uses MOVE_LEFT / MOVE_RIGHT for
+	// the feature-phone "drill into menu" feel.
+	void push(LVScreen* other, lv_scr_load_anim_t anim = LV_SCR_LOAD_ANIM_MOVE_BOTTOM);
+	void pop(lv_scr_load_anim_t anim = LV_SCR_LOAD_ANIM_MOVE_TOP);
 
 	lv_group_t* getInputGroup();
 

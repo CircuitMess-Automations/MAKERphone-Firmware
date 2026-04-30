@@ -69,19 +69,19 @@ void LVScreen::stop(){
 	onStop();
 }
 
-void LVScreen::push(LVScreen* other){
+void LVScreen::push(LVScreen* other, lv_scr_load_anim_t anim){
 	other->parent = this;
 	stop();
-	other->start(true);
+	other->start(true, anim);
 }
 
-void LVScreen::pop(){
+void LVScreen::pop(lv_scr_load_anim_t anim){
 	if(parent == nullptr) return;
 
 	stop();
 
 	parent->delOnStart.insert(this);
-	parent->start(true, LV_SCR_LOAD_ANIM_MOVE_TOP);
+	parent->start(true, anim);
 }
 
 void LVScreen::setParent(LVScreen* parent){
