@@ -49,7 +49,7 @@ Compose the existing atoms into the first MAKERphone-feeling screens.
 The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simulation.
 
 - [x] **S23** — `PhoneDialerScreen` using `PhoneDialerPad` with a digit-buffer label + "CALL" softkey.
-- [ ] **S24** — `PhoneIncomingCall` screen: caller name, pixel avatar, green Answer / red Hang-up.
+- [x] **S24** — `PhoneIncomingCall` screen: caller name, pixel avatar, green Answer / red Hang-up.
 - [ ] **S25** — `PhoneActiveCall` screen: call timer, caller info, mute button, hang-up.
 - [ ] **S26** — `PhoneCallEnded` screen: 1.5s "Call ended — Xm Ys" overlay, returns to homescreen.
 - [ ] **S27** — `PhoneCallHistory` screen: list of recent calls with type icons (incoming/outgoing/missed).
