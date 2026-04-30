@@ -1,0 +1,236 @@
+#include "PhoneMainMenu.h"
+
+#include <Input/Input.h>
+#include <Pins.hpp>
+#include <vector>
+
+#include "../Elements/PhoneSynthwaveBg.h"
+#include "../Elements/PhoneStatusBar.h"
+#include "../Elements/PhoneSoftKeyBar.h"
+#include "../Elements/PhoneMenuGrid.h"
+#include "../Fonts/font.h"
+
+// MAKERphone retro palette - kept consistent with the other phone widgets so
+// the caption that lives under the grid feels visually part of the same tile
+// system. These are intentionally inlined here (rather than living in a
+// shared header) because every Phone* widget already does the same thing -
+// it is the established pattern in this codebase.
+#define MP_ACCENT      lv_color_make(255, 140, 30)    // sunset orange caption
+#define MP_LABEL_DIM   lv_color_make(170, 140, 200)   // dim purple sub-caption
+
+PhoneMainMenu::PhoneMainMenu()
+		: LVScreen(),
+		  wallpaper(nullptr),
+		  statusBar(nullptr),
+		  softKeys(nullptr),
+		  grid(nullptr),
+		  caption(nullptr){
+
+	// Full-screen container, no scrollbars, no padding - every child below
+	// either uses IGNORE_LAYOUT and pins its own (x, y) on the 160x128
+	// display, or is an LVGL primitive (caption label) that we anchor
+	// manually. Same pattern PhoneHomeScreen uses; keeps the screen body
+	// truly transparent over the synthwave wallpaper.
+	lv_obj_set_size(obj, LV_PCT(100), LV_PCT(100));
+	lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
+	lv_obj_set_style_pad_all(obj, 0, 0);
+
+	// Wallpaper FIRST so it sits at the bottom of LVGL's z-order. The grid,
+	// status bar, soft keys and caption all overlay it without any opacity
+	// gymnastics on the parent. Matches PhoneHomeScreen exactly.
+	wallpaper = new PhoneSynthwaveBg(obj);
+
+	// Top: signal | clock | battery (10 px tall).
+	statusBar = new PhoneStatusBar(obj);
+
+	// Centerpiece grid (built BEFORE the caption so refreshCaption() can
+	// query the grid's initial cursor when it is wired up).
+	buildGrid();
+
+	// Big focused-app caption that lives between the grid's bottom edge and
+	// the soft-key bar. Updates on every cursor move via the grid's
+	// onSelectionChanged callback wired up in buildGrid().
+	buildCaption();
+	refreshCaption();
+
+	// Bottom: feature-phone soft-keys. SELECT (left) is what the host
+	// (S20) routes per-icon; BACK (right) returns to the parent screen.
+	softKeys = new PhoneSoftKeyBar(obj);
+	softKeys->setLeft("SELECT");
+	softKeys->setRight("BACK");
+}
+
+PhoneMainMenu::~PhoneMainMenu() {
+	// Children (wallpaper, statusBar, grid, softKeys, caption) are all
+	// parented to obj - LVGL frees them recursively when the screen's
+	// obj is destroyed by the LVScreen base destructor. Nothing manual.
+}
+
+void PhoneMainMenu::onStart() {
+	Input::getInstance()->addListener(this);
+}
+
+void PhoneMainMenu::onStop() {
+	Input::getInstance()->removeListener(this);
+}
+
+void PhoneMainMenu::buildGrid() {
+	// Hard-coded S19 layout: the seven roadmap apps in the documented order.
+	// Captions are short (max 6 chars) so they fit cleanly in a 36 px tile
+	// at pixelbasic7. Mail icon is intentionally not used here - that lives
+	// inside the messaging app and would duplicate Messages on the menu.
+	const std::vector<PhoneMenuGrid::Entry> entries = {
+		{ PhoneIconTile::Icon::Phone,    "PHONE"   },
+		{ PhoneIconTile::Icon::Messages, "MSGS"    },
+		{ PhoneIconTile::Icon::Contacts, "CONT"    },
+		{ PhoneIconTile::Icon::Music,    "MUSIC"   },
+		{ PhoneIconTile::Icon::Camera,   "CAM"     },
+		{ PhoneIconTile::Icon::Games,    "GAMES"   },
+		{ PhoneIconTile::Icon::Settings, "SETT"    },
+	};
+
+	grid = new PhoneMenuGrid(obj, entries, GridCols);
+
+	// PhoneMenuGrid auto-sizes its container to (4 * 36 + 3 * 2 + 2 * 1) =
+	// 152 px wide and (rows * 36 + (rows - 1) * 2 + 2 * 1) = 76 px tall for
+	// the 4x2 layout. We pin it just under the status bar (y = 11) and
+	// horizontally center it: (160 - 152) / 2 = 4 px from the left edge.
+	// Hard-coding the offsets keeps the screen layout deterministic across
+	// LVGL flex re-flows (the grid uses IGNORE_LAYOUT, see PhoneMenuGrid.h).
+	const lv_coord_t gridX = (160 - 152) / 2;
+	const lv_coord_t gridY = 11;
+	lv_obj_set_pos(grid->getLvObj(), gridX, gridY);
+
+	// Wire the cursor-change callback so the big focused-app caption under
+	// the grid stays in sync with the highlighted tile. The lambda captures
+	// `this` so it can call refreshCaption(); std::function is what
+	// PhoneMenuGrid::SelectionChangedCb already expects.
+	grid->setOnSelectionChanged([this](uint8_t /*prev*/, uint8_t /*curr*/){
+		this->refreshCaption();
+	});
+}
+
+void PhoneMainMenu::buildCaption() {
+	// One pixelbasic7 label centered horizontally between the grid's bottom
+	// edge (y = 11 + 76 = 87) and the soft-key bar (y = 118). That leaves
+	// a 31 px tall band; the label sits in the middle (y = 100, baseline
+	// approx). The caption is sunset orange so it pops over the synthwave
+	// background without competing with the cyan clock above it.
+	caption = lv_label_create(obj);
+	lv_obj_set_style_text_font(caption, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(caption, MP_ACCENT, 0);
+	lv_label_set_text(caption, "");
+	lv_obj_set_align(caption, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(caption, 100);
+
+	// Make sure the caption draws on top of the grid (LVGL z-order is
+	// child-creation order; we built the grid first so the caption is
+	// already above it, but explicitly moving it foreground future-proofs
+	// this against a later re-ordering of the constructor).
+	lv_obj_move_foreground(caption);
+}
+
+void PhoneMainMenu::refreshCaption() {
+	if(caption == nullptr) return;
+	if(grid == nullptr){
+		lv_label_set_text(caption, "");
+		return;
+	}
+	lv_label_set_text(caption, iconName(grid->getSelectedIcon()));
+}
+
+const char* PhoneMainMenu::iconName(PhoneIconTile::Icon icon) {
+	// Pretty, full-width app names rendered in the focus caption. Kept in
+	// uppercase to match the feature-phone aesthetic (the soft-key labels
+	// are uppercase too). Note: these are *bigger* than the per-tile labels
+	// because the user just navigated here and wants quick confirmation.
+	switch(icon){
+		case PhoneIconTile::Icon::Phone:    return "PHONE";
+		case PhoneIconTile::Icon::Messages: return "MESSAGES";
+		case PhoneIconTile::Icon::Contacts: return "CONTACTS";
+		case PhoneIconTile::Icon::Music:    return "MUSIC";
+		case PhoneIconTile::Icon::Camera:   return "CAMERA";
+		case PhoneIconTile::Icon::Games:    return "GAMES";
+		case PhoneIconTile::Icon::Settings: return "SETTINGS";
+		case PhoneIconTile::Icon::Mail:     return "MAIL";
+	}
+	return "";
+}
+
+void PhoneMainMenu::setOnSelect(SoftKeyHandler cb) {
+	selectCb = cb;
+}
+
+void PhoneMainMenu::setOnBack(SoftKeyHandler cb) {
+	backCb = cb;
+}
+
+PhoneIconTile::Icon PhoneMainMenu::getSelectedIcon() const {
+	if(grid == nullptr) return PhoneIconTile::Icon::Phone;
+	return grid->getSelectedIcon();
+}
+
+uint8_t PhoneMainMenu::getSelectedIndex() const {
+	if(grid == nullptr) return 0;
+	return grid->getCursor();
+}
+
+void PhoneMainMenu::setLeftLabel(const char* label) {
+	if(softKeys) softKeys->setLeft(label);
+}
+
+void PhoneMainMenu::setRightLabel(const char* label) {
+	if(softKeys) softKeys->setRight(label);
+}
+
+void PhoneMainMenu::buttonPressed(uint i) {
+	// Navigation primitives map directly onto PhoneMenuGrid::moveCursor:
+	//   BTN_LEFT  / BTN_4 -> dx = -1 (also wraps to previous row's last col)
+	//   BTN_RIGHT / BTN_6 -> dx = +1
+	//   BTN_2 (north)     -> dy = -1
+	//   BTN_8 (south)     -> dy = +1
+	// We accept both the dedicated direction buttons and their numpad
+	// equivalents so the user can drive the menu with either hand position.
+	switch(i) {
+		case BTN_LEFT:
+		case BTN_4:
+			if(grid) grid->moveCursor(-1, 0);
+			break;
+
+		case BTN_RIGHT:
+		case BTN_6:
+			if(grid) grid->moveCursor(+1, 0);
+			break;
+
+		case BTN_2:
+			if(grid) grid->moveCursor(0, -1);
+			break;
+
+		case BTN_8:
+			if(grid) grid->moveCursor(0, +1);
+			break;
+
+		case BTN_ENTER:
+			// SELECT - dispatch to the host-supplied handler. The handler
+			// reads getSelectedIcon() to decide where to go. If no handler
+			// is wired (S19 default) we silently no-op so the screen is
+			// still navigable for visual / hardware testing.
+			if(selectCb) selectCb(this);
+			break;
+
+		case BTN_BACK:
+			// BACK - host override or default `pop()` to return to whoever
+			// pushed us. Same fall-back pattern as PhoneHomeScreen so an
+			// unwired call site (push(new PhoneMainMenu()) without setOnBack)
+			// still does the right thing.
+			if(backCb){
+				backCb(this);
+			}else{
+				pop();
+			}
+			break;
+
+		default:
+			break;
+	}
+}
