@@ -1,5 +1,6 @@
 #include "IntroScreen.h"
 #include "../Screens/MainMenu.h"
+#include "../Screens/LockScreen.h"
 
 IntroScreen::IntroScreen(void (* callback)()) : callback(callback){
 	gif = lv_gif_create(obj);
@@ -14,8 +15,14 @@ IntroScreen::IntroScreen(void (* callback)()) : callback(callback){
 		volatile auto temp  = intro->callback;
 		lv_obj_del(intro->getLvObj());
 
+		// Boot into the MAKERphone LockScreen first so the synthwave
+		// wallpaper + retro clock + status/softkey bars appear on power-on.
+		// LockScreen.activate() keeps `menu` as its parent and resumes it
+		// (with a slide-up animation) once the user unlocks - so the rest
+		// of the firmware (messaging, friends, games, settings) is reached
+		// exactly as before, just one slide-to-unlock gesture later.
 		MainMenu* menu = new MainMenu();
-		menu->start();
+		LockScreen::activate(menu);
 		if(temp != nullptr) temp();
 	}, LV_EVENT_READY, this);
 }
