@@ -86,6 +86,14 @@ public:
 	Variant getVariant() const { return variant; }
 	bool    hasTail()    const { return showTail; }
 
+	/**
+	 * Inner LVGL object that draws the rounded bubble fill. Exposed so
+	 * a screen-level wrapper (e.g. ConvoScreen's per-message focus
+	 * highlight) can attach extra styles or state flags directly to the
+	 * bubble without needing to know its construction internals.
+	 */
+	lv_obj_t* getBubbleObj() const { return bubble; }
+
 	// 160 px display - leave 40 px of slack so the bubble never touches the
 	// opposite side and the tail/timestamp have room to breathe.
 	static constexpr uint16_t MaxBubbleWidth = 120;
