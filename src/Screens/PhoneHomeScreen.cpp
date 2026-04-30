@@ -38,6 +38,14 @@ PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
 	softKeys = new PhoneSoftKeyBar(obj);
 	softKeys->setLeft("CALL");
 	softKeys->setRight("MENU");
+
+	// S22: enable long-press detection on BTN_0 (homescreen quick-dial)
+	// and BTN_BACK (homescreen lock). 600 ms is the sweet spot used by
+	// classic feature-phones - long enough to be intentional, short
+	// enough not to feel laggy. The hold time is set on the listener
+	// itself, so it follows the listener's lifetime.
+	setButtonHoldTime(BTN_0, 600);
+	setButtonHoldTime(BTN_BACK, 600);
 }
 
 PhoneHomeScreen::~PhoneHomeScreen() {
@@ -60,6 +68,14 @@ void PhoneHomeScreen::setOnLeftSoftKey(SoftKeyHandler cb) {
 
 void PhoneHomeScreen::setOnRightSoftKey(SoftKeyHandler cb) {
 	rightCb = cb;
+}
+
+void PhoneHomeScreen::setOnQuickDial(SoftKeyHandler cb) {
+	quickDialCb = cb;
+}
+
+void PhoneHomeScreen::setOnLockHold(SoftKeyHandler cb) {
+	lockHoldCb = cb;
 }
 
 void PhoneHomeScreen::setLeftLabel(const char* label) {
@@ -95,12 +111,74 @@ void PhoneHomeScreen::buttonPressed(uint i) {
 			if(rightCb) rightCb(this);
 			break;
 
+		case BTN_0:
+			// S22: a *short* press of 0 is reserved for "type the digit 0
+			// into the dialer once the dialer is reachable from here". For
+			// the home screen alone the short press is currently inert -
+			// the long-press is what jumps to quick-dial, and it fires
+			// from buttonHeld() below.
+			zeroLongFired = false;
+			break;
+
 		case BTN_BACK:
-			// If a parent screen pushed us, BTN_BACK returns there. This is
-			// the same pattern other screens use. When PhoneHomeScreen later
-			// becomes the post-LockScreen *default* (S18), back will instead
-			// re-lock; the wiring lives in the call site, not here.
-			pop();
+			// S22 changes BTN_BACK on the homescreen: a *short* press still
+			// pop()s the parent (legacy behaviour - lets a host that pushed
+			// us pop back), and a long-press locks via the lockHoldCb. We
+			// defer the short-press action to buttonReleased so we can
+			// suppress it when a long-press fired.
+			backLongFired = false;
+			break;
+
+		default:
+			break;
+	}
+}
+
+void PhoneHomeScreen::buttonReleased(uint i) {
+	// S22: short-press dispatch lives here so a hold-then-release does not
+	// trigger the short-press action when the long-press already fired.
+	switch(i) {
+		case BTN_BACK:
+			if(!backLongFired){
+				// Same legacy short-press behaviour as before S22 - if a
+				// parent screen pushed us, return there. When PhoneHomeScreen
+				// is the root post-LockScreen (S18 wiring), there is no
+				// parent and pop() is a no-op, which is what we want.
+				pop();
+			}
+			backLongFired = false;
+			break;
+
+		case BTN_0:
+			// Short press of 0 on the homescreen has no current effect; this
+			// just clears the long-fired flag so a future press starts clean.
+			zeroLongFired = false;
+			break;
+
+		default:
+			break;
+	}
+}
+
+void PhoneHomeScreen::buttonHeld(uint i) {
+	// S22: long-press shortcuts.
+	//   - Hold 0    -> quick-dial   (homescreen + main menu, classic SE).
+	//   - Hold Back -> lock device  (homescreen + main menu).
+	// Both gestures flash the corresponding softkey when one exists, so the
+	// user gets the same visual "click" cue used everywhere else on the
+	// phone. The flag set here suppresses the matching buttonReleased so
+	// the short-press path does not double-fire on lift-off.
+	switch(i) {
+		case BTN_0:
+			zeroLongFired = true;
+			if(softKeys) softKeys->flashLeft();
+			if(quickDialCb) quickDialCb(this);
+			break;
+
+		case BTN_BACK:
+			backLongFired = true;
+			if(softKeys) softKeys->flashRight();
+			if(lockHoldCb) lockHoldCb(this);
 			break;
 
 		default:

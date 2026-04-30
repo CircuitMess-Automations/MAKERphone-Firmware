@@ -70,6 +70,24 @@ public:
 	/** Bind a callback to BTN_RIGHT (the "MENU" softkey). nullptr clears. */
 	void setOnRightSoftKey(SoftKeyHandler cb);
 
+	/**
+	 * S22: Bind a callback to a long-press of BTN_0. The classic Sony-
+	 * Ericsson "hold 0" shortcut on the homescreen jumps straight into
+	 * the dialer with the user's quick-dial number pre-loaded. The
+	 * dialer itself ships in S23 - until then the host wires this hook
+	 * to a stub so the gesture is observable. nullptr clears.
+	 */
+	void setOnQuickDial(SoftKeyHandler cb);
+
+	/**
+	 * S22: Bind a callback to a long-press of BTN_BACK. The classic
+	 * "hold Back to lock" gesture. Default (when nullptr) is to do
+	 * nothing - the host wires this to LockScreen::activate(this) so
+	 * the lock action lives next to the rest of the screen-routing
+	 * logic in IntroScreen.cpp.
+	 */
+	void setOnLockHold(SoftKeyHandler cb);
+
 	/** Replace the visible label of the left softkey (default "CALL"). */
 	void setLeftLabel(const char* label);
 
@@ -91,10 +109,21 @@ private:
 	PhoneClockFace*   clockFace;
 	PhoneSoftKeyBar*  softKeys;
 
-	SoftKeyHandler leftCb  = nullptr;
-	SoftKeyHandler rightCb = nullptr;
+	SoftKeyHandler leftCb       = nullptr;
+	SoftKeyHandler rightCb      = nullptr;
+	SoftKeyHandler quickDialCb  = nullptr;
+	SoftKeyHandler lockHoldCb   = nullptr;
+
+	// S22: track when a hold-fired action has already run for the
+	// current press, so the matching short-press handler doesn't ALSO
+	// fire on release. We simply suppress the next buttonReleased for
+	// the same key after a long-press shortcut triggered.
+	bool zeroLongFired = false;
+	bool backLongFired = false;
 
 	void buttonPressed(uint i) override;
+	void buttonReleased(uint i) override;
+	void buttonHeld(uint i) override;
 };
 
 #endif //MAKERPHONE_PHONEHOMESCREEN_H

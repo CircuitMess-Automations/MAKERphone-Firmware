@@ -43,7 +43,7 @@ Compose the existing atoms into the first MAKERphone-feeling screens.
 - [x] **S19** — `PhoneMainMenu` screen built on `PhoneMenuGrid`: 7 icons (Phone, Messages, Contacts, Music, Camera, Games, Settings).
 - [x] **S20** — Wire `PhoneMainMenu` as the new menu (replaces the vertical carousel). Each icon launches its current Chatter equivalent or a `not-yet-built` placeholder.
 - [x] **S21** — Homescreen ↔ Main-menu transition (ease-in slide + soft-key feedback).
-- [ ] **S22** — Long-press "0" on homescreen → quick-dial; long-press "Back" → lock. Same on main-menu.
+- [x] **S22** — Long-press "0" on homescreen → quick-dial; long-press "Back" → lock. Same on main-menu.
 
 ## Phase D — Phone / Calls (S23–S28)
 The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simulation.

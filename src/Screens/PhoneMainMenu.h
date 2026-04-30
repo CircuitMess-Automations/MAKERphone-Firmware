@@ -84,6 +84,24 @@ public:
 	 */
 	void setOnBack(SoftKeyHandler cb);
 
+	/**
+	 * S22: Bind a callback to a long-press of BTN_0 from anywhere on the
+	 * main menu (the same Sony-Ericsson "hold 0" quick-dial gesture wired
+	 * on PhoneHomeScreen). Pass nullptr to clear; with no callback the
+	 * gesture is silently ignored and BTN_0 short-press still does its
+	 * normal thing (currently a no-op on this screen).
+	 */
+	void setOnQuickDial(SoftKeyHandler cb);
+
+	/**
+	 * S22: Bind a callback to a long-press of BTN_BACK from anywhere on
+	 * the main menu (mirrors the home-screen lock gesture). Default
+	 * (when nullptr) is to fall back to the screen's normal short-press
+	 * BACK behaviour, which is the same screen as the back-tap target -
+	 * so an unwired lock gesture is harmless.
+	 */
+	void setOnLockHold(SoftKeyHandler cb);
+
 	/** Icon enum of the currently focused tile. Useful for SELECT dispatch. */
 	PhoneIconTile::Icon getSelectedIcon() const;
 
@@ -115,8 +133,15 @@ private:
 
 	lv_obj_t*         caption;   // pixelbasic7 label, big app name under the grid
 
-	SoftKeyHandler selectCb = nullptr;
-	SoftKeyHandler backCb   = nullptr;
+	SoftKeyHandler selectCb     = nullptr;
+	SoftKeyHandler backCb       = nullptr;
+	SoftKeyHandler quickDialCb  = nullptr;
+	SoftKeyHandler lockHoldCb   = nullptr;
+
+	// S22: prevent the short-press action from also firing on release
+	// after a long-press shortcut already triggered.
+	bool zeroLongFired = false;
+	bool backLongFired = false;
 
 	void buildGrid();
 	void buildCaption();
@@ -126,6 +151,8 @@ private:
 	static const char* iconName(PhoneIconTile::Icon icon);
 
 	void buttonPressed(uint i) override;
+	void buttonReleased(uint i) override;
+	void buttonHeld(uint i) override;
 };
 
 #endif //MAKERPHONE_PHONEMAINMENU_H

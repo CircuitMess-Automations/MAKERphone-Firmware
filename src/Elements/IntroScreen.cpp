@@ -101,6 +101,12 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 	}
 }
 
+// S22: forward declarations for the long-press helper handlers defined
+// further down in this file (they need to be visible to launchPhoneMainMenu
+// below, which wires them onto each freshly-built PhoneMainMenu).
+static void launchQuickDialFromMenu(PhoneMainMenu* self);
+static void lockFromMenu(PhoneMainMenu* self);
+
 // Free-function softkey handler (PhoneHomeScreen::SoftKeyHandler is a plain
 // function pointer, not a std::function, so we cannot capture state). When
 // the user taps the right softkey ("MENU") on the home screen we push a
@@ -113,6 +119,10 @@ static void launchPhoneMainMenu(PhoneHomeScreen* self){
 	if(self == nullptr) return;
 	auto* menu = new PhoneMainMenu();
 	menu->setOnSelect(launchPhoneMainMenuIcon);
+	// S22: same long-press shortcuts as the homescreen, so muscle memory
+	// works from anywhere in the top-level UI.
+	menu->setOnQuickDial(launchQuickDialFromMenu);
+	menu->setOnLockHold(lockFromMenu);
 	// Leave setOnBack unset so PhoneMainMenu's built-in default (pop()
 	// back to the home screen) is what BACK does - exactly what we want.
 	//
@@ -122,6 +132,40 @@ static void launchPhoneMainMenu(PhoneHomeScreen* self){
 	// with LV_SCR_LOAD_ANIM_MOVE_RIGHT so the unwound transition is the
 	// visual mirror of this push - a signature SE-style flick.
 	self->push(menu, LV_SCR_LOAD_ANIM_MOVE_LEFT);
+}
+
+// S22: long-press shortcut handlers shared by PhoneHomeScreen and
+// PhoneMainMenu. Both screens emit a hold-0 / hold-Back gesture through
+// their own callback hooks; the host wires both screens to the same
+// free functions below so the behaviour is identical from either entry.
+
+// "Hold 0 to quick-dial" - lands in the dialer with the user's quick-
+// dial number pre-loaded. The dialer ships in S23, so for now we push a
+// PhoneAppStubScreen labelled "QUICK DIAL" so the gesture is visibly
+// wired and back-able. Once S23 lands, this single helper is the place
+// to swap the stub for the real PhoneDialerScreen.
+static void launchQuickDialFromHome(PhoneHomeScreen* self){
+	if(self == nullptr) return;
+	auto* stub = new PhoneAppStubScreen("QUICK DIAL");
+	self->push(stub);
+}
+static void launchQuickDialFromMenu(PhoneMainMenu* self){
+	if(self == nullptr) return;
+	auto* stub = new PhoneAppStubScreen("QUICK DIAL");
+	self->push(stub);
+}
+
+// "Hold Back to lock" - drop into the LockScreen. LockScreen::activate
+// stops the current screen and resumes it on unlock, so the user lands
+// back exactly where they were holding from. Same call-pattern that
+// MainMenu (legacy) and SleepService already use.
+static void lockFromHome(PhoneHomeScreen* self){
+	if(self == nullptr) return;
+	LockScreen::activate(self);
+}
+static void lockFromMenu(PhoneMainMenu* self){
+	if(self == nullptr) return;
+	LockScreen::activate(self);
 }
 #endif
 
@@ -148,6 +192,9 @@ IntroScreen::IntroScreen(void (* callback)()) : callback(callback){
 		// or to PhoneAppStubScreen for apps not yet built.
 		auto* home = new PhoneHomeScreen();
 		home->setOnRightSoftKey(launchPhoneMainMenu);
+		// S22: long-press shortcuts on the homescreen.
+		home->setOnQuickDial(launchQuickDialFromHome);
+		home->setOnLockHold(lockFromHome);
 		LockScreen::activate(home);
 #else
 		// Legacy boot path - LockScreen resumes directly into MainMenu,

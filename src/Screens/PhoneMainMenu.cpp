@@ -58,6 +58,13 @@ PhoneMainMenu::PhoneMainMenu()
 	softKeys = new PhoneSoftKeyBar(obj);
 	softKeys->setLeft("SELECT");
 	softKeys->setRight("BACK");
+
+	// S22: enable long-press detection on BTN_0 (quick-dial) and BTN_BACK
+	// (lock device). Same 600 ms threshold as PhoneHomeScreen so the
+	// gesture feels identical between the home screen and the main menu -
+	// muscle-memory matters on a feature-phone.
+	setButtonHoldTime(BTN_0, 600);
+	setButtonHoldTime(BTN_BACK, 600);
 }
 
 PhoneMainMenu::~PhoneMainMenu() {
@@ -165,6 +172,14 @@ void PhoneMainMenu::setOnBack(SoftKeyHandler cb) {
 	backCb = cb;
 }
 
+void PhoneMainMenu::setOnQuickDial(SoftKeyHandler cb) {
+	quickDialCb = cb;
+}
+
+void PhoneMainMenu::setOnLockHold(SoftKeyHandler cb) {
+	lockHoldCb = cb;
+}
+
 PhoneIconTile::Icon PhoneMainMenu::getSelectedIcon() const {
 	if(grid == nullptr) return PhoneIconTile::Icon::Phone;
 	return grid->getSelectedIcon();
@@ -228,17 +243,77 @@ void PhoneMainMenu::buttonPressed(uint i) {
 			if(selectCb) selectCb(this);
 			break;
 
+		case BTN_0:
+			// S22: a *short* press of 0 on the menu has no semantic action
+			// today (the menu is grid-navigated, not number-keyed). We
+			// still listen for the press so the long-press detection that
+			// the input service emits later actually fires - InputListener
+			// will only call buttonHeld() for keys whose press was seen.
+			zeroLongFired = false;
+			break;
+
 		case BTN_BACK:
-			// BACK - flash the right softkey (S21), then either run the
-			// host-supplied handler or fall back to a horizontal slide-
-			// right pop so the home<->menu transition mirrors visually
-			// (home->menu slides MOVE_LEFT, menu->home slides MOVE_RIGHT).
+			// S22: defer the actual short-press BACK action to
+			// buttonReleased so it does not double-fire when a long-press
+			// already locked the device. The flash still happens here so
+			// the user sees an immediate "click" cue for any press, even
+			// one that turns into a long-press.
+			backLongFired = false;
 			if(softKeys) softKeys->flashRight();
-			if(backCb){
-				backCb(this);
-			}else{
-				pop(LV_SCR_LOAD_ANIM_MOVE_RIGHT);
+			break;
+
+		default:
+			break;
+	}
+}
+
+void PhoneMainMenu::buttonReleased(uint i) {
+	// S22: short-press dispatch for BTN_BACK so a long-press that already
+	// fired (and locked the device) does not also pop back to the home
+	// screen on key release. BTN_0 short-press is a no-op on this screen
+	// for now, but we still clear the long-fired flag for cleanliness.
+	switch(i){
+		case BTN_BACK:
+			if(!backLongFired){
+				if(backCb){
+					backCb(this);
+				}else{
+					// Default fallback - slide-right pop to mirror the
+					// home->menu push (S21).
+					pop(LV_SCR_LOAD_ANIM_MOVE_RIGHT);
+				}
 			}
+			backLongFired = false;
+			break;
+
+		case BTN_0:
+			zeroLongFired = false;
+			break;
+
+		default:
+			break;
+	}
+}
+
+void PhoneMainMenu::buttonHeld(uint i) {
+	// S22: long-press shortcuts. Same wiring as PhoneHomeScreen so the
+	// gestures feel identical from either screen:
+	//   - Hold 0    -> quick-dial (host-supplied callback).
+	//   - Hold Back -> lock the device (host-supplied callback). The
+	//                  short-press BACK is then suppressed in
+	//                  buttonReleased() via backLongFired.
+	switch(i){
+		case BTN_0:
+			zeroLongFired = true;
+			if(softKeys) softKeys->flashLeft();
+			if(quickDialCb) quickDialCb(this);
+			break;
+
+		case BTN_BACK:
+			backLongFired = true;
+			// Right softkey is already flashed by the press path; we do
+			// not flash again here so we don't double-blink it.
+			if(lockHoldCb) lockHoldCb(this);
 			break;
 
 		default:
