@@ -7,6 +7,7 @@
 #include "../Screens/PhoneHomeScreen.h"
 #include "../Screens/PhoneMainMenu.h"
 #include "../Screens/PhoneAppStubScreen.h"
+#include "../Screens/PhoneDialerScreen.h"
 #include "../Screens/InboxScreen.h"
 #include "../Screens/FriendsScreen.h"
 #include "../Screens/SettingsScreen.h"
@@ -19,11 +20,11 @@
 // std::function, so we cannot capture state - the handler reads the
 // currently-focused icon back off the menu and pushes the appropriate
 // concrete screen. Icons that do not yet have a real implementation
-// (Phone dialer / Music player / Camera) push PhoneAppStubScreen so the
-// user sees the dispatch happen and can BACK out, while the actually
-// implemented Chatter equivalents (Messages -> InboxScreen,
-// Contacts -> FriendsScreen, Games -> GamesScreen, Settings ->
-// SettingsScreen) are reachable today.
+// (Music player / Camera) push PhoneAppStubScreen so the user sees the
+// dispatch happen and can BACK out. The actually-implemented Chatter
+// equivalents (Messages -> InboxScreen, Contacts -> FriendsScreen,
+// Games -> GamesScreen, Settings -> SettingsScreen) are reachable today,
+// and S23 wired the Phone tile through to PhoneDialerScreen as well.
 //
 // Note: we instantiate the concrete legacy screens lazily inside the
 // handler so the resulting binary still links if any of the legacy
@@ -68,9 +69,11 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 			break;
 
 		case PhoneIconTile::Icon::Phone:
-			// Dialer ships in S23 (PhoneDialerScreen). Until then the
-			// stub keeps the dispatch wiring exercised.
-			dest = new PhoneAppStubScreen("PHONE");
+			// S23: real dialer screen replaces the placeholder stub. The
+			// CALL softkey on the dialer is currently inert (the actual
+			// call screens land in S24-S28); BACK on a non-empty buffer
+			// backspaces, BACK on an empty buffer pops back to the menu.
+			dest = new PhoneDialerScreen();
 			break;
 
 		case PhoneIconTile::Icon::Music:
@@ -140,19 +143,28 @@ static void launchPhoneMainMenu(PhoneHomeScreen* self){
 // free functions below so the behaviour is identical from either entry.
 
 // "Hold 0 to quick-dial" - lands in the dialer with the user's quick-
-// dial number pre-loaded. The dialer ships in S23, so for now we push a
-// PhoneAppStubScreen labelled "QUICK DIAL" so the gesture is visibly
-// wired and back-able. Once S23 lands, this single helper is the place
-// to swap the stub for the real PhoneDialerScreen.
+// dial number pre-loaded. S23 swapped the placeholder stub for the real
+// PhoneDialerScreen; the quick-dial-number pre-load itself comes with
+// the contacts work in Phase F (S35-S38) once the user has a way to
+// set "my quick-dial peer". For S23 the gesture just opens an empty
+// dialer ready for input.
 static void launchQuickDialFromHome(PhoneHomeScreen* self){
 	if(self == nullptr) return;
-	auto* stub = new PhoneAppStubScreen("QUICK DIAL");
-	self->push(stub);
+	// S23: the long-press-0 quick-dial gesture (S22) now lands directly
+	// in the real PhoneDialerScreen instead of the placeholder stub. We
+	// do not pre-populate a quick-dial number yet - that comes with the
+	// contacts work in Phase F (S35-S38) which gives the user a real
+	// "set my quick-dial peer" entry to draw from. For now the dialer
+	// just opens with an empty buffer ready for input.
+	auto* dialer = new PhoneDialerScreen();
+	self->push(dialer);
 }
 static void launchQuickDialFromMenu(PhoneMainMenu* self){
 	if(self == nullptr) return;
-	auto* stub = new PhoneAppStubScreen("QUICK DIAL");
-	self->push(stub);
+	// S23: same swap as launchQuickDialFromHome - the gesture from the
+	// main menu now opens the real dialer rather than the stub.
+	auto* dialer = new PhoneDialerScreen();
+	self->push(dialer);
 }
 
 // "Hold Back to lock" - drop into the LockScreen. LockScreen::activate
