@@ -40,8 +40,11 @@
  *    phone widgets) so it cooperates with parents that already use a
  *    flex/grid layout. Constructed first on the host screen so it sits
  *    behind every other widget.
- *  - Twinkle stars are static for now; animation is a deliberate Phase-2.5
- *    follow-up so this initial drop stays small and easy to compile-test.
+ *  - Stars twinkle. Each star runs its own infinite ping-pong opacity
+ *    animation with a per-star period and delay so the field reads as
+ *    organic noise rather than a synchronised pulse. The animations are
+ *    owned by the star objects, so when this widget is destroyed LVGL
+ *    auto-removes them on lv_obj_del - no manual teardown needed.
  */
 class PhoneSynthwaveBg : public LVObject {
 public:
@@ -76,6 +79,11 @@ private:
 	void buildRays();
 	void buildHorizontals();
 	void buildStars();
+
+	// Drives the per-star opacity animation. Free function semantics
+	// (matches LVGL's lv_anim_exec_xcb_t signature). Defined in the .cpp
+	// translation unit.
+	static void twinkleExec(void* var, int32_t v);
 };
 
 #endif //MAKERPHONE_PHONESYNTHWAVEBG_H

@@ -210,18 +210,33 @@ void PhoneSynthwaveBg::buildHorizontals(){
 }
 
 void PhoneSynthwaveBg::buildStars(){
-	// Static "twinkle" stars in the upper half of the sky. Positions are
-	// hand-picked to read well on a 160x72 sky band - clustered toward the
-	// top so they do not compete with the sun's halo.
-	struct Star { int16_t x; int16_t y; uint8_t size; lv_opa_t opa; };
+	// Twinkling stars in the upper half of the sky. Positions are hand-picked
+	// to read well on a 160x72 sky band - clustered toward the top so they do
+	// not compete with the sun's halo.
+	//
+	// Each star carries its own peak opacity, period and delay so the field
+	// reads as organic noise. Periods are intentionally coprime-ish (in the
+	// 0.9 - 2.1 s range) and delays are spread across the full cycle so no
+	// two stars fade in together. The dim end is anchored at LV_OPA_10 for
+	// every star, which keeps even the brightest stars (LV_OPA_COVER) from
+	// flickering all the way to fully solid black - feels more like a real
+	// night-sky shimmer than a square-wave blink.
+	struct Star {
+		int16_t  x;
+		int16_t  y;
+		uint8_t  size;
+		lv_opa_t peak;     // brightest point of the twinkle cycle
+		uint16_t period;   // ms for fade-in (full ping-pong cycle = 2*period)
+		uint16_t delay;    // ms before this star starts animating
+	};
 	static const Star starList[StarCount] = {
-			{  12,  6, 1, LV_OPA_COVER },
-			{  34, 14, 1, LV_OPA_70 },
-			{  58,  4, 2, LV_OPA_COVER },
-			{ 102, 10, 1, LV_OPA_50 },
-			{ 124,  3, 1, LV_OPA_COVER },
-			{ 144, 18, 2, LV_OPA_70 },
-			{  82, 24, 1, LV_OPA_30 },
+			{  12,  6, 1, LV_OPA_COVER, 1100,    0 },
+			{  34, 14, 1, LV_OPA_70,    1700,  400 },
+			{  58,  4, 2, LV_OPA_COVER, 1300,  200 },
+			{ 102, 10, 1, LV_OPA_50,    2100,  800 },
+			{ 124,  3, 1, LV_OPA_COVER,  900, 1000 },
+			{ 144, 18, 2, LV_OPA_70,    1500,  600 },
+			{  82, 24, 1, LV_OPA_30,    1900,  300 },
 	};
 
 	for(uint8_t i = 0; i < StarCount; i++){
@@ -232,9 +247,36 @@ void PhoneSynthwaveBg::buildStars(){
 		lv_obj_set_size(s, starList[i].size, starList[i].size);
 		lv_obj_set_pos(s, starList[i].x, starList[i].y);
 		lv_obj_set_style_bg_color(s, MP_STAR, 0);
-		lv_obj_set_style_bg_opa(s, starList[i].opa, 0);
+		// Initial bg_opa is set to peak so the star is visible during the
+		// pre-animation delay; the anim immediately overwrites it once it
+		// starts running.
+		lv_obj_set_style_bg_opa(s, starList[i].peak, 0);
 		lv_obj_set_style_radius(s, 0, 0);
 		lv_obj_set_style_border_width(s, 0, 0);
 		stars[i] = s;
+
+		// Per-star ping-pong opacity animation (Phase-2.5 follow-up to the
+		// initial PhoneSynthwaveBg drop). LVGL auto-removes the anim when
+		// the star object is deleted, so the widget destructor needs no
+		// extra teardown here.
+		lv_anim_t a;
+		lv_anim_init(&a);
+		lv_anim_set_var(&a, s);
+		lv_anim_set_values(&a, LV_OPA_10, starList[i].peak);
+		lv_anim_set_time(&a, starList[i].period);
+		lv_anim_set_playback_time(&a, starList[i].period);
+		lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
+		lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+		lv_anim_set_exec_cb(&a, twinkleExec);
+		lv_anim_set_delay(&a, starList[i].delay);
+		lv_anim_start(&a);
 	}
+}
+
+void PhoneSynthwaveBg::twinkleExec(void* var, int32_t v){
+	// Cast back to the lv_obj_t* given to lv_anim_set_var. v is the current
+	// interpolated value in the [LV_OPA_10, peak] range, which we map
+	// straight onto the star's bg_opa. Using a free static here keeps the
+	// callback ABI-compatible with lv_anim_exec_xcb_t.
+	lv_obj_set_style_bg_opa((lv_obj_t*) var, (lv_opa_t) v, 0);
 }
