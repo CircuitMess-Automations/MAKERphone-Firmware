@@ -11,6 +11,7 @@
 #include "src/Storage/Storage.h"
 #include "src/Services/LoRaService.h"
 #include "src/Services/MessageService.h"
+#include "src/Services/PhoneCallService.h"
 #include "src/Elements/IntroScreen.h"
 #include "src/Interface/Pics.h"
 #include "src/Services/ProfileService.h"
@@ -125,6 +126,12 @@ void boot(){
 
 	LoRa.begin();
 	Profiles.begin();
+
+	// S28: register the call service with MessageService so a magic
+	// CALL_REQUEST text from a paired peer raises PhoneIncomingCall on
+	// top of the current screen. Must come after Messages.begin() so the
+	// listener subscription is active before LoRa starts delivering.
+	Phone.begin();
 
 	//loadMock(true);
 	//printData();

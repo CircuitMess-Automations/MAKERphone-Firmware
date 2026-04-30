@@ -53,7 +53,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 - [x] **S25** — `PhoneActiveCall` screen: call timer, caller info, mute button, hang-up.
 - [x] **S26** — `PhoneCallEnded` screen: 1.5s "Call ended — Xm Ys" overlay, returns to homescreen.
 - [x] **S27** — `PhoneCallHistory` screen: list of recent calls with type icons (incoming/outgoing/missed).
-- [ ] **S28** — Tie call screens into existing `PairScreen` / `LoRaService`: a paired peer "calling" you triggers `PhoneIncomingCall`.
+- [x] **S28** — Tie call screens into existing `PairScreen` / `LoRaService`: a paired peer "calling" you triggers `PhoneIncomingCall`.
 
 ## Phase E — Messaging Restyle (S29–S34)
 
