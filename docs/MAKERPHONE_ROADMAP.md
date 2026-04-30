@@ -66,7 +66,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 
 ## Phase F — Contacts / Phonebook (S35–S38)
 
-- [ ] **S35** — `PhoneContact` data model + persistence (atop the existing `Friends` model where possible).
+- [x] **S35** — `PhoneContact` data model + persistence (atop the existing `Friends` model where possible).
 - [ ] **S36** — `PhoneContactsScreen` — alphabetical list, A–Z scroll-strip on the right.
 - [ ] **S37** — `PhoneContactDetail` screen — avatar, name, "number" (LoRa peer id), call/message buttons.
 - [ ] **S38** — `PhoneContactEdit` screen — name field (T9), avatar picker (8 generated PixelAvatars).

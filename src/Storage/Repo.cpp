@@ -4,10 +4,12 @@
 #include "../Model/Message.h"
 #include "../Model/Convo.hpp"
 #include "../Model/Friend.hpp"
+#include "../Model/PhoneContact.hpp"
 
 template class Repo<Message>;
 template class Repo<Convo>;
 template class Repo<Friend>;
+template class Repo<PhoneContact>;
 
 template<typename T>
 Repo<T>::Repo(const char* directory, size_t reserve) : directory(directory){

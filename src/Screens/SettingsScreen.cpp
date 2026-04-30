@@ -437,6 +437,7 @@ SettingsScreen::SettingsScreen() : LVScreen(){
 			Storage.Friends.clear();
 			Storage.Convos.clear();
 			Storage.Messages.clear();
+			Storage.PhoneContacts.clear();
 			nvs_flash_erase();
 			Settings.reset();
 			Chatter.fadeOut();

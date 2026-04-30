@@ -6,11 +6,13 @@
 #include "MessageRepo.h"
 #include "ConvoRepo.h"
 #include "../Model/Friend.hpp"
+#include "../Model/PhoneContact.hpp"
 
 struct Repositories {
 	MessageRepo Messages;
 	ConvoRepo Convos;
 	Repo<Friend> Friends;
+	Repo<PhoneContact> PhoneContacts;
 
 	void begin();
 };
