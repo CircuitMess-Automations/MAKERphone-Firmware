@@ -46,6 +46,20 @@ jobs:
           arduino-cli lib uninstall RadioLib 2>/dev/null || true
           echo "Using bundled RadioLib from cm:esp32@1.7.5 + local libraries/ for Chatter-Library"
 
+      - name: Ensure python shim for ESP32 toolchain
+        run: |
+          # The cm:esp32 1.7.5 toolchain invokes bare 'python' (e.g.
+          # gen_esp32part.py and esptool.py wrappers). macOS removed
+          # /usr/bin/python years ago, so we need a python -> python3 shim.
+          if ! command -v python >/dev/null 2>&1; then
+            mkdir -p "$HOME/bin"
+            ln -sf "$(command -v python3)" "$HOME/bin/python"
+          fi
+          # Persist for subsequent steps in this job.
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/bin:$PATH"
+          which python && python --version
+
       - name: Compile firmware
         run: |
           arduino-cli compile \
