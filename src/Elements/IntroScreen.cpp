@@ -11,9 +11,12 @@
 #include "../Screens/InboxScreen.h"
 #include "../Screens/FriendsScreen.h"
 #include "../Screens/PhoneContactsScreen.h"
+#include "../Screens/PhoneContactDetail.h"
+#include "../Screens/ConvoScreen.h"
 #include "../Screens/SettingsScreen.h"
 #include "../Screens/GamesScreen.h"
 #include "../Interface/LVScreen.h"
+#include "../Services/PhoneCallService.h"
 
 // S20: Per-icon dispatch from the new phone-style PhoneMainMenu.
 //
@@ -33,6 +36,42 @@
 // LVScreen and self-deletes on pop(), so leaving the new instance
 // dangling here would leak - push() takes ownership and pop() in the
 // child screen frees it.
+// S37: handlers wiring PhoneContactsScreen -> PhoneContactDetail. The
+// detail screen's CALL action delegates to PhoneCallService::placeCall
+// (the same path PhoneDialerScreen uses to ring a peer); MESSAGE pushes
+// a ConvoScreen for the contact's uid (the InboxScreen already does the
+// same thing when a row is opened, so the muscle memory transfers).
+// Sample / placeholder rows from the S36 fallback list have uid==0 -
+// we no-op the actions on those so the user gets a flash but nothing
+// nonsensical happens.
+static void contactDetailCall(PhoneContactDetail* self){
+	if(self == nullptr) return;
+	const UID_t uid = self->getUid();
+	if(uid == 0) return;
+	Phone.placeCall(uid);
+}
+
+static void contactDetailMessage(PhoneContactDetail* self){
+	if(self == nullptr) return;
+	const UID_t uid = self->getUid();
+	if(uid == 0) return;
+	self->push(new ConvoScreen(uid));
+}
+
+static void launchContactDetail(PhoneContactsScreen* self,
+								const PhoneContactsScreen::Entry& entry){
+	if(self == nullptr) return;
+	auto* detail = new PhoneContactDetail(entry.uid,
+										  entry.name,
+										  entry.avatarSeed,
+										  entry.favorite != 0);
+	detail->setOnCall(contactDetailCall);
+	detail->setOnMessage(contactDetailMessage);
+	// Leave setOnBack unset so the default pop() walks the user back
+	// to the contacts list with the same row still focused.
+	self->push(detail);
+}
+
 static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 	if(self == nullptr) return;
 
@@ -45,16 +84,21 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 			dest = new InboxScreen();
 			break;
 
-		case PhoneIconTile::Icon::Contacts:
+		case PhoneIconTile::Icon::Contacts: {
 			// S36: phone-style contacts screen built on the S35
 			// PhoneContacts data model. Walks Storage.Friends.all()
 			// and renders the paired peers as an alphabetised
 			// phone-book with an A-Z scroll-strip on the right. Falls
 			// back to a representative sample list when no peers are
 			// paired yet, so the screen reads as a real phone-book on
-			// first boot. The detail / open handler is wired by S37.
-			dest = new PhoneContactsScreen();
+			// first boot. S37 now wires the OPEN softkey to push a
+			// PhoneContactDetail screen for the focused row, so the
+			// user lands on the vCard view with CALL / MESSAGE actions.
+			auto* contacts = new PhoneContactsScreen();
+			contacts->setOnOpen(launchContactDetail);
+			dest = contacts;
 			break;
+		}
 
 		case PhoneIconTile::Icon::Games:
 			// Games tile maps directly onto the existing GamesScreen
