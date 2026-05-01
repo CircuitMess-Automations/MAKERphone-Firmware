@@ -8,7 +8,7 @@
 #include "../Elements/PhoneStatusBar.h"
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Fonts/font.h"
-#include "../Services/PhoneRingtoneLibrary.h"
+#include "../Services/PhoneMusicLibrary.h"
 
 // MAKERphone retro palette - inlined per the established pattern in this
 // codebase (see PhoneMainMenu.cpp / PhoneHomeScreen.cpp / PhoneDialerScreen.cpp).
@@ -23,25 +23,19 @@
 #define MP_LABEL_DIM   lv_color_make(170, 140, 200)   // dim purple sub-caption
 
 // ---------------------------------------------------------------------------
-// Default track list - the five S40 ringtone melodies. We hand the screen
-// pointers into the static const Melody storage owned by PhoneRingtoneLibrary,
-// so the array lifetime is the entire firmware lifetime (no GC concerns).
-// S43 will swap this default for a proper 10-tune music library by simply
-// calling setTracks() on the player; nothing else in the screen has to change.
+// Default track list - S43's PhoneMusicLibrary (ten original retro chiptunes).
+// Both S40's PhoneRingtoneLibrary and S43's PhoneMusicLibrary expose pointers
+// into static const Melody storage that lives for the entire firmware
+// lifetime, so we can hand the screen the library's pointer-array directly
+// with no copy + no GC concerns. Hosts that want a different track list can
+// still swap via setTracks() (see PhoneIncomingCall, which uses the ringtone
+// library instead).
 // ---------------------------------------------------------------------------
-static const PhoneRingtoneEngine::Melody* gDefaultTracks[PhoneRingtoneLibrary::Count] = { nullptr };
-
 static const PhoneRingtoneEngine::Melody* const* defaultTracks(){
-	// Lazy init - fill on first call, identical pointers on every subsequent
-	// call. We deliberately avoid touching this at static-init time because
-	// PhoneRingtoneLibrary::byIndex() reads from its own static storage and
-	// the C++ initialisation order between TUs is not guaranteed.
-	if(gDefaultTracks[0] == nullptr){
-		for(uint8_t i = 0; i < PhoneRingtoneLibrary::Count; ++i){
-			gDefaultTracks[i] = &PhoneRingtoneLibrary::byIndex(i);
-		}
-	}
-	return gDefaultTracks;
+	// PhoneMusicLibrary::tracks() is itself lazy/idempotent and not touched
+	// at static-init time, so calling it on first ctor is safe regardless of
+	// translation-unit initialisation order.
+	return PhoneMusicLibrary::tracks();
 }
 
 PhoneMusicPlayer::PhoneMusicPlayer()
@@ -61,7 +55,7 @@ PhoneMusicPlayer::PhoneMusicPlayer()
 		  playGlyph(nullptr),
 		  nextGlyph(nullptr),
 		  tracks(defaultTracks()),
-		  trackCount(PhoneRingtoneLibrary::Count),
+		  trackCount(PhoneMusicLibrary::Count),
 		  trackIndex(0),
 		  playing(false),
 		  trackTotalMs(0),

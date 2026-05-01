@@ -149,9 +149,11 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 
 		case PhoneIconTile::Icon::Music:
 			// S42: real music-player screen replaces the placeholder stub.
-			// PhoneMusicPlayer self-seeds with the five S40 ringtone
-			// melodies so the screen is driveable today; S43 will swap
-			// in the proper 10-tune music library via setTracks().
+			// S43: PhoneMusicPlayer now self-seeds with the proper 10-tune
+			// PhoneMusicLibrary (Neon Drive, Pixel Sunrise, Cyber Dawn,
+			// Crystal Cave, Hyperloop, Starfall, Retro Quest, Moonlit
+			// Drift, Arcade Hero, Sunset Blvd) — non-looping tracks that
+			// auto-advance through the playlist.
 			dest = new PhoneMusicPlayer();
 			break;
 

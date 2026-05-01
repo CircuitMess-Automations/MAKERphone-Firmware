@@ -85,9 +85,9 @@ public:
 	/**
 	 * Replace the playable track list. The screen does not take ownership
 	 * of the array or the melodies - both must outlive the screen. The
-	 * default ctor seeds the list with the five S40 PhoneRingtoneLibrary
-	 * entries, so calling setTracks() is only needed when wiring the
-	 * S43 music library.
+	 * default ctor seeds the list with the 10-tune PhoneMusicLibrary
+	 * (S43), so calling setTracks() is only needed when a host wants a
+	 * different catalogue (e.g. the ringtone library for a preview view).
 	 *
 	 * Passing count == 0 (or tracks == nullptr) puts the player into a
 	 * "no tracks" state where the title shows a dash and the transport

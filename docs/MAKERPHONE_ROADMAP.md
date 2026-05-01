@@ -77,7 +77,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 - [x] **S40** — Five default ringtone melodies (Synthwave, Classic, Beep, Boss, Silent).
 - [x] **S41** — Ringtone playback wired into `PhoneIncomingCall`.
 - [x] **S42** — `PhoneMusicPlayer` screen UI (track name, progress bar, play/pause/skip buttons).
-- [ ] **S43** — Music-player melody library (10 tunes) playable from the player; uses `PhoneRingtoneEngine`.
+- [x] **S43** — Music-player melody library (10 tunes) playable from the player; uses `PhoneRingtoneEngine`.
 
 ## Phase H — Camera (S44–S46)
 
