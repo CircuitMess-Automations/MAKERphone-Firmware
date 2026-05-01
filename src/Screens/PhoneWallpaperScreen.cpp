@@ -87,8 +87,10 @@ PhoneWallpaperScreen::PhoneWallpaperScreen()
 	// Bottom: SAVE on the left, BACK on the right - matches the
 	// Sony-Ericsson convention and the rest of the Phase-J screens.
 	softKeys = new PhoneSoftKeyBar(obj);
-	softKeys->setLeft("SAVE");
-	softKeys->setRight("BACK");
+	// S67 - dirty-aware caption pair: "" / "BACK" while the focused
+	// style still matches the persisted one, "SAVE" / "CANCEL" once
+	// the user has stepped onto a different style.
+	refreshSoftKeys();
 
 	// Initial paint: render the swatch for the persisted style and
 	// the pager labels.
@@ -490,6 +492,13 @@ void PhoneWallpaperScreen::drawStarsSwatch() {
 
 // ----- input + commit --------------------------------------------------
 
+void PhoneWallpaperScreen::refreshSoftKeys() {
+	if(softKeys == nullptr) return;
+	const bool dirty = (cursor != initialStyle);
+	softKeys->set(dirty ? "SAVE"   : "",
+	              dirty ? "CANCEL" : "BACK");
+}
+
 void PhoneWallpaperScreen::stepBy(int8_t delta) {
 	// Wrap around - 4 styles is small enough that cycling reads better
 	// than clamping. Same UX choice PhoneMainMenu's icon cursor uses.
@@ -500,6 +509,7 @@ void PhoneWallpaperScreen::stepBy(int8_t delta) {
 	cursor = static_cast<uint8_t>(next);
 	rebuildSwatch();
 	refreshPager();
+	refreshSoftKeys();
 }
 
 void PhoneWallpaperScreen::saveAndExit() {

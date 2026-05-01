@@ -101,8 +101,12 @@ PhoneCalculator::PhoneCalculator()
 	// standard back-out softkey -- a SHORT press doubles as backspace
 	// on the entry buffer and a LONG press exits the screen.
 	softKeys = new PhoneSoftKeyBar(obj);
-	softKeys->setLeft("OP");
-	softKeys->setRight("BACK");
+	// LEFT softkey is always "OP" (cycles +/-/x/// like BTN_L).
+	// S67 - the RIGHT softkey is dirty-aware: "DEL" while the entry
+	// buffer holds digits (so a short press pops one), "BACK" once
+	// the buffer is empty (so a short press exits cleanly). Driven
+	// from refreshSoftKeys() and primed in the very first paint.
+	softKeys->set("OP", "BACK");
 
 	// Long-press detection on BTN_BACK so a hold clears all (AC) and a
 	// short press is interpreted as backspace. Same 600 ms threshold
@@ -445,6 +449,15 @@ void PhoneCalculator::formatDisplay(double value, char* out, size_t outLen) {
 
 // ---------- repaint -------------------------------------------------------
 
+void PhoneCalculator::refreshSoftKeys() {
+	if(softKeys == nullptr) return;
+	// In an error state the buffer effectively holds no operand the
+	// user can edit - the only way out is clear-all (long BACK) or
+	// exit (long BACK), so the caption settles on "BACK".
+	const bool hasDigits = (!errorState && entryLen > 0);
+	softKeys->set("OP", hasDigits ? "DEL" : "BACK");
+}
+
 void PhoneCalculator::refreshDisplay() {
 	if(errorState) {
 		if(resultLabel)  lv_label_set_text(resultLabel, "ERROR");
@@ -477,6 +490,11 @@ void PhoneCalculator::refreshDisplay() {
 		snprintf(history, sizeof(history), "%s %c", accBuf, pendingOp);
 	}
 	if(historyLabel) lv_label_set_text(historyLabel, history);
+
+	// S67: keep the RIGHT softkey caption (BACK / DEL) in sync with
+	// the entry-buffer state. Costs a single label-text swap when
+	// the dirty boolean flips - cheap and leak-free.
+	refreshSoftKeys();
 }
 
 // ---------- press flash --------------------------------------------------

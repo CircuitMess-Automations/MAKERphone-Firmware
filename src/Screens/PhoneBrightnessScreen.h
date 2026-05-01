@@ -118,6 +118,13 @@ private:
 	void buildHint();
 
 	void refreshSlider();
+
+	/**
+	 * S67: rewrite the L/R softkey captions based on whether the
+	 * current cursor stop differs from the brightness saved at
+	 * screen-open. Pristine: "" / "BACK". Dirty: "SAVE" / "CANCEL".
+	 */
+	void refreshSoftKeys();
 	void applyPreviewBrightness();
 
 	void stepBy(int8_t delta);

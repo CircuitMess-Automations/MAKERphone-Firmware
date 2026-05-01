@@ -101,11 +101,12 @@ PhoneDateTimeScreen::PhoneDateTimeScreen()
 	// Bottom: SAVE on the left, BACK on the right - matches the
 	// Sony-Ericsson convention for option screens (commit / discard).
 	softKeys = new PhoneSoftKeyBar(obj);
-	softKeys->setLeft("SAVE");
-	softKeys->setRight("BACK");
 
-	// Initial paint: render every value label + colour the focused one.
+	// Initial paint: render every value label + colour the focused
+	// one, then prime the S67 dirty-aware soft-key labels (will hide
+	// SAVE / show BACK because the live fields match initialEpoch).
 	refreshDisplay();
+	refreshSoftKeys();
 }
 
 PhoneDateTimeScreen::~PhoneDateTimeScreen() {
@@ -319,6 +320,19 @@ void PhoneDateTimeScreen::clampDayToMonth() {
 	if(day > maxDay)   day = maxDay;
 }
 
+void PhoneDateTimeScreen::refreshSoftKeys() {
+	if(softKeys == nullptr) return;
+	// Compose the current edit fields into an epoch and compare
+	// against the value captured at screen-open. Any drift = dirty.
+	// Seconds are pinned at 0 (matching saveAndExit) so the user
+	// landing back on the entry minute is recognised as pristine.
+	const uint32_t live = PhoneClock::buildEpoch(year, month, day, hour, minute, 0);
+	const uint32_t base = (initialEpoch / 60u) * 60u;
+	const bool dirty = (live != base);
+	softKeys->set(dirty ? "SAVE"   : "",
+	              dirty ? "CANCEL" : "BACK");
+}
+
 void PhoneDateTimeScreen::moveCursorBy(int8_t delta) {
 	if(FieldCount == 0) return;
 	int16_t next = static_cast<int16_t>(cursor) + delta;
@@ -326,6 +340,7 @@ void PhoneDateTimeScreen::moveCursorBy(int8_t delta) {
 	while(next >= static_cast<int16_t>(FieldCount))  next -= FieldCount;
 	cursor = static_cast<uint8_t>(next);
 	refreshDisplay();
+	refreshSoftKeys();
 }
 
 void PhoneDateTimeScreen::adjustValueBy(int8_t delta) {
@@ -377,6 +392,7 @@ void PhoneDateTimeScreen::adjustValueBy(int8_t delta) {
 		}
 	}
 	refreshDisplay();
+	refreshSoftKeys();
 }
 
 void PhoneDateTimeScreen::saveAndExit() {

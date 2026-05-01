@@ -119,6 +119,13 @@ private:
 	void refreshPager();
 
 	void stepBy(int8_t delta);
+
+	/**
+	 * S67: rewrite the L/R softkey captions based on whether the
+	 * focused style differs from the one saved at screen-open.
+	 * Pristine: "" / "BACK". Dirty: "SAVE" / "CANCEL".
+	 */
+	void refreshSoftKeys();
 	void saveAndExit();
 	void cancelAndExit();
 

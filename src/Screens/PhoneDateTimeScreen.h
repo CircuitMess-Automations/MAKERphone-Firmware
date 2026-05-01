@@ -149,6 +149,14 @@ private:
 	/** Repaint every value label + recolor the focused / unfocused pair. */
 	void refreshDisplay();
 
+	/**
+	 * S67: rewrite the L/R softkey captions based on whether the
+	 * five edit fields compose an epoch that differs from the one
+	 * captured at screen-open. Pristine: "" / "BACK". Dirty:
+	 * "SAVE" / "CANCEL".
+	 */
+	void refreshSoftKeys();
+
 	/** Move the cursor by ±1 (wraps through the 5 fields). */
 	void moveCursorBy(int8_t delta);
 

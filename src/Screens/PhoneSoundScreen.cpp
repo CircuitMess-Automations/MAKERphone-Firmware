@@ -111,9 +111,12 @@ PhoneSoundScreen::PhoneSoundScreen()
 	buildHint();
 
 	// Bottom: SAVE / BACK soft-keys, matching PhoneBrightnessScreen.
+	// S67 - the LEFT caption is dirty-aware: "" while the focused row
+	// matches the saved profile, "SAVE" once the user has moved the
+	// cursor onto a different option. RIGHT mirrors that state with
+	// "BACK" / "CANCEL" so the affordance reads correctly at a glance.
 	softKeys = new PhoneSoftKeyBar(obj);
-	softKeys->setLeft("SAVE");
-	softKeys->setRight("BACK");
+	refreshSoftKeys();
 
 	// Initial paint: cursor sits on the saved profile, checkmark dot
 	// lights up on the same row, and we live-preview the audio stack
@@ -240,6 +243,16 @@ void PhoneSoundScreen::buildHint() {
 
 // ----- live updates ----------------------------------------------------
 
+void PhoneSoundScreen::refreshSoftKeys() {
+	if(softKeys == nullptr) return;
+	const bool dirty = (getFocusedProfile() != initialProfile);
+	// LEFT only shows SAVE when there is something to save - the
+	// pristine state hides the slot so the bar reads as a single-
+	// action BACK page (matches PhoneAboutScreen convention).
+	softKeys->set(dirty ? "SAVE"   : "",
+	              dirty ? "CANCEL" : "BACK");
+}
+
 void PhoneSoundScreen::refreshHighlight() {
 	if(highlight == nullptr) return;
 	if(cursor >= ProfileCount) cursor = 0;
@@ -276,6 +289,7 @@ void PhoneSoundScreen::moveCursorBy(int8_t delta) {
 	if(static_cast<uint8_t>(next) == cursor) return;
 	cursor = static_cast<uint8_t>(next);
 	refreshHighlight();
+	refreshSoftKeys();
 	applyPreview(getFocusedProfile());
 }
 

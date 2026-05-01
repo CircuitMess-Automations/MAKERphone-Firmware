@@ -53,6 +53,23 @@ public:
 	/** Set the optional center hint label. Empty string hides it. */
 	void setCenter(const char* label);
 
+	/**
+	 * S67 convenience helper - set both softkey labels in one call.
+	 * Equivalent to setLeft(left) followed by setRight(right). Useful
+	 * for screens that swap their L/R captions together when their
+	 * mode changes (e.g. PhoneNotepad list-vs-edit, PhoneCalculator
+	 * empty-vs-typed-entry, PhoneStopwatch idle-vs-running). Either
+	 * argument may be nullptr or "" to hide that side.
+	 */
+	void set(const char* left, const char* right);
+
+	/**
+	 * S67 convenience helper - set all three labels in one call.
+	 * Equivalent to set(left, right) followed by setCenter(center).
+	 * Useful for transient prompts ("HOLD R" lock hint, "OK" modal).
+	 */
+	void set(const char* left, const char* right, const char* center);
+
 	/** Hide the small triangular arrows next to each label. */
 	void setShowArrows(bool show);
 

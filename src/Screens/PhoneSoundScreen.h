@@ -134,6 +134,14 @@ private:
 	void buildList();
 	void buildHint();
 
+	/**
+	 * S67: rewrite the L/R softkey captions based on whether the
+	 * focused profile differs from the one saved at screen-open.
+	 * Pristine: "" / "BACK". Dirty: "SAVE" / "CANCEL". Lets the
+	 * user see at a glance whether ENTER will commit or no-op.
+	 */
+	void refreshSoftKeys();
+
 	void refreshHighlight();
 	void refreshCheckmarks(Profile saved);
 	void moveCursorBy(int8_t delta);

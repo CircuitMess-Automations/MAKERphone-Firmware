@@ -188,6 +188,16 @@ private:
 	void   showError();             // latch errorState + paint "ERROR"
 
 	void   refreshDisplay();
+
+	/**
+	 * S67: keep the right-softkey caption in sync with the entry
+	 * buffer state. Empty entry / no-op short-press = "BACK". Buffer
+	 * holds digits = "DEL" (a short BACK press will pop one digit).
+	 * Errored / cleared state collapses back to "BACK". Called from
+	 * refreshDisplay() so every state-changing path drives both at
+	 * once - no extra wiring at each call site.
+	 */
+	void   refreshSoftKeys();
 	void   flashCell(int8_t index);
 	void   restoreCellBorder(int8_t index);
 	static void onFlashTimer(lv_timer_t* timer);

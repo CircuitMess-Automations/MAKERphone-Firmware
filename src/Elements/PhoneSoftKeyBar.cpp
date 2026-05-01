@@ -161,6 +161,22 @@ void PhoneSoftKeyBar::setCenter(const char* label){
 	}
 }
 
+// S67: convenience two-arg setter so screens can swap both softkey
+// labels in one call when their mode changes. Empty / nullptr on
+// either side hides that label, matching the single-arg setters.
+void PhoneSoftKeyBar::set(const char* left, const char* right){
+	setLeft(left);
+	setRight(right);
+}
+
+// S67: convenience three-arg setter for screens that also drive the
+// optional center hint (lock-screen "HOLD R", modal "OK", etc).
+void PhoneSoftKeyBar::set(const char* left, const char* right, const char* center){
+	setLeft(left);
+	setRight(right);
+	setCenter(center);
+}
+
 void PhoneSoftKeyBar::setShowArrows(bool show){
 	if(showArrows == show) return;
 	showArrows = show;

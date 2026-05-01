@@ -86,9 +86,11 @@ PhoneBrightnessScreen::PhoneBrightnessScreen()
 
 	// Bottom: SAVE on the left, BACK on the right - matches the
 	// Sony-Ericsson convention for option screens (commit / discard).
+	// S67 - the L caption is dirty-aware ("" until the user moves
+	// the cursor away from the saved stop) and the R caption flips
+	// from "BACK" -> "CANCEL" so the discard action reads correctly.
 	softKeys = new PhoneSoftKeyBar(obj);
-	softKeys->setLeft("SAVE");
-	softKeys->setRight("BACK");
+	refreshSoftKeys();
 
 	// Initial paint: render the cells against the snapped cursor and
 	// drive the LCD so the screen opens visually consistent with both
@@ -210,6 +212,15 @@ void PhoneBrightnessScreen::buildHint() {
 
 // ----- live updates ----------------------------------------------------
 
+void PhoneBrightnessScreen::refreshSoftKeys() {
+	if(softKeys == nullptr) return;
+	const uint8_t initialStop = (static_cast<uint16_t>(initialBrightness) +
+	                             (StepSize / 2)) / StepSize;
+	const bool dirty = (cursor != initialStop);
+	softKeys->set(dirty ? "SAVE"   : "",
+	              dirty ? "CANCEL" : "BACK");
+}
+
 void PhoneBrightnessScreen::refreshSlider() {
 	// Defensive clamp - cursor should never be out of range, but the
 	// step / clamp logic in stepBy() is the only writer so a bug there
@@ -274,6 +285,7 @@ void PhoneBrightnessScreen::stepBy(int8_t delta) {
 	if(static_cast<uint8_t>(next) == cursor) return;
 	cursor = static_cast<uint8_t>(next);
 	refreshSlider();
+	refreshSoftKeys();
 }
 
 void PhoneBrightnessScreen::saveAndExit() {
