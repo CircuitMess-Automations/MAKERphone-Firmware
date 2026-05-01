@@ -55,6 +55,11 @@ const Section kLayout[] = {
 	{ false, "Wallpaper",          "WALLPAPER",   PhoneSettingsScreen::Item::Wallpaper  },
 	{ true,  "SOUND",              nullptr,       PhoneSettingsScreen::Item::Sound      },
 	{ false, "Sound & Vibration",  "SOUND",       PhoneSettingsScreen::Item::Sound      },
+	// S68 - haptic-style nav-key tick toggle. Listed in the SOUND
+	// group because it co-modulates with the sound profile (the tick
+	// only fires while the device is in Mute / Vibrate; in Loud the
+	// existing 25 ms key tones already cover navigation feedback).
+	{ false, "Key clicks",         "KEY CLICKS",  PhoneSettingsScreen::Item::Haptics    },
 	{ true,  "SYSTEM",             nullptr,       PhoneSettingsScreen::Item::DateTime   },
 	{ false, "Date & Time",        "DATE & TIME", PhoneSettingsScreen::Item::DateTime   },
 	{ false, "About",              "ABOUT",       PhoneSettingsScreen::Item::About      },

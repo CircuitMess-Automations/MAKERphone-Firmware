@@ -52,6 +52,20 @@ struct SettingsData {
 	// outside [0..3] are clamped to Synthwave at the wallpaper layer to be
 	// defensive against NVS-resize wipes that read the new byte as garbage.
 	uint8_t wallpaperStyle = 0;
+	// S68 — haptic-style nav-key ticks toggle. When `true` the BuzzerService
+	// emits a very short (~5 ms), very high-pitched click on D-pad / numpad
+	// navigation buttons (LEFT, RIGHT, 2, 4, 6, 8, ENTER, BACK) -- a "you
+	// pressed a key" tactile-style cue, distinct from the full per-button
+	// musical tones that the legacy `sound` flag (Loud profile) drives.
+	// The tick fires only when the legacy `sound` flag is `false`, so the
+	// two layers never double up: in Loud profile the existing 25 ms key
+	// tones cover navigation feedback, and in Mute / Vibrate the optional
+	// keyTicks layer can still give the user a subtle confirmation that a
+	// keypress was registered. Default `false` matches the conservative
+	// MAKERphone factory profile (sound off, no auto-sleep, no auto-shutdown).
+	// Toggle is exposed via PhoneHapticsScreen, reachable from the SOUND
+	// section of PhoneSettingsScreen as the "Key clicks" row.
+	bool keyTicks = false;
 };
 
 class SettingsImpl {

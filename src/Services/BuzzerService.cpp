@@ -64,7 +64,39 @@ void BuzzerService::buttonPressed(uint i){
 	extern bool gameStarted;
 	if(gameStarted) return;
 	if(i == BTN_ENTER && muteEnter) return;
-	if(!Settings.get().sound) return;
+
+	// S68 — subtle haptic-style nav-key tick. When the device is in
+	// Mute / Vibrate (legacy `sound` flag off) but the user has opted
+	// into key-tick haptics, emit a very short, very high-pitched
+	// "click" on navigation buttons. The 4 ms / NOTE_F6 envelope is
+	// deliberately at the low edge of "audible" so it reads as a soft
+	// tactile confirmation rather than a chime. Only navigation keys
+	// trigger it -- the dialer / alpha keys stay silent in Mute so a
+	// long T9 message does not turn into a buzzy stream of clicks.
+	// In Loud profile (`sound` true) the existing 25 ms per-button
+	// musical tones below already give the user feedback, so the tick
+	// layer skips itself to avoid double-firing.
+	if(!Settings.get().sound){
+		if(Settings.get().keyTicks){
+			switch(i){
+				case BTN_LEFT:
+				case BTN_RIGHT:
+				case BTN_2:
+				case BTN_4:
+				case BTN_6:
+				case BTN_8:
+				case BTN_ENTER:
+				case BTN_BACK:
+				case BTN_L:
+				case BTN_R:
+					Piezo.tone(NOTE_F6, 4);
+					break;
+				default:
+					break;
+			}
+		}
+		return;
+	}
 	Piezo.tone(noteMap.at(i), 25);
 }
 

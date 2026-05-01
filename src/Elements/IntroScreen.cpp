@@ -20,6 +20,7 @@
 #include "../Screens/PhoneSettingsScreen.h"
 #include "../Screens/PhoneBrightnessScreen.h"
 #include "../Screens/PhoneSoundScreen.h"
+#include "../Screens/PhoneHapticsScreen.h"
 #include "../Screens/PhoneWallpaperScreen.h"
 #include "../Screens/PhoneDateTimeScreen.h"
 #include "../Screens/PhoneAboutScreen.h"
@@ -184,6 +185,18 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// switch between Mute / Vibrate / Loud, persisting
 						// the choice on SAVE and reverting on BACK.
 						self->push(new PhoneSoundScreen());
+						break;
+					case PhoneSettingsScreen::Item::Haptics:
+						// S68: subtle haptic-style nav-key tick toggle.
+						// PhoneHapticsScreen lets the user opt the Mute /
+						// Vibrate profiles into a very short, very quiet
+						// click on directional / ENTER / BACK presses so
+						// the keypad still feels responsive even when the
+						// global ringer is off. Persists into
+						// Settings.keyTicks; the BuzzerService reads that
+						// flag on every buttonPressed() and emits the tick
+						// only when sound is otherwise off.
+						self->push(new PhoneHapticsScreen());
 						break;
 					case PhoneSettingsScreen::Item::DateTime:
 						// S54: real Date & Time editor replaces the placeholder

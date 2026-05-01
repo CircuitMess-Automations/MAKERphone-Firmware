@@ -78,8 +78,9 @@ public:
 		Brightness = 0,        // S51
 		Wallpaper  = 1,        // S53
 		Sound      = 2,        // S52 (sound + vibration toggles)
-		DateTime   = 3,        // S54
-		About      = 4,        // S55
+		Haptics    = 3,        // S68 (key-click haptic ticks toggle)
+		DateTime   = 4,        // S54
+		About      = 5,        // S55
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);
@@ -129,14 +130,23 @@ public:
 	void flashRightSoftKey();
 
 	/** Number of selectable rows (excludes group headers). */
-	static constexpr uint8_t ItemCount = 5;
+	static constexpr uint8_t ItemCount = 6;
 
 	// --- Geometry, exposed for unit-test friendliness. -----------------
 
-	/** Visible list-area top edge, just below the caption strip. */
-	static constexpr lv_coord_t ListY  = 22;
-	/** Per-row height (selectable rows). */
-	static constexpr lv_coord_t RowH   = 12;
+	/**
+	 * Visible list-area top edge, just below the caption strip. Lifted
+	 * 2 px in S68 (was 22) so the now-6-row list fits cleanly between
+	 * the caption and the soft-key bar without scrolling.
+	 */
+	static constexpr lv_coord_t ListY  = 20;
+	/**
+	 * Per-row height (selectable rows). Trimmed to 11 px in S68 (was
+	 * 12) so 6 rows + 3 headers tile to exactly the 96 px window
+	 * between ListY=20 and the soft-key bar at y=118. pixelbasic7 is
+	 * 7 px tall so the row still has 4 px halo for the highlight rect.
+	 */
+	static constexpr lv_coord_t RowH   = 11;
 	/** Per-header height (group titles). */
 	static constexpr lv_coord_t HdrH   = 10;
 	/** Width of the list container (full screen minus 4 px margins). */

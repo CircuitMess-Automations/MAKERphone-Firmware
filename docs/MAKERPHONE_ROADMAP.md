@@ -120,7 +120,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 
 - [x] **S66** — Generic page-transition animation helper (slide left/right, fade, used everywhere).
 - [x] **S67** — Soft-key labels become context-sensitive everywhere — every screen wires its own L/R captions.
-- [ ] **S68** — Subtle haptic-style buzzer ticks on key navigation (very short, very quiet, toggle in Settings).
+- [x] **S68** — Subtle haptic-style buzzer ticks on key navigation (very short, very quiet, toggle in Settings).
 - [ ] **S69** — Idle dimming + sleep behavior (auto-dim after 30s, sleep after 2min, wake on any key).
 - [ ] **S70** — End-to-end UX QA pass — exercise every screen flow, file a bug list as `KNOWN_ISSUES.md`, fix all critical regressions in the same commit, and write a v1.0 changelog.
 
