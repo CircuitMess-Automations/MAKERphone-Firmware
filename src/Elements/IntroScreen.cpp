@@ -19,6 +19,7 @@
 #include "../Screens/SettingsScreen.h"
 #include "../Screens/PhoneSettingsScreen.h"
 #include "../Screens/PhoneBrightnessScreen.h"
+#include "../Screens/PhoneSoundScreen.h"
 #include "../Screens/GamesScreen.h"
 #include "../Interface/LVScreen.h"
 #include "../Services/PhoneCallService.h"
@@ -160,7 +161,12 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						self->push(new PhoneAppStubScreen("WALLPAPER"));
 						break;
 					case PhoneSettingsScreen::Item::Sound:
-						self->push(new PhoneAppStubScreen("SOUND"));
+						// S52: Sound + Vibration toggles screen replaces the
+						// SOUND placeholder stub. PhoneSoundScreen reads the
+						// persisted profile from Settings and lets the user
+						// switch between Mute / Vibrate / Loud, persisting
+						// the choice on SAVE and reverting on BACK.
+						self->push(new PhoneSoundScreen());
 						break;
 					case PhoneSettingsScreen::Item::DateTime:
 						self->push(new PhoneAppStubScreen("DATE & TIME"));

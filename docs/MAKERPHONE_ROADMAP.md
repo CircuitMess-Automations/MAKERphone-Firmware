@@ -95,7 +95,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 
 - [x] **S50** — Phone-style `PhoneSettingsScreen` — grouped sections with chevrons.
 - [x] **S51** — Brightness slider (controls the existing `setBrightness` API).
-- [ ] **S52** — Sound + vibration toggles (mute / vibrate / loud).
+- [x] **S52** — Sound + vibration toggles (mute / vibrate / loud).
 - [ ] **S53** — Wallpaper picker (Synthwave / Plain / GridOnly / Stars).
 - [ ] **S54** — Date/time settings screen.
 - [ ] **S55** — About screen — device id, firmware version, free heap, uptime, peer count.
