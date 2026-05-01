@@ -103,7 +103,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 ## Phase K — Boot, Power, Battery (S56–S59)
 
 - [x] **S56** — Boot splash with MAKERphone wordmark + sunset (3s, skippable on any key).
-- [ ] **S57** — Power-down animation (CRT shrink + tone).
+- [x] **S57** — Power-down animation (CRT shrink + tone).
 - [ ] **S58** — Battery-low modal (≤15%) with ringtone chirp.
 - [ ] **S59** — Charging animation overlay on lock screen + homescreen.
 
