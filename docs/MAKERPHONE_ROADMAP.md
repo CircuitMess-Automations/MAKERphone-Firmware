@@ -138,7 +138,7 @@ A proper retro-arcade carousel for `PhoneGames`. Each entry is one self-containe
 - [x] **S79** — `PhoneMinesweeper` — keypad-driven, three difficulties.
 - [x] **S80** — `PhoneSlidingPuzzle` — randomized 15-tile puzzle.
 - [x] **S81** — `PhoneTicTacToe` — vs CPU.
-- [ ] **S82** — `PhoneMemoryMatch` — pixel-icon pairs, count-to-clear timer.
+- [x] **S82** — `PhoneMemoryMatch` — pixel-icon pairs, count-to-clear timer.
 - [ ] **S83** — `PhoneSokoban` — engine + 5 hand-built levels.
 - [ ] **S84** — `PhoneSokoban+` (split) — 10 more levels + level-select grid.
 - [ ] **S85** — `PhonePinball` — single-table flippers + bumpers.

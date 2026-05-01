@@ -25,6 +25,7 @@
 #include "PhoneMinesweeper.h"
 #include "PhoneSlidingPuzzle.h"
 #include "PhoneTicTacToe.h"
+#include "PhoneMemoryMatch.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -82,6 +83,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "MINES",    nullptr,                   GameKind::Screen },  // S79
 	{ "SLIDE15",  nullptr,                   GameKind::Screen },  // S80
 	{ "TICTAC",   nullptr,                   GameKind::Screen },  // S81
+	{ "MEMORY",   nullptr,                   GameKind::Screen },  // S82
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -509,6 +511,49 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g,  8, 17, 1, 1, cyan);
 			break;
 		}
+		case 12: { // MEMORY - 3x2 mini-grid of face-down cards + a heart pip
+			// S82: a stylised glance of a memory-match board. Three
+			// face-down cards in the top row + one face-up card showing
+			// a tiny red heart pip + two more face-down cards finish
+			// the grid. The colour split (purple backs vs orange-bordered
+			// face-up) telegraphs "concentration / pairs" at icon scale.
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t cream  = lv_color_make(255, 220, 180);
+			const lv_color_t red    = lv_color_make(240,  90,  90);
+			const lv_color_t orange = lv_color_make(255, 140,  30);
+
+			// Row 1 (face-down): three small cards with cyan dot pips.
+			px(g,  3,  3, 7, 7, MP_DIM);
+			px(g,  6,  6, 1, 1, cyan);
+			px(g, 11,  3, 7, 7, MP_DIM);
+			px(g, 14,  6, 1, 1, cyan);
+			px(g, 19,  3, 7, 7, MP_DIM);
+			px(g, 22,  6, 1, 1, cyan);
+
+			// Row 2: a face-up card (orange border) showing a heart,
+			// then two more face-down cards. Border is faked as four
+			// 1 px lines so we don't pay a real lv_obj border style.
+			px(g,  3, 12, 7, 7, MP_BG_DARK);
+			px(g,  3, 12, 7, 1, orange);
+			px(g,  3, 18, 7, 1, orange);
+			px(g,  3, 12, 1, 7, orange);
+			px(g,  9, 12, 1, 7, orange);
+			px(g,  4, 14, 2, 1, red);
+			px(g,  7, 14, 2, 1, red);
+			px(g,  4, 15, 5, 1, red);
+			px(g,  5, 16, 3, 1, red);
+			px(g,  6, 17, 1, 1, red);
+
+			px(g, 11, 12, 7, 7, MP_DIM);
+			px(g, 14, 15, 1, 1, cyan);
+			px(g, 19, 12, 7, 7, MP_DIM);
+			px(g, 22, 15, 1, 1, cyan);
+
+			// Tiny cream pip floating off the top-right corner so the
+			// "you just made a match" feel reads at icon scale.
+			px(g, 26,  2, 1, 1, cream);
+			break;
+		}
 		default:
 			break;
 	}
@@ -652,6 +697,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 9: push(new PhoneMinesweeper()); break;
 			case 10: push(new PhoneSlidingPuzzle()); break;
 			case 11: push(new PhoneTicTacToe()); break;
+			case 12: push(new PhoneMemoryMatch()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
