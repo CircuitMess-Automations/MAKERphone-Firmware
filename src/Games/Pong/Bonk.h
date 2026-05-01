@@ -15,7 +15,7 @@ namespace Bonk {
 	
 	class Bonk : public Game {
 	public:
-		Bonk(GamesScreen* gamesScreen);
+		Bonk(LVScreen* gamesScreen);
 		virtual ~Bonk();
 		void onStart() override;
 		void onLoop(float dt) override;

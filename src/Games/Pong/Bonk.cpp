@@ -6,7 +6,7 @@
 #include "PauseState.h"
 #include "State.hpp"
 
-Bonk::Bonk::Bonk(GamesScreen* gamesScreen) : Game(gamesScreen, "", {}), canvas(Chatter.getDisplay()->getBaseSprite()){
+Bonk::Bonk::Bonk(LVScreen* gamesScreen) : Game(gamesScreen, "", {}), canvas(Chatter.getDisplay()->getBaseSprite()){
 	state = new TitleState(canvas);
 }
 

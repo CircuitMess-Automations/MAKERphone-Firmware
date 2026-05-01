@@ -24,7 +24,7 @@ namespace Snake
     class Snake : public Game
     {
     public:
-		Snake(GamesScreen* gamesScreen);
+		Snake(LVScreen* gamesScreen);
 		void onStart() override;
 		void onLoop(float) override;
         void onStop() override;

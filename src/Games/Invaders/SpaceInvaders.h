@@ -23,7 +23,7 @@ constexpr int STAR_COLOR = 0xffff;
 
 class SpaceInvaders: public Game {
 public:
-	SpaceInvaders(GamesScreen* gamesScreen);
+	SpaceInvaders(LVScreen* gamesScreen);
 	void onStart() override;
 	void onLoop(float) override;
 	void onStop() override;

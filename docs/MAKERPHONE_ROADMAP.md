@@ -114,7 +114,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 - [x] **S62** — `PhoneTimer` app (count-down with buzzer ringtone on zero).
 - [x] **S63** — `PhoneCalendar` app (month grid, today highlight, day detail).
 - [x] **S64** — `PhoneNotepad` app (T9 entry + saved notes list).
-- [ ] **S65** — Integrate existing Snake / Pong / SpaceInvaders / SpaceRocks behind a phone-style `PhoneGames` grid.
+- [x] **S65** — Integrate existing Snake / Pong / SpaceInvaders / SpaceRocks behind a phone-style `PhoneGames` grid.
 
 ## Phase M — Final Polish & QA (S66–S70)
 

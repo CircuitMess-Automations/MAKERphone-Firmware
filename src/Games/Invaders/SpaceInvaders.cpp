@@ -4,7 +4,7 @@
 
 uint drawTime = 0;
 SpaceInvaders::SpaceInvaders* SpaceInvaders::SpaceInvaders::instance = nullptr;
-SpaceInvaders::SpaceInvaders::SpaceInvaders(GamesScreen* gamesScreen) : Game(gamesScreen, "/", {}), baseSprite(Chatter.getDisplay()->getBaseSprite()){
+SpaceInvaders::SpaceInvaders::SpaceInvaders(LVScreen* gamesScreen) : Game(gamesScreen, "/", {}), baseSprite(Chatter.getDisplay()->getBaseSprite()){
 	buttons = Input::getInstance();
 	instance = this;
 	randomSeed(millis()*micros());

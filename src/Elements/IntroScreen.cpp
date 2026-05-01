@@ -23,7 +23,7 @@
 #include "../Screens/PhoneWallpaperScreen.h"
 #include "../Screens/PhoneDateTimeScreen.h"
 #include "../Screens/PhoneAboutScreen.h"
-#include "../Screens/GamesScreen.h"
+#include "../Screens/PhoneGamesScreen.h"
 #include "../Interface/LVScreen.h"
 #include "../Services/PhoneCallService.h"
 
@@ -132,10 +132,15 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 		}
 
 		case PhoneIconTile::Icon::Games:
-			// Games tile maps directly onto the existing GamesScreen
-			// (Snake / Pong / SpaceInvaders / SpaceRocks). S65 later
-			// replaces this with a phone-style PhoneGames grid.
-			dest = new GamesScreen();
+			// S65: Games tile now routes to the phone-styled
+			// PhoneGamesScreen (2x2 grid of code-only retro game
+			// cards over the synthwave wallpaper) instead of the
+			// legacy ListItem-based GamesScreen. The four games
+			// themselves (Space Rocks / Invaderz / Snake / Bonk)
+			// are launched directly by the new screen using the
+			// same load/splash/start sequence the legacy launcher
+			// already proved out.
+			dest = new PhoneGamesScreen();
 			break;
 
 		case PhoneIconTile::Icon::Settings: {

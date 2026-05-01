@@ -14,7 +14,7 @@ constexpr SpaceRocks::ImageDesc SpaceRocks::asteroidIcons[];
 constexpr std::initializer_list<glm::vec2> SpaceRocks::playerHitbox;
 constexpr glm::vec2 SpaceRocks::startPosition;
 
-SpaceRocks::SpaceRocks(GamesScreen* gamesScreen) : wrapWalls({ .top =  { nullptr, std::make_unique<RectCC>(glm::vec2{ wrapWallsSize.x, 100 }) },
+SpaceRocks::SpaceRocks(LVScreen* gamesScreen) : wrapWalls({ .top =  { nullptr, std::make_unique<RectCC>(glm::vec2{ wrapWallsSize.x, 100 }) },
 								   .bot =  { nullptr, std::make_unique<RectCC>(glm::vec2{ wrapWallsSize.x, 100 }) },
 								   .left =  { nullptr, std::make_unique<RectCC>(glm::vec2{ 100, wrapWallsSize.y }) },
 								   .right =  { nullptr, std::make_unique<RectCC>(glm::vec2{ 100, wrapWallsSize.y }) }

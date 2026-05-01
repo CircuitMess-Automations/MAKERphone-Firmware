@@ -12,7 +12,7 @@
 class SpaceRocks : public Game, private InputListener {
 protected:
 public:
-	SpaceRocks(GamesScreen* gamesScreen);
+	SpaceRocks(LVScreen* gamesScreen);
 
 protected:
 	void onLoad() override;

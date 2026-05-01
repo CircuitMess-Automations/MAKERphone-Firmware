@@ -3,7 +3,7 @@
 #include <Chatter.h>
 
 Snake::Snake *Snake::Snake::instance = nullptr;
-Snake::Snake::Snake(GamesScreen* gamesScreen) : Game(gamesScreen, "", {}), baseSprite(Chatter.getDisplay()->getBaseSprite()), buttons(Input::getInstance())
+Snake::Snake::Snake(LVScreen* gamesScreen) : Game(gamesScreen, "", {}), baseSprite(Chatter.getDisplay()->getBaseSprite()), buttons(Input::getInstance())
 {
 	instance = this;
 	gamestatus = "title";

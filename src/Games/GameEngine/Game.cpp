@@ -3,14 +3,17 @@
 #include <utility>
 #include <Loop/LoopManager.h>
 #include <Chatter.h>
-#include "../../Screens/GamesScreen.h"
 #include "../../InputChatter.h"
 #include "../../FSLVGL.h"
 
 extern bool gameStarted;
 extern Game* startedGame;
 
-Game::Game(GamesScreen* gamesScreen, const char* root, std::vector<ResDescriptor> resources) : resMan(root), resources(std::move(resources)), gamesScreen(gamesScreen),
+// S65: hostScreen is now an `LVScreen*` (was `GamesScreen*`). Any LVScreen
+// can host a Game - the engine just restarts that screen on game pop. The
+// legacy GamesScreen list-view and the new PhoneGamesScreen retro grid are
+// both valid hosts because both inherit LVScreen and both implement start().
+Game::Game(LVScreen* hostScreen, const char* root, std::vector<ResDescriptor> resources) : resMan(root), resources(std::move(resources)), hostScreen(hostScreen),
 loadTask("loadTask", [](Task* t){
 	 auto game = (Game*) t->arg;
 	 game->loadFunc();
@@ -101,10 +104,13 @@ void Game::loop(uint micros){
 	poppedLabel:
 
 	stop();
-	volatile auto games = gamesScreen;
+	// Snapshot the host pointer because `delete this` invalidates it.
+	// `volatile` here just mirrors the original code's defensive style; both
+	// `LVScreen*` and `GamesScreen*` are valid receivers for `start()`.
+	volatile auto host = hostScreen;
 	delete this;
 	FSLVGL::loadCache();
-	games->start();
+	const_cast<LVScreen*>(host)->start();
 }
 
 void Game::onStart(){ }
@@ -121,6 +127,6 @@ void Game::pop(){
 	popped = true;
 }
 
-GamesScreen* Game::getGamesScreen(){
-	return gamesScreen;
+LVScreen* Game::getHostScreen(){
+	return hostScreen;
 }

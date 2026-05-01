@@ -10,12 +10,14 @@
 #include "Collision/CollisionSystem.h"
 #include "Rendering/RenderSystem.h"
 #include "../../Interface/LVScreen.h"
-#include "../../Screens/GamesScreen.h"
 #include <Loop/LoopListener.h>
 #include <Audio/ChirpSystem.h>
 
-class GamesScreen;
-
+// S65 (MAKERphone): the games engine no longer hard-couples to the legacy
+// GamesScreen. Any LVScreen can host a Game now - on game pop, the engine
+// just calls `host->start()` to bring the host screen back. This is what
+// lets the new PhoneGamesScreen serve as a phone-styled launcher without
+// us needing to subclass / fake the legacy list-screen.
 class Game : private LoopListener {
 friend GameSystem;
 public:
@@ -28,10 +30,21 @@ public:
 	void stop();
 	void pop();
 
-	GamesScreen* getGamesScreen();
+	/**
+	 * The screen that pushed us, which the engine `start()`s again when the
+	 * game pops. Either the legacy GamesScreen list view or the new
+	 * PhoneGamesScreen retro grid - the engine does not care.
+	 */
+	LVScreen* getHostScreen();
+
+	// Legacy alias kept so older call sites (and any downstream code that
+	// has not been migrated yet) still compile cleanly. Returns the same
+	// pointer as getHostScreen(); callers that need a true GamesScreen*
+	// will need to dynamic_cast<GamesScreen*>(...) themselves.
+	LVScreen* getGamesScreen() { return getHostScreen(); }
 
 protected:
-	Game(GamesScreen* gamesScreen, const char* root, std::vector<ResDescriptor> resources);
+	Game(LVScreen* hostScreen, const char* root, std::vector<ResDescriptor> resources);
 
 	virtual void onStart();
 	virtual void onStop();
@@ -65,7 +78,11 @@ private:
 	void loop(uint micros) final;
 	void loadFunc();
 
-	GamesScreen* gamesScreen;
+	// Host screen the engine restarts when the game pops. May be either
+	// the legacy GamesScreen list or the new phone-styled PhoneGamesScreen
+	// grid - both are LVScreens, both have a `start()` method, both look
+	// identical from this engine's perspective.
+	LVScreen* hostScreen;
 };
 
 
