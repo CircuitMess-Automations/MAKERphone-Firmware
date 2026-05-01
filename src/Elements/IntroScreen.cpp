@@ -17,6 +17,7 @@
 #include "../Screens/PhoneContactEdit.h"
 #include "../Screens/ConvoScreen.h"
 #include "../Screens/SettingsScreen.h"
+#include "../Screens/PhoneSettingsScreen.h"
 #include "../Screens/GamesScreen.h"
 #include "../Interface/LVScreen.h"
 #include "../Services/PhoneCallService.h"
@@ -133,11 +134,14 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 			break;
 
 		case PhoneIconTile::Icon::Settings:
-			// Settings tile maps onto the existing SettingsScreen.
-			// Phase J (S50-S55) restyles this into a phone-style
-			// PhoneSettingsScreen; for now the legacy screen is what
-			// the icon launches.
-			dest = new SettingsScreen();
+			// S50: phone-style PhoneSettingsScreen replaces the legacy
+			// SettingsScreen as the destination of the Settings tile.
+			// The new screen lists every Phase-J sub-page (Brightness
+			// S51, Wallpaper S53, Sound & Vibration S52, Date & Time
+			// S54, About S55) as a chevron row inside grouped sections;
+			// each row currently drills into a PhoneAppStubScreen
+			// placeholder until S51-S55 ship the real sub-screens.
+			dest = new PhoneSettingsScreen();
 			break;
 
 		case PhoneIconTile::Icon::Phone:
