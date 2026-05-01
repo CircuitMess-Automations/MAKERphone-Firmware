@@ -94,7 +94,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 ## Phase J — Settings (S50–S55)
 
 - [x] **S50** — Phone-style `PhoneSettingsScreen` — grouped sections with chevrons.
-- [ ] **S51** — Brightness slider (controls the existing `setBrightness` API).
+- [x] **S51** — Brightness slider (controls the existing `setBrightness` API).
 - [ ] **S52** — Sound + vibration toggles (mute / vibrate / loud).
 - [ ] **S53** — Wallpaper picker (Synthwave / Plain / GridOnly / Stars).
 - [ ] **S54** — Date/time settings screen.

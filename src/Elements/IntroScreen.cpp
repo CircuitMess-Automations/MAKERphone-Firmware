@@ -18,6 +18,7 @@
 #include "../Screens/ConvoScreen.h"
 #include "../Screens/SettingsScreen.h"
 #include "../Screens/PhoneSettingsScreen.h"
+#include "../Screens/PhoneBrightnessScreen.h"
 #include "../Screens/GamesScreen.h"
 #include "../Interface/LVScreen.h"
 #include "../Services/PhoneCallService.h"
@@ -133,16 +134,51 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 			dest = new GamesScreen();
 			break;
 
-		case PhoneIconTile::Icon::Settings:
+		case PhoneIconTile::Icon::Settings: {
 			// S50: phone-style PhoneSettingsScreen replaces the legacy
 			// SettingsScreen as the destination of the Settings tile.
 			// The new screen lists every Phase-J sub-page (Brightness
 			// S51, Wallpaper S53, Sound & Vibration S52, Date & Time
-			// S54, About S55) as a chevron row inside grouped sections;
-			// each row currently drills into a PhoneAppStubScreen
-			// placeholder until S51-S55 ship the real sub-screens.
-			dest = new PhoneSettingsScreen();
+			// S54, About S55) as a chevron row inside grouped sections.
+			//
+			// S51: the Brightness row now drills into the real
+			// PhoneBrightnessScreen instead of the placeholder stub;
+			// every other row is still a stub until S52-S55 land. We
+			// override the activate dispatch with a single function
+			// pointer (matching the PhoneSettingsScreen::ActivateHandler
+			// signature) and let it fall through to the screen's
+			// built-in launchDefault() for the unimplemented rows.
+			auto* settings = new PhoneSettingsScreen();
+			settings->setOnActivate([](PhoneSettingsScreen* self,
+									   PhoneSettingsScreen::Item item){
+				if(self == nullptr) return;
+				switch(item){
+					case PhoneSettingsScreen::Item::Brightness:
+						self->push(new PhoneBrightnessScreen());
+						break;
+					case PhoneSettingsScreen::Item::Wallpaper:
+						self->push(new PhoneAppStubScreen("WALLPAPER"));
+						break;
+					case PhoneSettingsScreen::Item::Sound:
+						self->push(new PhoneAppStubScreen("SOUND"));
+						break;
+					case PhoneSettingsScreen::Item::DateTime:
+						self->push(new PhoneAppStubScreen("DATE & TIME"));
+						break;
+					case PhoneSettingsScreen::Item::About:
+						self->push(new PhoneAppStubScreen("ABOUT"));
+						break;
+					default:
+						// Defensive: any future row that is added to
+						// the Item enum without being wired here lands
+						// on a generic stub rather than crashing.
+						self->push(new PhoneAppStubScreen("SETTING"));
+						break;
+				}
+			});
+			dest = settings;
 			break;
+		}
 
 		case PhoneIconTile::Icon::Phone:
 			// S23: real dialer screen replaces the placeholder stub. The
