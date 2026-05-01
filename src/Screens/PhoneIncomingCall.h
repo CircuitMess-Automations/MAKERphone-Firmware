@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <Input/InputListener.h>
 #include "../Interface/LVScreen.h"
+#include "../Services/PhoneRingtoneEngine.h"
 
 class PhoneSynthwaveBg;
 class PhoneStatusBar;
@@ -129,6 +130,29 @@ public:
 	/** Switch the avatar to a different seed without rebuilding. */
 	void setAvatarSeed(uint8_t seed);
 
+	/**
+	 * Override the ringtone played while this screen is on top. Pass
+	 * nullptr to suppress audible ringing entirely (visual-only call).
+	 * If left unset, PhoneIncomingCall picks the default ringtone
+	 * from PhoneRingtoneLibrary on first onStart(). Pointer must
+	 * outlive the screen — pass a Melody from PhoneRingtoneLibrary
+	 * (their backing Note arrays are static const).
+	 */
+	void setRingtone(const PhoneRingtoneEngine::Melody* melody);
+
+	/** Currently selected ringtone, or nullptr if none. */
+	const PhoneRingtoneEngine::Melody* getRingtone() const { return ringtone; }
+
+	/**
+	 * Master enable for ringtone playback on this screen. Defaults to
+	 * true. When false, onStart() does not start the engine and the
+	 * screen is silent regardless of which ringtone is selected.
+	 */
+	void setRingtoneEnabled(bool enabled);
+
+	/** Accessor for the master enable. */
+	bool isRingtoneEnabled() const { return ringtoneEnabled; }
+
 	const char* getCallerName()   const { return callerName; }
 	const char* getCallerNumber() const { return callerNumber; }
 	uint8_t     getAvatarSeed()   const { return avatarSeed; }
@@ -152,6 +176,17 @@ private:
 	char callerNumber[MaxNumberLen + 1];
 	uint8_t avatarSeed;
 
+	// S41 — ringtone playback. The screen acquires the global Ringtone
+	// engine in onStart() and releases it in onStop() so it never
+	// keeps the piezo busy after a transition. The pointer is held
+	// rather than the value because PhoneRingtoneLibrary returns
+	// references to static const Melody structs; using a pointer
+	// avoids both copying the struct and pulling the library header
+	// into this file.
+	const PhoneRingtoneEngine::Melody* ringtone = nullptr;
+	bool ringtoneEnabled = true;
+	bool ringtoneActive  = false;  // we are the current driver of the engine
+
 	ActionHandler answerCb = nullptr;
 	ActionHandler rejectCb = nullptr;
 
@@ -173,6 +208,9 @@ private:
 
 	void fireAnswer();
 	void fireReject();
+
+	void startRingtone();
+	void stopRingtone();
 
 	void buttonPressed(uint i) override;
 	void buttonReleased(uint i) override;

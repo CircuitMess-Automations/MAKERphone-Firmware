@@ -9,6 +9,7 @@
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Elements/PhonePixelAvatar.h"
 #include "../Fonts/font.h"
+#include "../Services/PhoneRingtoneLibrary.h"
 
 // MAKERphone retro palette - inlined per the established pattern in this
 // codebase (see PhoneMainMenu.cpp / PhoneHomeScreen.cpp / PhoneDialerScreen.cpp /
@@ -116,6 +117,12 @@ PhoneIncomingCall::~PhoneIncomingCall() {
 	if(ring != nullptr) {
 		lv_anim_del(ring, ringPulseExec);
 	}
+	// Defensive: hush the piezo if the screen is being
+	// torn down without a prior onStop() (rare, but a
+	// host that drops the unique_ptr without popping
+	// could trigger this). stopRingtone() is a no-op
+	// when ringtoneActive is already false.
+	stopRingtone();
 	// All other children (wallpaper, statusBar, softKeys, avatar,
 	// labels) are parented to obj - LVScreen's destructor frees obj
 	// and LVGL recursively frees their lv_obj_t backing storage.
@@ -123,9 +130,20 @@ PhoneIncomingCall::~PhoneIncomingCall() {
 
 void PhoneIncomingCall::onStart() {
 	Input::getInstance()->addListener(this);
+	// S41: start ringing as soon as the screen takes over. We
+	// always start fresh in onStart() so re-entering the screen
+	// (e.g. dismissing a modal that suspended us) restarts the
+	// melody from the top — matches feature-phone behaviour.
+	startRingtone();
 }
 
 void PhoneIncomingCall::onStop() {
+	// Hush the piezo before we hand input back to whoever is
+	// next on the screen stack. stopRingtone() is idempotent
+	// and only acts if THIS screen is currently the engine's
+	// driver, so a Settings-driven mute that already silenced
+	// playback does not double-stop the next caller.
+	stopRingtone();
 	Input::getInstance()->removeListener(this);
 }
 
@@ -315,6 +333,82 @@ void PhoneIncomingCall::setAvatarSeed(uint8_t seed) {
 	if(avatar) avatar->setSeed(seed);
 }
 
+// ----- ringtone (S41) -----
+
+// S41 wires the existing PhoneRingtoneEngine (S39) and the five
+// default melodies (S40) into the incoming-call screen so the user
+// finally hears their phone ring. Selection rule:
+//   1. setRingtone() override (if the host wired one)
+//   2. PhoneRingtoneLibrary::Synthwave as the default — picked
+//      because it loops cleanly, fits the synthwave palette, and
+//      its A-minor arpeggio is recognisable but not annoying when
+//      it repeats while the call is unanswered.
+// The selection is resolved lazily in startRingtone() rather than
+// in the constructor so a host that calls setRingtone() between
+// `new PhoneIncomingCall(...)` and the screen actually starting can
+// override the default without paying for an immediate first-melody
+// fetch.
+
+void PhoneIncomingCall::setRingtone(const PhoneRingtoneEngine::Melody* melody) {
+	ringtone = melody;
+	// If the screen is already audible, switch melodies live so the
+	// caller can preview their pick without leaving the screen. We
+	// only retune if WE were the engine driver — otherwise some
+	// other component owns the piezo and we would clobber its sound.
+	if(ringtoneActive && ringtoneEnabled) {
+		if(melody != nullptr) {
+			Ringtone.play(*melody);
+		} else {
+			Ringtone.stop();
+		}
+	}
+}
+
+void PhoneIncomingCall::setRingtoneEnabled(bool enabled) {
+	if(ringtoneEnabled == enabled) return;
+	ringtoneEnabled = enabled;
+	if(!ringtoneEnabled) {
+		// Disabling silences immediately, but we still consider the
+		// screen the active driver until onStop() — so re-enabling
+		// before the screen pops resumes ringing.
+		if(ringtoneActive) {
+			Ringtone.stop();
+		}
+	} else if(ringtoneActive) {
+		// Re-enable mid-screen — restart the melody from the top
+		// so the user hears it again even if Ringtone.stop() above
+		// already drained the engine state.
+		startRingtone();
+	}
+	// If we were never active (screen not yet onStart()-ed), the
+	// flag is sufficient — the next onStart() will pick it up.
+}
+
+void PhoneIncomingCall::startRingtone() {
+	if(!ringtoneEnabled) return;
+
+	// Lazy default — first time the screen actually rings, fall back
+	// to the Synthwave ringtone unless a host overrode it. The
+	// PhoneRingtoneLibrary returns a reference to a static const
+	// Melody, so storing the address is safe for the screen lifetime
+	// and beyond.
+	if(ringtone == nullptr) {
+		ringtone = &PhoneRingtoneLibrary::get(PhoneRingtoneLibrary::Synthwave);
+	}
+
+	Ringtone.play(*ringtone);
+	ringtoneActive = true;
+}
+
+void PhoneIncomingCall::stopRingtone() {
+	// Only stop the engine if WE started it. Belt-and-braces against
+	// a future caller that re-uses Ringtone for a foreground music
+	// player while the call screen is still alive in the background.
+	if(!ringtoneActive) return;
+	ringtoneActive = false;
+	Ringtone.stop();
+}
+
 // ----- action dispatch -----
 
 void PhoneIncomingCall::fireAnswer() {
@@ -323,6 +417,10 @@ void PhoneIncomingCall::fireAnswer() {
 	// no callback we just pop() so the screen does not feel "stuck".
 	// The actual call-state push (PhoneActiveCall) lives in S25 and is
 	// wired via setOnAnswer() by the LoRa-side handler.
+	// S41: stop the ringer before we hand off — the next screen
+	// (PhoneActiveCall, or whatever the host pushes) should never
+	// inherit a still-playing melody.
+	stopRingtone();
 	if(softKeys) softKeys->flashLeft();
 	if(answerCb) {
 		answerCb(this);
@@ -335,6 +433,9 @@ void PhoneIncomingCall::fireReject() {
 	// REJECT softkey: same flash-then-handler pattern as ANSWER. The
 	// default fall-through is pop() so a host that just wanted the
 	// visual gets sensible behaviour from BTN_BACK alone.
+	// S41: stop the ringer before we hand off / pop, so the
+	// piezo never lingers into whatever screen comes next.
+	stopRingtone();
 	if(softKeys) softKeys->flashRight();
 	if(rejectCb) {
 		rejectCb(this);
