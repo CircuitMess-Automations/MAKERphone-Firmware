@@ -7,6 +7,7 @@
 #include "../Elements/PhoneStatusBar.h"
 #include "../Elements/PhoneClockFace.h"
 #include "../Elements/PhoneSoftKeyBar.h"
+#include "../Elements/PhoneChargingOverlay.h"
 
 PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
 	// Full-screen container, no scrollbars, no inner padding - the four
@@ -38,6 +39,16 @@ PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
 	softKeys = new PhoneSoftKeyBar(obj);
 	softKeys->setLeft("CALL");
 	softKeys->setRight("MENU");
+
+	// S59 charging overlay - hidden by default. Drops just above the
+	// soft-key bar so the wallpaper / clock face are untouched while
+	// the device is unplugged. Auto-detect lets the widget flip its
+	// own visibility from the BatteryService voltage trend.
+	chargingOverlay = new PhoneChargingOverlay(obj);
+	lv_obj_set_align(chargingOverlay->getLvObj(), LV_ALIGN_BOTTOM_MID);
+	// PhoneSoftKeyBar is 10 px tall; sit the chip 4 px above it.
+	lv_obj_set_y(chargingOverlay->getLvObj(), -(int16_t)(10 + 4));
+	chargingOverlay->setAutoDetect(true);
 
 	// S22: enable long-press detection on BTN_0 (homescreen quick-dial)
 	// and BTN_BACK (homescreen lock). 600 ms is the sweet spot used by

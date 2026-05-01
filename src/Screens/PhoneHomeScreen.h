@@ -9,6 +9,7 @@ class PhoneSynthwaveBg;
 class PhoneStatusBar;
 class PhoneClockFace;
 class PhoneSoftKeyBar;
+class PhoneChargingOverlay;
 
 /**
  * PhoneHomeScreen
@@ -104,10 +105,11 @@ public:
 	void flashRightSoftKey();
 
 private:
-	PhoneSynthwaveBg* wallpaper;
-	PhoneStatusBar*   statusBar;
-	PhoneClockFace*   clockFace;
-	PhoneSoftKeyBar*  softKeys;
+	PhoneSynthwaveBg*     wallpaper;
+	PhoneStatusBar*       statusBar;
+	PhoneClockFace*       clockFace;
+	PhoneSoftKeyBar*      softKeys;
+	PhoneChargingOverlay* chargingOverlay = nullptr;
 
 	SoftKeyHandler leftCb       = nullptr;
 	SoftKeyHandler rightCb      = nullptr;

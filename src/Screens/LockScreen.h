@@ -8,6 +8,7 @@
 #include "../Elements/UnlockSlide.h"
 #include "../Elements/PhoneLockHint.h"
 #include "../Elements/PhoneNotificationPreview.h"
+#include "../Elements/PhoneChargingOverlay.h"
 #include "../Services/MessageService.h"
 #include "../Elements/UserWithMessage.h"
 
@@ -32,6 +33,7 @@ private:
 	UnlockSlide*               slide;
 	PhoneLockHint*             lockHint = nullptr;
 	PhoneNotificationPreview*  preview  = nullptr;
+	PhoneChargingOverlay*      chargingOverlay = nullptr;
 
 	void buttonPressed(uint i) override;
 	void buttonReleased(uint i) override;

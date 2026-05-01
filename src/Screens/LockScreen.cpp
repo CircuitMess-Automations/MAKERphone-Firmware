@@ -9,6 +9,7 @@
 #include "../Elements/PhoneSynthwaveBg.h"
 #include "../Elements/PhoneLockHint.h"
 #include "../Elements/PhoneNotificationPreview.h"
+#include "../Elements/PhoneChargingOverlay.h"
 #include <Input/Input.h>
 #include <Pins.hpp>
 
@@ -66,6 +67,17 @@ LockScreen::LockScreen() : LVScreen(){
 	// S47 phone-style redesign: a code-only "SLIDE TO UNLOCK" hint sweeps
 	// three cyan chevrons L->R just above the unlock slide. S48 adds the
 	// chord-armed shimmer state on top of this widget.
+	// S59 charging overlay - hidden by default, mounts above the lock
+	// hint and below the unlock slide. Auto-detect mode lets the widget
+	// own its visibility based on a voltage-trend heuristic.
+	chargingOverlay = new PhoneChargingOverlay(obj);
+	lv_obj_set_align(chargingOverlay->getLvObj(), LV_ALIGN_BOTTOM_MID);
+	// 10 (soft-key bar) + 18 (unlock slide gap) + 1 (separator) + HintHeight
+	// + 4 (gap) puts the chip directly above the slide-to-unlock hint.
+	lv_obj_set_y(chargingOverlay->getLvObj(),
+		-(int16_t)(PhoneSoftKeyBar::BarHeight + 18 + 1 + PhoneLockHint::HintHeight + 4));
+	chargingOverlay->setAutoDetect(true);
+
 	lockHint = new PhoneLockHint(obj);
 	lv_obj_set_align(lockHint->getLvObj(), LV_ALIGN_BOTTOM_MID);
 	lv_obj_set_y(lockHint->getLvObj(), -(PhoneSoftKeyBar::BarHeight + 18 + 1));
