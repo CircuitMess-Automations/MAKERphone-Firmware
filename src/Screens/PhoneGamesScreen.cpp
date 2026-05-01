@@ -26,6 +26,7 @@
 #include "PhoneSlidingPuzzle.h"
 #include "PhoneTicTacToe.h"
 #include "PhoneMemoryMatch.h"
+#include "PhoneSokoban.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -84,6 +85,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "SLIDE15",  nullptr,                   GameKind::Screen },  // S80
 	{ "TICTAC",   nullptr,                   GameKind::Screen },  // S81
 	{ "MEMORY",   nullptr,                   GameKind::Screen },  // S82
+	{ "SOKOBAN",  nullptr,                   GameKind::Screen },  // S83
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -554,6 +556,39 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 26,  2, 1, 1, cream);
 			break;
 		}
+		case 13: { // SOKOBAN - tiny crate + goal pad + warehouse worker
+			// S83: a stylised glance of the warehouse-keeper game. A
+			// cyan worker on the left, an orange-trimmed cream crate
+			// in the middle, and a faint "goal pad" outline on the
+			// right -- the same colour language used inside the game.
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t cream  = lv_color_make(255, 220, 180);
+			const lv_color_t orange = lv_color_make(255, 140,  30);
+
+			// Floor strip across the bottom so the scene reads as a
+			// warehouse aisle rather than three floating sprites.
+			px(g,  3, 18, 24, 1, MP_DIM);
+
+			// Cyan worker (head + body) on the left.
+			px(g,  4,  6, 5, 5, cyan);
+			px(g,  5,  8, 1, 1, MP_BG_DARK);
+			px(g,  7,  8, 1, 1, MP_BG_DARK);
+			px(g,  4, 12, 5, 5, cyan);
+
+			// Cream crate in the middle, orange-trimmed.
+			px(g, 12,  9, 8, 8, cream);
+			px(g, 12,  9, 8, 1, orange);
+			px(g, 12, 16, 8, 1, orange);
+			px(g, 12,  9, 1, 8, orange);
+			px(g, 19,  9, 1, 8, orange);
+
+			// Goal pad outline on the right (faint orange square).
+			px(g, 23, 11, 4, 1, orange);
+			px(g, 23, 14, 4, 1, orange);
+			px(g, 23, 11, 1, 4, orange);
+			px(g, 26, 11, 1, 4, orange);
+			break;
+		}
 		default:
 			break;
 	}
@@ -698,6 +733,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 10: push(new PhoneSlidingPuzzle()); break;
 			case 11: push(new PhoneTicTacToe()); break;
 			case 12: push(new PhoneMemoryMatch()); break;
+			case 13: push(new PhoneSokoban()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
