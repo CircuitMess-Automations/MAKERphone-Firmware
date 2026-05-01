@@ -66,6 +66,7 @@ PhoneBubbleSmile::PhoneBubbleSmile()
 	buildPlayfield();
 	buildCells();
 	buildOverlay();
+	buildPowerUpLabel();
 
 	softKeys = new PhoneSoftKeyBar(obj);
 	softKeys->setLeft("START");
@@ -194,6 +195,21 @@ void PhoneBubbleSmile::buildOverlay() {
 	lv_obj_set_y(overlayLabel, 4);
 }
 
+// S78: small HUD-strip flash label that announces the power-up that
+// just triggered ("STRIPE!" / "BOMB!" / "BLAST!" / "COMBO xN").
+// Lives between the "BUBBLES" caption and the score, hidden by
+// default and shown for one Match-phase tick whenever
+// `lastPowerUp != PowerUp::None`.
+void PhoneBubbleSmile::buildPowerUpLabel() {
+	powerUpLabel = lv_label_create(obj);
+	lv_obj_set_style_text_font(powerUpLabel, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(powerUpLabel, MP_HIGHLIGHT, 0);
+	lv_label_set_text(powerUpLabel, "");
+	lv_obj_set_align(powerUpLabel, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(powerUpLabel, 12);
+	lv_obj_add_flag(powerUpLabel, LV_OBJ_FLAG_HIDDEN);
+}
+
 // ===========================================================================
 // state transitions
 // ===========================================================================
@@ -201,18 +217,20 @@ void PhoneBubbleSmile::buildOverlay() {
 void PhoneBubbleSmile::enterIdle() {
 	state = GameState::Idle;
 	stopResolveTimer();
-	score        = 0;
-	cascadeLevel = 0;
-	cursor       = cellIndex(GridCols / 2, GridRows / 2);
-	selected     = -1;
-	revertPending= false;
-	rngState     = static_cast<uint16_t>(millis() & 0xFFFFu);
+	score         = 0;
+	cascadeLevel  = 0;
+	cursor        = cellIndex(GridCols / 2, GridRows / 2);
+	selected      = -1;
+	revertPending = false;
+	lastPowerUp   = PowerUp::None;     // clear S78 cascade flash
+	rngState      = static_cast<uint16_t>(millis() & 0xFFFFu);
 	if(rngState == 0) rngState = 0xACE1u;
 	seedBoard();
 	render();
 	refreshHud();
 	refreshSoftKeys();
 	refreshOverlay();
+	refreshPowerUpLabel();
 }
 
 void PhoneBubbleSmile::startGame() {
@@ -470,6 +488,135 @@ void PhoneBubbleSmile::shuffleBoard() {
 	}
 }
 
+// ===========================================================================
+// S78 -- power-up application + clear helpers
+// ===========================================================================
+
+// Mark every non-empty bubble in `row` as matched. The actual clearing
+// happens in the next Drop tick, so the player sees the row flash
+// MP_TEXT during the Match-phase tick.
+void PhoneBubbleSmile::clearRow(uint8_t row) {
+	if(row >= GridRows) return;
+	for(uint8_t col = 0; col < GridCols; ++col) {
+		const uint8_t idx = cellIndex(col, row);
+		if(grid[idx] != Bubble::Empty) matched[idx] = true;
+	}
+}
+
+// Mark every non-empty bubble in `col` as matched.
+void PhoneBubbleSmile::clearCol(uint8_t col) {
+	if(col >= GridCols) return;
+	for(uint8_t row = 0; row < GridRows; ++row) {
+		const uint8_t idx = cellIndex(col, row);
+		if(grid[idx] != Bubble::Empty) matched[idx] = true;
+	}
+}
+
+// Mark every non-empty cell in the 3x3 area centred on (cx, cy).
+// Bounds-clipped so corners and edges work cleanly.
+void PhoneBubbleSmile::clearArea3x3(uint8_t cx, uint8_t cy) {
+	for(int8_t dy = -1; dy <= 1; ++dy) {
+		const int16_t y = static_cast<int16_t>(cy) + dy;
+		if(y < 0 || y >= static_cast<int16_t>(GridRows)) continue;
+		for(int8_t dx = -1; dx <= 1; ++dx) {
+			const int16_t x = static_cast<int16_t>(cx) + dx;
+			if(x < 0 || x >= static_cast<int16_t>(GridCols)) continue;
+			const uint8_t idx = cellIndex(static_cast<uint8_t>(x),
+			                              static_cast<uint8_t>(y));
+			if(grid[idx] != Bubble::Empty) matched[idx] = true;
+		}
+	}
+}
+
+// Mark every bubble of colour `c` anywhere on the board as matched.
+void PhoneBubbleSmile::clearAllOfColor(Bubble c) {
+	if(c == Bubble::Empty) return;
+	for(uint8_t i = 0; i < CellCount; ++i) {
+		if(grid[i] == c) matched[i] = true;
+	}
+}
+
+// S78 power-up sweep. Run *after* detectMatches() during a Match-phase
+// tick. We re-walk rows then columns, tracking each contiguous same-
+// colour run, and for any run of length >= 4 we extend matched[] with
+// the appropriate blast radius:
+//
+//   length == 4 -> entire row (or column) flashes/clears.
+//   length >= 5 -> additional 3x3 around the run's centre cell.
+//   length >= 6 -> additional clear of every bubble of that colour.
+//
+// We also lift `lastPowerUp` to the highest tier triggered so the HUD
+// flash names the most spectacular thing the player just did.
+void PhoneBubbleSmile::applyPowerUps() {
+	auto upgrade = [this](PowerUp p) {
+		if(static_cast<uint8_t>(p) > static_cast<uint8_t>(lastPowerUp)) {
+			lastPowerUp = p;
+		}
+	};
+
+	// Row scan.
+	for(uint8_t row = 0; row < GridRows; ++row) {
+		uint8_t runStart = 0;
+		uint8_t runLen   = 1;
+		Bubble  runColor = grid[cellIndex(0, row)];
+		for(uint8_t col = 1; col <= GridCols; ++col) {
+			Bubble c = (col < GridCols) ? grid[cellIndex(col, row)] : Bubble::Empty;
+			if(col < GridCols && c == runColor && c != Bubble::Empty) {
+				++runLen;
+			} else {
+				if(runColor != Bubble::Empty && runLen >= 4) {
+					clearRow(row);
+					upgrade(PowerUp::StripeRow);
+					if(runLen >= 5) {
+						const uint8_t centreCol =
+							static_cast<uint8_t>(runStart + runLen / 2);
+						clearArea3x3(centreCol, row);
+						upgrade(PowerUp::Bomb);
+					}
+					if(runLen >= 6) {
+						clearAllOfColor(runColor);
+						upgrade(PowerUp::ColorBlast);
+					}
+				}
+				runStart = col;
+				runLen   = 1;
+				runColor = c;
+			}
+		}
+	}
+
+	// Column scan.
+	for(uint8_t col = 0; col < GridCols; ++col) {
+		uint8_t runStart = 0;
+		uint8_t runLen   = 1;
+		Bubble  runColor = grid[cellIndex(col, 0)];
+		for(uint8_t row = 1; row <= GridRows; ++row) {
+			Bubble c = (row < GridRows) ? grid[cellIndex(col, row)] : Bubble::Empty;
+			if(row < GridRows && c == runColor && c != Bubble::Empty) {
+				++runLen;
+			} else {
+				if(runColor != Bubble::Empty && runLen >= 4) {
+					clearCol(col);
+					upgrade(PowerUp::StripeCol);
+					if(runLen >= 5) {
+						const uint8_t centreRow =
+							static_cast<uint8_t>(runStart + runLen / 2);
+						clearArea3x3(col, centreRow);
+						upgrade(PowerUp::Bomb);
+					}
+					if(runLen >= 6) {
+						clearAllOfColor(runColor);
+						upgrade(PowerUp::ColorBlast);
+					}
+				}
+				runStart = row;
+				runLen   = 1;
+				runColor = c;
+			}
+		}
+	}
+}
+
 void PhoneBubbleSmile::doSwap(uint8_t a, uint8_t b) {
 	const Bubble tmp = grid[a];
 	grid[a] = grid[b];
@@ -482,8 +629,10 @@ void PhoneBubbleSmile::onPlayerSwap() {
 	cascadeLevel = 1;
 	phase        = ResolvePhase::Match;
 	state        = GameState::Resolving;
+	lastPowerUp  = PowerUp::None;     // S78: clear stale cascade flash
 	startResolveTimer();
 	refreshSoftKeys();
+	refreshPowerUpLabel();
 }
 
 // ===========================================================================
@@ -589,6 +738,48 @@ void PhoneBubbleSmile::refreshOverlay() {
 	}
 }
 
+// S78 power-up flash. Mirrors the cascade pipeline's `lastPowerUp`
+// state into the small HUD label. Hidden when no power-up is active
+// or the game is in a non-Resolving state.
+void PhoneBubbleSmile::refreshPowerUpLabel() {
+	if(powerUpLabel == nullptr) return;
+	if(lastPowerUp == PowerUp::None) {
+		lv_obj_add_flag(powerUpLabel, LV_OBJ_FLAG_HIDDEN);
+		return;
+	}
+	char buf[12];
+	const char* txt = "";
+	lv_color_t  col = MP_HIGHLIGHT;
+	switch(lastPowerUp) {
+		case PowerUp::StripeRow:
+		case PowerUp::StripeCol:
+			txt = "STRIPE!";
+			col = MP_HIGHLIGHT;
+			break;
+		case PowerUp::Bomb:
+			txt = "BOMB!";
+			col = MP_ACCENT;
+			break;
+		case PowerUp::ColorBlast:
+			txt = "BLAST!";
+			col = MP_ACCENT;
+			break;
+		case PowerUp::Combo:
+			snprintf(buf, sizeof(buf), "COMBO x%u",
+			         static_cast<unsigned>(cascadeLevel));
+			txt = buf;
+			col = MP_ACCENT;
+			break;
+		case PowerUp::None:
+		default:
+			lv_obj_add_flag(powerUpLabel, LV_OBJ_FLAG_HIDDEN);
+			return;
+	}
+	lv_label_set_text(powerUpLabel, txt);
+	lv_obj_set_style_text_color(powerUpLabel, col, 0);
+	lv_obj_clear_flag(powerUpLabel, LV_OBJ_FLAG_HIDDEN);
+}
+
 // ===========================================================================
 // timers
 // ===========================================================================
@@ -612,7 +803,9 @@ void PhoneBubbleSmile::onResolveTickStatic(lv_timer_t* timer) {
 	if(self->state != PhoneBubbleSmile::GameState::Resolving) return;
 
 	// One pipeline phase per tick. Each tick re-renders so the player
-	// sees the cascade flow.
+	// sees the cascade flow. S78 hooks the Match phase to also run the
+	// power-up sweep + combo bonus, and the Drop phase to clear the HUD
+	// power-up flash before the next chain link starts.
 	switch(self->phase) {
 		case PhoneBubbleSmile::ResolvePhase::Match: {
 			uint16_t cleared = 0;
@@ -639,15 +832,48 @@ void PhoneBubbleSmile::onResolveTickStatic(lv_timer_t* timer) {
 				}
 				self->stopResolveTimer();
 				self->state = PhoneBubbleSmile::GameState::Playing;
+				// S78: settle hides the cascade flash so the HUD does not
+				// keep "COMBO xN" showing once Playing input resumes.
+				self->lastPowerUp = PhoneBubbleSmile::PowerUp::None;
+				self->refreshPowerUpLabel();
 				self->refreshSoftKeys();
 				return;
 			}
 			// We have matches. Score them and render the flash before
 			// the next tick clears them.
 			self->revertPending = false;     // a real match landed
-			self->score += static_cast<uint32_t>(cleared) * 10u
+
+			// S78: clear last tick's flash so a fresh chain link starts
+			// from None and applyPowerUps() / cascade bonus can elect
+			// the correct tier without inheriting stale state.
+			self->lastPowerUp = PhoneBubbleSmile::PowerUp::None;
+
+			// S78 power-up sweep: extend matched[] with stripe / bomb /
+			// blast radii for any run of length >= 4. Recount the
+			// cleared mask afterwards so the score credits the entire
+			// blast, not just the original 3+ run.
+			self->applyPowerUps();
+			uint16_t total = 0;
+			for(uint8_t k = 0; k < PhoneBubbleSmile::CellCount; ++k) {
+				if(self->matched[k]) ++total;
+			}
+
+			// S78 cascade scoring: per-link multiplier is `cascadeLevel`
+			// (already in the original cascade design); chain reward of
+			// +50%% kicks in once cascadeLevel reaches 3, and elects the
+			// Combo flash if no bigger power-up was triggered this tick.
+			uint32_t pts = static_cast<uint32_t>(total) * 10u
 			               * static_cast<uint32_t>(self->cascadeLevel);
+			if(self->cascadeLevel >= 3) {
+				pts = (pts * 3u) / 2u;
+				if(self->lastPowerUp == PhoneBubbleSmile::PowerUp::None) {
+					self->lastPowerUp = PhoneBubbleSmile::PowerUp::Combo;
+				}
+			}
+			self->score += pts;
+
 			self->refreshHud();
+			self->refreshPowerUpLabel();
 			self->phase = PhoneBubbleSmile::ResolvePhase::Drop;
 			self->render();
 			break;
@@ -655,6 +881,9 @@ void PhoneBubbleSmile::onResolveTickStatic(lv_timer_t* timer) {
 		case PhoneBubbleSmile::ResolvePhase::Drop: {
 			self->clearMatches();
 			self->dropBubbles();
+			// S78: hide the HUD power-up flash now that the bubbles drop.
+			self->lastPowerUp = PhoneBubbleSmile::PowerUp::None;
+			self->refreshPowerUpLabel();
 			self->phase = PhoneBubbleSmile::ResolvePhase::Fill;
 			self->render();
 			break;

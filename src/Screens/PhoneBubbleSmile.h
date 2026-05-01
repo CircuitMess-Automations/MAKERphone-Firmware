@@ -11,7 +11,7 @@ class PhoneStatusBar;
 class PhoneSoftKeyBar;
 
 /**
- * PhoneBubbleSmile (S77)
+ * PhoneBubbleSmile (S77, extended in S78)
  *
  * Phase-N arcade entry: a colour-matching grid puzzle in the
  * "Bubble Smile" / Bejeweled / "match-3" tradition. The board is
@@ -82,6 +82,26 @@ class PhoneSoftKeyBar;
  *     in-place, runs match detection, then swaps back. With 42
  *     cells and ~78 adjacent pairs the cost is trivial on the
  *     ESP32 and only runs once per cascade settle.
+ *
+ * S78 split (combo cascades + 5 power-ups):
+ *   - Combo cascades. Each cascade chain link beyond the first
+ *     scales the score multiplier (cascadeLevel * 10), and chains
+ *     of 3+ also earn a +50%% bonus on that tick's points and a
+ *     "COMBO xN" flash in the HUD strip.
+ *   - Five event-driven power-ups, awarded inline during match
+ *     detection (no persistent special-bubble state required):
+ *       1. StripeRow  - any horizontal run of 4 also clears the
+ *                       entire row the run lives on.
+ *       2. StripeCol  - any vertical   run of 4 also clears the
+ *                       entire column the run lives on.
+ *       3. Bomb       - any single-direction run of 5 also clears
+ *                       the 3x3 area centred on the run.
+ *       4. ColorBlast - any run of 6 also clears every bubble of
+ *                       that colour anywhere on the board.
+ *       5. Combo      - cascadeLevel >= 3 multiplies the tick's
+ *                       points by 1.5 (chain reward).
+ *     The most spectacular power-up that triggered in a Match-phase
+ *     tick wins the `powerUpLabel` HUD flash for that tick.
  */
 class PhoneBubbleSmile : public LVScreen, private InputListener {
 public:
@@ -108,6 +128,19 @@ public:
 		Magenta = 5,
 	};
 	static constexpr uint8_t ColorCount = 5;   // Bubble::Cyan .. Bubble::Magenta
+
+	// S78 power-up tiers tracked during the cascade pipeline. Higher
+	// tiers strictly subsume lower tiers when multiple are triggered
+	// in the same Match-phase tick: the most spectacular one wins
+	// the HUD `powerUpLabel` flash.
+	enum class PowerUp : uint8_t {
+		None       = 0,
+		StripeRow  = 1,
+		StripeCol  = 2,
+		Bomb       = 3,
+		ColorBlast = 4,
+		Combo      = 5,
+	};
 
 	// Cell pixel size + spacing. Centred horizontally inside 160 px
 	// playfield: total width = 6*18 + 5*1 = 113, x_start = 23.
@@ -140,6 +173,7 @@ private:
 	lv_obj_t* targetLabel   = nullptr;   // "/ 1000"
 	lv_obj_t* playfield     = nullptr;
 	lv_obj_t* overlayLabel  = nullptr;
+	lv_obj_t* powerUpLabel  = nullptr;   // S78 power-up flash text
 
 	// One cell = pad + bubble inner + highlight pixel. We keep the pad
 	// as the focusable frame so cursor / selection borders can be drawn
@@ -156,6 +190,12 @@ private:
 		GameOver,
 	};
 	GameState state = GameState::Idle;
+
+	// S78 cascade flash state: which power-up tier (if any) triggered
+	// during the most recent Match-phase tick. Reset to None on player
+	// swap and on the Drop tick that follows the flash so the HUD does
+	// not retain stale text.
+	PowerUp lastPowerUp = PowerUp::None;
 
 	// Grid of bubbles + per-cell match-flag (used during resolve).
 	Bubble  grid[CellCount];
@@ -201,6 +241,7 @@ private:
 	void buildPlayfield();
 	void buildCells();
 	void buildOverlay();
+	void buildPowerUpLabel();
 
 	// ---- state transitions --------------------------------------------
 	void enterIdle();
@@ -219,6 +260,17 @@ private:
 	bool hasAnyValidMove() const;
 	void shuffleBoard();              // emergency shuffle if no moves
 
+	// S78 power-up sweep, run after detectMatches() during every
+	// Match-phase tick. Walks rows/columns again, this time looking
+	// for runs of length >= 4 and extending the matched[] mask with
+	// the power-up's blast radius. Sets `lastPowerUp` to the
+	// highest-tier power-up triggered during the sweep.
+	void applyPowerUps();
+	void clearRow(uint8_t row);
+	void clearCol(uint8_t col);
+	void clearArea3x3(uint8_t cx, uint8_t cy);
+	void clearAllOfColor(Bubble c);
+
 	void doSwap(uint8_t a, uint8_t b);
 	void onPlayerSwap();              // begin resolve pipeline after swap
 
@@ -231,6 +283,7 @@ private:
 	void refreshHud();
 	void refreshSoftKeys();
 	void refreshOverlay();
+	void refreshPowerUpLabel();
 	lv_color_t bubbleColor(Bubble b) const;
 
 	// ---- timers -------------------------------------------------------
