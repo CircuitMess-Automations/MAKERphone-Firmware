@@ -130,7 +130,7 @@ A proper retro-arcade carousel for `PhoneGames`. Each entry is one self-containe
 - [x] **S71** — `PhoneTetris` — base falling tetrominoes, line clear with row flash.
 - [x] **S72** — `PhoneTetris+` (split) — level progression, ghost piece, T-spin scoring.
 - [x] **S73** — `PhoneBounce` — gravity ball, simple side-scrolling level.
-- [ ] **S74** — `PhoneBounce II` (split) — three more levels + collectible rings.
+- [x] **S74** — `PhoneBounce II` (split) — three more levels + collectible rings.
 - [ ] **S75** — `PhoneBrickBreaker` — paddle, ball, bricks, power-up bricks.
 - [ ] **S76** — `PhoneBantumi` — Mancala vs CPU, the Nokia classic.
 - [ ] **S77** — `PhoneBubbleSmile` — match-3 colored bubbles.
