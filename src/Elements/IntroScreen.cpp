@@ -25,6 +25,7 @@
 #include "../Screens/PhoneAboutScreen.h"
 #include "../Screens/PhoneGamesScreen.h"
 #include "../Interface/LVScreen.h"
+#include "../Interface/PhoneTransitions.h"
 #include "../Services/PhoneCallService.h"
 
 // S20: Per-icon dispatch from the new phone-style PhoneMainMenu.
@@ -253,11 +254,12 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 	}
 
 	if(dest != nullptr){
-		// push() reparents `dest` under `self`, so when the child screen
-		// pop()s the user lands back on the PhoneMainMenu icon grid with
-		// the same selection still focused. Same lifetime contract every
-		// LVScreen consumer in this codebase relies on.
-		self->push(dest);
+		// S66: route every main-menu->app push through PhoneTransitions
+		// with the Drill gesture so each launch uses the same SE-style
+		// horizontal flick (slide-in-from-right). The reparenting and
+		// pop-back-to-menu lifetime contract is unchanged - the helper
+		// just forwards into LVScreen::push under the hood.
+		PhoneTransitions::push(self, dest, PhoneTransition::Drill);
 	}
 }
 
@@ -291,7 +293,12 @@ static void launchPhoneMainMenu(PhoneHomeScreen* self){
 	// "drill into menu" feel. PhoneMainMenu's default BTN_BACK then pops
 	// with LV_SCR_LOAD_ANIM_MOVE_RIGHT so the unwound transition is the
 	// visual mirror of this push - a signature SE-style flick.
-	self->push(menu, LV_SCR_LOAD_ANIM_MOVE_LEFT);
+	// S66: route through PhoneTransitions so the home->menu drill
+	// uses the same Drill gesture every other "go one level deeper"
+	// site in the firmware does. Identical visual result
+	// (LV_SCR_LOAD_ANIM_MOVE_LEFT) - the helper just centralises the
+	// choice so future tweaks live in one file.
+	PhoneTransitions::push(self, menu, PhoneTransition::Drill);
 }
 
 // S22: long-press shortcut handlers shared by PhoneHomeScreen and

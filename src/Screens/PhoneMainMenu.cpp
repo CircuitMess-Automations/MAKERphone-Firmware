@@ -9,6 +9,7 @@
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Elements/PhoneMenuGrid.h"
 #include "../Fonts/font.h"
+#include "../Interface/PhoneTransitions.h"
 
 // MAKERphone retro palette - kept consistent with the other phone widgets so
 // the caption that lives under the grid feels visually part of the same tile
@@ -278,9 +279,11 @@ void PhoneMainMenu::buttonReleased(uint i) {
 				if(backCb){
 					backCb(this);
 				}else{
-					// Default fallback - slide-right pop to mirror the
-					// home->menu push (S21).
-					pop(LV_SCR_LOAD_ANIM_MOVE_RIGHT);
+					// S66: route through PhoneTransitions so the menu->home
+					// pop uses the Drill gesture pop direction. Mirror of
+					// IntroScreen home->menu push (also Drill) so the SE-
+					// style flick stays consistent on both edges.
+					PhoneTransitions::pop(this, PhoneTransition::Drill);
 				}
 			}
 			backLongFired = false;
