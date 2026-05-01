@@ -100,17 +100,162 @@ const char* const kLevel5[] = {
 	"###########",
 };
 
+
+// ---------------------------------------------------------------------------
+// S84 - Level Pack: 10 more puzzles + a level-select grid.
+//
+// Difficulty curves gently from "one push, one goal" up to a 6-crate
+// final stage. Each level is laid out so a forward push can never trap
+// a crate against a corner, so the solver never needs the undo button
+// to recover from an unwinnable state. They all fit inside the 12-col
+// x 9-row grid, in line with the engine constants in PhoneSokoban.h.
+// ---------------------------------------------------------------------------
+
+// Level 6 -- 1 crate. Push right, two squares. Same shape as L1 but
+// kept tiny on purpose, easing the player back in after the harder L5.
+const char* const kLevel6[] = {
+	"#######",
+	"#.....#",
+	"#@.o._#",
+	"#.....#",
+	"#######",
+};
+
+// Level 7 -- 1 crate, push down. Forces a vertical push for the first
+// time in the pack, with plenty of empty floor either side.
+const char* const kLevel7[] = {
+	"########",
+	"#@.....#",
+	"#......#",
+	"#..o...#",
+	"#......#",
+	"#..._..#",
+	"########",
+};
+
+// Level 8 -- 2 crates, parallel push-right lanes. Player walks down a
+// column to switch rows.
+const char* const kLevel8[] = {
+	"##########",
+	"#@.......#",
+	"#..o...._#",
+	"#........#",
+	"#..o...._#",
+	"##########",
+};
+
+// Level 9 -- 3 crates, three goals stacked on the left. Player must
+// push each crate west across the room. Crates live in distinct rows
+// so the order doesn't matter.
+const char* const kLevel9[] = {
+	"##########",
+	"#........#",
+	"#_....o..#",
+	"#........#",
+	"#_....o..#",
+	"#........#",
+	"#_....o.@#",
+	"##########",
+};
+
+// Level 10 -- 1 crate, push left. Mirror of L6 to vary the rhythm.
+const char* const kLevel10[] = {
+	"########",
+	"#......#",
+	"#_..o.@#",
+	"#......#",
+	"########",
+};
+
+// Level 11 -- 1 crate, push up through a corridor opening at the top.
+// The walls flanking the column give the puzzle a satisfying chute
+// feel without changing the difficulty.
+const char* const kLevel11[] = {
+	"########",
+	"#..._..#",
+	"#......#",
+	"#......#",
+	"#..o...#",
+	"#......#",
+	"#@.....#",
+	"########",
+};
+
+// Level 12 -- 2 crates, push left, separate rows. Mirrors L8 but on
+// the opposite axis.
+const char* const kLevel12[] = {
+	"##########",
+	"#........#",
+	"#_....o.@#",
+	"#........#",
+	"#_....o..#",
+	"#........#",
+	"##########",
+};
+
+// Level 13 -- 4 crates, push up, separate columns. Player walks below
+// each crate and pushes north onto the row of goals.
+const char* const kLevel13[] = {
+	"##########",
+	"#._._._._#",
+	"#........#",
+	"#........#",
+	"#.o.o.o.o#",
+	"#........#",
+	"#@.......#",
+	"##########",
+};
+
+// Level 14 -- 5 crates, push down. The column-and-corridor layout fits
+// the full 12-wide engine grid, the first time the pack uses it.
+const char* const kLevel14[] = {
+	"############",
+	"#@.........#",
+	"#..........#",
+	"#.o.o.o.o.o#",
+	"#..........#",
+	"#..........#",
+	"#..........#",
+	"#._._._._._#",
+	"############",
+};
+
+// Level 15 -- final. 6 crates, push down. Pairs of crates sit close
+// enough that the player has to walk all the way around to reach each
+// one's pushing tile, doubling the apparent travel distance for the
+// "boss" finale of the pack.
+const char* const kLevel15[] = {
+	"############",
+	"#@.........#",
+	"#oo.oo.oo..#",
+	"#..........#",
+	"#..........#",
+	"#__.__.__..#",
+	"############",
+};
+
 struct LevelDef {
 	const char* const* rows;
 	uint8_t            rowCount;
 };
 
 const LevelDef kLevels[PhoneSokoban::LevelCount] = {
-	{ kLevel1, sizeof(kLevel1) / sizeof(kLevel1[0]) },
-	{ kLevel2, sizeof(kLevel2) / sizeof(kLevel2[0]) },
-	{ kLevel3, sizeof(kLevel3) / sizeof(kLevel3[0]) },
-	{ kLevel4, sizeof(kLevel4) / sizeof(kLevel4[0]) },
-	{ kLevel5, sizeof(kLevel5) / sizeof(kLevel5[0]) },
+	{ kLevel1,  sizeof(kLevel1)  / sizeof(kLevel1[0])  },
+	{ kLevel2,  sizeof(kLevel2)  / sizeof(kLevel2[0])  },
+	{ kLevel3,  sizeof(kLevel3)  / sizeof(kLevel3[0])  },
+	{ kLevel4,  sizeof(kLevel4)  / sizeof(kLevel4[0])  },
+	{ kLevel5,  sizeof(kLevel5)  / sizeof(kLevel5[0])  },
+	// S84 pack:
+	{ kLevel6,  sizeof(kLevel6)  / sizeof(kLevel6[0])  },
+	{ kLevel7,  sizeof(kLevel7)  / sizeof(kLevel7[0])  },
+	{ kLevel8,  sizeof(kLevel8)  / sizeof(kLevel8[0])  },
+	{ kLevel9,  sizeof(kLevel9)  / sizeof(kLevel9[0])  },
+	{ kLevel10, sizeof(kLevel10) / sizeof(kLevel10[0]) },
+	{ kLevel11, sizeof(kLevel11) / sizeof(kLevel11[0]) },
+	{ kLevel12, sizeof(kLevel12) / sizeof(kLevel12[0]) },
+	{ kLevel13, sizeof(kLevel13) / sizeof(kLevel13[0]) },
+	{ kLevel14, sizeof(kLevel14) / sizeof(kLevel14[0]) },
+	{ kLevel15, sizeof(kLevel15) / sizeof(kLevel15[0]) },
 };
 
 // Pack (col,row) into the 8-bit form used by undoBuf / cratePos.
@@ -143,6 +288,8 @@ PhoneSokoban::PhoneSokoban()
 	}
 	for(uint8_t i = 0; i < LevelCount; ++i) {
 		bestMoves[i] = 0;
+		levelTiles[i]      = nullptr;
+		levelTileLabels[i] = nullptr;
 	}
 
 	lv_obj_set_size(obj, LV_PCT(100), LV_PCT(100));
@@ -156,12 +303,16 @@ PhoneSokoban::PhoneSokoban()
 	buildStaticGrid();
 	buildDynamicLayer();
 	buildOverlay();
+	buildLevelSelect();   // S84
 
 	softKeys = new PhoneSoftKeyBar(obj);
 	softKeys->setLeft("MOVE");
 	softKeys->setRight("BACK");
 
-	loadLevel(0);
+	// S84 - boot directly into the level-select grid. The board nodes
+	// are kept alive but hidden behind the picker until the player picks
+	// a level.
+	enterLevelSelect();
 }
 
 PhoneSokoban::~PhoneSokoban() {
@@ -651,17 +802,23 @@ void PhoneSokoban::refreshHud() {
 void PhoneSokoban::refreshSoftKeys() {
 	if(softKeys == nullptr) return;
 	switch(state) {
+		case GameState::LevelSelect:
+			softKeys->setLeft("PLAY");
+			softKeys->setRight("BACK");
+			break;
 		case GameState::Playing:
 			softKeys->setLeft("MOVE");
-			softKeys->setRight("BACK");
+			// S84 - "MENU" returns to the level-select grid; a second
+			// BACK from there pops out of the screen.
+			softKeys->setRight("MENU");
 			break;
 		case GameState::Won:
 			softKeys->setLeft("NEXT");
-			softKeys->setRight("BACK");
+			softKeys->setRight("MENU");
 			break;
 		case GameState::AllClear:
-			softKeys->setLeft("AGAIN");
-			softKeys->setRight("BACK");
+			softKeys->setLeft("MENU");
+			softKeys->setRight("MENU");
 			break;
 	}
 }
@@ -669,6 +826,7 @@ void PhoneSokoban::refreshSoftKeys() {
 void PhoneSokoban::refreshOverlay() {
 	if(overlayLabel == nullptr) return;
 	switch(state) {
+		case GameState::LevelSelect:
 		case GameState::Playing:
 			lv_obj_add_flag(overlayLabel, LV_OBJ_FLAG_HIDDEN);
 			break;
@@ -690,7 +848,7 @@ void PhoneSokoban::refreshOverlay() {
 		}
 		case GameState::AllClear: {
 			lv_label_set_text(overlayLabel,
-			                  "ALL CLEAR!\nWAREHOUSE EMPTY\nA=REPLAY");
+			                  "ALL CLEAR!\nWAREHOUSE EMPTY\nA=MENU");
 			lv_obj_set_style_text_color(overlayLabel, MP_ACCENT, 0);
 			lv_obj_set_style_border_color(overlayLabel, MP_ACCENT, 0);
 			lv_obj_clear_flag(overlayLabel, LV_OBJ_FLAG_HIDDEN);
@@ -700,25 +858,208 @@ void PhoneSokoban::refreshOverlay() {
 	}
 }
 
+
+// ===========================================================================
+// S84 - level select
+// ===========================================================================
+
+void PhoneSokoban::buildLevelSelect() {
+	// Section title.
+	levelSelectTitle = lv_label_create(obj);
+	lv_obj_set_style_text_font(levelSelectTitle, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(levelSelectTitle, MP_HIGHLIGHT, 0);
+	lv_label_set_text(levelSelectTitle, "PICK A LEVEL");
+	lv_obj_set_align(levelSelectTitle, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(levelSelectTitle, StatusBarH + 4);
+	lv_obj_add_flag(levelSelectTitle, LV_OBJ_FLAG_HIDDEN);
+
+	// 5x3 grid of tiles, centred horizontally inside the play band.
+	// total grid width  = 5 * 24 + 4 * 4 = 136 px (centred at x = 12)
+	// total grid height = 3 * 18 + 2 * 4 =  62 px
+	const lv_coord_t gridW = static_cast<lv_coord_t>(
+		LevelSelectCols * LevelTileW
+		+ (LevelSelectCols - 1) * LevelTileGap);
+	const lv_coord_t gridH = static_cast<lv_coord_t>(
+		LevelSelectRows * LevelTileH
+		+ (LevelSelectRows - 1) * LevelTileGap);
+	const lv_coord_t originX = static_cast<lv_coord_t>((160 - gridW) / 2);
+	// Place the grid in the play band (below status + title, above
+	// the soft-key bar).
+	const lv_coord_t bandTop  = StatusBarH + 14;          // below title
+	const lv_coord_t bandH    = 128 - SoftKeyH - bandTop; // ~104 px
+	const lv_coord_t originY  = bandTop + (bandH - gridH) / 2;
+
+	for(uint8_t i = 0; i < LevelCount; ++i) {
+		const uint8_t r = static_cast<uint8_t>(i / LevelSelectCols);
+		const uint8_t c = static_cast<uint8_t>(i % LevelSelectCols);
+		auto* tile = lv_obj_create(obj);
+		lv_obj_remove_style_all(tile);
+		lv_obj_set_size(tile, LevelTileW, LevelTileH);
+		lv_obj_set_pos(tile,
+		               static_cast<lv_coord_t>(originX + c * (LevelTileW + LevelTileGap)),
+		               static_cast<lv_coord_t>(originY + r * (LevelTileH + LevelTileGap)));
+		lv_obj_set_style_bg_color(tile, MP_BG_DARK, 0);
+		lv_obj_set_style_bg_opa(tile, LV_OPA_70, 0);
+		lv_obj_set_style_border_color(tile, MP_DIM, 0);
+		lv_obj_set_style_border_width(tile, 1, 0);
+		lv_obj_set_style_radius(tile, 2, 0);
+		lv_obj_set_style_pad_all(tile, 0, 0);
+		lv_obj_clear_flag(tile, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_clear_flag(tile, LV_OBJ_FLAG_CLICKABLE);
+		lv_obj_add_flag(tile, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_add_flag(tile, LV_OBJ_FLAG_HIDDEN);
+		levelTiles[i] = tile;
+
+		auto* lab = lv_label_create(tile);
+		lv_obj_remove_style_all(lab);
+		lv_obj_set_style_text_font(lab, &pixelbasic7, 0);
+		lv_obj_set_style_text_color(lab, MP_TEXT, 0);
+		lv_obj_set_align(lab, LV_ALIGN_CENTER);
+		char buf[8];
+		snprintf(buf, sizeof(buf), "%u", static_cast<unsigned>(i + 1));
+		lv_label_set_text(lab, buf);
+		levelTileLabels[i] = lab;
+	}
+}
+
+void PhoneSokoban::enterLevelSelect() {
+	state = GameState::LevelSelect;
+
+	// Hide all in-game UI (HUD, sprites, overlay).
+	if(hudLevelLabel)  lv_obj_add_flag(hudLevelLabel,  LV_OBJ_FLAG_HIDDEN);
+	if(hudMovesLabel)  lv_obj_add_flag(hudMovesLabel,  LV_OBJ_FLAG_HIDDEN);
+	if(hudPushesLabel) lv_obj_add_flag(hudPushesLabel, LV_OBJ_FLAG_HIDDEN);
+	if(overlayLabel)   lv_obj_add_flag(overlayLabel,   LV_OBJ_FLAG_HIDDEN);
+	for(uint16_t i = 0; i < CellCount; ++i) {
+		if(staticSprites[i]) lv_obj_add_flag(staticSprites[i], LV_OBJ_FLAG_HIDDEN);
+	}
+	for(uint8_t i = 0; i < MaxCrates; ++i) {
+		if(crateSprites[i]) lv_obj_add_flag(crateSprites[i], LV_OBJ_FLAG_HIDDEN);
+	}
+	if(playerSprite) lv_obj_add_flag(playerSprite, LV_OBJ_FLAG_HIDDEN);
+
+	// Show the picker.
+	// Just unhide the picker; the soft-key bar was created last so it
+	// already sits above the picker in z-order.
+	if(levelSelectTitle) lv_obj_clear_flag(levelSelectTitle, LV_OBJ_FLAG_HIDDEN);
+	for(uint8_t i = 0; i < LevelCount; ++i) {
+		if(levelTiles[i]) lv_obj_clear_flag(levelTiles[i], LV_OBJ_FLAG_HIDDEN);
+	}
+
+	refreshLevelSelect();
+	refreshSoftKeys();
+}
+
+void PhoneSokoban::showBoard() {
+	// Hide picker.
+	if(levelSelectTitle) lv_obj_add_flag(levelSelectTitle, LV_OBJ_FLAG_HIDDEN);
+	for(uint8_t i = 0; i < LevelCount; ++i) {
+		if(levelTiles[i]) lv_obj_add_flag(levelTiles[i], LV_OBJ_FLAG_HIDDEN);
+	}
+
+	// Re-show the in-game HUD; sprites become visible again the
+	// moment loadLevel() repaints them.
+	if(hudLevelLabel)  lv_obj_clear_flag(hudLevelLabel,  LV_OBJ_FLAG_HIDDEN);
+	if(hudMovesLabel)  lv_obj_clear_flag(hudMovesLabel,  LV_OBJ_FLAG_HIDDEN);
+	if(hudPushesLabel) lv_obj_clear_flag(hudPushesLabel, LV_OBJ_FLAG_HIDDEN);
+}
+
+void PhoneSokoban::moveLevelCursor(int8_t dCol, int8_t dRow) {
+	const int8_t curCol = static_cast<int8_t>(levelCursor % LevelSelectCols);
+	const int8_t curRow = static_cast<int8_t>(levelCursor / LevelSelectCols);
+	int8_t nc = curCol + dCol;
+	int8_t nr = curRow + dRow;
+	// Wrap around in both axes so the navigation feels phone-keypad-y.
+	if(nc < 0) nc = static_cast<int8_t>(LevelSelectCols - 1);
+	if(nc >= static_cast<int8_t>(LevelSelectCols)) nc = 0;
+	if(nr < 0) nr = static_cast<int8_t>(LevelSelectRows - 1);
+	if(nr >= static_cast<int8_t>(LevelSelectRows)) nr = 0;
+	levelCursor = static_cast<uint8_t>(nr * LevelSelectCols + nc);
+	refreshLevelSelect();
+}
+
+void PhoneSokoban::refreshLevelSelect() {
+	for(uint8_t i = 0; i < LevelCount; ++i) {
+		auto* tile = levelTiles[i];
+		auto* lab  = levelTileLabels[i];
+		if(!tile || !lab) continue;
+
+		const bool selected = (i == levelCursor);
+		const bool beaten   = (bestMoves[i] != 0);
+
+		if(selected) {
+			lv_obj_set_style_bg_color(tile, MP_ACCENT, 0);
+			lv_obj_set_style_bg_opa(tile, LV_OPA_COVER, 0);
+			lv_obj_set_style_border_color(tile, MP_HIGHLIGHT, 0);
+			lv_obj_set_style_border_width(tile, 2, 0);
+			lv_obj_set_style_text_color(lab, MP_BG_DARK, 0);
+		} else if(beaten) {
+			lv_obj_set_style_bg_color(tile, MP_DIM, 0);
+			lv_obj_set_style_bg_opa(tile, LV_OPA_70, 0);
+			lv_obj_set_style_border_color(tile, MP_HIGHLIGHT, 0);
+			lv_obj_set_style_border_width(tile, 1, 0);
+			lv_obj_set_style_text_color(lab, MP_HIGHLIGHT, 0);
+		} else {
+			lv_obj_set_style_bg_color(tile, MP_BG_DARK, 0);
+			lv_obj_set_style_bg_opa(tile, LV_OPA_70, 0);
+			lv_obj_set_style_border_color(tile, MP_DIM, 0);
+			lv_obj_set_style_border_width(tile, 1, 0);
+			lv_obj_set_style_text_color(lab, MP_TEXT, 0);
+		}
+
+		// Tick mark suffix on beaten levels (drawn as a small dot in
+		// the label text — keeps the build code-only).
+		char buf[12];
+		if(beaten) {
+			snprintf(buf, sizeof(buf), "%u*", static_cast<unsigned>(i + 1));
+		} else {
+			snprintf(buf, sizeof(buf), "%u", static_cast<unsigned>(i + 1));
+		}
+		lv_label_set_text(lab, buf);
+	}
+}
+
 // ===========================================================================
 // input
 // ===========================================================================
 
 void PhoneSokoban::buttonPressed(uint i) {
-	// BACK always pops out, regardless of state.
+	// S84 - BACK is now context-sensitive:
+	//   * from the level-select grid it pops the screen back to PhoneGames
+	//   * from gameplay / win / all-clear it returns to the level-select
+	//     grid so the player can hop puzzles without leaving Sokoban
 	if(i == BTN_BACK) {
 		if(softKeys) softKeys->flashRight();
-		pop();
+		if(state == GameState::LevelSelect) {
+			pop();
+		} else {
+			enterLevelSelect();
+		}
 		return;
 	}
 
-	// Reset the active level (works in any state).
-	if(i == BTN_R) {
+	// Reset the active level. Only meaningful while playing; pressing
+	// it from the picker would reset a level the player isn't on, so
+	// it's restricted to gameplay states.
+	if(i == BTN_R && state != GameState::LevelSelect) {
 		resetCurrentLevel();
 		return;
 	}
 
 	switch(state) {
+		case GameState::LevelSelect: {
+			if(i == BTN_LEFT || i == BTN_4) { moveLevelCursor(-1, 0); return; }
+			if(i == BTN_RIGHT || i == BTN_6) { moveLevelCursor(+1, 0); return; }
+			if(i == BTN_2) { moveLevelCursor(0, -1); return; }
+			if(i == BTN_8) { moveLevelCursor(0, +1); return; }
+			if(i == BTN_5 || i == BTN_ENTER) {
+				if(softKeys) softKeys->flashLeft();
+				showBoard();
+				loadLevel(levelCursor);
+				return;
+			}
+			return;
+		}
 		case GameState::Playing: {
 			if(i == BTN_LEFT || i == BTN_4) {
 				tryMove(-1, 0);
@@ -758,7 +1099,9 @@ void PhoneSokoban::buttonPressed(uint i) {
 		case GameState::AllClear: {
 			if(i == BTN_5 || i == BTN_ENTER) {
 				if(softKeys) softKeys->flashLeft();
-				loadLevel(0);
+				// S84 - now there are 15 levels, popping back to the
+				// picker is more useful than auto-restarting at L1.
+				enterLevelSelect();
 				return;
 			}
 			return;

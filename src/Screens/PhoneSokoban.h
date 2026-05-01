@@ -11,7 +11,7 @@ class PhoneStatusBar;
 class PhoneSoftKeyBar;
 
 /**
- * PhoneSokoban (S83)
+ * PhoneSokoban (S83 + S84)
  *
  * Phase-N arcade entry: the classic warehouse-keeper push puzzler.
  * The player walks a forklift around a tile-grid, pushing crates onto
@@ -99,8 +99,9 @@ public:
 	static constexpr lv_coord_t FieldYBot = 128 - SoftKeyH;          // 118
 	static constexpr lv_coord_t FieldH    = FieldYBot - FieldYTop;   // 96
 
-	// 5 hand-built levels.
-	static constexpr uint8_t LevelCount = 5;
+	// 15 hand-built levels: the original five from S83 plus the
+	// 10 added in S84 (level-select pack).
+	static constexpr uint8_t LevelCount = 15;
 
 	// Undo ring-buffer cap.
 	static constexpr uint8_t UndoCap = 32;
@@ -143,11 +144,12 @@ private:
 
 	// ---- game state ---------------------------------------------------
 	enum class GameState : uint8_t {
+		LevelSelect,   // S84 - boot/return state showing the 5x3 picker.
 		Playing,
 		Won,
 		AllClear,
 	};
-	GameState state = GameState::Playing;
+	GameState state = GameState::LevelSelect;
 
 	// Active level index 0..LevelCount-1.
 	uint8_t levelIndex = 0;
@@ -190,11 +192,27 @@ private:
 	uint8_t   undoHead  = 0;   // index where the next push will write
 	uint8_t   undoCount = 0;   // valid entries in [head-undoCount .. head)
 
+	// S84 - level-select grid state. The 15 tiles live in
+	// `levelTiles[]` (one rounded rect each) with their numeric label as
+	// a child label. The cursor index points at the currently focused
+	// tile (0..14, row-major: 0..4 = row 0, 5..9 = row 1, 10..14 = row 2).
+	static constexpr uint8_t LevelSelectCols = 5;
+	static constexpr uint8_t LevelSelectRows = 3;
+	static constexpr uint8_t LevelTileW = 24;
+	static constexpr uint8_t LevelTileH = 18;
+	static constexpr uint8_t LevelTileGap = 4;
+
+	lv_obj_t* levelSelectTitle = nullptr;
+	lv_obj_t* levelTiles[LevelCount];
+	lv_obj_t* levelTileLabels[LevelCount];
+	uint8_t   levelCursor = 0;
+
 	// ---- build helpers ------------------------------------------------
 	void buildHud();
 	void buildOverlay();
 	void buildStaticGrid();
 	void buildDynamicLayer();
+	void buildLevelSelect();   // S84
 
 	// ---- state transitions --------------------------------------------
 	void loadLevel(uint8_t idx);
@@ -204,6 +222,10 @@ private:
 	bool isLevelSolved() const;
 	void winLevel();
 	void advanceLevel();
+
+	void enterLevelSelect();   // S84 - shows the picker, hides board.
+	void showBoard();          // S84 - inverse of enterLevelSelect.
+	void moveLevelCursor(int8_t dCol, int8_t dRow);   // S84
 
 	// ---- helpers ------------------------------------------------------
 	uint16_t indexOf(uint8_t col, uint8_t row) const {
@@ -224,6 +246,7 @@ private:
 	void refreshHud();
 	void refreshSoftKeys();
 	void refreshOverlay();
+	void refreshLevelSelect();   // S84 - cursor highlight + tick marks.
 
 	// ---- input --------------------------------------------------------
 	void buttonPressed(uint i) override;
