@@ -24,6 +24,7 @@
 #include "PhoneBubbleSmile.h"
 #include "PhoneMinesweeper.h"
 #include "PhoneSlidingPuzzle.h"
+#include "PhoneTicTacToe.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -80,6 +81,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "BUBBLES",  nullptr,                   GameKind::Screen },  // S77
 	{ "MINES",    nullptr,                   GameKind::Screen },  // S79
 	{ "SLIDE15",  nullptr,                   GameKind::Screen },  // S80
+	{ "TICTAC",   nullptr,                   GameKind::Screen },  // S81
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -467,6 +469,46 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			// No row3 col3: that's the blank slot.
 			break;
 		}
+		case 11: { // TICTAC - mini 3x3 board with X / O in play
+			// S81: a stylised glance of the noughts-and-crosses board.
+			// Three thin grid bars + a cyan X (player) in the centre and
+			// an orange O (CPU) in the top-right cell so the colour
+			// language matches the in-game palette without us drawing a
+			// full match.
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t orange = lv_color_make(255, 140,  30);
+
+			// Two vertical grid bars + two horizontal grid bars carving
+			// the 30x22 glyph into a 3x3 layout (cells are ~9x6 each).
+			px(g, 12,  3, 1, 17, MP_LABEL_DIM);
+			px(g, 19,  3, 1, 17, MP_LABEL_DIM);
+			px(g,  3,  9, 25, 1, MP_LABEL_DIM);
+			px(g,  3, 15, 25, 1, MP_LABEL_DIM);
+
+			// Cyan X in the centre cell (rows 9-15, cols 12-19).
+			px(g, 14, 10, 1, 1, cyan);
+			px(g, 15, 11, 1, 1, cyan);
+			px(g, 16, 12, 1, 1, cyan);
+			px(g, 17, 13, 1, 1, cyan);
+			px(g, 17, 11, 1, 1, cyan);
+			px(g, 14, 13, 1, 1, cyan);
+			px(g, 16, 12, 1, 1, cyan);
+
+			// Orange O in the top-right cell (rows 3-9, cols 19-30).
+			px(g, 22,  4, 4, 1, orange);
+			px(g, 22,  8, 4, 1, orange);
+			px(g, 21,  5, 1, 3, orange);
+			px(g, 26,  5, 1, 3, orange);
+
+			// Player X in the bottom-left (rows 15-22, cols 3-12) -- a
+			// small cross of three pixels diagonally each way.
+			px(g,  5, 16, 1, 1, cyan);
+			px(g,  6, 17, 1, 1, cyan);
+			px(g,  7, 18, 1, 1, cyan);
+			px(g,  9, 16, 1, 1, cyan);
+			px(g,  8, 17, 1, 1, cyan);
+			break;
+		}
 		default:
 			break;
 	}
@@ -609,6 +651,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 8: push(new PhoneBubbleSmile()); break;
 			case 9: push(new PhoneMinesweeper()); break;
 			case 10: push(new PhoneSlidingPuzzle()); break;
+			case 11: push(new PhoneTicTacToe()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
