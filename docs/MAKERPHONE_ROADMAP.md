@@ -110,7 +110,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 ## Phase L — Utility Apps (S60–S65)
 
 - [x] **S60** — `PhoneCalculator` app (basic 4-fn, dialer-pad-style buttons).
-- [ ] **S61** — `PhoneStopwatch` app (start/stop/lap, mm:ss.cs).
+- [x] **S61** — `PhoneStopwatch` app (start/stop/lap, mm:ss.cs).
 - [ ] **S62** — `PhoneTimer` app (count-down with buzzer ringtone on zero).
 - [ ] **S63** — `PhoneCalendar` app (month grid, today highlight, day detail).
 - [ ] **S64** — `PhoneNotepad` app (T9 entry + saved notes list).
