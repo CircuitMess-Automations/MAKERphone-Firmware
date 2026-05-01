@@ -19,6 +19,7 @@
 #include "../Games/Space/SpaceRocks.h"
 #include "PhoneTetris.h"
 #include "PhoneBounce.h"
+#include "PhoneBrickBreaker.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -70,6 +71,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "BONK",     nullptr,                   GameKind::Engine },
 	{ "TETRIS",   nullptr,                   GameKind::Screen },  // S71
 	{ "BOUNCE",   nullptr,                   GameKind::Screen },  // S73
+	{ "BRICK",    nullptr,                   GameKind::Screen },  // S75
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -300,6 +302,28 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 19,  9, 2, 2, orange);
 			break;
 		}
+		case 6: { // BRICK - colourful brick stack + paddle + ball
+			// S75: a five-row Breakout-coloured wall sat above a thin
+			// paddle with the ball mid-flight. The colours match the
+			// in-game brick palette, so the glyph foreshadows the screen.
+			const lv_color_t red    = lv_color_make(240,  90,  90);
+			const lv_color_t orange = lv_color_make(255, 140,  30);
+			const lv_color_t yellow = lv_color_make(255, 220,  60);
+			const lv_color_t green  = lv_color_make(120, 220, 110);
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+
+			// Five 24x2 brick rows (compressed to fit the 30x22 glyph).
+			px(g,  3,  3, 24, 2, red);
+			px(g,  3,  6, 24, 2, orange);
+			px(g,  3,  9, 24, 2, yellow);
+			px(g,  3, 12, 24, 2, green);
+			px(g,  3, 15, 24, 2, cyan);
+
+			// Ball mid-flight + paddle catch-strip below the brick wall.
+			px(g, 13, 18, 2, 2, MP_TEXT);
+			px(g,  8, 19, 14, 1, MP_TEXT);
+			break;
+		}
 		default:
 			break;
 	}
@@ -437,6 +461,7 @@ void PhoneGamesScreen::launchSelected() {
 		switch(gameIdx) {
 			case 4: push(new PhoneTetris()); break;
 			case 5: push(new PhoneBounce()); break;
+			case 6: push(new PhoneBrickBreaker()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
