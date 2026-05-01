@@ -220,7 +220,7 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// Defensive: any future row that is added to
 						// the Item enum without being wired here lands
 						// on a generic stub rather than crashing.
-						self->push(new PhoneAppStubScreen("SETTING"));
+						self->push(new PhoneAppStubScreen("SETTINGS"));
 						break;
 				}
 			});
