@@ -45,6 +45,13 @@ struct SettingsData {
 	// S52 — three-state sound profile (0=Mute, 1=Vibrate, 2=Loud).
 	// Default 0 (Mute) aligns with the existing `sound = false` factory default.
 	uint8_t soundProfile = 0;
+	// S53 — wallpaper style selector (0=Synthwave, 1=Plain, 2=GridOnly, 3=Stars).
+	// Read by PhoneSynthwaveBg's constructor on every screen build, so changing
+	// the value via PhoneWallpaperScreen takes effect on the next screen push
+	// (e.g. popping back to PhoneHomeScreen / PhoneMainMenu). Persisted values
+	// outside [0..3] are clamped to Synthwave at the wallpaper layer to be
+	// defensive against NVS-resize wipes that read the new byte as garbage.
+	uint8_t wallpaperStyle = 0;
 };
 
 class SettingsImpl {

@@ -1,5 +1,6 @@
 #include "PhoneSynthwaveBg.h"
 #include <stdio.h>
+#include <Settings.h>
 
 // MAKERphone retro palette (kept consistent with PhoneStatusBar /
 // PhoneSoftKeyBar / PhoneClockFace).
@@ -14,7 +15,39 @@
 #define MP_GRID        lv_color_make(122, 232, 255)   // cyan grid
 #define MP_STAR        lv_color_make(255, 240, 220)   // warm white stars
 
-PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent) : LVObject(parent){
+PhoneSynthwaveBg::Style PhoneSynthwaveBg::styleFromByte(uint8_t raw){
+	// Defensive clamp - any persisted byte outside the known enum range
+	// falls back to Synthwave (the original look) so a corrupted NVS
+	// page can never render a blank screen.
+	switch(raw){
+		case static_cast<uint8_t>(Style::Plain):     return Style::Plain;
+		case static_cast<uint8_t>(Style::GridOnly):  return Style::GridOnly;
+		case static_cast<uint8_t>(Style::Stars):     return Style::Stars;
+		case static_cast<uint8_t>(Style::Synthwave):
+		default:                                     return Style::Synthwave;
+	}
+}
+
+PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent)
+		: PhoneSynthwaveBg(parent, styleFromByte(Settings.get().wallpaperStyle)) {
+	// Delegating ctor - reads the persisted style on every drop so every
+	// new screen picks up the user's current preference without each
+	// caller having to know the wiring.
+}
+
+PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent, Style style) : LVObject(parent){
+	// Default-init member pointers that may be left null by a non-Synthwave
+	// style. Keeps the destructor / future code defensive against null
+	// dereferences if a follow-up commit references e.g. sun directly.
+	sky      = nullptr;
+	ground   = nullptr;
+	sun      = nullptr;
+	haloRing = nullptr;
+	for(uint8_t i = 0; i < ScanCount;  ++i) scanLines[i]  = nullptr;
+	for(uint8_t i = 0; i < HLineCount; ++i) hGridLines[i] = nullptr;
+	for(uint8_t i = 0; i < RayCount;   ++i) rays[i]       = nullptr;
+	for(uint8_t i = 0; i < StarCount;  ++i) stars[i]      = nullptr;
+
 	// Anchor to the full 160x128 display regardless of parent layout. Using
 	// IGNORE_LAYOUT keeps this widget a pure "wallpaper" - it does not get
 	// re-flowed by a flex/grid parent.
@@ -31,12 +64,31 @@ PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent) : LVObject(parent){
 	lv_obj_set_style_border_width(obj, 0, 0);
 	lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
 
+	// Sky + ground are the foundation of every variant - they always run
+	// so the screen never falls back to the default LVGL theme color.
 	buildSky();
-	buildSun();        // sun is a child of sky so it auto-clips at the horizon
 	buildGround();
-	buildRays();
-	buildHorizontals();
-	buildStars();
+
+	// The sun (and its halo) live only in the full Synthwave variant.
+	// Plain / GridOnly / Stars deliberately omit it to read calmer.
+	if(style == Style::Synthwave){
+		buildSun();
+	}
+
+	// Perspective rays + scrolling horizontals belong to the synthwave
+	// "racing grid" motif. They appear in Synthwave and GridOnly so a
+	// user who wants the grid feel without the sun can still get it.
+	if(style == Style::Synthwave || style == Style::GridOnly){
+		buildRays();
+		buildHorizontals();
+	}
+
+	// Twinkle stars are the night-sky cue. They appear in Synthwave and
+	// Stars - the Stars-only variant keeps the gradient + stars and
+	// drops everything else so the wallpaper reads as a calm sky.
+	if(style == Style::Synthwave || style == Style::Stars){
+		buildStars();
+	}
 }
 
 // ----- builders -----

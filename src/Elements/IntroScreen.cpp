@@ -20,6 +20,7 @@
 #include "../Screens/PhoneSettingsScreen.h"
 #include "../Screens/PhoneBrightnessScreen.h"
 #include "../Screens/PhoneSoundScreen.h"
+#include "../Screens/PhoneWallpaperScreen.h"
 #include "../Screens/GamesScreen.h"
 #include "../Interface/LVScreen.h"
 #include "../Services/PhoneCallService.h"
@@ -158,7 +159,15 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						self->push(new PhoneBrightnessScreen());
 						break;
 					case PhoneSettingsScreen::Item::Wallpaper:
-						self->push(new PhoneAppStubScreen("WALLPAPER"));
+						// S53: real wallpaper picker replaces the WALLPAPER
+						// placeholder stub. PhoneWallpaperScreen reads the
+						// persisted style from Settings, lets the user step
+						// through the four PhoneSynthwaveBg variants
+						// (Synthwave / Plain / GridOnly / Stars) with a
+						// live swatch preview, and persists the choice on
+						// SAVE so every subsequent screen drop picks up
+						// the new look.
+						self->push(new PhoneWallpaperScreen());
 						break;
 					case PhoneSettingsScreen::Item::Sound:
 						// S52: Sound + Vibration toggles screen replaces the

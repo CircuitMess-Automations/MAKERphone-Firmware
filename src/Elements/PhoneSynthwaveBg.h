@@ -59,8 +59,41 @@
  */
 class PhoneSynthwaveBg : public LVObject {
 public:
+	/**
+	 * S53 wallpaper variants. The default constructor reads the
+	 * persisted choice from `Settings.get().wallpaperStyle` so every
+	 * screen that drops a `new PhoneSynthwaveBg(obj)` automatically
+	 * picks up the user's preference. Tests / hosts that want a
+	 * specific look (e.g. always-Synthwave for a swatch preview) can
+	 * pass the Style explicitly via the second constructor.
+	 *
+	 *  - Synthwave: full retro look (sun, gradient, perspective grid,
+	 *    ground horizontals, twinkle stars). The original wallpaper.
+	 *  - Plain:     gradient sky + ground only - calmest look, easiest
+	 *               on the eyes for long settings/reading screens.
+	 *  - GridOnly:  gradient + perspective rays + ground horizontals -
+	 *               keeps the synthwave grid motion without the sun
+	 *               drawing the eye, useful for utility screens.
+	 *  - Stars:     gradient + twinkle stars - night-sky vibe, no
+	 *               sun and no grid. Reads as "calm + magical".
+	 */
+	enum class Style : uint8_t {
+		Synthwave = 0,
+		Plain     = 1,
+		GridOnly  = 2,
+		Stars     = 3,
+	};
+
+	/** Default ctor — picks the style from `Settings.get().wallpaperStyle`. */
 	PhoneSynthwaveBg(lv_obj_t* parent);
+
+	/** Explicit-style ctor — used by previews / tests that bypass Settings. */
+	PhoneSynthwaveBg(lv_obj_t* parent, Style style);
+
 	virtual ~PhoneSynthwaveBg() = default;
+
+	/** Resolve a raw `Settings.wallpaperStyle` byte to a clamped Style. */
+	static Style styleFromByte(uint8_t raw);
 
 	static constexpr uint16_t BgWidth   = 160;
 	static constexpr uint16_t BgHeight  = 128;
