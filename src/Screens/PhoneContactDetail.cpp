@@ -133,6 +133,13 @@ void PhoneContactDetail::buildLayout() {
 	// out to the homescreen. Short-press still fires the BACK softkey.
 	setButtonHoldTime(BTN_BACK, kBackHoldMs);
 
+	// S38: hold BTN_ENTER to open the contact editor. The hook is
+	// optional - defaults to a no-op flash if nothing is bound, so a
+	// host that does not want the gesture simply leaves setOnEdit
+	// unset. The same long-press cadence as the BACK gesture so the
+	// muscle memory transfers cleanly.
+	setButtonHoldTime(BTN_ENTER, kBackHoldMs);
+
 	// Initial focus paint.
 	refreshFocus();
 }
@@ -249,6 +256,7 @@ void PhoneContactDetail::buildActionButtons() {
 void PhoneContactDetail::setOnCall(ActionHandler cb)    { callCb    = cb; }
 void PhoneContactDetail::setOnMessage(ActionHandler cb) { messageCb = cb; }
 void PhoneContactDetail::setOnBack(ActionHandler cb)    { backCb    = cb; }
+void PhoneContactDetail::setOnEdit(ActionHandler cb)    { editCb    = cb; }
 
 void PhoneContactDetail::setLeftLabel(const char* label) {
 	if(softKeys) softKeys->setLeft(label);
@@ -389,6 +397,15 @@ void PhoneContactDetail::buttonPressed(uint i) {
 }
 
 void PhoneContactDetail::buttonHeld(uint i) {
+	if(i == BTN_ENTER) {
+		// S38: hold-ENTER = open the contact editor. The default
+		// behaviour with no callback wired is a flash on the LEFT
+		// softkey so the user gets a visible cue that the gesture
+		// was recognised even before any host wires the callback.
+		if(softKeys) softKeys->flashLeft();
+		if(editCb) editCb(this);
+		return;
+	}
 	if(i == BTN_BACK) {
 		// Hold-BACK = bail to homescreen. We pop our own screen here
 		// (the parent will continue the unwind chain when the user

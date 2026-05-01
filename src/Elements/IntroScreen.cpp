@@ -12,6 +12,7 @@
 #include "../Screens/FriendsScreen.h"
 #include "../Screens/PhoneContactsScreen.h"
 #include "../Screens/PhoneContactDetail.h"
+#include "../Screens/PhoneContactEdit.h"
 #include "../Screens/ConvoScreen.h"
 #include "../Screens/SettingsScreen.h"
 #include "../Screens/GamesScreen.h"
@@ -58,6 +59,26 @@ static void contactDetailMessage(PhoneContactDetail* self){
 	self->push(new ConvoScreen(uid));
 }
 
+// S38: long-pressing ENTER on a PhoneContactDetail opens the contact
+// editor for that uid. Sample rows (uid==0) cannot be edited so the
+// gesture flashes but no-ops, matching the CALL / MESSAGE convention
+// the detail screen uses for placeholder contacts.
+static void contactDetailEdit(PhoneContactDetail* self){
+	if(self == nullptr) return;
+	const UID_t uid = self->getUid();
+	if(uid == 0) return;
+	auto* editor = new PhoneContactEdit(uid,
+										self->getName(),
+										self->getAvatarSeed());
+	// Leave setOnSave / setOnBack unset so the editor's default
+	// behaviour applies: SAVE persists through PhoneContacts and
+	// pops, BACK pops without persisting. Returning to the detail
+	// screen lets the user immediately see the new name / avatar
+	// because the detail's own labels are written from the same
+	// helpers the editor wrote into.
+	self->push(editor);
+}
+
 static void launchContactDetail(PhoneContactsScreen* self,
 								const PhoneContactsScreen::Entry& entry){
 	if(self == nullptr) return;
@@ -67,6 +88,8 @@ static void launchContactDetail(PhoneContactsScreen* self,
 										  entry.favorite != 0);
 	detail->setOnCall(contactDetailCall);
 	detail->setOnMessage(contactDetailMessage);
+	// S38: hold-ENTER on the detail screen opens the contact editor.
+	detail->setOnEdit(contactDetailEdit);
 	// Leave setOnBack unset so the default pop() walks the user back
 	// to the contacts list with the same row still focused.
 	self->push(detail);

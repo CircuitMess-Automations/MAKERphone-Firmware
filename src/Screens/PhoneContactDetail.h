@@ -118,6 +118,15 @@ public:
 	/** Bind the BACK softkey. Default: pop(). */
 	void setOnBack(ActionHandler cb);
 
+	/**
+	 * Bind the EDIT action - fired on a long-press of BTN_ENTER. The
+	 * S38 wiring in IntroScreen.cpp uses this hook to push a
+	 * PhoneContactEdit screen for the focused contact. Default
+	 * behaviour with no callback wired is a soft-key flash + no-op
+	 * so the screen still works in unit / visual tests.
+	 */
+	void setOnEdit(ActionHandler cb);
+
 	/** Replace the visible label of the left softkey (default "CALL"). */
 	void setLeftLabel(const char* label);
 	/** Replace the visible label of the right softkey (default "BACK"). */
@@ -165,6 +174,7 @@ private:
 	ActionHandler callCb    = nullptr;
 	ActionHandler messageCb = nullptr;
 	ActionHandler backCb    = nullptr;
+	ActionHandler editCb    = nullptr;
 
 	// Suppress the BTN_BACK short-press handling once a long-press has
 	// already fired pop-to-home on the same hold cycle.
