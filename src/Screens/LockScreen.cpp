@@ -8,6 +8,7 @@
 #include "../Elements/PhoneClockFace.h"
 #include "../Elements/PhoneSynthwaveBg.h"
 #include "../Elements/PhoneLockHint.h"
+#include "../Elements/PhoneNotificationPreview.h"
 #include <Input/Input.h>
 #include <Pins.hpp>
 
@@ -40,8 +41,22 @@ LockScreen::LockScreen() : LVScreen(){
 	// Big retro clock face directly under the status bar.
 	new PhoneClockFace(obj);
 
-	// 11 px (status bar + 1 px separator) + clock face height + 2 px gap.
-	lv_obj_set_style_pad_top(container, 11 + PhoneClockFace::FaceHeight + 2, 0);
+	// S49 lock-screen notifications preview: a compact two-row summary
+	// of unread messages + missed calls. Anchored just under the clock
+	// face. Self-hides when both streams are empty so the existing
+	// "Nothing new" centre label can take the floor.
+	preview = new PhoneNotificationPreview(obj);
+	lv_obj_set_align(preview->getLvObj(), LV_ALIGN_TOP_MID);
+	lv_obj_set_y(preview->getLvObj(), 11 + PhoneClockFace::FaceHeight + 2);
+
+	// 11 px (status bar + 1 px separator) + clock face height + 2 px gap
+	// + preview height + 2 px gap. Pushes the unread-message rows below
+	// the new preview so the two never overlap.
+	lv_obj_set_style_pad_top(
+			container,
+			11 + PhoneClockFace::FaceHeight + 2 + PhoneNotificationPreview::PreviewHeight + 2,
+			0
+	);
 
 	// Soft-key bar foreshadows the future Phase 3-4 wiring.
 	auto softkeys = new PhoneSoftKeyBar(obj);
@@ -112,6 +127,7 @@ void LockScreen::activate(LVScreen* parent){
 
 void LockScreen::onStarting(){
 	loadUnread();
+	if(preview) preview->refresh();
 	slide->reset();
 	if(lockHint){
 		lockHint->setBoost(false);
@@ -217,6 +233,12 @@ void LockScreen::onUnread(bool unread){
 	}else{
 		createNoUnreads();
 	}
+
+	// S49: poke the summary preview so its empty-state visibility
+	// flips in lock-step with the rebuilt row list.
+	if(preview){
+		preview->refresh();
+	}
 }
 
 void LockScreen::loadUnread(){
@@ -233,7 +255,7 @@ void LockScreen::loadUnread(){
 		auto el = new UserWithMessage(container, fren);
 		unreads.push_back(el);
 
-		if(unreads.size() >= 2) break;
+		if(unreads.size() >= 1) break;
 	}
 
 	if(unreads.empty()){
@@ -244,8 +266,16 @@ void LockScreen::loadUnread(){
 void LockScreen::createNoUnreads(){
 	clearUnreads();
 
+	// S49: when the summary preview already has missed-call content to
+	// render, suppress the centre label so the lock screen reads as
+	// "you have notifications" rather than "nothing waiting".
+	if(preview && !preview->isEmpty()){
+		noUnreads = nullptr;
+		return;
+	}
+
 	noUnreads = lv_label_create(container);
-	lv_label_set_text(noUnreads, "You have no new messages.");
+	lv_label_set_text(noUnreads, "Nothing new.");
 	lv_obj_set_style_text_font(noUnreads, &pixelbasic7, 0);
 	lv_obj_set_style_text_color(noUnreads, lv_color_make(200, 200, 200), 0);
 }

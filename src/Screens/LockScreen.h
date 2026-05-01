@@ -7,6 +7,7 @@
 #include "../Interface/LVScreen.h"
 #include "../Elements/UnlockSlide.h"
 #include "../Elements/PhoneLockHint.h"
+#include "../Elements/PhoneNotificationPreview.h"
 #include "../Services/MessageService.h"
 #include "../Elements/UserWithMessage.h"
 
@@ -28,8 +29,9 @@ private:
 	lv_obj_t* container;
 	lv_obj_t* noUnreads = nullptr;
 
-	UnlockSlide*   slide;
-	PhoneLockHint* lockHint = nullptr;
+	UnlockSlide*               slide;
+	PhoneLockHint*             lockHint = nullptr;
+	PhoneNotificationPreview*  preview  = nullptr;
 
 	void buttonPressed(uint i) override;
 	void buttonReleased(uint i) override;
