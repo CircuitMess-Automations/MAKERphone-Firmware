@@ -73,7 +73,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 
 ## Phase G — Audio, Music, Buzzer (S39–S43)
 
-- [ ] **S39** — `PhoneRingtoneEngine` — non-blocking melody framework over the existing `BuzzerService`.
+- [x] **S39** — `PhoneRingtoneEngine` — non-blocking melody framework over the existing `BuzzerService`.
 - [ ] **S40** — Five default ringtone melodies (Synthwave, Classic, Beep, Boss, Silent).
 - [ ] **S41** — Ringtone playback wired into `PhoneIncomingCall`.
 - [ ] **S42** — `PhoneMusicPlayer` screen UI (track name, progress bar, play/pause/skip buttons).
