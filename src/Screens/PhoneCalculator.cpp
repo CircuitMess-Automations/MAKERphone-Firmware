@@ -2,7 +2,7 @@
 
 #include <Input/Input.h>
 #include <Pins.hpp>
-#include <math.h>
+#include <cmath>
 #include <stdio.h>
 #include <string.h>
 
@@ -409,7 +409,7 @@ void PhoneCalculator::formatDisplay(double value, char* out, size_t outLen) {
 	// Reject non-finite values up front -- they would otherwise print as
 	// "inf" / "nan" through %g, which is not the kind of feedback a
 	// feature-phone calc would give. The caller paints "ERROR" instead.
-	if(!isfinite(value)) {
+	if(!std::isfinite(value)) {
 		strncpy(out, "ERROR", outLen);
 		out[outLen - 1] = '\0';
 		return;
