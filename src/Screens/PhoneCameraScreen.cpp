@@ -9,6 +9,7 @@
 #include "../Elements/PhoneStatusBar.h"
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Fonts/font.h"
+#include "PhoneGalleryScreen.h"   // S46: BTN_RIGHT pushes the gallery stub
 
 // MAKERphone retro palette - inlined per the established pattern in this
 // codebase (see PhoneMainMenu.cpp / PhoneHomeScreen.cpp / PhoneMusicPlayer.cpp).
@@ -523,10 +524,21 @@ void PhoneCameraScreen::buttonPressed(uint i) {
 			// S45: next mode (Photo -> Effect -> Selfie, wraps).
 			cycleMode(+1);
 			break;
+		case BTN_RIGHT:
+			// S46: d-pad DOWN opens the gallery stub. The d-pad
+			// vertical axis was previously ignored on this screen
+			// (mode cycling lives on the shoulder bumpers BTN_L/BTN_R),
+			// so this is purely additive - shutter, mode and exit
+			// still react identically. push() reparents the gallery
+			// under us so its BTN_BACK lands the user back on the
+			// viewfinder with the current mode/frameCount intact.
+			push(new PhoneGalleryScreen());
+			break;
 		default:
-			// Any other key (digits, BTN_LEFT/RIGHT) is intentionally
+			// Any other key (digits, BTN_LEFT) is intentionally
 			// ignored - the dialer-pad muscle memory does not apply
-			// inside the camera viewfinder.
+			// inside the camera viewfinder. (BTN_RIGHT is now wired
+			// up to the gallery stub above.)
 			break;
 	}
 }

@@ -42,6 +42,9 @@ class PhoneSoftKeyBar;
  *   - BTN_BACK         : pop back to the main menu
  *   - BTN_L            : previous mode (Photo <- Effect <- Selfie, wraps)
  *   - BTN_R            : next mode (Photo -> Effect -> Selfie, wraps)
+ *   - BTN_RIGHT (DOWN) : open PhoneGalleryScreen stub (S46) - the d-pad
+ *                        vertical axis is repurposed as a "view captures"
+ *                        shortcut, since the camera does not need a d-pad.
  *
  * Mode-switching (PHOTO / EFFECT / SELFIE) ships in S45 - the L/R
  * bumpers (BTN_L / BTN_R) cycle the mode, the mode label recolours

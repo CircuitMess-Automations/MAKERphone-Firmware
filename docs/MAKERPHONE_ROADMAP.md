@@ -83,7 +83,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 
 - [x] **S44** — `PhoneCameraScreen` — retro viewfinder (dotted frame, crosshair, mode label, shutter sound).
 - [x] **S45** — Camera mode switcher (Photo / Effect / Selfie placeholder) with L/R bumper navigation.
-- [ ] **S46** — `PhoneGalleryScreen` placeholder — 4-thumbnail grid stub for future captures.
+- [x] **S46** — `PhoneGalleryScreen` placeholder — 4-thumbnail grid stub for future captures.
 
 ## Phase I — Lock Screen Polish (S47–S49)
 
