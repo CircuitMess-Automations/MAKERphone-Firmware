@@ -18,6 +18,7 @@
 #include "../Games/Invaders/SpaceInvaders.h"
 #include "../Games/Space/SpaceRocks.h"
 #include "PhoneTetris.h"
+#include "PhoneBounce.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -68,6 +69,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "SNAKE",    nullptr,                   GameKind::Engine },
 	{ "BONK",     nullptr,                   GameKind::Engine },
 	{ "TETRIS",   nullptr,                   GameKind::Screen },  // S71
+	{ "BOUNCE",   nullptr,                   GameKind::Screen },  // S73
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -275,6 +277,29 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 23, 15, 4, 3, yellow);
 			break;
 		}
+		case 5: { // BOUNCE - cyan ball arcing over a chunky platform
+			// S73: a single bouncy ball mid-arc with motion lines, sitting
+			// above a low platform so the silhouette reads as "physics game"
+			// even at 30x22 px. The cyan-on-orange combo matches the actual
+			// in-game ball + goal flag, so the glyph foreshadows the screen.
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t orange = lv_color_make(255, 140,  30);
+			const lv_color_t cream  = lv_color_make(255, 220, 180);
+
+			// Two ground tiles + one raised step on the right.
+			px(g,  3, 16, 8, 4, MP_DIM);
+			px(g, 11, 16, 8, 4, MP_DIM);
+			px(g, 19, 12, 8, 8, MP_DIM);
+
+			// Ball mid-arc.
+			px(g, 12,  6, 5, 5, cyan);
+			px(g, 13,  7, 3, 3, cream);
+
+			// Motion-trail dots heading up-right toward the step.
+			px(g,  8, 11, 2, 2, orange);
+			px(g, 19,  9, 2, 2, orange);
+			break;
+		}
 		default:
 			break;
 	}
@@ -411,6 +436,7 @@ void PhoneGamesScreen::launchSelected() {
 		// lifecycle and will pop() back to us on BACK.
 		switch(gameIdx) {
 			case 4: push(new PhoneTetris()); break;
+			case 5: push(new PhoneBounce()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
