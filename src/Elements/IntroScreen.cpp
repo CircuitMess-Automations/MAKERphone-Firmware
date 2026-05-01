@@ -21,6 +21,7 @@
 #include "../Screens/PhoneBrightnessScreen.h"
 #include "../Screens/PhoneSoundScreen.h"
 #include "../Screens/PhoneWallpaperScreen.h"
+#include "../Screens/PhoneDateTimeScreen.h"
 #include "../Screens/GamesScreen.h"
 #include "../Interface/LVScreen.h"
 #include "../Services/PhoneCallService.h"
@@ -178,7 +179,14 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						self->push(new PhoneSoundScreen());
 						break;
 					case PhoneSettingsScreen::Item::DateTime:
-						self->push(new PhoneAppStubScreen("DATE & TIME"));
+						// S54: real Date & Time editor replaces the placeholder
+						// stub. PhoneDateTimeScreen edits a copy of the wall
+						// clock held by PhoneClock (the in-memory wall-clock
+						// service introduced in S54) and only commits on SAVE,
+						// so a feature-phone-style five-field civil-time editor
+						// drives the underlying clock without leaking through
+						// any of the existing uptime-driven widgets.
+						self->push(new PhoneDateTimeScreen());
 						break;
 					case PhoneSettingsScreen::Item::About:
 						self->push(new PhoneAppStubScreen("ABOUT"));
