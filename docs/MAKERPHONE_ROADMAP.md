@@ -133,7 +133,7 @@ A proper retro-arcade carousel for `PhoneGames`. Each entry is one self-containe
 - [x] **S74** — `PhoneBounce II` (split) — three more levels + collectible rings.
 - [x] **S75** — `PhoneBrickBreaker` — paddle, ball, bricks, power-up bricks.
 - [x] **S76** — `PhoneBantumi` — Mancala vs CPU, the Nokia classic.
-- [ ] **S77** — `PhoneBubbleSmile` — match-3 colored bubbles.
+- [x] **S77** — `PhoneBubbleSmile` — match-3 colored bubbles.
 - [ ] **S78** — `PhoneBubbleSmile+` (split) — combo cascades + 5 power-ups.
 - [ ] **S79** — `PhoneMinesweeper` — keypad-driven, three difficulties.
 - [ ] **S80** — `PhoneSlidingPuzzle` — randomized 15-tile puzzle.

@@ -21,6 +21,7 @@
 #include "PhoneBounce.h"
 #include "PhoneBrickBreaker.h"
 #include "PhoneBantumi.h"
+#include "PhoneBubbleSmile.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -74,6 +75,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "BOUNCE",   nullptr,                   GameKind::Screen },  // S73
 	{ "BRICK",    nullptr,                   GameKind::Screen },  // S75
 	{ "BANTUMI",  nullptr,                   GameKind::Screen },  // S76
+	{ "BUBBLES",  nullptr,                   GameKind::Screen },  // S77
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -359,6 +361,33 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 26, 12, 1, 1, cyan);
 			break;
 		}
+		case 8: { // BUBBLES - cluster of three matching cyan bubbles + two strays
+			// S77: a 3x3 cluster of round bubbles where the middle row
+			// reads as a "match-3 line" (cyan trio) with two off-colour
+			// outliers above. Foreshadows the swap-to-match mechanic.
+			const lv_color_t cyan    = lv_color_make(122, 232, 255);
+			const lv_color_t red     = lv_color_make(240,  90,  90);
+			const lv_color_t yellow  = lv_color_make(255, 220,  60);
+			const lv_color_t magenta = lv_color_make(220, 130, 240);
+
+			// Top row: red + yellow strays.
+			px(g,  4,  3, 6, 5, red);
+			px(g, 12,  3, 6, 5, yellow);
+
+			// Middle row: a cyan match-3 trio.
+			px(g,  4, 10, 6, 5, cyan);
+			px(g, 12, 10, 6, 5, cyan);
+			px(g, 20, 10, 6, 5, cyan);
+
+			// Bottom row: a magenta lone + cyan tail-end stray.
+			px(g,  4, 17, 6, 4, magenta);
+			px(g, 20, 17, 6, 4, cyan);
+
+			// Tiny cream highlight pip on the centre cyan bubble so the
+			// glyph reads as glossy spheres rather than flat squares.
+			px(g, 14, 11, 1, 1, MP_TEXT);
+			break;
+		}
 		default:
 			break;
 	}
@@ -498,6 +527,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 5: push(new PhoneBounce()); break;
 			case 6: push(new PhoneBrickBreaker()); break;
 			case 7: push(new PhoneBantumi()); break;
+			case 8: push(new PhoneBubbleSmile()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
