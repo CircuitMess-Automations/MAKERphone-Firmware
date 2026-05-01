@@ -7,6 +7,7 @@
 #include "../Screens/PhoneHomeScreen.h"
 #include "../Screens/PhoneMainMenu.h"
 #include "../Screens/PhoneAppStubScreen.h"
+#include "../Screens/PhoneMusicPlayer.h"
 #include "../Screens/PhoneDialerScreen.h"
 #include "../Screens/InboxScreen.h"
 #include "../Screens/FriendsScreen.h"
@@ -147,8 +148,11 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 			break;
 
 		case PhoneIconTile::Icon::Music:
-			// Music player ships in S42 (PhoneMusicPlayer).
-			dest = new PhoneAppStubScreen("MUSIC");
+			// S42: real music-player screen replaces the placeholder stub.
+			// PhoneMusicPlayer self-seeds with the five S40 ringtone
+			// melodies so the screen is driveable today; S43 will swap
+			// in the proper 10-tune music library via setTracks().
+			dest = new PhoneMusicPlayer();
 			break;
 
 		case PhoneIconTile::Icon::Camera:
