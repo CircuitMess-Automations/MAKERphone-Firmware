@@ -20,6 +20,7 @@
 #include "PhoneTetris.h"
 #include "PhoneBounce.h"
 #include "PhoneBrickBreaker.h"
+#include "PhoneBantumi.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -72,6 +73,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "TETRIS",   nullptr,                   GameKind::Screen },  // S71
 	{ "BOUNCE",   nullptr,                   GameKind::Screen },  // S73
 	{ "BRICK",    nullptr,                   GameKind::Screen },  // S75
+	{ "BANTUMI",  nullptr,                   GameKind::Screen },  // S76
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -324,6 +326,39 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g,  8, 19, 14, 1, MP_TEXT);
 			break;
 		}
+		case 7: { // BANTUMI - two pit rows + a store on each side
+			// S76: a stylised Mancala board glyph -- two rows of three pits
+			// with a tall store on each end. Cyan stones in the player's
+			// pits/store + dim stones in the CPU's so the side asymmetry
+			// reads even at 30x22 px.
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t purple = lv_color_make(170, 140, 200);
+
+			// CPU store (left) + Player store (right) frames.
+			px(g,  2,  4, 3, 14, MP_DIM);
+			px(g, 25,  4, 3, 14, MP_ACCENT);
+
+			// CPU pit row (top) -- three small pit cells with dim stones.
+			px(g,  7,  4, 5, 6, MP_DIM);
+			px(g, 13,  4, 5, 6, MP_DIM);
+			px(g, 19,  4, 5, 6, MP_DIM);
+			px(g,  9,  6, 1, 2, purple);
+			px(g, 15,  6, 1, 2, purple);
+			px(g, 21,  6, 1, 2, purple);
+
+			// Player pit row (bottom) -- cyan stones, ride the accent line.
+			px(g,  7, 12, 5, 6, MP_DIM);
+			px(g, 13, 12, 5, 6, MP_DIM);
+			px(g, 19, 12, 5, 6, MP_DIM);
+			px(g,  9, 14, 1, 2, cyan);
+			px(g, 15, 14, 1, 2, cyan);
+			px(g, 21, 14, 1, 2, cyan);
+
+			// A couple of stones tucked in the player's store for flavour.
+			px(g, 26,  8, 1, 1, cyan);
+			px(g, 26, 12, 1, 1, cyan);
+			break;
+		}
 		default:
 			break;
 	}
@@ -462,6 +497,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 4: push(new PhoneTetris()); break;
 			case 5: push(new PhoneBounce()); break;
 			case 6: push(new PhoneBrickBreaker()); break;
+			case 7: push(new PhoneBantumi()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
