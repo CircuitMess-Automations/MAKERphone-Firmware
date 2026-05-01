@@ -162,12 +162,23 @@ private:
 	uint32_t lines    = 0;
 	uint8_t  level    = 0;
 
+	// (S72) Last successful piece action was a rotation -- gating
+	// condition for T-spin detection. Reset on spawn / move / drop,
+	// set on a successful rotateCW. Survives a lock-without-movement
+	// so T-spins triggered by a natural drop tick still register.
+	bool lastActionRotation = false;
+	// (S72) Latched T-spin verdict for the most recently locked piece.
+	// Set in lockPiece(), consumed by awardLineScore via either the
+	// no-lines path or the line-clear timer callback, then cleared.
+	bool pendingTSpin       = false;
+
 	// Line-clear animation: which rows are flashing.
 	bool clearedRows[Rows];
 
 	// LVGL timers.
 	lv_timer_t* dropTimer       = nullptr; // Playing-only drop tick
 	lv_timer_t* lineClearTimer  = nullptr; // one-shot line-flash collapse
+	lv_timer_t* levelUpTimer    = nullptr; // (S72) one-shot HUD flash on level-up
 
 	// ---- build helpers --------------------------------------------------
 	void buildTitle();
@@ -190,7 +201,7 @@ private:
 	bool collides(int8_t nx, int8_t ny, uint8_t nrot) const;
 	void lockPiece();         // stamp piece into `board` and lock
 	uint8_t findFullRows();   // populate clearedRows[], return count
-	void awardLineScore(uint8_t cleared);
+	void awardLineScore(uint8_t cleared, bool tSpin);
 	void collapseClearedRows(); // remove flashed rows + drop above
 
 	void moveLeft();
@@ -198,6 +209,16 @@ private:
 	void rotateCW();
 	bool softDrop();          // returns false if it locked
 	void hardDrop();
+
+	// (S72) T-spin detection (3-corner rule). Caller is expected to
+	// invoke this from lockPiece() right after stamping the piece.
+	bool detectTSpin() const;
+
+	// (S72) Brief MP_ACCENT highlight on the LEVEL caption when the
+	// player crosses a 10-line milestone.
+	void startLevelUpFlash();
+	void stopLevelUpTimer();
+	static void onLevelUpTimerStatic(lv_timer_t* timer);
 
 	// ---- timers --------------------------------------------------------
 	void startDropTimer();

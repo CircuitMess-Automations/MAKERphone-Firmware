@@ -202,6 +202,7 @@ PhoneTetris::PhoneTetris()
 PhoneTetris::~PhoneTetris() {
 	stopDropTimer();
 	stopLineClearTimer();
+	stopLevelUpTimer();
 	// All children are parented to obj; LVGL frees them recursively when
 	// the screen's obj is destroyed by the LVScreen base destructor.
 }
@@ -215,6 +216,7 @@ void PhoneTetris::onStop() {
 	// Defensive: stop any active timers if the screen is popped mid-game.
 	stopDropTimer();
 	stopLineClearTimer();
+	stopLevelUpTimer();
 }
 
 // ---------- build helpers ------------------------------------------------
@@ -421,6 +423,8 @@ void PhoneTetris::resetBoard() {
 		}
 		clearedRows[r] = false;
 	}
+	lastActionRotation = false; // (S72)
+	pendingTSpin       = false; // (S72)
 }
 
 void PhoneTetris::refillBag() {
@@ -453,6 +457,7 @@ void PhoneTetris::spawnPiece() {
 	// spawn that lets pieces "peek" before fully entering the field.
 	pieceX = static_cast<int8_t>((Cols / 2) - 2);
 	pieceY = -1;
+	lastActionRotation = false; // (S72) fresh piece, no rotation yet
 	nextPiece = pullFromBag();
 	renderPreview();
 	// Top-out check: if the spawn location is already blocked, the well
@@ -491,6 +496,11 @@ void PhoneTetris::lockPiece() {
 		}
 	}
 
+	// (S72) Latch the T-spin verdict for this piece. Done after stamping
+	// because none of the T's rotations cover the corner cells around
+	// its centre, so stamping is a no-op for the corner sample.
+	pendingTSpin = detectTSpin();
+
 	// Detect full rows. If any, kick off the line-clear flash animation;
 	// the real collapse + score award happens in the timer callback so
 	// the player sees the flash before the rows disappear.
@@ -503,6 +513,12 @@ void PhoneTetris::lockPiece() {
 		render();   // paint the cleared rows in flash colour
 		startLineClearTimer();
 		return;
+	}
+	// (S72) No lines cleared but a T-spin still earns its base bonus.
+	if(pendingTSpin) {
+		awardLineScore(0, true);
+		refreshHud();
+		pendingTSpin = false;
 	}
 	// No lines cleared: spawn the next piece directly.
 	spawnPiece();
@@ -522,20 +538,30 @@ uint8_t PhoneTetris::findFullRows() {
 	return cleared;
 }
 
-void PhoneTetris::awardLineScore(uint8_t cleared) {
-	static const uint16_t kBase[5] = { 0, 100, 300, 500, 800 };
-	const uint8_t idx = (cleared > 4 ? 4 : cleared);
-	const uint32_t add = static_cast<uint32_t>(kBase[idx]) *
-	                     static_cast<uint32_t>(level + 1);
+void PhoneTetris::awardLineScore(uint8_t cleared, bool tSpin) {
+	static const uint16_t kBase[5]      = {   0, 100,  300,  500,  800 };
+	// (S72) T-spin payout table, indexed by lines cleared. Index 0 is
+	// a "T-spin no lines" setup move; 1-3 stack the bonus on top of
+	// the line clear; 4 mirrors triple as a safety landing.
+	static const uint16_t kTSpinBase[5] = { 400, 800, 1200, 1600, 1600 };
+	const uint8_t  idx  = (cleared > 4 ? 4 : cleared);
+	const uint16_t base = tSpin ? kTSpinBase[idx] : kBase[idx];
+	const uint32_t add  = static_cast<uint32_t>(base) *
+	                      static_cast<uint32_t>(level + 1);
 	score += add;
 	lines += cleared;
 
 	// Level-up curve: every LinesPerLevel cleared lines bumps the level
 	// by 1 (so the drop interval gets ~15 % shorter). Cap at 99 so the
 	// HUD label width stays predictable.
-	const uint8_t newLevel = static_cast<uint8_t>(lines / LinesPerLevel);
+	const uint8_t prevLevel = level;
+	const uint8_t newLevel  = static_cast<uint8_t>(lines / LinesPerLevel);
 	if(newLevel != level) {
 		level = newLevel > 99 ? 99 : newLevel;
+	}
+	// (S72) Brief HUD flash whenever the level actually changed.
+	if(level != prevLevel) {
+		startLevelUpFlash();
 	}
 }
 
@@ -565,6 +591,7 @@ void PhoneTetris::moveLeft() {
 	if(state != GameState::Playing) return;
 	if(!collides(pieceX - 1, pieceY, pieceRot)) {
 		--pieceX;
+		lastActionRotation = false; // (S72) lateral move kills T-spin
 		render();
 	}
 }
@@ -573,6 +600,7 @@ void PhoneTetris::moveRight() {
 	if(state != GameState::Playing) return;
 	if(!collides(pieceX + 1, pieceY, pieceRot)) {
 		++pieceX;
+		lastActionRotation = false; // (S72) lateral move kills T-spin
 		render();
 	}
 }
@@ -582,6 +610,7 @@ void PhoneTetris::rotateCW() {
 	const uint8_t nrot = static_cast<uint8_t>((pieceRot + 1) % Rotations);
 	if(!collides(pieceX, pieceY, nrot)) {
 		pieceRot = nrot;
+		lastActionRotation = true; // (S72) latch for T-spin detection
 		render();
 	}
 }
@@ -590,6 +619,7 @@ bool PhoneTetris::softDrop() {
 	if(state != GameState::Playing) return true;
 	if(!collides(pieceX, pieceY + 1, pieceRot)) {
 		++pieceY;
+		lastActionRotation = false; // (S72) drop step kills T-spin
 		render();
 		return true;
 	}
@@ -600,7 +630,15 @@ bool PhoneTetris::softDrop() {
 
 void PhoneTetris::hardDrop() {
 	if(state != GameState::Playing) return;
-	while(!collides(pieceX, pieceY + 1, pieceRot)) ++pieceY;
+	// (S72) Track whether the piece actually moved during the slam --
+	// a hardDrop from an already-resting position can still latch a
+	// T-spin if the previous action was a rotation.
+	bool moved = false;
+	while(!collides(pieceX, pieceY + 1, pieceRot)) {
+		++pieceY;
+		moved = true;
+	}
+	if(moved) lastActionRotation = false;
 	lockPiece();
 }
 
@@ -656,7 +694,8 @@ void PhoneTetris::onLineClearTimerStatic(lv_timer_t* timer) {
 	// Tally lines + collapse rows + drop next piece + resume.
 	uint8_t cleared = 0;
 	for(uint8_t r = 0; r < Rows; ++r) if(self->clearedRows[r]) ++cleared;
-	self->awardLineScore(cleared);
+	self->awardLineScore(cleared, self->pendingTSpin);
+	self->pendingTSpin = false;
 	self->collapseClearedRows();
 	self->refreshHud();
 
@@ -699,10 +738,38 @@ void PhoneTetris::render() {
 		}
 	}
 
-	// 2) Stamp the falling piece on top of the board view, but only when
-	// we are actually playing. In Idle / Paused / GameOver / LineClear we
-	// either have no piece or do not want to draw it.
+	// We only draw the ghost + active piece while actually playing. In
+	// Idle / Paused / GameOver / LineClear we either have no piece or
+	// do not want to draw it.
 	if(state != GameState::Playing) return;
+
+	// 2) (S72) Paint the ghost piece -- a dimmed projection of where
+	// the active piece would land if hard-dropped from its current
+	// (X, rotation). Sits above the locked board but below the active
+	// piece, so an active cell always overrides the ghost on overlap.
+	// We deliberately reuse MP_DIM (the same purple as the empty cell
+	// look) so the ghost reads as "about to be filled" rather than as
+	// a competing piece.
+	int8_t ghostY = pieceY;
+	while(!collides(pieceX, static_cast<int8_t>(ghostY + 1), pieceRot)) ++ghostY;
+	if(ghostY != pieceY) {
+		for(uint8_t r = 0; r < PieceCells; ++r) {
+			for(uint8_t c = 0; c < PieceCells; ++c) {
+				if(!pieceCell(pieceType, pieceRot, r, c)) continue;
+				const int8_t bc = static_cast<int8_t>(pieceX + c);
+				const int8_t br = static_cast<int8_t>(ghostY + r);
+				if(br < 0 || br >= static_cast<int8_t>(Rows)) continue;
+				if(bc < 0 || bc >= static_cast<int8_t>(Cols)) continue;
+				if(board[br][bc] != 0) continue; // skip locked cells
+				lv_obj_t* cell = cells[br][bc];
+				if(cell == nullptr) continue;
+				lv_obj_clear_flag(cell, LV_OBJ_FLAG_HIDDEN);
+				lv_obj_set_style_bg_color(cell, MP_DIM, 0);
+			}
+		}
+	}
+
+	// 3) Stamp the active falling piece on top of the ghost + board.
 	for(uint8_t r = 0; r < PieceCells; ++r) {
 		for(uint8_t c = 0; c < PieceCells; ++c) {
 			if(!pieceCell(pieceType, pieceRot, r, c)) continue;
@@ -802,6 +869,70 @@ void PhoneTetris::refreshOverlay() {
 			lv_obj_clear_flag(overlayLabel, LV_OBJ_FLAG_HIDDEN);
 			break;
 	}
+}
+
+// ---------- T-spin detection (S72) -------------------------------------
+
+bool PhoneTetris::detectTSpin() const {
+	// Only T pieces can T-spin (T's piece-table index is 2).
+	if(pieceType != 2)        return false;
+	if(!lastActionRotation)   return false;
+
+	// The T-piece's centre cell is (1, 1) in the 4x4 piece-local box for
+	// every rotation in our shape table -- verified by inspection of
+	// kShapes[2][0..3]: (1, 1) is filled in all four rotations.
+	const int8_t cy = static_cast<int8_t>(pieceY + 1);
+	const int8_t cx = static_cast<int8_t>(pieceX + 1);
+
+	// Three-corner rule: count the four diagonal neighbours of the
+	// centre that are blocked (wall, floor, or any non-zero board
+	// cell). Cells above the playfield (br < 0) count as open so we
+	// match the modern guideline behaviour.
+	static constexpr int8_t kCornerOff[4][2] = {
+		{-1, -1}, {-1, 1}, {1, -1}, {1, 1}
+	};
+	uint8_t blocked = 0;
+	for(uint8_t i = 0; i < 4; ++i) {
+		const int8_t cr = static_cast<int8_t>(cy + kCornerOff[i][0]);
+		const int8_t cc = static_cast<int8_t>(cx + kCornerOff[i][1]);
+		bool isBlocked = false;
+		if(cc < 0 || cc >= static_cast<int8_t>(Cols))      isBlocked = true;
+		else if(cr >= static_cast<int8_t>(Rows))           isBlocked = true;
+		else if(cr < 0)                                    isBlocked = false;
+		else if(board[cr][cc] != 0)                        isBlocked = true;
+		if(isBlocked) ++blocked;
+	}
+	return blocked >= 3;
+}
+
+// ---------- level-up flash (S72) ---------------------------------------
+
+void PhoneTetris::startLevelUpFlash() {
+	// Recolour the LEVEL caption + value to MP_ACCENT, then schedule a
+	// one-shot timer that flips them back. The drop-speed change itself
+	// kicks in via the existing stop+start of the drop timer in the
+	// line-clear callback (which calls awardLineScore -> us). This is
+	// purely a visual cue.
+	if(levelLabel   != nullptr) lv_obj_set_style_text_color(levelLabel,   MP_ACCENT, 0);
+	if(levelCaption != nullptr) lv_obj_set_style_text_color(levelCaption, MP_ACCENT, 0);
+	stopLevelUpTimer();
+	levelUpTimer = lv_timer_create(onLevelUpTimerStatic, 600, this);
+	if(levelUpTimer != nullptr) lv_timer_set_repeat_count(levelUpTimer, 1);
+}
+
+void PhoneTetris::stopLevelUpTimer() {
+	if(levelUpTimer == nullptr) return;
+	lv_timer_del(levelUpTimer);
+	levelUpTimer = nullptr;
+}
+
+void PhoneTetris::onLevelUpTimerStatic(lv_timer_t* timer) {
+	auto* self = static_cast<PhoneTetris*>(timer->user_data);
+	if(self == nullptr) return;
+	if(self->levelLabel   != nullptr) lv_obj_set_style_text_color(self->levelLabel,   MP_TEXT,      0);
+	if(self->levelCaption != nullptr) lv_obj_set_style_text_color(self->levelCaption, MP_LABEL_DIM, 0);
+	// Self-deletes via set_repeat_count(1).
+	self->levelUpTimer = nullptr;
 }
 
 // ---------- input --------------------------------------------------------

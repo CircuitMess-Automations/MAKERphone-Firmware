@@ -128,7 +128,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 A proper retro-arcade carousel for `PhoneGames`. Each entry is one self-contained game extending `LVScreen`, hooked into the existing games grid. Code-only, palette-faithful.
 
 - [x] **S71** — `PhoneTetris` — base falling tetrominoes, line clear with row flash.
-- [ ] **S72** — `PhoneTetris+` (split) — level progression, ghost piece, T-spin scoring.
+- [x] **S72** — `PhoneTetris+` (split) — level progression, ghost piece, T-spin scoring.
 - [ ] **S73** — `PhoneBounce` — gravity ball, simple side-scrolling level.
 - [ ] **S74** — `PhoneBounce II` (split) — three more levels + collectible rings.
 - [ ] **S75** — `PhoneBrickBreaker` — paddle, ball, bricks, power-up bricks.
