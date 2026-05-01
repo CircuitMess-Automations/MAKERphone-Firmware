@@ -20,6 +20,7 @@
 #include <Settings.h>
 #include <Util/HWRevision.h>
 #include "src/Services/SleepService.h"
+#include "src/Services/PhoneIdleDim.h"
 #include "src/Services/ShutdownService.h"
 #include "src/Services/BuzzerService.h"
 #include "src/Services/PhoneRingtoneEngine.h"
@@ -139,6 +140,13 @@ void boot(){
 	//printData();
 
 	Sleep.begin();
+
+	// S69: idle-dim runs alongside SleepService - it is the soft,
+	// reversible step (auto-dim backlight after 30 s, restore on any
+	// key) that precedes the hard sleep / light-sleep that
+	// SleepService still owns. Both share the same any-key activity
+	// reset semantics through Input::addListener().
+	IdleDim.begin();
 
 
 	// S56: the very first screen on boot is now PhoneBootSplash - the
