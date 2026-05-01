@@ -13,6 +13,7 @@
 #include "src/Services/MessageService.h"
 #include "src/Services/PhoneCallService.h"
 #include "src/Elements/IntroScreen.h"
+#include "src/Screens/PhoneBootSplash.h"
 #include "src/Interface/Pics.h"
 #include "src/Services/ProfileService.h"
 #include "src/Screens/UserHWTest.h"
@@ -140,15 +141,25 @@ void boot(){
 	Sleep.begin();
 
 
-	auto intro = new IntroScreen([](){
-		Shutdown.begin();
-		Buzz.begin();
-		Ringtone.begin();
+	// S56: the very first screen on boot is now PhoneBootSplash - the
+	// MAKERphone-branded sunset wordmark splash. It holds for 3 s (or
+	// any-key skip) and on dismiss starts the legacy IntroScreen, which
+	// keeps doing all the post-intro routing into LockScreen ->
+	// PhoneHomeScreen and the Service.begin() side-effects below. This
+	// is a precede-not-replace wiring: the existing CircuitMess intro
+	// gif still plays, but the user sees the MAKERphone wordmark first.
+	auto* splash = new PhoneBootSplash([](){
+		auto intro = new IntroScreen([](){
+			Shutdown.begin();
+			Buzz.begin();
+			Ringtone.begin();
+		});
+		intro->start();
 	});
 
 	lv_timer_handler();
 
-	intro->start();
+	splash->start();
 }
 
 bool checkJig(){
