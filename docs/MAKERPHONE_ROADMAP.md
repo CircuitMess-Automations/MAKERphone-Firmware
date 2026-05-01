@@ -136,7 +136,7 @@ A proper retro-arcade carousel for `PhoneGames`. Each entry is one self-containe
 - [x] **S77** — `PhoneBubbleSmile` — match-3 colored bubbles.
 - [x] **S78** — `PhoneBubbleSmile+` (split) — combo cascades + 5 power-ups.
 - [x] **S79** — `PhoneMinesweeper` — keypad-driven, three difficulties.
-- [ ] **S80** — `PhoneSlidingPuzzle` — randomized 15-tile puzzle.
+- [x] **S80** — `PhoneSlidingPuzzle` — randomized 15-tile puzzle.
 - [ ] **S81** — `PhoneTicTacToe` — vs CPU.
 - [ ] **S82** — `PhoneMemoryMatch` — pixel-icon pairs, count-to-clear timer.
 - [ ] **S83** — `PhoneSokoban` — engine + 5 hand-built levels.

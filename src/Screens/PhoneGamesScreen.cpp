@@ -23,6 +23,7 @@
 #include "PhoneBantumi.h"
 #include "PhoneBubbleSmile.h"
 #include "PhoneMinesweeper.h"
+#include "PhoneSlidingPuzzle.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -78,6 +79,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "BANTUMI",  nullptr,                   GameKind::Screen },  // S76
 	{ "BUBBLES",  nullptr,                   GameKind::Screen },  // S77
 	{ "MINES",    nullptr,                   GameKind::Screen },  // S79
+	{ "SLIDE15",  nullptr,                   GameKind::Screen },  // S80
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -432,6 +434,39 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 25, 15, 1, 1, cream);
 			break;
 		}
+		case 10: { // SLIDE15 - mini 3x3 grid with one tile out of place
+			// S80: a stylised glance of a 3-row sliding-puzzle board.
+			// Rows of three cells with a single empty slot to telegraph
+			// the swap-into-blank mechanic. We tint two solved-position
+			// tiles cyan + the rest cream so the "in place vs out of
+			// place" cue from the real game reads at icon scale.
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t cream  = lv_color_make(255, 220, 180);
+
+			// Row 1: three "in-place" tiles in cyan.
+			px(g,  4,  4, 6, 5, MP_DIM);
+			px(g,  6,  5, 1, 3, cyan);
+			px(g, 11,  4, 6, 5, MP_DIM);
+			px(g, 13,  5, 2, 3, cyan);
+			px(g, 18,  4, 6, 5, MP_DIM);
+			px(g, 20,  5, 2, 3, cyan);
+
+			// Row 2: two cream tiles + one accent (the highlighted /
+			// movable tile) sitting next to the blank slot.
+			px(g,  4, 10, 6, 5, MP_DIM);
+			px(g,  6, 11, 2, 3, cream);
+			px(g, 11, 10, 6, 5, MP_DIM);
+			px(g, 13, 11, 1, 3, cream);
+			px(g, 18, 10, 6, 5, MP_ACCENT);
+
+			// Row 3: cream tile + cream tile + blank (no rectangle).
+			px(g,  4, 16, 6, 5, MP_DIM);
+			px(g,  6, 17, 2, 3, cream);
+			px(g, 11, 16, 6, 5, MP_DIM);
+			px(g, 13, 17, 2, 3, cream);
+			// No row3 col3: that's the blank slot.
+			break;
+		}
 		default:
 			break;
 	}
@@ -573,6 +608,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 7: push(new PhoneBantumi()); break;
 			case 8: push(new PhoneBubbleSmile()); break;
 			case 9: push(new PhoneMinesweeper()); break;
+			case 10: push(new PhoneSlidingPuzzle()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
