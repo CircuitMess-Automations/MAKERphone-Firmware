@@ -4,6 +4,7 @@
 #include <Pins.hpp>
 #include <Settings.h>
 #include <Audio/Piezo.h>
+#include <Notes.h>
 
 #include "../Elements/PhoneSynthwaveBg.h"
 #include "../Elements/PhoneStatusBar.h"
