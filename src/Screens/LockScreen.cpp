@@ -7,6 +7,7 @@
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Elements/PhoneClockFace.h"
 #include "../Elements/PhoneSynthwaveBg.h"
+#include "../Elements/PhoneLockHint.h"
 #include <Input/Input.h>
 #include <Pins.hpp>
 
@@ -52,8 +53,27 @@ LockScreen::LockScreen() : LVScreen(){
 	auto softkeys = new PhoneSoftKeyBar(obj);
 	softkeys->setLeft("CALL");
 	softkeys->setRight("MENU");
-	// Reserve the bottom 10 px so unread-message rows do not slip behind the bar.
-	lv_obj_set_style_pad_bottom(container, PhoneSoftKeyBar::BarHeight + 1, 0);
+
+	// S47 phone-style redesign: a code-only "SLIDE TO UNLOCK ›››" hint that
+	// sweeps three cyan chevrons L->R sits just above the existing
+	// UnlockSlide. The hint is purely visual - the actual unlock action
+	// (BTN_R hold today, Left->Right chord in S48) is still owned by
+	// UnlockSlide so we do not regress the unlock flow on this run.
+	lockHint = new PhoneLockHint(obj);
+	lv_obj_set_align(lockHint->getLvObj(), LV_ALIGN_BOTTOM_MID);
+	// Stack: soft-key bar (10 px) + unlock-slide bar (~18 px) + this hint.
+	// Leaves a 1 px gap between the hint and the unlock bar for legibility.
+	lv_obj_set_y(lockHint->getLvObj(), -(PhoneSoftKeyBar::BarHeight + 18 + 1));
+
+	// Reserve enough room at the bottom of the unread-messages container so
+	// the message rows never slip behind the new hint or the unlock bar.
+	// Layout from the bottom up: soft-key bar (10) + unlock slide (~18) +
+	// hint (HintHeight) + 2 px breathing room.
+	lv_obj_set_style_pad_bottom(
+			container,
+			PhoneSoftKeyBar::BarHeight + 18 + PhoneLockHint::HintHeight + 2,
+			0
+	);
 
 	slide = new UnlockSlide(obj, [this](){
 		stop();
@@ -98,6 +118,7 @@ void LockScreen::activate(LVScreen* parent){
 void LockScreen::onStarting(){
 	loadUnread();
 	slide->reset();
+	if(lockHint) lockHint->setActive(true);
 }
 
 void LockScreen::onStart(){
@@ -107,6 +128,7 @@ void LockScreen::onStart(){
 
 void LockScreen::onStop(){
 	slide->stop();
+	if(lockHint) lockHint->setActive(false);
 	Input::getInstance()->removeListener(this);
 	Messages.removeUnreadListener(this);
 }

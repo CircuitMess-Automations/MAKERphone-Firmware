@@ -87,7 +87,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 
 ## Phase I — Lock Screen Polish (S47–S49)
 
-- [ ] **S47** — Phone-style lock-screen redesign with big clock + wallpaper + "slide to unlock" hint.
+- [x] **S47** — Phone-style lock-screen redesign with big clock + wallpaper + "slide to unlock" hint.
 - [ ] **S48** — Slide-to-unlock animation (Left → Right input chord, hint shimmer).
 - [ ] **S49** — Lock-screen notifications preview (latest unread SMS / missed call summary).
 
