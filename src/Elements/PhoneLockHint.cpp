@@ -5,6 +5,7 @@
 // MAKERphone retro palette - kept identical across the Phone* family.
 #define MP_TEXT       lv_color_make(255, 220, 180)   // warm cream caption
 #define MP_HIGHLIGHT  lv_color_make(122, 232, 255)   // cyan chevrons
+#define MP_ACCENT     lv_color_make(255, 140, 30)    // sunset orange - chord-armed accent
 #define MP_DIM        lv_color_make(70, 56, 100)     // muted purple - inactive chevrons
 
 PhoneLockHint::PhoneLockHint(lv_obj_t* parent) : LVObject(parent){
@@ -25,6 +26,7 @@ PhoneLockHint::PhoneLockHint(lv_obj_t* parent) : LVObject(parent){
 
 	buildLabels();
 	redrawChevrons();
+	redrawCaption();
 
 	LoopManager::addListener(this);
 }
@@ -60,10 +62,36 @@ void PhoneLockHint::buildLabels(){
 void PhoneLockHint::redrawChevrons(){
 	for(uint8_t i = 0; i < ChevronN; i++){
 		if(!chevrons[i]) continue;
-		const bool isActive = (i == activeIdx);
-		lv_obj_set_style_text_color(chevrons[i], isActive ? MP_HIGHLIGHT : MP_DIM, 0);
-		lv_obj_set_style_text_opa(chevrons[i], isActive ? LV_OPA_COVER : LV_OPA_60, 0);
+
+		if(boost){
+			// Chord-armed: every chevron is bright cyan; the active one
+			// strobes at full opacity, the others stay at a high baseline
+			// so the row reads as a solid pulsing cue rather than a sweep.
+			const bool isActive = (i == activeIdx);
+			lv_obj_set_style_text_color(chevrons[i], MP_HIGHLIGHT, 0);
+			lv_obj_set_style_text_opa(chevrons[i], isActive ? LV_OPA_COVER : LV_OPA_70, 0);
+		}else{
+			const bool isActive = (i == activeIdx);
+			lv_obj_set_style_text_color(chevrons[i], isActive ? MP_HIGHLIGHT : MP_DIM, 0);
+			lv_obj_set_style_text_opa(chevrons[i], isActive ? LV_OPA_COVER : LV_OPA_60, 0);
+		}
 	}
+}
+
+void PhoneLockHint::redrawCaption(){
+	if(!caption) return;
+
+	// 4-phase opacity wave - the "hint shimmer" of S48. Idle pulses
+	// gently between 80% and 100% so the caption breathes without
+	// distracting; boost mode strobes harder and recolors orange so
+	// the user knows the next-step prompt is live.
+	static const lv_opa_t idleWave[4]  = { LV_OPA_COVER, LV_OPA_90, LV_OPA_80, LV_OPA_90 };
+	static const lv_opa_t boostWave[4] = { LV_OPA_COVER, LV_OPA_70, LV_OPA_50, LV_OPA_70 };
+
+	const lv_opa_t op = (boost ? boostWave : idleWave)[shimmerPhase % 4];
+
+	lv_obj_set_style_text_color(caption, boost ? MP_ACCENT : MP_TEXT, 0);
+	lv_obj_set_style_text_opa(caption, op, 0);
 }
 
 void PhoneLockHint::setActive(bool active){
@@ -72,18 +100,55 @@ void PhoneLockHint::setActive(bool active){
 		// Park all chevrons dim so the hint is visually quiet while paused.
 		activeIdx = 0xFF;
 		redrawChevrons();
+		// Caption stays at idle look while paused.
+		boost = false;
+		redrawCaption();
 	}else{
 		activeIdx = 0;
+		shimmerPhase = 0;
 		lastStepMs = millis();
+		lastShimmerMs = lastStepMs;
 		redrawChevrons();
+		redrawCaption();
 	}
+}
+
+void PhoneLockHint::setBoost(bool b){
+	if(boost == b) return;
+	boost = b;
+
+	if(!caption) return;
+
+	if(boost){
+		lv_label_set_text(caption, "PRESS  >  TO UNLOCK");
+	}else{
+		lv_label_set_text(caption, "SLIDE TO UNLOCK");
+	}
+
+	// Reset the sweep so the new mode starts on a clean phase.
+	activeIdx = 0;
+	shimmerPhase = 0;
+	lastStepMs = millis();
+	lastShimmerMs = lastStepMs;
+	redrawChevrons();
+	redrawCaption();
 }
 
 void PhoneLockHint::loop(uint micros){
 	if(!running) return;
 
 	const uint32_t now = millis();
-	if(now - lastStepMs < StepMs) return;
+
+	// Caption shimmer wave - independent cadence from the chevron sweep
+	// so the two animations interleave rather than locking into a beat.
+	if(now - lastShimmerMs >= ShimmerStepMs){
+		lastShimmerMs = now;
+		shimmerPhase = (shimmerPhase + 1) & 0x03;
+		redrawCaption();
+	}
+
+	const uint32_t step = boost ? BoostStepMs : StepMs;
+	if(now - lastStepMs < step) return;
 	lastStepMs = now;
 
 	activeIdx = (activeIdx + 1) % ChevronN;

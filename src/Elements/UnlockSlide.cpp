@@ -35,6 +35,11 @@ void UnlockSlide::start(){
 }
 
 void UnlockSlide::stop(){
+	// Only the BTN_R hold flow is interruptible by release; the chord
+	// states (ChordArming / ChordSliding) own their own lifecycle and
+	// must not be ripped out by a stray button release event.
+	if(state != Slide && state != Shake) return;
+
 	LoopManager::removeListener(this);
 	state = Idle;
 
@@ -45,37 +50,100 @@ void UnlockSlide::stop(){
 }
 
 void UnlockSlide::shake(){
+	// A shake while a chord-slide is finalizing would fight the unlock
+	// animation; ignore it. Arming-state shakes intentionally cancel
+	// the armed chord (caller is expected to reset shimmer first).
+	if(state == ChordSliding) return;
+
 	LoopManager::addListener(this);
 	state = Shake;
 	t = 0;
 }
 
 void UnlockSlide::reset(){
+	// Don't blow away an in-flight chord-sliding animation - it is
+	// about to fire onDone and tear the screen down anyway.
+	if(state == ChordSliding) return;
+
+	LoopManager::removeListener(this);
 	t = 0;
 	repos();
 	lv_img_set_src(lock, "S:/Lock/Locked.bin");
+	if(!unlocked){
+		lv_obj_clear_flag(icon, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_clear_flag(text, LV_OBJ_FLAG_HIDDEN);
+	}
 	state = Idle;
 }
 
+void UnlockSlide::armChord(){
+	// Already running a slide / chord-completion - ignore so a stray
+	// LEFT press cannot rewind in-flight animations.
+	if(state == Slide || state == ChordSliding) return;
+
+	LoopManager::addListener(this);
+	state = ChordArming;
+	t = 0;
+	armedAt = millis();
+	lv_img_set_src(lock, "S:/Lock/Locked.bin");
+	// Hide the legacy "Hold ... to unlock" prompt during chord arming;
+	// the shimmer hint above the slide carries the chord prompt now.
+	lv_obj_add_flag(text, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(icon, LV_OBJ_FLAG_HIDDEN);
+}
+
+void UnlockSlide::completeChord(){
+	if(state != ChordArming) return;
+
+	LoopManager::addListener(this);
+	state = ChordSliding;
+	// t is left at chordHalfTarget so the lock animates from the
+	// halfway position to the right edge - the visible "snap closed".
+	lv_img_set_src(lock, "S:/Lock/Unlocked.bin");
+}
+
+bool UnlockSlide::isArmed() const{
+	return state == ChordArming;
+}
+
+void UnlockSlide::setOnArmTimeout(std::function<void()> cb){
+	onArmTimeout = std::move(cb);
+}
+
 void UnlockSlide::loop(uint32_t dt){
-	float speed = 1.0f;
-	if(state == Slide){
-		speed = slideSpeed;
-	}else if(state == Shake){
-		speed = shakeSpeed;
+	float speed  = 1.0f;
+	float target = 1.0f;
+	switch(state){
+		case Slide:        speed = slideSpeed;          target = 1.0f;             break;
+		case Shake:        speed = shakeSpeed;          target = 1.0f;             break;
+		case ChordArming:  speed = armSpeed;            target = chordHalfTarget;  break;
+		case ChordSliding: speed = chordCompleteSpeed;  target = 1.0f;             break;
+		default:
+			return;
 	}
 
-	t = std::min(1.0f, t + speed * (float) dt / 1000000.0f);
+	t = std::min(target, t + speed * (float) dt / 1000000.0f);
 
 	repos();
 
-	if(t == 1.0f){
+	// ChordArming pauses at the halfway target waiting for completeChord.
+	// Drive the timeout from here so a stale arm cannot strand the screen.
+	if(state == ChordArming){
+		if(millis() - armedAt >= ChordWindowMs){
+			auto cb = onArmTimeout;
+			reset();
+			if(cb) cb();
+		}
+		return;
+	}
+
+	if(t >= target){
 		LoopManager::removeListener(this);
 
 		auto oldState = state;
 		state = Idle;
 
-		if(oldState == Slide){
+		if(oldState == Slide || oldState == ChordSliding){
 			unlocked = true;
 			onDone();
 		}

@@ -35,40 +35,28 @@ LockScreen::LockScreen() : LVScreen(){
 	lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, 0);
 
 	// MAKERphone retro status bar (signal | clock | battery) anchored to the top.
-	// Pushes the unread-message list down so it does not overlap the bar.
 	new PhoneStatusBar(obj);
 
-	// Big retro clock face directly under the status bar - the third
-	// foundational MAKERphone widget. Always visible on the lock screen so
-	// the device feels like a phone even before the user unlocks.
+	// Big retro clock face directly under the status bar.
 	new PhoneClockFace(obj);
 
 	// 11 px (status bar + 1 px separator) + clock face height + 2 px gap.
 	lv_obj_set_style_pad_top(container, 11 + PhoneClockFace::FaceHeight + 2, 0);
 
-	// MAKERphone retro softkey bar anchored to the bottom. The lock screen
-	// has no real left/right actions yet, but the labels foreshadow the
-	// future Phase 3-4 wiring (BTN_LEFT -> phone, BTN_RIGHT -> menu) and
-	// give the screen the unmistakable Sony-Ericsson silhouette.
+	// Soft-key bar foreshadows the future Phase 3-4 wiring.
 	auto softkeys = new PhoneSoftKeyBar(obj);
 	softkeys->setLeft("CALL");
 	softkeys->setRight("MENU");
 
-	// S47 phone-style redesign: a code-only "SLIDE TO UNLOCK ›››" hint that
-	// sweeps three cyan chevrons L->R sits just above the existing
-	// UnlockSlide. The hint is purely visual - the actual unlock action
-	// (BTN_R hold today, Left->Right chord in S48) is still owned by
-	// UnlockSlide so we do not regress the unlock flow on this run.
+	// S47 phone-style redesign: a code-only "SLIDE TO UNLOCK" hint sweeps
+	// three cyan chevrons L->R just above the unlock slide. S48 adds the
+	// chord-armed shimmer state on top of this widget.
 	lockHint = new PhoneLockHint(obj);
 	lv_obj_set_align(lockHint->getLvObj(), LV_ALIGN_BOTTOM_MID);
-	// Stack: soft-key bar (10 px) + unlock-slide bar (~18 px) + this hint.
-	// Leaves a 1 px gap between the hint and the unlock bar for legibility.
 	lv_obj_set_y(lockHint->getLvObj(), -(PhoneSoftKeyBar::BarHeight + 18 + 1));
 
-	// Reserve enough room at the bottom of the unread-messages container so
-	// the message rows never slip behind the new hint or the unlock bar.
-	// Layout from the bottom up: soft-key bar (10) + unlock slide (~18) +
-	// hint (HintHeight) + 2 px breathing room.
+	// Reserve enough room at the bottom of the unread-messages container
+	// so the message rows never slip behind the hint or the unlock bar.
 	lv_obj_set_style_pad_bottom(
 			container,
 			PhoneSoftKeyBar::BarHeight + 18 + PhoneLockHint::HintHeight + 2,
@@ -85,6 +73,13 @@ LockScreen::LockScreen() : LVScreen(){
 		}
 
 		lv_obj_del_delayed(obj, 500);
+	});
+
+	// S48: when the chord-arming window expires without a BTN_RIGHT,
+	// drop the matching shimmer boost on the hint so the user is back
+	// in the calm idle visual.
+	slide->setOnArmTimeout([this](){
+		if(lockHint) lockHint->setBoost(false);
 	});
 
 	lv_obj_add_flag(slide->getLvObj(), LV_OBJ_FLAG_IGNORE_LAYOUT);
@@ -118,7 +113,10 @@ void LockScreen::activate(LVScreen* parent){
 void LockScreen::onStarting(){
 	loadUnread();
 	slide->reset();
-	if(lockHint) lockHint->setActive(true);
+	if(lockHint){
+		lockHint->setBoost(false);
+		lockHint->setActive(true);
+	}
 }
 
 void LockScreen::onStart(){
@@ -128,26 +126,73 @@ void LockScreen::onStart(){
 
 void LockScreen::onStop(){
 	slide->stop();
-	if(lockHint) lockHint->setActive(false);
+	if(lockHint){
+		lockHint->setBoost(false);
+		lockHint->setActive(false);
+	}
 	Input::getInstance()->removeListener(this);
 	Messages.removeUnreadListener(this);
 }
 
 void LockScreen::buttonPressed(uint i){
+	// BTN_BACK is the universal "go to sleep" key on the lock screen.
+	// While a chord is armed, treat it as a cancel instead of immediate
+	// sleep so the user can recover from a misfire.
 	if(i == BTN_BACK){
+		if(slide->isArmed()){
+			slide->reset();
+			if(lockHint) lockHint->setBoost(false);
+			return;
+		}
 		Sleep.enterSleep();
 		return;
-	}else if(i != BTN_R){
+	}
+
+	// Legacy fallback: BTN_R hold still slides the lock all the way open.
+	if(i == BTN_R){
+		if(slide->isArmed()){
+			slide->reset();
+			if(lockHint) lockHint->setBoost(false);
+		}
+		slide->start();
+		return;
+	}
+
+	// S48: BTN_LEFT arms the chord. The slide animates halfway and the
+	// hint flips into shimmer-boost mode so the user can see the next
+	// expected key (BTN_RIGHT).
+	if(i == BTN_LEFT){
+		if(slide->isArmed()) return;     // already armed - ignore re-press
+		slide->armChord();
+		if(lockHint) lockHint->setBoost(true);
+		return;
+	}
+
+	// S48: BTN_RIGHT after BTN_LEFT completes the chord and unlocks.
+	// BTN_RIGHT alone is treated as a wrong-key shake.
+	if(i == BTN_RIGHT){
+		if(slide->isArmed()){
+			slide->completeChord();
+			if(lockHint) lockHint->setBoost(false);
+			return;
+		}
 		slide->shake();
 		return;
 	}
 
-	slide->start();
+	// Any other key: cancel any armed chord and shake the slide.
+	if(slide->isArmed()){
+		slide->reset();
+		if(lockHint) lockHint->setBoost(false);
+	}
+	slide->shake();
 }
 
 void LockScreen::buttonReleased(uint i){
 	if(i != BTN_R) return;
 
+	// Only the legacy hold path is interrupted by release; the chord
+	// states ignore stop()/reset() while they own the slide.
 	slide->stop();
 	slide->reset();
 }
