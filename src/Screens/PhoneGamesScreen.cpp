@@ -5,6 +5,7 @@
 #include <Chatter.h>
 #include <SPIFFS.h>
 #include <Loop/LoopManager.h>
+#include <stdio.h>
 
 #include "../Elements/PhoneSynthwaveBg.h"
 #include "../Elements/PhoneStatusBar.h"
@@ -16,6 +17,7 @@
 #include "../Games/Pong/Bonk.h"
 #include "../Games/Invaders/SpaceInvaders.h"
 #include "../Games/Space/SpaceRocks.h"
+#include "PhoneTetris.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -56,15 +58,16 @@ void px(lv_obj_t* parent, lv_coord_t x, lv_coord_t y,
 } // namespace
 
 // --- Game info table ----------------------------------------------------
-// Mirrors the legacy GamesScreen list. The launch lambdas in
-// `launchSelected()` build the right Game subclass per index, so this
-// table is intentionally minimal (display name + splash path). Order
-// matches the cursor index (0=Space, 1=Invaderz, 2=Snake, 3=Bonk).
-const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[4] = {
-	{ "SPACE",    "/Games/Space/splash.raw" },
-	{ "INVADERZ", nullptr },
-	{ "SNAKE",    nullptr },
-	{ "BONK",     nullptr },
+// Order matters: the cursor + page index resolve to a slot in this table.
+// Engine games keep their existing splash blits; Screen games (PhoneTetris
+// and every Phase-N successor) skip the splash because they handle their
+// own intro overlay inside the screen itself.
+const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGameCount] = {
+	{ "SPACE",    "/Games/Space/splash.raw", GameKind::Engine },
+	{ "INVADERZ", nullptr,                   GameKind::Engine },
+	{ "SNAKE",    nullptr,                   GameKind::Engine },
+	{ "BONK",     nullptr,                   GameKind::Engine },
+	{ "TETRIS",   nullptr,                   GameKind::Screen },  // S71
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -93,8 +96,7 @@ PhoneGamesScreen::PhoneGamesScreen()
 
 	// Title sits under the status bar, centred. pixelbasic7 in sunset
 	// orange so it pops over the synthwave gradient without competing
-	// with the cyan clock face above it. Anchored manually because the
-	// screen body has no flex layout.
+	// with the cyan clock face above it.
 	titleLabel = lv_label_create(obj);
 	lv_obj_set_style_text_font(titleLabel, &pixelbasic7, 0);
 	lv_obj_set_style_text_color(titleLabel, MP_ACCENT, 0);
@@ -102,13 +104,25 @@ PhoneGamesScreen::PhoneGamesScreen()
 	lv_obj_set_align(titleLabel, LV_ALIGN_TOP_MID);
 	lv_obj_set_y(titleLabel, 12);
 
-	// Build the 2x2 grid of cards. Constructor order matches the cursor
-	// index so applySelection() can look the card up by index alone.
-	cards.reserve(4);
-	for(uint8_t i = 0; i < 4; i++){
-		buildCard(i, Games[i].name);
-		buildGlyph(i);
+	// S71: small page indicator at the right end of the title row.
+	// pixelbasic7 in dim purple - just visible enough to telegraph that
+	// the carousel has more than one page. Hidden when only one page
+	// exists so the legacy 4-game launcher visuals stay untouched.
+	pageLabel = lv_label_create(obj);
+	lv_obj_set_style_text_font(pageLabel, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(pageLabel, MP_LABEL_DIM, 0);
+	lv_label_set_text(pageLabel, "1/1");
+	lv_obj_set_pos(pageLabel, 138, 12);
+
+	// Build the four visual slots (the 2x2 grid). The slots themselves
+	// are page-agnostic; their content (glyph + label) is filled in by
+	// repaintCards() once the slots exist.
+	cards.reserve(SlotsPerPage);
+	for(uint8_t i = 0; i < SlotsPerPage; i++){
+		buildCard(i);
 	}
+	repaintCards();
+	refreshPageLabel();
 
 	// Initial selection visuals - card 0 (top-left) starts focused.
 	applySelection(/*prev*/ 0, /*curr*/ 0);
@@ -135,7 +149,7 @@ void PhoneGamesScreen::onStop() {
 	Input::getInstance()->removeListener(this);
 }
 
-void PhoneGamesScreen::buildCard(uint8_t index, const char* label) {
+void PhoneGamesScreen::buildCard(uint8_t slotIndex) {
 	// Card root: a 70x44 panel anchored at (gridX, gridY) inside the
 	// 2x2 layout. The layout flag IGNORE_LAYOUT pins the card so its
 	// position does not get shoved around if the parent ever decides to
@@ -153,9 +167,9 @@ void PhoneGamesScreen::buildCard(uint8_t index, const char* label) {
 	lv_obj_clear_flag(root, LV_OBJ_FLAG_CLICKABLE);
 	lv_obj_add_flag(root, LV_OBJ_FLAG_IGNORE_LAYOUT);
 
-	// Position based on flat index - row 0 is i<2, row 1 is i>=2.
-	const lv_coord_t col = index % 2;
-	const lv_coord_t row = index / 2;
+	// Position based on flat slot index - row 0 is i<2, row 1 is i>=2.
+	const lv_coord_t col = slotIndex % 2;
+	const lv_coord_t row = slotIndex / 2;
 	const lv_coord_t x = GridX + col * (CardW + CardGapX);
 	const lv_coord_t y = GridY + row * (CardH + CardGapY);
 	lv_obj_set_pos(root, x, y);
@@ -173,47 +187,36 @@ void PhoneGamesScreen::buildCard(uint8_t index, const char* label) {
 	lv_obj_clear_flag(glyph, LV_OBJ_FLAG_CLICKABLE);
 
 	// Label pinned at the bottom of the card. pixelbasic7 in warm cream
-	// so it reads cleanly against the dim purple card background. The
-	// label is wider than CardW would naturally allow because LVGL
-	// labels expand to content; we centre-align manually using
-	// LV_ALIGN_BOTTOM_MID.
+	// so it reads cleanly against the dim purple card background.
 	auto* lbl = lv_label_create(root);
 	lv_obj_set_style_text_font(lbl, &pixelbasic7, 0);
 	lv_obj_set_style_text_color(lbl, MP_TEXT, 0);
-	lv_label_set_text(lbl, label);
+	lv_label_set_text(lbl, "");
 	lv_obj_set_align(lbl, LV_ALIGN_BOTTOM_MID);
 	lv_obj_set_y(lbl, -3);
 
 	cards.push_back({ root, glyph, lbl });
 }
 
-void PhoneGamesScreen::buildGlyph(uint8_t index) {
-	auto* g = cards[index].glyph;
-	switch(index) {
+void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
+	switch(gameIndex) {
 		case 0: { // SPACE - chunky asteroid + thin laser streak
-			// Asteroid silhouette (rough rock outline) at left-centre.
 			px(g,  3,  6, 7, 4, MP_LABEL_DIM);
 			px(g,  2,  9, 10, 6, MP_LABEL_DIM);
 			px(g,  4, 14, 8, 2, MP_LABEL_DIM);
 			px(g,  6,  4, 4, 2, MP_LABEL_DIM);
-			// Laser streak (cyan diagonal).
 			px(g, 14, 12, 4, 2, MP_HIGHLIGHT);
 			px(g, 19, 10, 4, 2, MP_HIGHLIGHT);
 			px(g, 24,  8, 3, 2, MP_HIGHLIGHT);
 			break;
 		}
 		case 1: { // INVADERZ - classic tri-row pixel alien
-			// Top "antennae".
 			px(g,  6,  3, 2, 2, MP_HIGHLIGHT);
 			px(g, 22,  3, 2, 2, MP_HIGHLIGHT);
-			// Head.
 			px(g,  8,  5, 14, 4, MP_HIGHLIGHT);
-			// Eyes (cut-outs as accent dots).
 			px(g, 11,  6, 2, 2, MP_BG_DARK);
 			px(g, 17,  6, 2, 2, MP_BG_DARK);
-			// Body bulge.
 			px(g,  6,  9, 18, 4, MP_HIGHLIGHT);
-			// Legs.
 			px(g,  6, 13, 3, 3, MP_HIGHLIGHT);
 			px(g, 13, 13, 4, 3, MP_HIGHLIGHT);
 			px(g, 21, 13, 3, 3, MP_HIGHLIGHT);
@@ -221,7 +224,6 @@ void PhoneGamesScreen::buildGlyph(uint8_t index) {
 		}
 		case 2: { // SNAKE - segmented body in classic green
 			const lv_color_t snakeGreen = lv_color_make(140, 220, 110);
-			// Snake body segments forming an S-curve.
 			px(g,  3,  4, 3, 3, snakeGreen);
 			px(g,  6,  4, 3, 3, snakeGreen);
 			px(g,  9,  4, 3, 3, snakeGreen);
@@ -230,26 +232,91 @@ void PhoneGamesScreen::buildGlyph(uint8_t index) {
 			px(g, 18, 13, 3, 3, snakeGreen);
 			px(g, 21, 13, 3, 3, snakeGreen);
 			px(g, 24, 13, 3, 3, snakeGreen);
-			// Head (slightly larger) with a single accent eye.
 			px(g, 24,  4, 4, 4, snakeGreen);
 			px(g, 26,  5, 1, 1, MP_BG_DARK);
 			break;
 		}
 		case 3: { // BONK - left paddle | ball | right paddle
-			// Left paddle.
 			px(g,  3,  4, 2, 14, MP_TEXT);
-			// Right paddle.
 			px(g, 25,  4, 2, 14, MP_TEXT);
-			// Centre dotted divider.
 			px(g, 14,  4, 2, 2, MP_DIM);
 			px(g, 14,  9, 2, 2, MP_DIM);
 			px(g, 14, 14, 2, 2, MP_DIM);
-			// Ball.
 			px(g, 19,  9, 3, 3, MP_ACCENT);
+			break;
+		}
+		case 4: { // TETRIS - little stack of falling blocks
+			// S71: a tiny T-piece floating above a pile of mixed blocks.
+			// Colours match the in-game palette so the glyph "previews"
+			// what the player is about to see when they hit PLAY.
+			const lv_color_t cyan    = lv_color_make(122, 232, 255);
+			const lv_color_t yellow  = lv_color_make(255, 220,  60);
+			const lv_color_t magenta = lv_color_make(220, 130, 240);
+			const lv_color_t green   = lv_color_make(120, 220, 110);
+			const lv_color_t red     = lv_color_make(240,  90,  90);
+
+			// Falling T at the top.
+			px(g, 11,  3, 8, 3, magenta);
+			px(g, 14,  6, 2, 3, magenta);
+
+			// Settled stack at the bottom (six 4x3 cells in two rows).
+			px(g,  3, 12, 4, 3, green);
+			px(g,  7, 12, 4, 3, yellow);
+			px(g, 11, 12, 4, 3, cyan);
+			px(g, 15, 12, 4, 3, red);
+			px(g, 19, 12, 4, 3, yellow);
+			px(g, 23, 12, 4, 3, green);
+
+			px(g,  3, 15, 4, 3, cyan);
+			px(g,  7, 15, 4, 3, magenta);
+			px(g, 11, 15, 4, 3, red);
+			px(g, 15, 15, 4, 3, green);
+			px(g, 19, 15, 4, 3, cyan);
+			px(g, 23, 15, 4, 3, yellow);
 			break;
 		}
 		default:
 			break;
+	}
+}
+
+void PhoneGamesScreen::paintSlot(uint8_t slotIndex, int8_t gameIndex) {
+	if(slotIndex >= cards.size()) return;
+	Card& card = cards[slotIndex];
+
+	// Wipe any previous glyph children so successive page flips do not
+	// leave stale rectangles behind. lv_obj_clean() recursively deletes
+	// all children of the glyph parent (LVGL 8.x).
+	if(card.glyph != nullptr) {
+		lv_obj_clean(card.glyph);
+	}
+
+	if(gameIndex < 0 || static_cast<uint8_t>(gameIndex) >= kGameCount) {
+		// Empty slot - hide the card root so the user does not see a
+		// disabled-looking ghost panel.
+		if(card.root != nullptr) {
+			lv_obj_add_flag(card.root, LV_OBJ_FLAG_HIDDEN);
+		}
+		if(card.label != nullptr) {
+			lv_label_set_text(card.label, "");
+		}
+		return;
+	}
+
+	if(card.root != nullptr) {
+		lv_obj_clear_flag(card.root, LV_OBJ_FLAG_HIDDEN);
+	}
+	if(card.label != nullptr) {
+		lv_label_set_text(card.label, Games[gameIndex].name);
+	}
+	if(card.glyph != nullptr) {
+		paintGlyph(card.glyph, static_cast<uint8_t>(gameIndex));
+	}
+}
+
+void PhoneGamesScreen::repaintCards() {
+	for(uint8_t i = 0; i < SlotsPerPage; ++i) {
+		paintSlot(i, gameIndexFor(i));
 	}
 }
 
@@ -265,40 +332,103 @@ void PhoneGamesScreen::applySelection(uint8_t prev, uint8_t curr) {
 	if(curr < cards.size()) {
 		lv_obj_set_style_border_color(cards[curr].root, MP_ACCENT, 0);
 		lv_obj_set_style_bg_opa(cards[curr].root, LV_OPA_90, 0);
-		// Bring the focused card to the foreground so its border draws
-		// on top of any neighbour cards in case of overlap rounding.
 		lv_obj_move_foreground(cards[curr].root);
 	}
 }
 
 void PhoneGamesScreen::moveCursor(int8_t dx, int8_t dy) {
-	// Decompose the flat 0..3 cursor onto the 2x2 grid, apply the delta
-	// with wrap-around, and recompose. Two columns by two rows means
-	// every move is either a column flip or a row flip - we do not need
-	// the more general (dx, dy) arithmetic the grid widget does.
 	uint8_t col = cursor % 2;
 	uint8_t row = cursor / 2;
-	if(dx > 0) col = (col + 1) % 2;
-	if(dx < 0) col = (col + 1) % 2; // 2-col grid, +/-1 are the same
-	if(dy > 0) row = (row + 1) % 2;
-	if(dy < 0) row = (row + 1) % 2; // 2-row grid, +/-1 are the same
-	const uint8_t next = static_cast<uint8_t>(row * 2 + col);
+	if(dx != 0) col = (col + 1) % 2;
+	if(dy != 0) row = (row + 1) % 2;
+	uint8_t next = static_cast<uint8_t>(row * 2 + col);
+
+	// Clamp to a slot that actually has a game on the current page. If
+	// the chosen slot is empty (last page partially full), drop back to
+	// the highest valid slot on this page.
+	while(next > 0 && gameIndexFor(next) < 0) --next;
 	if(next == cursor) return;
 	const uint8_t prev = cursor;
 	cursor = next;
 	applySelection(prev, cursor);
 }
 
+void PhoneGamesScreen::changePage(int8_t dir) {
+	const uint8_t pages = pageCount();
+	if(pages <= 1) return;
+	const int next = (static_cast<int>(currentPage) + dir + pages) % pages;
+	currentPage = static_cast<uint8_t>(next);
+
+	// Clamp the cursor to a valid slot on the new page.
+	uint8_t maxSlot = 0;
+	for(uint8_t i = 0; i < SlotsPerPage; ++i) {
+		if(gameIndexFor(i) >= 0) maxSlot = i;
+	}
+	const uint8_t prev = cursor;
+	if(cursor > maxSlot) cursor = maxSlot;
+
+	repaintCards();
+	applySelection(prev, cursor);
+	refreshPageLabel();
+}
+
+void PhoneGamesScreen::refreshPageLabel() {
+	if(pageLabel == nullptr) return;
+	const uint8_t pages = pageCount();
+	if(pages <= 1) {
+		lv_obj_add_flag(pageLabel, LV_OBJ_FLAG_HIDDEN);
+		return;
+	}
+	lv_obj_clear_flag(pageLabel, LV_OBJ_FLAG_HIDDEN);
+	char buf[8];
+	snprintf(buf, sizeof(buf), "%u/%u",
+	         static_cast<unsigned>(currentPage + 1),
+	         static_cast<unsigned>(pages));
+	lv_label_set_text(pageLabel, buf);
+}
+
+int8_t PhoneGamesScreen::gameIndexFor(uint8_t slotIndex) const {
+	const uint16_t idx = static_cast<uint16_t>(currentPage) * SlotsPerPage
+	                     + static_cast<uint16_t>(slotIndex);
+	if(idx >= kGameCount) return -1;
+	return static_cast<int8_t>(idx);
+}
+
+uint8_t PhoneGamesScreen::pageCount() const {
+	return static_cast<uint8_t>((kGameCount + SlotsPerPage - 1) / SlotsPerPage);
+}
+
 void PhoneGamesScreen::launchSelected() {
+	const int8_t gameIdx = gameIndexFor(cursor);
+	if(gameIdx < 0) return;   // empty slot - ignore launch
+
 	if(softKeys) softKeys->flashLeft();
 
-	// Replicate the launch sequence the legacy GamesScreen already proved
-	// out (S65 lifted Game's host pointer to LVScreen* so we can pass
-	// `this`). The deferred LoopManager call ensures we are out of the
-	// LVGL event chain before unloading the LVGL cache and starting the
-	// game's own render loop. The Game ctor below grabs `this` as its
-	// host; on game pop, the engine will `host->start()` us back.
-	const uint8_t idx = cursor;
+	if(Games[gameIdx].kind == GameKind::Screen) {
+		// LVScreen-style launch: PhoneTetris (S71) and every Phase-N
+		// successor. Just push() the screen with the standard slide
+		// transition. The pushed screen is responsible for its own
+		// lifecycle and will pop() back to us on BACK.
+		switch(gameIdx) {
+			case 4: push(new PhoneTetris()); break;
+			default:
+				// Should never happen unless somebody added a Screen
+				// entry to Games[] without wiring it here. Be loud
+				// about it in serial so the next session catches it.
+				printf("PhoneGamesScreen: no Screen-launcher for game %d\n",
+				       static_cast<int>(gameIdx));
+				break;
+		}
+		return;
+	}
+
+	// Engine-style launch (legacy Game / GameSystem path). Replicate the
+	// sequence the original GamesScreen / S65 PhoneGamesScreen already
+	// proved out (S65 lifted Game's host pointer to LVScreen* so we can
+	// pass `this`). The deferred LoopManager call ensures we are out of
+	// the LVGL event chain before unloading the LVGL cache and starting
+	// the game's own render loop.
+	const uint8_t idx = static_cast<uint8_t>(gameIdx);
 	auto* host = this;
 	stop();
 	LoopManager::defer([idx, host](uint32_t /*dt*/){
@@ -328,9 +458,6 @@ void PhoneGamesScreen::launchSelected() {
 			delay(1);
 		}
 
-		// Hold the splash long enough to read - same 2 s window the
-		// legacy screen used. For the games without a splash this loop
-		// exits immediately because splashStart stayed at 0.
 		while(splashStart != 0 && millis() - splashStart < 2000){
 			delay(10);
 		}
@@ -340,9 +467,6 @@ void PhoneGamesScreen::launchSelected() {
 }
 
 void PhoneGamesScreen::buttonPressed(uint i) {
-	// Same navigation chord every other phone-style screen uses - we
-	// accept both the dedicated direction buttons and their numpad
-	// equivalents so the user can drive the menu with either hand.
 	switch(i){
 		case BTN_LEFT:
 		case BTN_4:
@@ -360,6 +484,16 @@ void PhoneGamesScreen::buttonPressed(uint i) {
 
 		case BTN_8:
 			moveCursor(0, +1);
+			break;
+
+		// S71: bumpers paginate. Wraps in both directions so the user
+		// does not have to backtrack to reach the next page.
+		case BTN_L:
+			changePage(-1);
+			break;
+
+		case BTN_R:
+			changePage(+1);
 			break;
 
 		case BTN_ENTER:
