@@ -8,6 +8,7 @@
 #include "../Screens/PhoneMainMenu.h"
 #include "../Screens/PhoneAppStubScreen.h"
 #include "../Screens/PhoneMusicPlayer.h"
+#include "../Screens/PhoneCameraScreen.h"
 #include "../Screens/PhoneDialerScreen.h"
 #include "../Screens/InboxScreen.h"
 #include "../Screens/FriendsScreen.h"
@@ -158,8 +159,14 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 			break;
 
 		case PhoneIconTile::Icon::Camera:
-			// Camera ships in S44 (PhoneCameraScreen).
-			dest = new PhoneAppStubScreen("CAMERA");
+			// S44: real camera screen replaces the placeholder stub. The
+			// retro viewfinder (corner brackets, dotted edge ticks,
+			// crosshair, REC dot, mode label, frame counter) lives in
+			// PhoneCameraScreen; ENTER fires the shutter (cyan flash +
+			// 3-note click via the global PhoneRingtoneEngine), BACK
+			// pops back to the main menu. Mode-cycling on L/R bumpers
+			// (PHOTO / EFFECT / SELFIE) ships in S45.
+			dest = new PhoneCameraScreen();
 			break;
 
 		case PhoneIconTile::Icon::Mail:
