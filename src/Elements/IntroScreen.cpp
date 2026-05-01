@@ -22,6 +22,7 @@
 #include "../Screens/PhoneSoundScreen.h"
 #include "../Screens/PhoneWallpaperScreen.h"
 #include "../Screens/PhoneDateTimeScreen.h"
+#include "../Screens/PhoneAboutScreen.h"
 #include "../Screens/GamesScreen.h"
 #include "../Interface/LVScreen.h"
 #include "../Services/PhoneCallService.h"
@@ -189,7 +190,12 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						self->push(new PhoneDateTimeScreen());
 						break;
 					case PhoneSettingsScreen::Item::About:
-						self->push(new PhoneAppStubScreen("ABOUT"));
+						// S55: real About page replaces the placeholder stub. The
+						// PhoneAboutScreen is a read-only diagnostics page that shows
+						// the device id (efuse MAC), firmware version, free heap,
+						// uptime, and paired peer count, with the heap + uptime
+						// fields refreshed at 1 Hz so the user sees a live readout.
+						self->push(new PhoneAboutScreen());
 						break;
 					default:
 						// Defensive: any future row that is added to

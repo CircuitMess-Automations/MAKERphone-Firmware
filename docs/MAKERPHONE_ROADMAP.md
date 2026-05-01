@@ -98,7 +98,7 @@ The flagship "feels-like-a-phone" feature, even though it's a LoRa-backed simula
 - [x] **S52** — Sound + vibration toggles (mute / vibrate / loud).
 - [x] **S53** — Wallpaper picker (Synthwave / Plain / GridOnly / Stars).
 - [x] **S54** — Date/time settings screen.
-- [ ] **S55** — About screen — device id, firmware version, free heap, uptime, peer count.
+- [x] **S55** — About screen — device id, firmware version, free heap, uptime, peer count.
 
 ## Phase K — Boot, Power, Battery (S56–S59)
 
