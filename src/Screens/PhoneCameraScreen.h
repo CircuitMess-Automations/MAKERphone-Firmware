@@ -40,11 +40,18 @@ class PhoneSoftKeyBar;
  * Input contract - feature-phone muscle memory:
  *   - BTN_ENTER (BTN_A) : trigger the shutter (flash + click + counter++)
  *   - BTN_BACK         : pop back to the main menu
+ *   - BTN_L            : previous mode (Photo <- Effect <- Selfie, wraps)
+ *   - BTN_R            : next mode (Photo -> Effect -> Selfie, wraps)
  *
- * Mode-switching (PHOTO / EFFECT / SELFIE) lands in S45 - this screen
- * keeps the API surface (setMode / cycleMode) ready so S45 only has to
- * wire input and the mode label updates for free. For S44 the mode is
- * fixed at PHOTO so no public API is required to drive it.
+ * Mode-switching (PHOTO / EFFECT / SELFIE) ships in S45 - the L/R
+ * bumpers (BTN_L / BTN_R) cycle the mode, the mode label recolours
+ * to the per-mode accent (cyan/orange/cream), the small REC dot in
+ * the top-left of the viewfinder switches to the same accent so the
+ * mode is visible at a glance even with the label half-occluded by
+ * the soft-key bar, and a single soft "tick" plays through the
+ * Ringtone engine so the cycle has audio feedback. Photo / Effect /
+ * Selfie are still placeholder behaviours - the actual capture path
+ * is identical for all three modes; S46+ will diverge them.
  *
  * Implementation notes:
  *  - Code-only (no SPIFFS assets). Every primitive is a tiny lv_obj
@@ -83,11 +90,16 @@ public:
 	void onStart() override;
 	void onStop() override;
 
-	/** Switch to the given mode (refreshes the mode label). Mode-cycling
-	 *  input wiring lands in S45; for S44 callers may still drive this
-	 *  programmatically. */
+	/** Switch to the given mode. Refreshes the mode label, recolours
+	 *  the live REC dot to the per-mode accent so the change is visible
+	 *  at a glance, and is safe to call before / after onStart(). */
 	void setMode(Mode m);
 	Mode getMode() const { return mode; }
+
+	/** Cycle modes by +1 (next) or -1 (prev) with wrap. Plays a soft
+	 *  "tick" through the Ringtone engine so the user gets audio
+	 *  feedback on the bumper press. Any other dir is treated as +1. */
+	void cycleMode(int8_t dir);
 
 	/** Trigger the shutter: flash overlay + click sound + frame++. Public
 	 *  so a host or future test harness can simulate captures. */
@@ -116,6 +128,14 @@ private:
 	lv_obj_t* modeLabel;      // "PHOTO" - cyan, pixelbasic7
 	lv_obj_t* frameLabel;     // "0/24" - dim purple, pixelbasic7
 
+	// Small "live" REC dot in the top-left of the viewfinder. Held as
+	// a member (S45) so cycleMode can recolour it on mode change. Built
+	// in buildViewfinder() so the rest of the corner-bracket / tick /
+	// crosshair primitives stay anonymous (we never need them again
+	// after construction).
+
+	lv_obj_t* recDot;         // sunset-orange (Photo) / cyan (Effect) / cream (Selfie)
+
 	// Flash overlay (cyan rect over the viewfinder, opaque on shoot()).
 	lv_obj_t* flash;
 
@@ -138,6 +158,15 @@ private:
 	void refreshModeLabel();
 	void refreshFrameLabel();
 	void playShutterSound();
+
+	// S45: tiny non-blocking "tick" played on every mode cycle so the
+	// bumper press has audible feedback alongside the label change.
+	void playModeTickSound();
+
+	// S45: per-mode accent colour. Cyan for Photo, sunset orange for
+	// Effect, warm cream for Selfie. Used by setMode to retint the
+	// mode label and the REC dot together.
+	static lv_color_t modeAccent(Mode m);
 
 	// LVGL animation / timer callbacks. They cast user_data back to the
 	// screen instance.

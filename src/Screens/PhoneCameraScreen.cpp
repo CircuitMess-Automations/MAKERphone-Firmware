@@ -46,6 +46,24 @@ static const PhoneRingtoneEngine::Melody kShutterMelody = {
 	"Shutter"
 };
 
+// ---------------------------------------------------------------------------
+// S45 - mode-cycle "tick". A single very-short blip, deliberately quieter
+// than the shutter so spamming the bumpers does not drown out the device.
+// Same static-storage discipline as kShutterMelody so cycleMode never
+// allocates - the array lives in .rodata for the firmware lifetime.
+// ---------------------------------------------------------------------------
+static const PhoneRingtoneEngine::Note kModeTickNotes[] = {
+	{ NOTE_E6, 18 },   // single quick chirp (~1319 Hz, 18 ms)
+};
+
+static const PhoneRingtoneEngine::Melody kModeTickMelody = {
+	kModeTickNotes,
+	sizeof(kModeTickNotes) / sizeof(kModeTickNotes[0]),
+	0,
+	false,
+	"ModeTick"
+};
+
 // ===========================================================================
 // Construction / destruction
 // ===========================================================================
@@ -57,6 +75,7 @@ PhoneCameraScreen::PhoneCameraScreen()
 		  softKeys(nullptr),
 		  modeLabel(nullptr),
 		  frameLabel(nullptr),
+		  recDot(nullptr),
 		  flash(nullptr),
 		  mode(Mode::Photo),
 		  frameCount(0),
@@ -100,8 +119,13 @@ PhoneCameraScreen::PhoneCameraScreen()
 	softKeys->setLeft("CAPTURE");
 	softKeys->setRight("EXIT");
 
-	// Initial label state.
-	refreshModeLabel();
+	// Initial state. setMode(mode) seeds the mode-label text + colour
+	// AND the REC-dot accent in lock-step so the boot-time appearance
+	// matches the cycleMode result. We pass `mode` (the default Photo
+	// from the initializer list) rather than hard-coding so future
+	// hosts that change `mode` before calling onStart still see a
+	// consistent viewfinder on the first frame.
+	setMode(mode);
 	refreshFrameLabel();
 }
 
@@ -247,11 +271,12 @@ void PhoneCameraScreen::buildViewfinder() {
 	makeRect(cx - 1,            cy - 1,         2,                2, crossC);  // centre dot
 
 	// ----- "live" REC indicator -----
-	// Small sunset-orange 3x3 dot just inside the top-left bracket so
-	// the user reads "this viewfinder is live" the moment they look at
-	// it. Positioned to not overlap the bracket arms - 4 px in from each
-	// edge gives clear separation.
-	makeRect(x0 + CornerLen + 4, y0 + 3, 3, 3, recC);
+	// Small 3x3 dot just inside the top-left bracket so the user reads
+	// "this viewfinder is live" the moment they look at it. Positioned
+	// to not overlap the bracket arms - 4 px in from each edge gives
+	// clear separation. Initial colour is the Photo accent (sunset
+	// orange); S45 retints it on every mode cycle through setMode().
+	recDot = makeRect(x0 + CornerLen + 4, y0 + 3, 3, 3, recC);
 }
 
 void PhoneCameraScreen::buildHud() {
@@ -296,6 +321,57 @@ void PhoneCameraScreen::buildFlash() {
 void PhoneCameraScreen::setMode(Mode m) {
 	mode = m;
 	refreshModeLabel();
+	// S45: REC dot + mode label share the same per-mode accent so the
+	// active mode is unambiguous even at a glance. Guard recDot because
+	// setMode may legitimately be called before buildViewfinder()
+	// finishes if a host wires it up early - the constructor calls
+	// refreshModeLabel/refreshFrameLabel directly so this guard mirrors
+	// the existing nullptr-tolerant style of those helpers.
+	const lv_color_t accent = modeAccent(m);
+	if(recDot != nullptr){
+		lv_obj_set_style_bg_color(recDot, accent, 0);
+	}
+	if(modeLabel != nullptr){
+		lv_obj_set_style_text_color(modeLabel, accent, 0);
+	}
+}
+
+void PhoneCameraScreen::cycleMode(int8_t dir) {
+	// Wrap Photo <-> Effect <-> Selfie in either direction. We compute
+	// modulo 3 by hand because C++'s % on a negative left operand is
+	// implementation-defined for the sign of the result up through
+	// C++03; explicit branch keeps us portable across whatever Arduino
+	// core the toolchain pins. Non +/-1 dirs are normalised to +1 so
+	// callers cannot accidentally produce huge jumps.
+	const uint8_t modeCount = 3;
+	const uint8_t cur = (uint8_t)mode;
+	uint8_t next;
+	if(dir < 0){
+		next = (cur == 0) ? (modeCount - 1) : (cur - 1);
+	}else{
+		next = (cur + 1) % modeCount;
+	}
+	setMode((Mode)next);
+
+	// Audio feedback for the bumper press. Engine is non-blocking and
+	// idempotent on play(), so back-to-back cycles never stack.
+	playModeTickSound();
+}
+
+lv_color_t PhoneCameraScreen::modeAccent(Mode m) {
+	// Cyan for Photo (matches the crosshair, the default "feels neutral"
+	// look), sunset orange for Effect (warm/saturated, hints at the
+	// future filter pipeline), warm cream for Selfie (softer, reads
+	// closer to skin tones at the 160x128 density). All three are
+	// already part of the shared MAKERphone palette so we never invent
+	// new colours, and the recDot/modeLabel pair always pull from the
+	// same source so they stay visually locked together.
+	switch(m){
+		case Mode::Photo:  return MP_HIGHLIGHT;   // cyan
+		case Mode::Effect: return MP_ACCENT;      // sunset orange
+		case Mode::Selfie: return MP_TEXT;        // warm cream
+		default:           return MP_HIGHLIGHT;
+	}
 }
 
 void PhoneCameraScreen::shoot() {
@@ -386,6 +462,14 @@ void PhoneCameraScreen::playShutterSound() {
 	Ringtone.play(kShutterMelody);
 }
 
+void PhoneCameraScreen::playModeTickSound() {
+	// One-shot bumper tick. Same delivery path as the shutter sound -
+	// drop the static const Melody on the engine and return. Sound is
+	// gated by Settings.sound at the engine layer so a muted device
+	// stays silent on bumper presses too.
+	Ringtone.play(kModeTickMelody);
+}
+
 void PhoneCameraScreen::onFlashAnim(void* var, int32_t v) {
 	// Static animation exec - matches the file-scope helpers in
 	// PhoneIncomingCall and PhoneIconTile. var is the flash overlay
@@ -431,10 +515,18 @@ void PhoneCameraScreen::buttonPressed(uint i) {
 			// tear down the click-reset timer.
 			pop();
 			break;
+		case BTN_L:
+			// S45: previous mode (Photo <- Effect <- Selfie, wraps).
+			cycleMode(-1);
+			break;
+		case BTN_R:
+			// S45: next mode (Photo -> Effect -> Selfie, wraps).
+			cycleMode(+1);
+			break;
 		default:
-			// Mode-cycling on L/R bumpers is intentionally NOT wired
-			// here - it lands in S45. Leaving the default case empty
-			// keeps the screen quiet on accidental presses.
+			// Any other key (digits, BTN_LEFT/RIGHT) is intentionally
+			// ignored - the dialer-pad muscle memory does not apply
+			// inside the camera viewfinder.
 			break;
 	}
 }
