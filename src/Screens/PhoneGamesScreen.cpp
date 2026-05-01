@@ -22,6 +22,7 @@
 #include "PhoneBrickBreaker.h"
 #include "PhoneBantumi.h"
 #include "PhoneBubbleSmile.h"
+#include "PhoneMinesweeper.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -76,6 +77,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "BRICK",    nullptr,                   GameKind::Screen },  // S75
 	{ "BANTUMI",  nullptr,                   GameKind::Screen },  // S76
 	{ "BUBBLES",  nullptr,                   GameKind::Screen },  // S77
+	{ "MINES",    nullptr,                   GameKind::Screen },  // S79
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -388,6 +390,48 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 14, 11, 1, 1, MP_TEXT);
 			break;
 		}
+		case 9: { // MINES - peek of the Minesweeper field
+			// S79: a stylised glance of three cells across two rows. The
+			// top row reads as "opened-3", "flagged", "still-hidden"; the
+			// bottom row finishes the scene with an opened blank, an
+			// opened "1", and the struck mine. Reads as Minesweeper at a
+			// glance without faking literal mine pixels at 26 px wide.
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t orange = lv_color_make(255, 140,  30);
+			const lv_color_t cream  = lv_color_make(255, 220, 180);
+			const lv_color_t panel  = lv_color_make( 70,  56, 100);
+			const lv_color_t deep   = lv_color_make( 20,  12,  36);
+
+			// Top row.
+			px(g,  4,  4, 7, 7, deep);
+			px(g,  6,  5, 3, 1, cyan);
+			px(g,  8,  6, 1, 1, cyan);
+			px(g,  6,  7, 3, 1, cyan);
+			px(g,  8,  8, 1, 1, cyan);
+			px(g,  6,  9, 3, 1, cyan);
+
+			px(g, 12,  4, 7, 7, panel);
+			px(g, 14,  6, 1, 4, orange);
+			px(g, 15,  6, 2, 2, orange);
+
+			px(g, 20,  4, 7, 7, panel);
+			px(g, 22,  6, 3, 3, MP_DIM);
+
+			// Bottom row.
+			px(g,  4, 12, 7, 7, deep);
+
+			px(g, 12, 12, 7, 7, deep);
+			px(g, 14, 13, 1, 1, cyan);
+			px(g, 15, 13, 1, 5, cyan);
+
+			px(g, 20, 12, 7, 7, orange);
+			px(g, 22, 14, 3, 3, deep);
+			px(g, 23, 13, 1, 1, cream);
+			px(g, 23, 17, 1, 1, cream);
+			px(g, 21, 15, 1, 1, cream);
+			px(g, 25, 15, 1, 1, cream);
+			break;
+		}
 		default:
 			break;
 	}
@@ -528,6 +572,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 6: push(new PhoneBrickBreaker()); break;
 			case 7: push(new PhoneBantumi()); break;
 			case 8: push(new PhoneBubbleSmile()); break;
+			case 9: push(new PhoneMinesweeper()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
