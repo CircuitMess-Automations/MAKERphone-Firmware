@@ -156,6 +156,40 @@ public:
 	static lv_color_t dim();
 	static lv_color_t text();
 	static lv_color_t labelDim();
+
+	/*
+	 * S104 - icon-glyph accent resolvers.
+	 *
+	 * The Phase O themes have varying-contrast palettes, and "icon
+	 * stroke" + "icon inner detail" are the two roles where that shows
+	 * up most. Default/Nokia 3310 rely on the existing highlight/accent
+	 * mapping (icon strokes in the highlight colour, small filled
+	 * details - camera lens, gear bolt, action buttons - in the accent
+	 * colour) which gives them their hue contrast (cyan-on-purple,
+	 * deep-olive-on-light-olive). Game Boy DMG, with its 4-shade green
+	 * LCD, needs a *brightness* hierarchy instead: darkest ink for the
+	 * bulk of the icon outline, mid-shadow ink for inner details so
+	 * the icon reads as a real DMG sprite (filled outlines with a
+	 * lighter mid-tone shading) rather than a flat silhouette.
+	 *
+	 *   iconStroke - primary icon outline / bulk fill
+	 *   iconDetail - secondary inner accent (lens, gear bolt, button)
+	 *
+	 * Mappings:
+	 *   Default:    iconStroke = MP_HIGHLIGHT, iconDetail = MP_ACCENT
+	 *   Nokia3310:  iconStroke = N3310_PIXEL,  iconDetail = N3310_FRAME
+	 *   GameBoyDMG: iconStroke = GBDMG_INK,    iconDetail = GBDMG_INK_MID
+	 *
+	 * Default + Nokia mappings are byte-identical to what
+	 * `highlight()` / `accent()` already return for those themes, so
+	 * S104 is a pure DMG visual upgrade. The DMG iconDetail is
+	 * deliberately *lighter* than iconStroke (mid-shadow vs darkest)
+	 * so an inner accent reads as a sprite-shading highlight inside
+	 * its dark outline - the way Pokemon Red/Blue, Tetris menus and
+	 * every other DMG-era game drew their iconography.
+	 */
+	static lv_color_t iconStroke();
+	static lv_color_t iconDetail();
 };
 
 /*

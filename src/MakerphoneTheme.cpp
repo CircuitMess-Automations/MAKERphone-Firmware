@@ -106,3 +106,36 @@ lv_color_t MakerphoneTheme::labelDim(){
 		default:                return MP_LABEL_DIM;
 	}
 }
+
+// ---------------------------------------------------------------------
+// S104 - icon-glyph accent resolvers.
+//
+// Each helper switches on the active theme and returns the role-coloured
+// lv_color_t for the icon-glyph layer. Default + Nokia 3310 mappings
+// are deliberately byte-identical to what `highlight()` / `accent()`
+// already return for those themes - the only theme that benefits from
+// the new helpers is Game Boy DMG, where the 4-shade green LCD needs a
+// brightness hierarchy (darkest ink for outlines, mid-shadow for inner
+// details) rather than a hue hierarchy. Wiring PhoneIconTile.cpp to
+// `iconStroke()` / `iconDetail()` therefore changes nothing for the
+// existing Synthwave + Nokia tiles, and turns the DMG tile glyphs from
+// flat-mid-shadow silhouettes into properly-shaded DMG-era sprites.
+// ---------------------------------------------------------------------
+
+lv_color_t MakerphoneTheme::iconStroke(){
+	switch(getCurrent()){
+		case Theme::Nokia3310:  return N3310_PIXEL;
+		case Theme::GameBoyDMG: return GBDMG_INK;
+		case Theme::Default:
+		default:                return MP_HIGHLIGHT;
+	}
+}
+
+lv_color_t MakerphoneTheme::iconDetail(){
+	switch(getCurrent()){
+		case Theme::Nokia3310:  return N3310_FRAME;
+		case Theme::GameBoyDMG: return GBDMG_INK_MID;
+		case Theme::Default:
+		default:                return MP_ACCENT;
+	}
+}
