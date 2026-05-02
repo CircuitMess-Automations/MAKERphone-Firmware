@@ -38,6 +38,7 @@
 #include "PhoneSolitaire.h"
 #include "PhoneSudoku.h"
 #include "PhoneWordle.h"
+#include "PhoneSimon.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -108,6 +109,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "SOLITAIR", nullptr,                   GameKind::Screen },  // S94
 	{ "SUDOKU",   nullptr,                   GameKind::Screen },  // S95
 	{ "WORDLE",   nullptr,                   GameKind::Screen },  // S96
+	{ "SIMON",    nullptr,                   GameKind::Screen },  // S97
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -1005,6 +1007,30 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 14, 12, 1, 1, cream);
 			break;
 		}
+		case 25: { // SIMON - 2x2 cluster of coloured pads, top-right pad lit
+			// S97: stylised glance of the memory + buzzer-tone game.
+			// A 2x2 cluster of pads (cyan, orange, magenta, yellow)
+			// matches the in-game palette; the orange pad in the top
+			// right gets a brighter wash + a small cream highlight pip
+			// to telegraph "this pad is currently lit, mirror it".
+			const lv_color_t cyanDim    = lv_color_make( 35,  90, 110);
+			const lv_color_t orangeLit  = lv_color_make(255, 160,  50);
+			const lv_color_t magentaDim = lv_color_make( 80,  30,  90);
+			const lv_color_t yellowDim  = lv_color_make(100,  90,  20);
+			const lv_color_t cream      = lv_color_make(255, 220, 180);
+
+			// Top-left pad: cyan (dim).
+			px(g,  3,  3, 11, 8, cyanDim);
+			// Top-right pad: orange (lit) -- the "press me" cue.
+			px(g, 16,  3, 11, 8, orangeLit);
+			// Cream highlight pip on the lit pad so it reads as glossy.
+			px(g, 19,  5,  2, 2, cream);
+			// Bottom-left pad: magenta (dim).
+			px(g,  3, 12, 11, 8, magentaDim);
+			// Bottom-right pad: yellow (dim).
+			px(g, 16, 12, 11, 8, yellowDim);
+			break;
+		}
 		default:
 			break;
 	}
@@ -1161,6 +1187,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 22: push(new PhoneSolitaire()); break;
 			case 23: push(new PhoneSudoku()); break;
 			case 24: push(new PhoneWordle()); break;
+			case 25: push(new PhoneSimon()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud

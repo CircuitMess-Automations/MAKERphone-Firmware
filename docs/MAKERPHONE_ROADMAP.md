@@ -153,7 +153,7 @@ A proper retro-arcade carousel for `PhoneGames`. Each entry is one self-containe
 - [x] **S94** — `PhoneSolitaire` — Klondike, dialer-driven column select.
 - [x] **S95** — `PhoneSudoku` — three difficulty packs, generated.
 - [x] **S96** — `PhoneWordle` — daily 5-letter guess.
-- [ ] **S97** — `PhoneSimon` — memory + buzzer-tone Simon Says.
+- [x] **S97** — `PhoneSimon` — memory + buzzer-tone Simon Says.
 - [ ] **S98** — `PhoneSnakesLadders` — vs CPU.
 - [ ] **S99** — `PhoneAirHockey` — vs CPU, single-screen.
 - [ ] **S100** — `PhoneTowerDefence` — single lane, 8 waves.
