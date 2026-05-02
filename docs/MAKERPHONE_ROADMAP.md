@@ -156,7 +156,7 @@ A proper retro-arcade carousel for `PhoneGames`. Each entry is one self-containe
 - [x] **S97** — `PhoneSimon` — memory + buzzer-tone Simon Says.
 - [x] **S98** — `PhoneSnakesLadders` — vs CPU.
 - [x] **S99** — `PhoneAirHockey` — vs CPU, single-screen.
-- [ ] **S100** — `PhoneTowerDefence` — single lane, 8 waves.
+- [x] **S100** — `PhoneTowerDefence` — single lane, 8 waves.
 
 ## Phase O — Themes & Icon Sets (S101–S120)
 Two sessions per theme: **part 1 = palette + wallpaper variant**, **part 2 = matching icon glyphs + soft-key tint + lock-screen accent**. All themes pickable from `Settings → Theme`.

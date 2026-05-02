@@ -41,6 +41,7 @@
 #include "PhoneSimon.h"
 #include "PhoneSnakesLadders.h"
 #include "PhoneAirHockey.h"
+#include "PhoneTowerDefence.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -114,6 +115,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "SIMON",    nullptr,                   GameKind::Screen },  // S97
 	{ "S&L",     nullptr,                   GameKind::Screen },  // S98
 	{ "AIRHOCK",  nullptr,                   GameKind::Screen },  // S99
+	{ "TOWERDEF", nullptr,                   GameKind::Screen },  // S100
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -1113,6 +1115,39 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 18, 12,  2, 2, cream);
 			break;
 		}
+		case 28: { // TOWERDEF -- single-lane defence: lane + towers + walker
+			// S100: a stylised glance of a tower-defence battlefield --
+			// a horizontal lane with three little tower turrets below
+			// it and an enemy walking along it. Cyan towers (player
+			// colour), orange enemy (the threat), cream lane fill so
+			// it reads against the dim purple card.
+			const lv_color_t cream  = lv_color_make(255, 220, 180);
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t orange = lv_color_make(255, 140,  30);
+
+			// Lane: a thin horizontal strip slicing the glyph in half.
+			px(g,  3,  9, 24, 4, MP_DIM);
+			px(g,  3, 12, 24, 1, MP_LABEL_DIM);   // bottom lane edge
+
+			// Spawn cap (left) + goal cap (right) tinted cyan / orange.
+			px(g,  3,  9,  1, 4, cyan);
+			px(g, 26,  9,  1, 4, orange);
+
+			// Walker on the lane (orange enemy mid-lane).
+			px(g, 14, 10,  3, 2, orange);
+
+			// Three player towers below the lane.
+			px(g,  5, 15,  3, 3, cyan);
+			px(g, 13, 15,  3, 3, cyan);
+			px(g, 21, 15,  3, 3, cyan);
+
+			// Tower bases (1-px cream rim under each tower so they
+			// read as standing on a foundation, not floating).
+			px(g,  5, 18,  3, 1, cream);
+			px(g, 13, 18,  3, 1, cream);
+			px(g, 21, 18,  3, 1, cream);
+			break;
+		}
 		default:
 			break;
 	}
@@ -1272,6 +1307,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 25: push(new PhoneSimon()); break;
 			case 26: push(new PhoneSnakesLadders()); break;
 			case 27: push(new PhoneAirHockey()); break;
+			case 28: push(new PhoneTowerDefence()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
