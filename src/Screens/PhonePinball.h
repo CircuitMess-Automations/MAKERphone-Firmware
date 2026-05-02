@@ -11,12 +11,18 @@ class PhoneStatusBar;
 class PhoneSoftKeyBar;
 
 /**
- * PhonePinball (S85)
+ * PhonePinball (S85 + S86)
  *
- * Phase-N arcade entry: a single-table pinball game with a pair of
- * flippers at the bottom and a cluster of bumpers above. Cast in the
- * MAKERphone palette so it slots in beside the rest of the Phone*
- * arcade carousel without a visual seam.
+ * Phase-N arcade entry: a pinball game with a pair of flippers at the
+ * bottom and bumpers above. Cast in the MAKERphone palette so it slots
+ * in beside the rest of the Phone* arcade carousel without a visual
+ * seam.
+ *
+ * S86 — PhonePinball+ adds:
+ *   - A second table layout (Classic 5-bumper trio vs. Cluster 7-bumper
+ *     dense field) selectable from the Idle screen with L/R bumpers.
+ *   - A per-table leaderboard (top 3 scores, RAM-only -- survives game
+ *     restarts during the same power cycle, resets on reboot).
  *
  * Layout (160 x 128):
  *   - PhoneStatusBar at the top   (10 px)
@@ -24,31 +30,30 @@ class PhoneSoftKeyBar;
  *   - Playfield                   (98 px tall, 160 px wide)
  *   - PhoneSoftKeyBar at bottom   (10 px)
  *
- * Table layout:
- *   - Closed top + sides + bottom (the bottom is broken by a drain
- *     gap between the two flippers).
- *   - 5 round bumpers in the upper third / centre arranged so the
- *     ball naturally bounces between them after launch.
- *   - Two flippers near the bottom, each on a fixed pivot and with
- *     two states: REST (tip drops 8 px) and ACTIVE (tip raises 8 px).
- *   - Drain gap of ~12 px between the flipper tips at rest. Both
- *     flippers raised closes the drain entirely (the "save" reflex).
+ * Table layouts:
+ *   - Classic (S85) -- 5 bumpers in a Williams-style top trio plus a
+ *     pair of lower side bumpers. Forgiving, classic feel.
+ *   - Cluster (S86) -- 7 bumpers in a denser arrangement with a centred
+ *     lower "kicker" bumper that pushes drained shots back into play.
+ *     Higher scoring potential, harder to predict.
  *
  * Controls:
- *   - BTN_4 / BTN_LEFT  : hold = left flipper raised. Release = drop.
- *   - BTN_6 / BTN_RIGHT : hold = right flipper raised. Release = drop.
- *   - BTN_ENTER (A)     : launch ball / pause / resume / restart.
+ *   - BTN_4 / BTN_LEFT  : (Playing) hold = left flipper raised.
+ *                         (Idle)    select previous table.
+ *   - BTN_6 / BTN_RIGHT : (Playing) hold = right flipper raised.
+ *                         (Idle)    select next table.
+ *   - BTN_ENTER (A)     : launch ball / start / pause / resume / restart.
  *   - BTN_BACK  (B)     : pop back to PhoneGamesScreen.
  *
  * State machine:
  *   Idle      -- "PRESS START" overlay, ball parked above bumpers.
- *                ENTER -> Playing (ball stuck until next ENTER).
+ *                L/R cycles through tables. ENTER -> Playing.
  *   Playing   -- physics tick (30 Hz). Ball stuck above bumpers
  *                until the player presses ENTER to launch (or after
  *                a respawn following a drain).
  *   Paused    -- tick suspended, "PAUSED" overlay.
  *                ENTER -> Playing.
- *   GameOver  -- "GAME OVER" overlay (lives ran out).
+ *   GameOver  -- overlay shows score + leaderboard best.
  *                ENTER -> Idle (full reset).
  *
  * Scoring:
@@ -63,12 +68,16 @@ class PhoneSoftKeyBar;
  *     of 3x3 dot sprites positioned along the pivot->tip line, which
  *     side-steps LVGL 8.x's lack of cheap rotated-rectangle support
  *     and still looks crisp on the 160x128 panel.
+ *   - Bumper sprite pool is sized for the largest table; sprites past
+ *     the active table's bumper count are hidden via `LV_OBJ_FLAG_HIDDEN`.
  *   - Ball position / velocity in Q8 fixed-point so collision
  *     bookkeeping stays integer-only on the ESP32. Gravity is a
  *     small constant Vy delta applied per physics tick.
  *   - Bumper / flipper collision uses circle-vs-circle and
  *     circle-vs-segment math, both performed in integer pixel space
  *     with a Newton's-method `isqrt` for the rare normalisation.
+ *   - Leaderboard is a static array on the class so it persists across
+ *     re-entries from PhoneGamesScreen during one power cycle.
  */
 class PhonePinball : public LVScreen, private InputListener {
 public:
@@ -100,8 +109,13 @@ public:
 	static constexpr lv_coord_t BallSize   = 4;
 	static constexpr int16_t    BallRadius = 2;          // BallSize / 2
 
-	// Bumpers.
-	static constexpr uint8_t BumperCount = 5;
+	// Bumper sprite pool (sized to fit the largest table layout).
+	static constexpr uint8_t BumperCount = 7;
+
+	// Tables (S86).
+	static constexpr uint8_t TableCount      = 2;
+	static constexpr uint8_t LeaderboardSize = 3;
+
 	// Flipper geometry (pivots are immutable; tip y delta defines angle).
 	static constexpr int16_t LeftPivotX  = 50;
 	static constexpr int16_t RightPivotX = 110;
@@ -125,6 +139,11 @@ public:
 		Playing,
 		Paused,
 		GameOver,
+	};
+
+	enum class TableId : uint8_t {
+		Classic = 0,
+		Cluster = 1,
 	};
 
 private:
@@ -161,8 +180,14 @@ private:
 	// Overlay used for "PRESS START" / "LAUNCH!" / "PAUSED" / "GAME OVER".
 	lv_obj_t* overlayLabel = nullptr;
 
+	// S86 -- table label ("TABLE: CLASSIC <>") on the Idle screen and
+	// leaderboard preview ("TOP 1234 / 800 / 500").
+	lv_obj_t* tableLabel       = nullptr;
+	lv_obj_t* leaderboardLabel = nullptr;
+
 	// ---- game state ---------------------------------------------------
 	GameState state = GameState::Idle;
+	TableId   currentTable = TableId::Classic;
 
 	// Ball state (Q8 fixed-point). ballStuck = true when waiting on a
 	// player launch (true at game start and after every life-loss).
@@ -187,6 +212,11 @@ private:
 	uint16_t rngState = 0xBEEFu;
 
 	lv_timer_t* tickTimer = nullptr;
+
+	// S86 -- per-table top-LeaderboardSize scores. Static so the
+	// leaderboard survives across re-entries to the screen during the
+	// same power cycle. Cleared to zero at first use.
+	static uint32_t leaderboard[TableCount][LeaderboardSize];
 
 	// ---- build helpers ------------------------------------------------
 	void buildHud();
@@ -231,10 +261,26 @@ private:
 	// flipper side and its active/rest state.
 	void getFlipperTip(bool isLeft, int16_t& tipX, int16_t& tipY) const;
 
-	// Static bumper geometry. Centre + radius live in the .cpp's table.
-	static int16_t bumperCx(uint8_t i);
-	static int16_t bumperCy(uint8_t i);
-	static int16_t bumperRadius(uint8_t i);
+	// Bumper geometry for the active table. Centre + radius live in
+	// per-table tables in the .cpp.
+	int16_t bumperCx(uint8_t i) const;
+	int16_t bumperCy(uint8_t i) const;
+	int16_t bumperRadius(uint8_t i) const;
+	uint8_t activeBumperCount() const;
+
+	// ---- S86 helpers --------------------------------------------------
+	static const char* tableName(TableId t);
+	void cycleTable(int8_t delta);
+	// Apply the current table layout to the bumper sprite pool: hide
+	// unused, reposition active. Also refreshes the table + leaderboard
+	// labels on the Idle screen.
+	void applyTable();
+	void refreshTableLabel();
+	void refreshLeaderboardLabel();
+	// Insert the supplied score into the leaderboard for the active
+	// table, preserving descending order.
+	void recordScore(uint32_t finalScore);
+	uint32_t bestScoreForCurrentTable() const;
 
 	// ---- timers -------------------------------------------------------
 	void startTickTimer();

@@ -48,35 +48,90 @@ uint32_t isqrt32(uint32_t n) {
 	return x;
 }
 
-// Bumper layout for S85's single table. Centres in playfield coords
-// (which are screen coords for this game -- the playfield rectangle
-// pins to (0, 20)). Radii kept small (5-6 px) to leave room for the
-// ball to weave between them on the 160x128 panel.
+// Bumper layout (per table). Centres in playfield coords (which are
+// screen coords for this game -- the playfield rectangle pins to
+// (0, 20)). Radii kept small (5-6 px) to leave room for the ball to
+// weave between them on the 160x128 panel.
 struct BumperDef {
 	int16_t cx;
 	int16_t cy;
 	int16_t r;
 };
 
-// Five bumpers: a top triangle (the "trio" is the classic Williams
-// arrangement) plus two side bumpers slightly lower for variety. The
-// values are tuned so a freshly-launched ball doesn't fall straight
-// through the lattice without bouncing once.
-constexpr BumperDef kBumpers[PhonePinball::BumperCount] = {
-	{ 40,  46, 6 },   // upper-left
-	{ 80,  36, 6 },   // top centre
-	{ 120, 46, 6 },   // upper-right
-	{ 56,  72, 5 },   // lower-left
-	{ 104, 72, 5 },   // lower-right
+// Per-table layout table (S86). The first row is S85's classic Williams
+// arrangement -- top trio + side pair. The second row is the S86
+// "Cluster" preset: a denser 7-disc field with a centred lower bumper
+// that nudges drained shots back toward the flippers.
+//
+// Sized to the largest layout (BumperCount). Tables with fewer active
+// bumpers leave the trailing entries with `r == 0`; the runtime hides
+// those sprites and skips them in collision and render loops via
+// activeBumperCount().
+constexpr BumperDef kTableBumpers[PhonePinball::TableCount]
+                                 [PhonePinball::BumperCount] = {
+	// Classic (S85) -- 5 bumpers, trio + side pair.
+	{
+		{ 40,  46, 6 },   // upper-left
+		{ 80,  36, 6 },   // top centre
+		{ 120, 46, 6 },   // upper-right
+		{ 56,  72, 5 },   // lower-left
+		{ 104, 72, 5 },   // lower-right
+		{ 0,   0,  0 },
+		{ 0,   0,  0 },
+	},
+	// Cluster (S86) -- 7 bumpers, denser field with central kicker.
+	// Top row of 4 packs the upper third; side pair drops a row;
+	// the lone centre-bottom disc rebounds drained shots back up.
+	{
+		{ 28,  34, 5 },   // top-left
+		{ 64,  28, 5 },   // top mid-left
+		{ 96,  28, 5 },   // top mid-right
+		{ 132, 34, 5 },   // top-right
+		{ 44,  62, 5 },   // mid-left
+		{ 116, 62, 5 },   // mid-right
+		{ 80,  82, 6 },   // bottom centre kicker
+	},
 };
+
+constexpr uint8_t kTableBumperCount[PhonePinball::TableCount] = { 5, 7 };
 
 constexpr uint8_t HitFlashTicks = 6;   // ~200 ms at 30 Hz
 
 } // namespace
 
-int16_t PhonePinball::bumperCx(uint8_t i)     { return kBumpers[i].cx; }
-int16_t PhonePinball::bumperCy(uint8_t i)     { return kBumpers[i].cy; }
-int16_t PhonePinball::bumperRadius(uint8_t i) { return kBumpers[i].r;  }
+// S86 -- per-table top-LeaderboardSize scores. RAM-only, so the
+// leaderboard survives across re-entries to the screen during the same
+// power cycle and resets on reboot. Zero-initialised at first use.
+uint32_t PhonePinball::leaderboard[PhonePinball::TableCount]
+                                  [PhonePinball::LeaderboardSize] = {
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+};
+
+uint8_t PhonePinball::activeBumperCount() const {
+	const uint8_t idx = static_cast<uint8_t>(currentTable);
+	return kTableBumperCount[idx];
+}
+
+int16_t PhonePinball::bumperCx(uint8_t i) const {
+	return kTableBumpers[static_cast<uint8_t>(currentTable)][i].cx;
+}
+
+int16_t PhonePinball::bumperCy(uint8_t i) const {
+	return kTableBumpers[static_cast<uint8_t>(currentTable)][i].cy;
+}
+
+int16_t PhonePinball::bumperRadius(uint8_t i) const {
+	return kTableBumpers[static_cast<uint8_t>(currentTable)][i].r;
+}
+
+const char* PhonePinball::tableName(TableId t) {
+	switch(t) {
+		case TableId::Classic: return "CLASSIC";
+		case TableId::Cluster: return "CLUSTER";
+	}
+	return "?";
+}
 
 // ===========================================================================
 // ctor / dtor
@@ -229,18 +284,13 @@ void PhonePinball::buildPlayfield() {
 }
 
 void PhonePinball::buildBumpers() {
+	// Allocate the maximum-sized sprite pool once; applyTable() shows,
+	// hides, and repositions sprites when the table changes (S86).
 	for(uint8_t i = 0; i < BumperCount; ++i) {
-		const int16_t r  = kBumpers[i].r;
-		const int16_t cx = kBumpers[i].cx;
-		const int16_t cy = PlayfieldY + kBumpers[i].cy;
-
-		// Halo overlay first (so it ends up below the disc in z-order
-		// after we move the disc to foreground on flash). 1 px wider on
-		// each side, drawn in cyan with 0 opacity until a hit flash.
 		auto* halo = lv_obj_create(obj);
 		lv_obj_remove_style_all(halo);
-		lv_obj_set_size(halo, (r + 2) * 2, (r + 2) * 2);
-		lv_obj_set_pos(halo, cx - r - 2, cy - r - 2);
+		lv_obj_set_size(halo, 6, 6);
+		lv_obj_set_pos(halo, -20, -20);
 		lv_obj_set_style_bg_color(halo, MP_HIGHLIGHT, 0);
 		lv_obj_set_style_bg_opa(halo, LV_OPA_TRANSP, 0);
 		lv_obj_set_style_border_color(halo, MP_TEXT, 0);
@@ -252,12 +302,10 @@ void PhonePinball::buildBumpers() {
 		lv_obj_add_flag(halo, LV_OBJ_FLAG_IGNORE_LAYOUT);
 		bumperHalos[i] = halo;
 
-		// Disc itself: orange with a 1-px cream rim so the bumpers
-		// pop against the deep-purple playfield even at 5-6 px radius.
 		auto* disc = lv_obj_create(obj);
 		lv_obj_remove_style_all(disc);
-		lv_obj_set_size(disc, r * 2, r * 2);
-		lv_obj_set_pos(disc, cx - r, cy - r);
+		lv_obj_set_size(disc, 6, 6);
+		lv_obj_set_pos(disc, -20, -20);
 		lv_obj_set_style_bg_color(disc, MP_ACCENT, 0);
 		lv_obj_set_style_bg_opa(disc, LV_OPA_COVER, 0);
 		lv_obj_set_style_border_color(disc, MP_TEXT, 0);
@@ -317,6 +365,29 @@ void PhonePinball::buildOverlay() {
 	lv_label_set_text(overlayLabel, "");
 	lv_obj_set_align(overlayLabel, LV_ALIGN_CENTER);
 	lv_obj_set_y(overlayLabel, -4);
+
+	// S86 -- table-name caption shown only on the Idle screen. Pinned
+	// to the strip just below the HUD and above the top bumpers (the
+	// uppermost bumper centre lives at screen y ~= 48 in the Cluster
+	// preset, so we have room for two compact lines of pixelbasic7).
+	tableLabel = lv_label_create(obj);
+	lv_obj_set_style_text_font(tableLabel, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(tableLabel, MP_HIGHLIGHT, 0);
+	lv_obj_set_style_text_align(tableLabel, LV_TEXT_ALIGN_CENTER, 0);
+	lv_label_set_text(tableLabel, "");
+	lv_obj_set_align(tableLabel, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(tableLabel, 21);
+
+	// S86 -- top-LeaderboardSize preview ("TOP 1234 / 800 / 500"),
+	// shown both on the Idle screen and below the GameOver overlay so
+	// the player can see how this run ranked against earlier ones.
+	leaderboardLabel = lv_label_create(obj);
+	lv_obj_set_style_text_font(leaderboardLabel, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(leaderboardLabel, MP_LABEL_DIM, 0);
+	lv_obj_set_style_text_align(leaderboardLabel, LV_TEXT_ALIGN_CENTER, 0);
+	lv_label_set_text(leaderboardLabel, "");
+	lv_obj_set_align(leaderboardLabel, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(leaderboardLabel, 30);
 }
 
 // ===========================================================================
@@ -331,11 +402,14 @@ void PhonePinball::enterIdle() {
 	score = 0;
 	lives = StartLives;
 	for(uint8_t i = 0; i < BumperCount; ++i) bumperFlashTicks[i] = 0;
+	applyTable();
 	resetBall();
 	render();
 	refreshHud();
 	refreshSoftKeys();
 	refreshOverlay();
+	refreshTableLabel();
+	refreshLeaderboardLabel();
 }
 
 void PhonePinball::startGame() {
@@ -364,8 +438,13 @@ void PhonePinball::endGame() {
 	stopTickTimer();
 	leftActive  = false;
 	rightActive = false;
+	// S86 -- commit the run's score to the active table's leaderboard
+	// before refreshing the overlay so the GameOver screen reads the
+	// final ranking.
+	recordScore(score);
 	refreshSoftKeys();
 	refreshOverlay();
+	refreshLeaderboardLabel();
 }
 
 // ===========================================================================
@@ -461,7 +540,8 @@ void PhonePinball::collideBumpers() {
 	const int16_t bcx = static_cast<int16_t>(ballXQ8 / Q8) + BallRadius;
 	const int16_t bcy = static_cast<int16_t>(ballYQ8 / Q8) + BallRadius;
 
-	for(uint8_t i = 0; i < BumperCount; ++i) {
+	const uint8_t count = activeBumperCount();
+	for(uint8_t i = 0; i < count; ++i) {
 		const int16_t cx = bumperCx(i);
 		const int16_t cy = PlayfieldY + bumperCy(i);
 		const int16_t r  = bumperRadius(i);
@@ -642,7 +722,8 @@ void PhonePinball::render() {
 }
 
 void PhonePinball::renderBumpers() {
-	for(uint8_t i = 0; i < BumperCount; ++i) {
+	const uint8_t count = activeBumperCount();
+	for(uint8_t i = 0; i < count; ++i) {
 		auto* halo = bumperHalos[i];
 		auto* disc = bumperSprites[i];
 		if(halo == nullptr || disc == nullptr) continue;
@@ -736,6 +817,26 @@ void PhonePinball::refreshSoftKeys() {
 
 void PhonePinball::refreshOverlay() {
 	if(overlayLabel == nullptr) return;
+
+	// S86 -- the table + leaderboard captions are useful to the player
+	// only on the Idle (table-select) screen, so hide them everywhere
+	// else. GameOver replaces them with its own score line below.
+	const bool showTable =
+		(state == GameState::Idle) && (tableLabel != nullptr);
+	const bool showLeaderboard =
+		(state == GameState::Idle || state == GameState::GameOver) &&
+		(leaderboardLabel != nullptr);
+	if(tableLabel != nullptr) {
+		if(showTable) lv_obj_clear_flag(tableLabel, LV_OBJ_FLAG_HIDDEN);
+		else          lv_obj_add_flag(tableLabel,   LV_OBJ_FLAG_HIDDEN);
+	}
+	if(leaderboardLabel != nullptr) {
+		if(showLeaderboard) lv_obj_clear_flag(leaderboardLabel,
+		                                      LV_OBJ_FLAG_HIDDEN);
+		else                lv_obj_add_flag(leaderboardLabel,
+		                                    LV_OBJ_FLAG_HIDDEN);
+	}
+
 	switch(state) {
 		case GameState::Idle:
 			lv_label_set_text(overlayLabel, "PRESS\nSTART");
@@ -753,11 +854,108 @@ void PhonePinball::refreshOverlay() {
 			lv_label_set_text(overlayLabel, "PAUSED");
 			lv_obj_clear_flag(overlayLabel, LV_OBJ_FLAG_HIDDEN);
 			break;
-		case GameState::GameOver:
-			lv_label_set_text(overlayLabel, "GAME\nOVER");
+		case GameState::GameOver: {
+			// S86 -- "GAME OVER\n<score>" so the player sees the run's
+			// score front-and-centre; the leaderboard label below the
+			// overlay shows the new top-3 ranking.
+			char buf[28];
+			snprintf(buf, sizeof(buf), "GAME OVER\n%lu",
+			         static_cast<unsigned long>(score));
+			lv_label_set_text(overlayLabel, buf);
 			lv_obj_clear_flag(overlayLabel, LV_OBJ_FLAG_HIDDEN);
 			break;
+		}
 	}
+}
+
+// ===========================================================================
+// S86 -- table select + leaderboard
+// ===========================================================================
+
+void PhonePinball::cycleTable(int8_t delta) {
+	int8_t v = static_cast<int8_t>(currentTable) + delta;
+	while(v < 0)               v += TableCount;
+	while(v >= TableCount)     v -= TableCount;
+	currentTable = static_cast<TableId>(v);
+	applyTable();
+	resetBall();
+	render();
+	refreshTableLabel();
+	refreshLeaderboardLabel();
+}
+
+void PhonePinball::applyTable() {
+	const uint8_t count = activeBumperCount();
+	for(uint8_t i = 0; i < BumperCount; ++i) {
+		auto* halo = bumperHalos[i];
+		auto* disc = bumperSprites[i];
+		if(halo == nullptr || disc == nullptr) continue;
+
+		if(i < count) {
+			const int16_t r  = bumperRadius(i);
+			const int16_t cx = bumperCx(i);
+			const int16_t cy = PlayfieldY + bumperCy(i);
+
+			lv_obj_set_size(halo, (r + 2) * 2, (r + 2) * 2);
+			lv_obj_set_pos(halo, cx - r - 2, cy - r - 2);
+			lv_obj_set_style_bg_opa(halo, LV_OPA_TRANSP, 0);
+			lv_obj_clear_flag(halo, LV_OBJ_FLAG_HIDDEN);
+
+			lv_obj_set_size(disc, r * 2, r * 2);
+			lv_obj_set_pos(disc, cx - r, cy - r);
+			lv_obj_set_style_bg_color(disc, MP_ACCENT, 0);
+			lv_obj_clear_flag(disc, LV_OBJ_FLAG_HIDDEN);
+		} else {
+			lv_obj_add_flag(halo, LV_OBJ_FLAG_HIDDEN);
+			lv_obj_add_flag(disc, LV_OBJ_FLAG_HIDDEN);
+		}
+		bumperFlashTicks[i] = 0;
+	}
+}
+
+void PhonePinball::refreshTableLabel() {
+	if(tableLabel == nullptr) return;
+	char buf[24];
+	snprintf(buf, sizeof(buf), "<  TABLE: %s  >", tableName(currentTable));
+	lv_label_set_text(tableLabel, buf);
+}
+
+void PhonePinball::refreshLeaderboardLabel() {
+	if(leaderboardLabel == nullptr) return;
+	const uint8_t idx = static_cast<uint8_t>(currentTable);
+	uint32_t a = leaderboard[idx][0];
+	uint32_t b = (LeaderboardSize > 1) ? leaderboard[idx][1] : 0;
+	uint32_t c = (LeaderboardSize > 2) ? leaderboard[idx][2] : 0;
+	char buf[40];
+	if(a == 0 && b == 0 && c == 0) {
+		snprintf(buf, sizeof(buf), "TOP: --- / --- / ---");
+	} else {
+		snprintf(buf, sizeof(buf), "TOP: %lu / %lu / %lu",
+		         static_cast<unsigned long>(a),
+		         static_cast<unsigned long>(b),
+		         static_cast<unsigned long>(c));
+	}
+	lv_label_set_text(leaderboardLabel, buf);
+}
+
+void PhonePinball::recordScore(uint32_t finalScore) {
+	if(finalScore == 0) return;   // don't pollute the board with zeros
+	const uint8_t idx = static_cast<uint8_t>(currentTable);
+	for(uint8_t i = 0; i < LeaderboardSize; ++i) {
+		if(finalScore > leaderboard[idx][i]) {
+			// Shift everything from i..end-1 down by one slot.
+			for(uint8_t j = LeaderboardSize - 1; j > i; --j) {
+				leaderboard[idx][j] = leaderboard[idx][j - 1];
+			}
+			leaderboard[idx][i] = finalScore;
+			return;
+		}
+	}
+}
+
+uint32_t PhonePinball::bestScoreForCurrentTable() const {
+	const uint8_t idx = static_cast<uint8_t>(currentTable);
+	return leaderboard[idx][0];
 }
 
 // ===========================================================================
@@ -798,6 +996,11 @@ void PhonePinball::buttonPressed(uint i) {
 			} else if(i == BTN_BACK) {
 				if(softKeys) softKeys->flashRight();
 				pop();
+			} else if(i == BTN_LEFT || i == BTN_4) {
+				// S86 -- L/R cycles the active table while idle.
+				cycleTable(-1);
+			} else if(i == BTN_RIGHT || i == BTN_6) {
+				cycleTable(+1);
 			}
 			return;
 
