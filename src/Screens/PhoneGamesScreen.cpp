@@ -27,6 +27,7 @@
 #include "PhoneTicTacToe.h"
 #include "PhoneMemoryMatch.h"
 #include "PhoneSokoban.h"
+#include "PhonePinball.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -86,6 +87,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "TICTAC",   nullptr,                   GameKind::Screen },  // S81
 	{ "MEMORY",   nullptr,                   GameKind::Screen },  // S82
 	{ "SOKOBAN",  nullptr,                   GameKind::Screen },  // S83
+	{ "PINBALL",  nullptr,                   GameKind::Screen },  // S85
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -589,6 +591,38 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 26, 11, 1, 4, orange);
 			break;
 		}
+		case 14: { // PINBALL - bumper trio + flippers below
+			// S85: a stylised glance of the single-table pinball game.
+			// Three orange bumpers sit above a pair of cream flipper bars
+			// flanking a tiny drain gap. Cyan ball mid-flight between the
+			// upper bumpers. Reads as pinball at icon scale without us
+			// drawing literal table apron geometry.
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t cream  = lv_color_make(255, 220, 180);
+			const lv_color_t orange = lv_color_make(255, 140,  30);
+
+			// Three bumpers across the top half (a triangular cluster).
+			px(g,  6,  4, 5, 5, orange);
+			px(g,  7,  5, 3, 3, cream);
+			px(g, 19,  4, 5, 5, orange);
+			px(g, 20,  5, 3, 3, cream);
+			px(g, 12, 10, 5, 5, orange);
+			px(g, 13, 11, 3, 3, cream);
+
+			// Cyan ball mid-flight between the upper-left bumper and the
+			// centre bumper.
+			px(g, 13,  6, 2, 2, cyan);
+
+			// Two cream flipper bars near the bottom -- diagonal hint via
+			// staircase-stacked rectangles. Drain gap between them.
+			px(g,  4, 17, 2, 2, cream);
+			px(g,  6, 16, 2, 2, cream);
+			px(g,  8, 15, 2, 2, cream);
+			px(g, 24, 17, 2, 2, cream);
+			px(g, 22, 16, 2, 2, cream);
+			px(g, 20, 15, 2, 2, cream);
+			break;
+		}
 		default:
 			break;
 	}
@@ -734,6 +768,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 11: push(new PhoneTicTacToe()); break;
 			case 12: push(new PhoneMemoryMatch()); break;
 			case 13: push(new PhoneSokoban()); break;
+			case 14: push(new PhonePinball()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud

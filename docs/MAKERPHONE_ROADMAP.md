@@ -141,7 +141,7 @@ A proper retro-arcade carousel for `PhoneGames`. Each entry is one self-containe
 - [x] **S82** — `PhoneMemoryMatch` — pixel-icon pairs, count-to-clear timer.
 - [x] **S83** — `PhoneSokoban` — engine + 5 hand-built levels.
 - [x] **S84** — `PhoneSokoban+` (split) — 10 more levels + level-select grid.
-- [ ] **S85** — `PhonePinball` — single-table flippers + bumpers.
+- [x] **S85** — `PhonePinball` — single-table flippers + bumpers.
 - [ ] **S86** — `PhonePinball+` (split) — second table + leaderboard.
 - [ ] **S87** — `PhoneHangman` — uses existing T9 input + inline word list.
 - [ ] **S88** — `PhoneConnectFour` — vs CPU.
