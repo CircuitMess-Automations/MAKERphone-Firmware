@@ -92,6 +92,18 @@ public:
 		// /stars) so the wallpaper reads as a real Nokia 3310 idle
 		// screen rather than a tinted Synthwave.
 		Nokia3310 = 4,
+
+		// S103 - Game Boy DMG (Dot Matrix Game) theme override.
+		// Same dispatch pattern as Nokia3310: not part of the 4-style
+		// PhoneWallpaperScreen pager (StyleCount stays at 4 there);
+		// this value is only ever returned by
+		// resolveStyleFromSettings() when Settings.themeId picks the
+		// Game Boy DMG theme. Renders a flat 4-shade pea-mint LCD
+		// panel with a faint pixel-dither pattern + a small 8-bit
+		// 'boy' silhouette anchored bottom-right, bypassing every
+		// Synthwave builder so the wallpaper reads as a real DMG-01
+		// idle screen rather than a tinted Synthwave.
+		GameBoyDMG = 5,
 	};
 
 	/** Default ctor — picks the style from `Settings.get().wallpaperStyle`. */
@@ -111,7 +123,8 @@ public:
 	 * choice (Settings.wallpaperStyle).
 	 *
 	 * Returns Style::Nokia3310 whenever the user has the Nokia 3310
-	 * Monochrome theme selected; in every other case it falls through
+	 * Monochrome theme selected, Style::GameBoyDMG when the Game Boy
+	 * DMG theme is selected (S103); in every other case it falls through
 	 * to styleFromByte(Settings.wallpaperStyle), preserving the
 	 * existing per-Synthwave-variant behaviour. The default
 	 * constructor uses this resolver, so dropping `new
@@ -169,6 +182,18 @@ private:
 	// the Nokia 3310's idle screen is famously static, so a still
 	// preview is the authentic look.
 	void buildNokia3310Wallpaper();
+
+	// S103 - Game Boy DMG (Dot Matrix Game) wallpaper builder. Same
+	// pattern as buildNokia3310Wallpaper: paints a flat 4-shade
+	// pea-mint LCD panel covering the full 160x128 area, a faint
+	// 2-shade pixel-dither pattern across the panel to suggest the
+	// LCD's row structure, and a tiny pixel-art 'boy' silhouette
+	// (the DMG-01's iconic startup animation reduced to its idle
+	// resting pose) anchored bottom-right in the patch the soft-key
+	// bar covers anyway. Uses the GBDMG_* palette from
+	// MakerphoneTheme.h. ~22 LVGL primitives total, no animations -
+	// matches the Nokia variant's still-image philosophy.
+	void buildGameBoyDMGWallpaper();
 
 	// Drives the per-star opacity animation. Free function semantics
 	// (matches LVGL's lv_anim_exec_xcb_t signature). Defined in the .cpp

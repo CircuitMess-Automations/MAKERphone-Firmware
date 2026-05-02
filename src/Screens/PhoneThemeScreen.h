@@ -135,6 +135,7 @@ private:
 	// SwatchW x SwatchH box.
 	void drawDefaultSwatch();
 	void drawNokia3310Swatch();
+	void drawGameBoyDMGSwatch();
 };
 
 #endif // MAKERPHONE_PHONETHEMESCREEN_H

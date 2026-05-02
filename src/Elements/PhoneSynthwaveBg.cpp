@@ -39,6 +39,13 @@ PhoneSynthwaveBg::Style PhoneSynthwaveBg::resolveStyleFromSettings(){
 	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::Nokia3310){
 		return Style::Nokia3310;
 	}
+	// S103 - dispatch the DMG style override the same way. The
+	// wallpaperStyle byte stays persisted underneath so flipping the
+	// theme back to Default restores the previously chosen Synthwave
+	// variant unchanged, exactly like the Nokia branch.
+	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::GameBoyDMG){
+		return Style::GameBoyDMG;
+	}
 	return styleFromByte(Settings.get().wallpaperStyle);
 }
 
@@ -89,6 +96,15 @@ PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent, Style style) : LVObject(par
 	// canvas while the Nokia theme is active.
 	if(style == Style::Nokia3310){
 		buildNokia3310Wallpaper();
+		return;
+	}
+
+	// S103 - the Game Boy DMG theme owns its wallpaper end to end
+	// the same way: it bypasses every Synthwave builder and paints a
+	// flat 4-shade pea-mint LCD panel instead. Returning early keeps
+	// the GBDMG palette out of every Synthwave hot-path.
+	if(style == Style::GameBoyDMG){
+		buildGameBoyDMGWallpaper();
 		return;
 	}
 
@@ -587,5 +603,151 @@ void PhoneSynthwaveBg::buildNokia3310Wallpaper(){
 		lv_obj_set_style_bg_opa(w, waves[i].opa, 0);
 		lv_obj_set_style_radius(w, 0, 0);
 		lv_obj_set_style_border_width(w, 0, 0);
+	}
+}
+
+// ----- Game Boy DMG (Dot Matrix Game) wallpaper (S103) ----------------
+//
+// The DMG-01's idle/menu screen is a flat 4-shade pea-mint LCD panel,
+// usually with a small pixel-art glyph in one corner and a hairline
+// dither pattern visible across the rest of the panel. Same constraint
+// as the Nokia variant: PhoneStatusBar already owns the top 10 px and
+// PhoneSoftKeyBar the bottom 10 px, so this wallpaper paints
+//
+//   1. A 4-shade LCD panel covering the full 160x128 area. Top half
+//      uses GBDMG_LCD_LIGHT, bottom half tilts toward GBDMG_LCD_DEEP
+//      via a vertical gradient. The tilt is intentionally subtle -
+//      the DMG panel is more or less flat - but enough saturation
+//      shift to keep it from reading as a flat fill.
+//
+//   2. A faint 2-shade dither pattern: every 4th row (y % 4 == 2) gets
+//      a 1 px wide strip of the mid-tone GBDMG_LCD_MID at LV_OPA_30.
+//      Same trick as the Nokia variant's scanlines, but tuned to the
+//      DMG's denser dither grid. The dither suggests the LCD's
+//      sub-pixel structure without overwhelming foreground content.
+//
+//   3. A small pixel-art "boy" silhouette anchored at the bottom-
+//      right - the DMG-01's iconic startup-animation character
+//      reduced to its idle resting pose. The glyph is built from
+//      ~14 1-2 px rectangles in GBDMG_INK and GBDMG_INK_MID. The
+//      whole motif fits in a 12x16 bounding box, fully covered by
+//      the soft-key bar's 10 px height during normal use; on screens
+//      that omit the soft-key bar (boot splash, lock screen) it
+//      peeks through as the theme's signature glyph.
+//
+// Everything runs static - no animations - matching the Nokia variant's
+// still-image philosophy. The DMG-01's idle screen is famously calm
+// (the original boot animation aside), so a still preview is the
+// authentic look. ~22 LVGL primitives total.
+void PhoneSynthwaveBg::buildGameBoyDMGWallpaper(){
+	// ----- LCD panel: solid pea-mint vertical gradient -----
+	//
+	// Painted on the same `sky` member pointer the Synthwave variant
+	// uses, mirroring the Nokia builder so a future caller iterating
+	// wallpaper children can rely on a single named root regardless
+	// of theme.
+	sky = lv_obj_create(obj);
+	lv_obj_remove_style_all(sky);
+	lv_obj_clear_flag(sky, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(sky, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(sky, BgWidth, BgHeight);
+	lv_obj_set_pos(sky, 0, 0);
+	lv_obj_set_style_bg_color(sky, GBDMG_LCD_LIGHT, 0);
+	lv_obj_set_style_bg_grad_color(sky, GBDMG_LCD_DEEP, 0);
+	lv_obj_set_style_bg_grad_dir(sky, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(sky, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(sky, 0, 0);
+	lv_obj_set_style_pad_all(sky, 0, 0);
+	lv_obj_set_style_border_width(sky, 0, 0);
+
+	// ----- LCD dither pattern: faint horizontal strips -----
+	//
+	// One 1 px tall strip every 4 rows, in GBDMG_LCD_MID at LV_OPA_30.
+	// Reads as the LCD's sub-pixel structure without competing with
+	// foreground text. The strips are skipped over the rows where the
+	// status bar / soft-key bar paint to avoid double-painting that
+	// area at boot.
+	const lv_coord_t ditherSpacing = 4;
+	const lv_coord_t ditherY0      = 12;          // clear of status bar
+	const lv_coord_t ditherYEnd    = BgHeight - 12; // clear of soft-key bar
+	for(lv_coord_t y = ditherY0; y < ditherYEnd; y += ditherSpacing){
+		lv_obj_t* strip = lv_obj_create(sky);
+		lv_obj_remove_style_all(strip);
+		lv_obj_clear_flag(strip, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(strip, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(strip, BgWidth, 1);
+		lv_obj_set_pos(strip, 0, y);
+		lv_obj_set_style_bg_color(strip, GBDMG_LCD_MID, 0);
+		lv_obj_set_style_bg_opa(strip, LV_OPA_30, 0);
+		lv_obj_set_style_radius(strip, 0, 0);
+		lv_obj_set_style_border_width(strip, 0, 0);
+	}
+
+	// ----- Pixel-art "boy" silhouette (bottom-right corner) -----
+	//
+	// The DMG-01's startup animation features a small marching figure
+	// that drops in from the top of the screen. Reduced to a 9x12
+	// idle silhouette here: a 5 px round head, a 7 px wide torso, and
+	// two 2 px legs - all built out of GBDMG_INK rectangles with a
+	// GBDMG_INK_MID shadow column for shading. The whole motif fits
+	// in a 12x16 box anchored to (138, 104) so the soft-key bar's
+	// 10 px height fully covers it during normal use.
+	const lv_coord_t boyX = BgWidth  - 22;   // 138
+	const lv_coord_t boyY = BgHeight - 28;   // 100
+
+	struct PixelRect {
+		int8_t   dx;
+		int8_t   dy;
+		uint8_t  w;
+		uint8_t  h;
+		bool     mid;       // true -> GBDMG_INK_MID, false -> GBDMG_INK
+		lv_opa_t opa;
+	};
+
+	// 14 rectangles - rough approximation of the DMG mascot's idle
+	// pose: head (top), arms-by-sides torso, two stubby legs.
+	// dx/dy are local to (boyX, boyY); w/h are pixel sizes.
+	const PixelRect boyParts[] = {
+			// Head: 5x4 cap at top, with mid-tone shadow on the right side.
+			{  3, 0, 5, 1, false, LV_OPA_COVER },
+			{  2, 1, 7, 1, false, LV_OPA_COVER },
+			{  2, 2, 7, 1, false, LV_OPA_COVER },
+			{  3, 3, 5, 1, false, LV_OPA_COVER },
+			// One mid-tone column on the right side of the head as shading.
+			{  8, 1, 1, 3, true,  LV_OPA_70 },
+
+			// Neck: 3 px wide, 1 px tall.
+			{  4, 4, 3, 1, false, LV_OPA_COVER },
+
+			// Torso: 5 wide, 4 tall, with a 1 px highlight notch on the
+			// left for shape definition.
+			{  3, 5, 5, 4, false, LV_OPA_COVER },
+			{  3, 5, 1, 4, true,  LV_OPA_70 },
+
+			// Arms: 1 px out from each torso side, 2 tall.
+			{  2, 5, 1, 3, false, LV_OPA_COVER },
+			{  8, 5, 1, 3, false, LV_OPA_COVER },
+
+			// Legs: two 2 px wide bars under the torso, separated by 1 px.
+			{  3, 9, 2, 2, false, LV_OPA_COVER },
+			{  6, 9, 2, 2, false, LV_OPA_COVER },
+
+			// Feet: tiny 2 px shoe at the base of each leg.
+			{  2, 11, 3, 1, false, LV_OPA_COVER },
+			{  6, 11, 3, 1, false, LV_OPA_COVER },
+	};
+	const uint8_t boyPartCount = sizeof(boyParts) / sizeof(boyParts[0]);
+	for(uint8_t i = 0; i < boyPartCount; i++){
+		lv_obj_t* px = lv_obj_create(sky);
+		lv_obj_remove_style_all(px);
+		lv_obj_clear_flag(px, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(px, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(px, boyParts[i].w, boyParts[i].h);
+		lv_obj_set_pos(px, boyX + boyParts[i].dx, boyY + boyParts[i].dy);
+		lv_obj_set_style_bg_color(px,
+		                          boyParts[i].mid ? GBDMG_INK_MID : GBDMG_INK, 0);
+		lv_obj_set_style_bg_opa(px, boyParts[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
 	}
 }

@@ -189,9 +189,10 @@ void PhoneThemeScreen::rebuildSwatch() {
 
 	const Theme t = MakerphoneTheme::themeFromByte(cursor);
 	switch(t){
-		case Theme::Default:   drawDefaultSwatch();   break;
-		case Theme::Nokia3310: drawNokia3310Swatch(); break;
-		default:               drawDefaultSwatch();   break;  // defensive
+		case Theme::Default:    drawDefaultSwatch();    break;
+		case Theme::Nokia3310:  drawNokia3310Swatch();  break;
+		case Theme::GameBoyDMG: drawGameBoyDMGSwatch(); break;
+		default:                drawDefaultSwatch();    break;  // defensive
 	}
 }
 
@@ -343,6 +344,71 @@ void PhoneThemeScreen::drawNokia3310Swatch() {
 		lv_obj_set_style_bg_opa(t, ticks[i].opa, 0);
 		lv_obj_set_style_radius(t, 0, 0);
 		lv_obj_set_style_border_width(t, 0, 0);
+	}
+}
+
+void PhoneThemeScreen::drawGameBoyDMGSwatch() {
+	// LCD-mint vertical gradient covering the full swatch (the DMG
+	// panel, like the Nokia, is a single flat surface — no horizon).
+	lv_obj_t* panel = lv_obj_create(swatchInner);
+	lv_obj_remove_style_all(panel);
+	lv_obj_set_size(panel, SwatchW, SwatchH);
+	lv_obj_set_pos(panel, 0, 0);
+	lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_set_style_bg_color(panel, GBDMG_LCD_LIGHT, 0);
+	lv_obj_set_style_bg_grad_color(panel, GBDMG_LCD_DEEP, 0);
+	lv_obj_set_style_bg_grad_dir(panel, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(panel, 0, 0);
+	lv_obj_set_style_border_width(panel, 0, 0);
+
+	// Faint dither: a 1 px strip every 4 rows in the lightest mid-tone.
+	// Reads as the LCD's sub-pixel structure at the swatch's small size.
+	for(lv_coord_t y = 3; y < SwatchH; y += 4){
+		lv_obj_t* strip = lv_obj_create(panel);
+		lv_obj_remove_style_all(strip);
+		lv_obj_set_size(strip, SwatchW, 1);
+		lv_obj_set_pos(strip, 0, y);
+		lv_obj_set_style_bg_color(strip, GBDMG_LCD_MID, 0);
+		lv_obj_set_style_bg_opa(strip, LV_OPA_30, 0);
+		lv_obj_set_style_radius(strip, 0, 0);
+		lv_obj_set_style_border_width(strip, 0, 0);
+	}
+
+	// Mascot-style "boy" silhouette, centred in the swatch. Mirrors
+	// the wallpaper's bottom-right glyph but pulled to the centre so
+	// it reads as the theme's signature glyph rather than incidental
+	// decor — exactly how drawNokia3310Swatch positions its antenna.
+	const lv_coord_t bx = SwatchW / 2 - 5;
+	const lv_coord_t by = SwatchH / 2 - 7;
+
+	struct PixelRect { int8_t dx, dy; uint8_t w, h; bool mid; lv_opa_t opa; };
+	const PixelRect parts[] = {
+			{ 3, 0, 5, 1, false, LV_OPA_COVER },
+			{ 2, 1, 7, 1, false, LV_OPA_COVER },
+			{ 2, 2, 7, 1, false, LV_OPA_COVER },
+			{ 3, 3, 5, 1, false, LV_OPA_COVER },
+			{ 8, 1, 1, 3, true,  LV_OPA_70 },
+			{ 4, 4, 3, 1, false, LV_OPA_COVER },
+			{ 3, 5, 5, 4, false, LV_OPA_COVER },
+			{ 3, 5, 1, 4, true,  LV_OPA_70 },
+			{ 2, 5, 1, 3, false, LV_OPA_COVER },
+			{ 8, 5, 1, 3, false, LV_OPA_COVER },
+			{ 3, 9, 2, 2, false, LV_OPA_COVER },
+			{ 6, 9, 2, 2, false, LV_OPA_COVER },
+			{ 2, 11, 3, 1, false, LV_OPA_COVER },
+			{ 6, 11, 3, 1, false, LV_OPA_COVER },
+	};
+	const uint8_t partCount = sizeof(parts) / sizeof(parts[0]);
+	for(uint8_t i = 0; i < partCount; i++){
+		lv_obj_t* px = lv_obj_create(panel);
+		lv_obj_remove_style_all(px);
+		lv_obj_set_size(px, parts[i].w, parts[i].h);
+		lv_obj_set_pos(px, bx + parts[i].dx, by + parts[i].dy);
+		lv_obj_set_style_bg_color(px, parts[i].mid ? GBDMG_INK_MID : GBDMG_INK, 0);
+		lv_obj_set_style_bg_opa(px, parts[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
 	}
 }
 

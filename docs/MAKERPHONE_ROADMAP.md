@@ -163,7 +163,7 @@ Two sessions per theme: **part 1 = palette + wallpaper variant**, **part 2 = mat
 
 - [x] **S101** — Theme: Nokia 3310 Monochrome — palette + wallpaper.
 - [x] **S102** — Theme: Nokia 3310 Monochrome — icon glyphs + accents.
-- [ ] **S103** — Theme: Game Boy DMG (4-shade green) — palette + wallpaper.
+- [x] **S103** — Theme: Game Boy DMG (4-shade green) — palette + wallpaper.
 - [ ] **S104** — Theme: Game Boy DMG — icon glyphs + accents.
 - [ ] **S105** — Theme: Amber CRT — palette + wallpaper.
 - [ ] **S106** — Theme: Amber CRT — icon glyphs + accents.

@@ -63,8 +63,17 @@ public:
 		// bottom-right (clear of the status bar / clock / soft keys).
 		Nokia3310 = 1,
 
-		// Reserved 2..15 for the upcoming Phase O themes:
-		//   2  Game Boy DMG (S103)
+		// Game Boy DMG (Dot Matrix Game) — 4-shade green LCD homage
+		// to the 1989 brick. Palette: pale-mint LCD off ("dead pixel"
+		// background), light-olive mid-tone, dark-olive mid-shadow,
+		// near-black olive-ink. Wallpaper is a flat 4-shade LCD panel
+		// with a faint pixel-dither pattern + a small 8-bit "boy"
+		// figure anchored bottom-right. Bypasses every Synthwave
+		// builder so the wallpaper reads as a real DMG-01 idle
+		// screen rather than a tinted Synthwave.
+		GameBoyDMG = 2,
+
+		// Reserved 3..15 for the upcoming Phase O themes:
 		//   3  Amber CRT    (S105)
 		//   4  Sony Ericsson Aqua (S107)
 		//   5  RAZR Hot Pink (S109)
@@ -76,7 +85,7 @@ public:
 	};
 
 	/** Total number of themes the picker should expose today. */
-	static constexpr uint8_t ThemeCount = 2;
+	static constexpr uint8_t ThemeCount = 3;
 
 	/**
 	 * Resolve a raw `Settings.themeId` byte to a clamped Theme. Bytes
@@ -127,6 +136,12 @@ public:
 	 *   Nokia3310:  N3310_BG_LIGHT (LCD off) / N3310_FRAME (deep
 	 *               olive) / N3310_PIXEL (LCD on) / N3310_PIXEL_DIM /
 	 *               N3310_PIXEL / N3310_PIXEL_DIM
+	 *   GameBoyDMG: GBDMG_LCD_LIGHT (LCD off) / GBDMG_INK
+	 *               (darkest 4-shade) / GBDMG_INK_MID (mid-shadow) /
+	 *               GBDMG_LCD_MID (lightest mid-tone) / GBDMG_INK /
+	 *               GBDMG_INK_MID. The DMG palette mirrors the Nokia
+	 *               mapping (dark ink on a pale LCD panel), keeping
+	 *               the part-2 icon-glyph swap in S104 mechanical.
 	 *
 	 * The Nokia mapping inverts the Synthwave dark-on-light
 	 * convention: the "background" role becomes a light olive and
@@ -175,5 +190,48 @@ public:
 #define N3310_PIXEL_DIM  lv_color_make( 79,  94,  71)
 #define N3310_FRAME      lv_color_make( 47,  54,  29)
 #define N3310_HIGHLIGHT  lv_color_make(255, 255, 255)
+
+/*
+ * ---------------------------------------------------------------------
+ * Game Boy DMG (Dot Matrix Game) palette.
+ *
+ * Approximates the famous 4-shade green LCD of the 1989 DMG-01: a pale
+ * pea-mint backdrop ("LCD off"), a slightly darker olive mid-tone, a
+ * mid-shadow forest-olive, and a near-black olive-ink for the darkest
+ * "LCD on" pixel. The four shades together are what gives any DMG
+ * screenshot its distinctive 2-bit-per-pixel feel.
+ *
+ * Stored as lv_color_make(R, G, B) so the values render identically
+ * on every LV_COLOR_DEPTH the firmware might be built against — same
+ * portability rationale as the Nokia palette.
+ *
+ * Naming follows the MP_* / N3310_* convention so the part-2
+ * icon-glyph swap in S104 only changes which header it includes,
+ * not how it spells colours.
+ *
+ *   GBDMG_LCD_LIGHT  — LCD off (the panel itself), top of gradient
+ *   GBDMG_LCD_MID    — lightest mid-tone (used for the dither pattern
+ *                      and the lightest icon shade)
+ *   GBDMG_INK_MID    — mid-shadow (used for icon mid-tones, frame
+ *                      borders that need to stay subtle)
+ *   GBDMG_INK        — LCD on (full dark "ink" pixel, used for icon
+ *                      strokes, text, hard frame borders)
+ *   GBDMG_LCD_DEEP   — bottom of the panel gradient (slight tilt
+ *                      toward saturation so the panel reads as a
+ *                      real LCD rather than a flat fill)
+ *
+ * RGB choices: tuned to match the DMG-01 reference grade Nintendo
+ * shipped (the so-called "pea-soup green" — slightly more yellow
+ * than the 3310's pea green) without veering into Game Boy Pocket
+ * grayscale. The four ink shades are deliberately spaced so that
+ * the lightest mid-tone is still readable as "filled" against the
+ * LCD-off background, the same constraint the original DMG had.
+ * ---------------------------------------------------------------------
+ */
+#define GBDMG_LCD_LIGHT  lv_color_make(155, 188,  15)
+#define GBDMG_LCD_DEEP   lv_color_make(139, 172,  15)
+#define GBDMG_LCD_MID    lv_color_make(107, 142,  15)
+#define GBDMG_INK_MID    lv_color_make( 48,  98,  48)
+#define GBDMG_INK        lv_color_make( 15,  56,  15)
 
 #endif // MAKERPHONE_THEME_H
