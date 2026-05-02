@@ -86,6 +86,20 @@ private:
 	                        //          edge of the tile body. Mirrors `shine` (top edge) on the
 	                        //          opposite axis so the two cues read as physically distinct
 	                        //          lighting models. Fully transparent under every non-RAZR theme.
+	lv_obj_t* statusLed;   // S112 - Stealth Black tactical-red status LED dot anchored to the
+	                        //          tile's top-right corner. Mirrors neither `shine` (top edge)
+	                        //          nor `edgeGlow` (bottom edge) - it's a corner-anchored 2x2
+	                        //          dot, so the three cue axes (top edge / bottom edge /
+	                        //          top-right corner) stay disjoint and a future theme can
+	                        //          combine any subset of them without overpainting. Fully
+	                        //          transparent under every non-Stealth-Black theme.
+	lv_obj_t* statusLedHi; // S112 - Stealth Black status-LED emission peak: a 1x1 STEALTH_BONE
+	                        //          highlight pixel that rides the same opacity as the LED
+	                        //          dot. Together with `statusLed` they read as a hot-spec
+	                        //          on a slightly less-hot dot (the way a photographed armed
+	                        //          status LED always exhibits a near-white emission peak in
+	                        //          its centre, even though the LED itself is red). Fully
+	                        //          transparent under every non-Stealth-Black theme.
 	lv_obj_t* iconLayer;   // 16x16 transparent container that holds the pixel rectangles
 	lv_obj_t* labelEl;     // optional pixelbasic7 label below the icon (nullable)
 
@@ -93,6 +107,7 @@ private:
 	void buildHalo();
 	void buildShine();
 	void buildEdgeGlow();
+	void buildStatusLed();
 	void buildIconLayer();
 	void buildLabel(const char* label);
 	void refreshSelection();

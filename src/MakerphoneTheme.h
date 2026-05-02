@@ -495,6 +495,93 @@ public:
 	static lv_color_t edgeGlowColor();
 	static uint8_t    edgeGlowIdleOpa();
 	static uint8_t    edgeGlowSelectedOpa();
+	/*
+	 * S112 - Stealth Black status-LED helpers (icon-glyph pass).
+	 *
+	 * The defining visual cue of every early-2010s "blacked-out" tactical
+	 * handset (Vertu Constellation Black, BlackBerry Bold 9900 Stealth,
+	 * Nokia 8800 Carbon Arte, the obsidian-slab generation that bridged
+	 * the late-2000s feature phone and the late-2010s glass-sandwich
+	 * smartphone) was a single tactical-red status LED indicator -
+	 * usually a 1-2 mm pinprick in the top corner of the bezel that
+	 * stayed lit whenever the device was armed. Everything else about
+	 * the phone read as a sea of obsidian + bone-white menu chrome;
+	 * the LED was the only chromatic accent, and the only thing that
+	 * told you the device was actually on rather than a slab of glass.
+	 * Without that LED, an obsidian tile with bone-white icon strokes
+	 * just reads as 'a dark icon on a black background', missing the
+	 * single visual that defined the era's tactical aesthetic.
+	 *
+	 * Phase O folds that effect into PhoneIconTile via a per-theme
+	 * 'status-LED' overlay - a 2x2 STEALTH_LED dot rendered in the
+	 * top-right corner of every tile body, capped with a 1x1
+	 * STEALTH_BONE highlight pixel in the upper-left of that dot
+	 * (the LED's emission peak, the bright spec every photo of an
+	 * armed status LED captures). On themes that don't have a
+	 * tactical-LED convention (Default Synthwave purple, Nokia 3310
+	 * LCD, Game Boy DMG LCD, Amber CRT phosphor, Sony Ericsson Aqua
+	 * glass, RAZR Hot Pink EL backlight) the dot stays fully
+	 * transparent, byte-identical to the previous behaviour. On
+	 * Stealth Black, the dot rests at a moderate idle opacity - the
+	 * always-on status LED cue - and the selected tile burns the
+	 * dot to full intensity (the 'this key is the active selection,
+	 * status LED at full intensity' cue every armed tactical
+	 * handset's UI used to mark its focused row).
+	 *
+	 *   statusLedEnabled()        - true only for StealthBlack
+	 *   statusLedColor()          - STEALTH_LED under StealthBlack,
+	 *                               MP_ACCENT otherwise (the latter is
+	 *                               a fallback that's never observed
+	 *                               because callers gate on
+	 *                               statusLedEnabled() first via the
+	 *                               opacity helpers below)
+	 *   statusLedHighlightColor() - STEALTH_BONE under StealthBlack,
+	 *                               MP_TEXT otherwise (same fallback
+	 *                               semantics; never observed outside
+	 *                               Stealth Black because the highlight
+	 *                               pixel rides the same opacity as
+	 *                               the LED dot)
+	 *   statusLedIdleOpa()        - LV_OPA_70 under StealthBlack,
+	 *                               LV_OPA_TRANSP otherwise (so the
+	 *                               existing tiles render byte-
+	 *                               identically on every other theme)
+	 *   statusLedSelectedOpa()    - LV_OPA_COVER under StealthBlack,
+	 *                               LV_OPA_TRANSP otherwise
+	 *
+	 * The selected-vs-idle opacity gap (70% -> 100%) is intentionally
+	 * smaller than the S108 Aqua chrome-shine (50% -> 100%) and the
+	 * S110 RAZR EL-bleed (40% -> 100%) because a real tactical-handset
+	 * status LED never went dark - it stayed lit at near-full intensity
+	 * whenever the device was armed, and only pulsed slightly on
+	 * activity. The 70%/100% gap captures that 'always-armed, briefly
+	 * burning hotter on focus' behaviour without flashing the dot from
+	 * faint to bright (which would read as a notification LED rather
+	 * than a status LED). PhoneIconTile applies this static (non-
+	 * pulsing) overlay rather than animating it because the existing
+	 * halo already pulses on selection; layering a second pulsing
+	 * element on top would make the focused tile read as jittery
+	 * rather than 'armed', which contradicts the cool composure of
+	 * the Stealth Black aesthetic.
+	 *
+	 * Why top-right corner (vs S108's top edge / S110's bottom edge):
+	 * the status LED on a real tactical handset always sat in the
+	 * top-right of the bezel (the convention shared by every
+	 * blacked-out feature phone of the era - the LED was placed where
+	 * a glance at the device while it was face-down on a desk would
+	 * still catch the indicator). Anchoring the dot to the top-right
+	 * corner of the tile keeps the cue physically faithful and gives
+	 * the Stealth Black theme a visual axis that's distinct from the
+	 * Aqua top-shine and the RAZR bottom-bleed - so a user flipping
+	 * between Aqua, RAZR, and Stealth Black sees the highlight move
+	 * from top edge to bottom edge to top-right corner, reinforcing
+	 * that they're three genuinely different lighting models rather
+	 * than three recoloured versions of the same overlay.
+	 */
+	static bool       statusLedEnabled();
+	static lv_color_t statusLedColor();
+	static lv_color_t statusLedHighlightColor();
+	static uint8_t    statusLedIdleOpa();
+	static uint8_t    statusLedSelectedOpa();
 };
 
 /*

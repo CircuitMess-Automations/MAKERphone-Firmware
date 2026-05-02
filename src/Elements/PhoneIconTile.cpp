@@ -34,7 +34,7 @@
 #define MP_ICON_DETAIL (MakerphoneTheme::iconDetail())
 
 PhoneIconTile::PhoneIconTile(lv_obj_t* parent, Icon icon, const char* label)
-		: LVObject(parent), icon(icon), halo(nullptr), shine(nullptr), edgeGlow(nullptr), iconLayer(nullptr), labelEl(nullptr){
+		: LVObject(parent), icon(icon), halo(nullptr), shine(nullptr), edgeGlow(nullptr), statusLed(nullptr), statusLedHi(nullptr), iconLayer(nullptr), labelEl(nullptr){
 
 	// The tile is a fixed-size widget that flows naturally inside a flex
 	// or grid parent (no IGNORE_LAYOUT flag, see header notes).
@@ -44,6 +44,7 @@ PhoneIconTile::PhoneIconTile(lv_obj_t* parent, Icon icon, const char* label)
 	buildHalo();
 	buildShine();
 	buildEdgeGlow();
+	buildStatusLed();
 	buildIconLayer();
 	buildLabel(label);
 
@@ -171,6 +172,77 @@ void PhoneIconTile::buildEdgeGlow(){
 	lv_obj_set_style_bg_opa(edgeGlow, LV_OPA_TRANSP, 0);
 }
 
+
+// S112 - Stealth Black tactical-red status LED.
+// A 2x2 STEALTH_LED dot anchored to the top-right corner of the tile
+// body, with a 1x1 STEALTH_BONE highlight pixel in the upper-left of
+// the dot (the LED's emission peak - the bright spec every photo of
+// an armed status LED captures). Lives as two children of the tile
+// alongside `shine` and `edgeGlow`, drawn just below the icon layer
+// so the dot never occludes any of the per-icon rectangles. Colour +
+// opacity resolve through MakerphoneTheme::statusLed*() so the dot is
+// fully transparent under Default / Nokia 3310 / Game Boy DMG / Amber
+// CRT / Sony Ericsson Aqua / RAZR Hot Pink (byte-identical to the
+// previous behaviour) and only becomes visible under StealthBlack.
+//
+// Distinct from PhoneIconTile::buildShine() (top edge) and
+// PhoneIconTile::buildEdgeGlow() (bottom edge) along the corner-anchor
+// axis - the dot occupies a 2x2 box in the tile's top-right corner,
+// which is disjoint from both edge strips, so the three cue
+// geometries (top edge / bottom edge / top-right corner) stay
+// non-overlapping and a future theme can combine any subset of them
+// without overpainting. The corner-anchor is also physically faithful:
+// a real Vertu Constellation Black, BlackBerry Bold 9900 Stealth, or
+// Nokia 8800 Carbon Arte placed its tactical status LED in the top
+// corner of the bezel (the convention shared by every blacked-out
+// feature phone of the era - the LED was placed where a glance at
+// the device while it was face-down on a desk would still catch the
+// indicator), so anchoring the dot to the top-right of the tile
+// captures that placement directly.
+void PhoneIconTile::buildStatusLed(){
+	// Outer 2x2 LED dot.
+	statusLed = lv_obj_create(obj);
+	lv_obj_remove_style_all(statusLed);
+	lv_obj_clear_flag(statusLed, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(statusLed, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(statusLed, 2, 2);
+	lv_obj_set_align(statusLed, LV_ALIGN_TOP_RIGHT);
+	// Inset 2 px from the right edge and 2 px from the top edge so the
+	// dot sits cleanly inside the 1 px tile border without overpainting
+	// it (the border carries the selection cue, so the LED must never
+	// touch it).
+	lv_obj_set_pos(statusLed, -2, 2);
+	lv_obj_set_style_radius(statusLed, 0, 0);
+	lv_obj_set_style_border_width(statusLed, 0, 0);
+	lv_obj_set_style_pad_all(statusLed, 0, 0);
+	lv_obj_set_style_bg_color(statusLed, MakerphoneTheme::statusLedColor(), 0);
+	// Idle opacity is wired in refreshSelection() (which runs once at
+	// the end of the constructor), so this initial set just keeps the
+	// dot invisible until refreshSelection() decides per-theme.
+	lv_obj_set_style_bg_opa(statusLed, LV_OPA_TRANSP, 0);
+
+	// Inner 1x1 highlight pixel - the LED's emission peak.
+	statusLedHi = lv_obj_create(obj);
+	lv_obj_remove_style_all(statusLedHi);
+	lv_obj_clear_flag(statusLedHi, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(statusLedHi, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(statusLedHi, 1, 1);
+	lv_obj_set_align(statusLedHi, LV_ALIGN_TOP_RIGHT);
+	// One pixel inset deeper than the LED dot so the highlight pixel
+	// occupies the upper-left of the 2x2 dot (origin x = -3 = the LED's
+	// upper-left pixel; origin y = 2 = the LED's top row). The result
+	// reads as 'hot spec on a slightly less-hot dot', the way a real
+	// armed status LED looks under a camera: the LED itself is red,
+	// but the centre of the emission is so saturated it photographs
+	// near-white.
+	lv_obj_set_pos(statusLedHi, -3, 2);
+	lv_obj_set_style_radius(statusLedHi, 0, 0);
+	lv_obj_set_style_border_width(statusLedHi, 0, 0);
+	lv_obj_set_style_pad_all(statusLedHi, 0, 0);
+	lv_obj_set_style_bg_color(statusLedHi, MakerphoneTheme::statusLedHighlightColor(), 0);
+	lv_obj_set_style_bg_opa(statusLedHi, LV_OPA_TRANSP, 0);
+}
+
 void PhoneIconTile::buildIconLayer(){
 	// 16x16 transparent container that holds the per-icon pixel rectangles.
 	// Centered horizontally; sits 3 px from the top of the tile so the
@@ -254,6 +326,19 @@ void PhoneIconTile::refreshSelection(){
 		// the press-feedback signature of every mid-2000s RAZR.
 		lv_obj_set_style_bg_color(edgeGlow, MakerphoneTheme::edgeGlowColor(), 0);
 		lv_obj_set_style_bg_opa(edgeGlow, (lv_opa_t) MakerphoneTheme::edgeGlowSelectedOpa(), 0);
+		// S112 - Stealth Black: focused tile burns the tactical status
+		// LED dot to full intensity (LV_OPA_COVER under StealthBlack,
+		// LV_OPA_TRANSP everywhere else - same byte as the idle non-
+		// Stealth-Black state, so non-Stealth-Black themes never see
+		// a status-LED flash). The cue reads as 'this row is the
+		// active selection, status LED at full intensity' - the focus-
+		// feedback signature of every armed early-2010s tactical
+		// handset. The highlight pixel rides the same opacity, so the
+		// LED's emission peak stays visible (and bright) on focus.
+		lv_obj_set_style_bg_color(statusLed, MakerphoneTheme::statusLedColor(), 0);
+		lv_obj_set_style_bg_opa(statusLed, (lv_opa_t) MakerphoneTheme::statusLedSelectedOpa(), 0);
+		lv_obj_set_style_bg_color(statusLedHi, MakerphoneTheme::statusLedHighlightColor(), 0);
+		lv_obj_set_style_bg_opa(statusLedHi, (lv_opa_t) MakerphoneTheme::statusLedSelectedOpa(), 0);
 
 		lv_anim_t a;
 		lv_anim_init(&a);
@@ -293,6 +378,22 @@ void PhoneIconTile::refreshSelection(){
 		// was lit.
 		lv_obj_set_style_bg_color(edgeGlow, MakerphoneTheme::edgeGlowColor(), 0);
 		lv_obj_set_style_bg_opa(edgeGlow, (lv_opa_t) MakerphoneTheme::edgeGlowIdleOpa(), 0);
+		// S112 - Stealth Black: idle tile rests with a faint STEALTH_LED
+		// dot in its top-right corner (LV_OPA_70 under StealthBlack,
+		// LV_OPA_TRANSP everywhere else - so non-Stealth-Black themes
+		// still render a perfectly flat tile body, byte-identical to
+		// the pre-S112 behaviour). The cue reads as 'tactical status
+		// LED, always-on while the device is armed' - the soft red
+		// pinprick every blacked-out feature phone of the early-2010s
+		// kept lit in the top of its bezel. The highlight pixel rides
+		// the same idle opacity so the LED's emission peak shows
+		// through even at the soft idle brightness, the way a real
+		// armed status LED always reads brighter than the surrounding
+		// LED body.
+		lv_obj_set_style_bg_color(statusLed, MakerphoneTheme::statusLedColor(), 0);
+		lv_obj_set_style_bg_opa(statusLed, (lv_opa_t) MakerphoneTheme::statusLedIdleOpa(), 0);
+		lv_obj_set_style_bg_color(statusLedHi, MakerphoneTheme::statusLedHighlightColor(), 0);
+		lv_obj_set_style_bg_opa(statusLedHi, (lv_opa_t) MakerphoneTheme::statusLedIdleOpa(), 0);
 	}
 }
 

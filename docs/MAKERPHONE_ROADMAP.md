@@ -172,7 +172,7 @@ Two sessions per theme: **part 1 = palette + wallpaper variant**, **part 2 = mat
 - [x] **S109** — Theme: RAZR Hot Pink — palette + wallpaper.
 - [x] **S110** — Theme: RAZR Hot Pink — icon glyphs + accents.
 - [x] **S111** — Theme: Stealth Black — palette + wallpaper.
-- [ ] **S112** — Theme: Stealth Black — icon glyphs + accents.
+- [x] **S112** — Theme: Stealth Black — icon glyphs + accents.
 - [ ] **S113** — Theme: Y2K Silver — palette + wallpaper.
 - [ ] **S114** — Theme: Y2K Silver — icon glyphs + accents.
 - [ ] **S115** — Theme: Cyberpunk Red — palette + wallpaper.

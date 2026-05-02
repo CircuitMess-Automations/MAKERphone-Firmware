@@ -410,3 +410,137 @@ uint8_t MakerphoneTheme::edgeGlowSelectedOpa(){
 	return edgeGlowEnabled() ? LV_OPA_COVER : LV_OPA_TRANSP;
 }
 
+
+// ---------------------------------------------------------------------
+// S112 - Stealth Black status-LED helpers.
+//
+// The early-2010s "blacked-out" tactical-handset aesthetic (Vertu
+// Constellation Black, BlackBerry Bold 9900 Stealth, Nokia 8800 Carbon
+// Arte, the obsidian-slab generation that bridged the late-2000s
+// feature phone to the late-2010s glass-sandwich smartphone) shipped a
+// single defining accent: a tactical-red status LED indicator in the
+// top corner of the bezel that stayed lit whenever the device was
+// armed. Everything else about the phone read as a sea of obsidian +
+// bone-white menu chrome; the LED was the only chromatic accent, and
+// the only thing that told you the device was actually on rather than
+// a slab of glass. Without that LED, an obsidian tile with bone-white
+// icon strokes just reads as 'a dark icon on a black background',
+// missing the single visual that defined the era.
+//
+// PhoneIconTile consumes these helpers at idle (gated on
+// statusLedEnabled()) so every tile under StealthBlack rests with a
+// faint STEALTH_LED dot in its top-right corner - the always-on
+// status-LED cue. Selecting the tile then snaps the dot to LV_OPA_COVER
+// so the focused tile reads as 'this row is the active selection,
+// status LED at full intensity' against its softly-armed neighbours -
+// the same focus-feedback cue every armed tactical handset's UI used
+// to mark its current row.
+//
+// Default / Nokia 3310 / Game Boy DMG / Amber CRT / Sony Ericsson Aqua
+// / RAZR Hot Pink return values that produce the previous byte-
+// identical behaviour: statusLedEnabled() == false, both opacity
+// helpers return LV_OPA_TRANSP (so statusLedColor() and
+// statusLedHighlightColor() values are never observed), keeping the
+// existing tile silhouette unchanged on every non-Stealth-Black theme.
+//
+// Mechanically a corner-anchored 2x2 dot (with a 1x1 highlight pixel),
+// not the top-edge / bottom-edge strip patterns S108 + S110 used. The
+// corner-anchor + STEALTH_LED colour give the Stealth Black theme a
+// visual axis that's distinct from both the Aqua top-shine and the
+// RAZR bottom-bleed - so a user flipping between Aqua, RAZR, and
+// Stealth Black sees the highlight move from top edge to bottom edge
+// to top-right corner, reinforcing that they're three genuinely
+// different lighting models rather than three recoloured versions of
+// the same overlay.
+// ---------------------------------------------------------------------
+
+bool MakerphoneTheme::statusLedEnabled(){
+	return getCurrent() == Theme::StealthBlack;
+}
+
+lv_color_t MakerphoneTheme::statusLedColor(){
+	switch(getCurrent()){
+		case Theme::StealthBlack: return STEALTH_LED;
+		// The fallbacks below are never observed - statusLedIdleOpa()
+		// and statusLedSelectedOpa() both return LV_OPA_TRANSP on every
+		// non-Stealth-Black theme, so the dot's colour can't reach the
+		// framebuffer. The values still resolve to a sensible per-theme
+		// 'brightest accent' so a future caller that probes the colour
+		// outside the opacity gate (e.g. a debug overlay) reads
+		// something coherent rather than an undefined value.
+		case Theme::Nokia3310:        return N3310_FRAME;
+		case Theme::GameBoyDMG:       return GBDMG_INK;
+		case Theme::AmberCRT:         return AMBER_CRT_HOT;
+		case Theme::SonyEricssonAqua: return AQUA_GLOW;
+		case Theme::RazrHotPink:      return RAZR_GLOW;
+		case Theme::Default:
+		default:                      return MP_ACCENT;
+	}
+}
+
+lv_color_t MakerphoneTheme::statusLedHighlightColor(){
+	switch(getCurrent()){
+		case Theme::StealthBlack: return STEALTH_BONE;
+		// The fallbacks below are never observed - the highlight pixel
+		// rides the same opacity as the LED dot, and that opacity
+		// returns LV_OPA_TRANSP on every non-Stealth-Black theme.
+		// The values still resolve to a sensible per-theme 'brightest
+		// chrome / body-text white' so a future caller that probes
+		// the colour outside the opacity gate reads something coherent.
+		case Theme::Nokia3310:        return N3310_HIGHLIGHT;
+		case Theme::GameBoyDMG:       return GBDMG_LCD_LIGHT;
+		case Theme::AmberCRT:         return AMBER_CRT_HOT;
+		case Theme::SonyEricssonAqua: return AQUA_CHROME;
+		case Theme::RazrHotPink:      return RAZR_CHROME;
+		case Theme::Default:
+		default:                      return MP_TEXT;
+	}
+}
+
+uint8_t MakerphoneTheme::statusLedIdleOpa(){
+	// LV_OPA_70 is the calibrated 'always-on tactical status LED'
+	// opacity: bright enough that the dot reads as a deliberate
+	// indicator (the eye picks it out as 'lit, armed') rather than
+	// a stray pixel, dim enough that it doesn't dominate the tile
+	// body. On a real Vertu Constellation Black or BlackBerry Bold
+	// 9900 Stealth the status LED rested at roughly 60-75% of full
+	// brightness when idle (the LED never fully dimmed during use -
+	// that was the whole point of a status indicator) and LV_OPA_70
+	// is the closest 1-pixel approximation of that brightness on a
+	// 16 bpp panel.
+	//
+	// Higher than S108's LV_OPA_50 chrome-shine idle and S110's
+	// LV_OPA_40 EL-bleed idle because a status LED is fundamentally a
+	// 'lit indicator', not a 'reflected highlight' - it reads as
+	// brighter than ambient panel light by definition, while the
+	// chrome-shine and EL-bleed were always softer reflected/leaked
+	// effects. The idle-opacity ranking (40 < 50 < 70) is therefore
+	// physically faithful: an EL panel bleed is the dimmest, a
+	// reflected glass shine is in the middle, an emitting LED is the
+	// brightest.
+	return statusLedEnabled() ? LV_OPA_70 : LV_OPA_TRANSP;
+}
+
+uint8_t MakerphoneTheme::statusLedSelectedOpa(){
+	// LV_OPA_COVER (full intensity) on selection - the focused
+	// Stealth Black tile snaps to a 'fully-bright tactical LED' that
+	// the eye reads as 'this row is the active selection'. This is a
+	// non-pulsing, on/off overlay because the existing halo already
+	// pulses on selection; layering a second pulsing element on top
+	// would make the focused tile read as jittery rather than 'armed',
+	// which contradicts the cool composure of the Stealth Black
+	// aesthetic (a real tactical handset's status LED transitioned
+	// cleanly between 'armed' and 'active' brightness, never flashing
+	// or fading - the LED was a status indicator, not a notification
+	// indicator, and panel-level emit/dim was handled by per-row
+	// driver logic).
+	//
+	// The 70%->100% gap is intentionally smaller than S108's 50%->100%
+	// (Aqua) and S110's 40%->100% (RAZR) because the Stealth Black
+	// LED is already armed at idle - the focus state is a small bump
+	// in brightness, not a transition from 'dim' to 'lit'. A wider gap
+	// would read as 'LED started flashing' rather than 'LED brightened
+	// to confirm focus', which is the wrong cue for a status
+	// indicator.
+	return statusLedEnabled() ? LV_OPA_COVER : LV_OPA_TRANSP;
+}
