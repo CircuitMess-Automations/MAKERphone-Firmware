@@ -31,6 +31,7 @@
 #include "PhoneHangman.h"
 #include "PhoneConnectFour.h"
 #include "PhoneReversi.h"
+#include "PhoneWhackAMole.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -94,6 +95,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "HANGMAN",  nullptr,                   GameKind::Screen },  // S87
 	{ "CONNECT4", nullptr,                   GameKind::Screen },  // S88
 	{ "REVERSI",  nullptr,                   GameKind::Screen },  // S89
+	{ "WHACK",    nullptr,                   GameKind::Screen },  // S90
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -733,6 +735,35 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 20, 10, 3, 3, cyan);
 			break;
 		}
+		case 18: { // WHACK - 3x3 hole grid with one cyan mole popping out
+		           // and a sunset hammer hovering over the centre cell.
+			// S90: a stylised glance of the dialer-key reaction game.
+			// Three rows of three faint dim-purple holes sketch the
+			// 1-9 grid; one cyan disc rises out of the top-right hole
+			// and a small orange "hammer" (square + handle) hovers
+			// over the centre so the silhouette reads as "whack a
+			// mole" even at 30x22 px.
+			const lv_color_t purple = lv_color_make(70, 56, 100);
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t orange = lv_color_make(255, 140, 30);
+
+			// 3x3 hole grid (4 px pitch, top-left at (4, 4)).
+			for(uint8_t r = 0; r < 3; ++r) {
+				for(uint8_t c = 0; c < 3; ++c) {
+					const uint8_t dx = static_cast<uint8_t>(4 + c * 8);
+					const uint8_t dy = static_cast<uint8_t>(4 + r * 6);
+					px(g, dx, dy, 4, 2, purple);
+				}
+			}
+
+			// Cyan mole rising out of the top-right hole.
+			px(g, 20,  3, 4, 3, cyan);
+
+			// Orange hammer head + handle hovering over the centre.
+			px(g, 13, 10, 5, 3, orange);
+			px(g, 15, 13, 1, 5, orange);
+			break;
+		}
 		default:
 			break;
 	}
@@ -882,6 +913,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 15: push(new PhoneHangman()); break;
 			case 16: push(new PhoneConnectFour()); break;
 			case 17: push(new PhoneReversi()); break;
+			case 18: push(new PhoneWhackAMole()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
