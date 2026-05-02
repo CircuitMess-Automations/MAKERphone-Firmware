@@ -9,6 +9,8 @@
 #include "../Elements/PhoneStatusBar.h"
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Fonts/font.h"
+#include "../Services/PhoneComposerStorage.h"
+#include "../Services/PhoneComposerPlayback.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget so
 // the composer slots in beside PhoneCalculator (S60) / PhoneStopwatch (S61) /
@@ -111,6 +113,23 @@ PhoneComposer::PhoneComposer()
 	// from any screen.
 	setButtonHoldTime(BTN_BACK, BackHoldMs);
 
+	// S123 -- long-press gestures wired alongside the short-press
+	// behaviour the screen already had. The press handler stamps the
+	// "*LongFired" flag so the matching released-handler can suppress
+	// the short-press fall-through, mirroring the BTN_BACK pattern.
+	//   BTN_9        : preview play / stop
+	//   BTN_0        : save current buffer to active slot
+	//   BTN_ENTER    : load active slot into buffer
+	//   BTN_LEFT     : cycle active slot (0..SaveSlotCount-1)
+	setButtonHoldTime(BTN_9,     SlotHoldMs);
+	setButtonHoldTime(BTN_0,     SlotHoldMs);
+	setButtonHoldTime(BTN_ENTER, SlotHoldMs);
+	setButtonHoldTime(BTN_LEFT,  SlotHoldMs);
+
+	// Lazily warm up the NVS handle so the first save / load doesn't
+	// pay the open cost on the input path. Idempotent if already open.
+	PhoneComposerStorage::begin();
+
 	// Initial paint -- everything renders against an empty buffer so the
 	// preview reads "REST 1/4 o4" and every ribbon row reads "(empty)".
 	refreshCaption();
@@ -118,6 +137,7 @@ PhoneComposer::PhoneComposer()
 	refreshStamp();
 	refreshRibbon();
 	refreshSoftKeys();
+	refreshHints();
 }
 
 PhoneComposer::~PhoneComposer() {
@@ -131,6 +151,9 @@ void PhoneComposer::onStart() {
 
 void PhoneComposer::onStop() {
 	Input::getInstance()->removeListener(this);
+	// Hush any in-flight preview so the buzzer does not bleed past
+	// the screen's lifetime. Safe to call when nothing is playing.
+	PhoneComposerPlayback::stop();
 }
 
 // ---------- builders ------------------------------------------------------
@@ -209,6 +232,8 @@ void PhoneComposer::buildRibbon() {
 }
 
 void PhoneComposer::buildHints() {
+	// Hint line 1 keeps the short-press summary the user already
+	// learned from S121.
 	hintLine1 = lv_label_create(obj);
 	lv_obj_set_style_text_font(hintLine1, &pixelbasic7, 0);
 	lv_obj_set_style_text_color(hintLine1, MP_LABEL_DIM, 0);
@@ -217,12 +242,16 @@ void PhoneComposer::buildHints() {
 	lv_label_set_text(hintLine1, "1=REST  2-8=NOTES  9=DUP");
 	lv_obj_set_pos(hintLine1, kRowLeftX, kHint1Y);
 
+	// Hint line 2 is rewritten by S123 -- it doubles as a status
+	// indicator for the active slot AND a discoverability cue for the
+	// long-press save/load/play gestures. The literal text is filled
+	// in by refreshHints() so it can react to slot changes.
 	hintLine2 = lv_label_create(obj);
 	lv_obj_set_style_text_font(hintLine2, &pixelbasic7, 0);
 	lv_obj_set_style_text_color(hintLine2, MP_LABEL_DIM, 0);
 	lv_obj_set_style_text_align(hintLine2, LV_TEXT_ALIGN_CENTER, 0);
 	lv_obj_set_width(hintLine2, kRowWidth);
-	lv_label_set_text(hintLine2, "0=LEN  L/R=OCT  A=INS");
+	lv_label_set_text(hintLine2, "");
 	lv_obj_set_pos(hintLine2, kRowLeftX, kHint2Y);
 }
 
@@ -329,9 +358,14 @@ void PhoneComposer::formatNote(const Note& n, char* out, size_t outLen) {
 
 void PhoneComposer::refreshCaption() {
 	if(captionLabel == nullptr) return;
-	char buf[24] = {};
-	snprintf(buf, sizeof(buf), "COMPOSER  %u/%u",
-			 (unsigned)noteCount, (unsigned)MaxNotes);
+	char buf[32] = {};
+	// S123: caption now shows the active save slot index in addition
+	// to the buffer fill ratio. The "S0" prefix matches the storage
+	// layer's slot-key naming so a power-user reading the NVS dump
+	// recognises the binding immediately.
+	snprintf(buf, sizeof(buf), "COMPOSER  %u/%u  S%u",
+			 (unsigned)noteCount, (unsigned)MaxNotes,
+			 (unsigned)activeSlot);
 	lv_label_set_text(captionLabel, buf);
 }
 
@@ -555,20 +589,31 @@ void PhoneComposer::buttonPressed(uint i) {
 		case BTN_6: onToneKey('G'); break;
 		case BTN_7: onToneKey('A'); break;
 		case BTN_8: onToneKey('B'); break;
-		case BTN_9: onDuplicateKey(); break;
-		case BTN_0: onCycleLength(); break;
+
+		// S123: BTN_9 / BTN_0 / BTN_ENTER / BTN_LEFT short-press
+		// behaviour is unchanged, but the long-press handlers now
+		// fire too. The "*LongFired" flags are reset on press and
+		// the matching released-handler suppresses the short-press
+		// fall-through when a hold has already triggered.
+		case BTN_9:
+			dupLongFired   = false;
+			break;
+		case BTN_0:
+			cycleLongFired = false;
+			break;
+		case BTN_ENTER:
+			enterLongFired = false;
+			break;
 
 		case BTN_L: onOctaveDelta(-1); break;
 		case BTN_R: onOctaveDelta(+1); break;
 
-		case BTN_ENTER:
-			onInsertCopy();
-			break;
-
 		case BTN_LEFT:
-			// "CLR" -- wipe the buffer.
-			if(softKeys) softKeys->flashLeft();
-			clearAll();
+			// "CLR" / cycle-slot split: clearing the buffer is a
+			// destructive operation, so we wait until release to
+			// commit. A long-press cycles the active slot and
+			// suppresses the CLR fall-through.
+			leftLongFired = false;
 			break;
 
 		case BTN_RIGHT:
@@ -591,6 +636,43 @@ void PhoneComposer::buttonHeld(uint i) {
 		backLongFired = true;
 		if(softKeys) softKeys->flashRight();
 		pop();
+		return;
+	}
+
+	// S123 long-press gestures.
+	switch(i) {
+		case BTN_9:
+			// Hold-9: toggle preview playback. Stays inside the
+			// screen so the user can keep editing while a loop runs.
+			dupLongFired = true;
+			togglePreview();
+			break;
+		case BTN_0:
+			// Hold-0: save the current buffer to the active slot.
+			cycleLongFired = true;
+			(void)saveToActiveSlot();
+			break;
+		case BTN_ENTER:
+			// Hold-A: load the active slot into the buffer. If the
+			// slot is empty the load is a no-op and the screen just
+			// flashes a hint update so the user knows nothing was
+			// loaded.
+			enterLongFired = true;
+			(void)loadFromActiveSlot();
+			break;
+		case BTN_LEFT: {
+			// Hold-LEFT: cycle the active slot (0..SaveSlotCount-1).
+			// Suppresses the CLR fall-through that would have fired
+			// on a short press of the same key.
+			leftLongFired = true;
+			activeSlot = (uint8_t)((activeSlot + 1) % SaveSlotCount);
+			if(softKeys) softKeys->flashLeft();
+			refreshCaption();
+			refreshHints();
+			break;
+		}
+		default:
+			break;
 	}
 }
 
@@ -606,10 +688,162 @@ void PhoneComposer::buttonReleased(uint i) {
 		}
 		if(softKeys) softKeys->flashRight();
 		onDeleteCursor();
-	} else if(i == BTN_RIGHT) {
+		return;
+	}
+	if(i == BTN_RIGHT) {
 		// Softkey RIGHT mirrors the BACK short-press semantics so the
 		// user has two keys for the same action.
 		if(softKeys) softKeys->flashRight();
 		onDeleteCursor();
+		return;
 	}
+
+	// S123 short-press fall-throughs. Each branch checks the matching
+	// "*LongFired" flag so a hold doesn't double-fire its short-press
+	// behaviour on release.
+	if(i == BTN_9) {
+		if(dupLongFired) {
+			dupLongFired = false;
+			return;
+		}
+		onDuplicateKey();
+		return;
+	}
+	if(i == BTN_0) {
+		if(cycleLongFired) {
+			cycleLongFired = false;
+			return;
+		}
+		onCycleLength();
+		return;
+	}
+	if(i == BTN_ENTER) {
+		if(enterLongFired) {
+			enterLongFired = false;
+			return;
+		}
+		onInsertCopy();
+		return;
+	}
+	if(i == BTN_LEFT) {
+		if(leftLongFired) {
+			leftLongFired = false;
+			return;
+		}
+		// Short-press: keep the legacy "CLR" wipe.
+		if(softKeys) softKeys->flashLeft();
+		clearAll();
+		return;
+	}
+}
+
+
+// =====================================================================
+// S123 — slot persistence + Ringtone preview wiring.
+// =====================================================================
+
+void PhoneComposer::refreshHints() {
+	if(hintLine2 == nullptr) return;
+
+	// Tell the user what the long-press gestures do AND surface the
+	// active slot's current state. The line is intentionally compact
+	// (4 tokens, ~28 chars) so it fits at 7-pixel font on the 160 px
+	// screen.
+	const bool occupied = PhoneComposerStorage::hasSlot(activeSlot);
+	const bool playing  = isPreviewing();
+
+	char buf[40] = {};
+	// 21-ish glyphs at pixelbasic7 6 px stride keeps us inside the
+	// 148 px row width with margin to spare. The "*" suffix on the
+	// slot tag flags whether the slot already has saved data.
+	snprintf(buf, sizeof(buf),
+			 "S%u%s 9=%s 0=SV A=LD",
+			 (unsigned)activeSlot,
+			 occupied ? "*" : " ",
+			 playing  ? "STP" : "PLY");
+	lv_label_set_text(hintLine2, buf);
+}
+
+bool PhoneComposer::isPreviewing() const {
+	return PhoneComposerPlayback::isPlaying();
+}
+
+void PhoneComposer::togglePreview() {
+	if(PhoneComposerPlayback::isPlaying()) {
+		PhoneComposerPlayback::stop();
+		refreshHints();
+		return;
+	}
+	if(noteCount == 0) {
+		// Nothing to preview -- give the user a visible cue rather
+		// than a silent buzzer-no-op.
+		if(softKeys) softKeys->flashLeft();
+		return;
+	}
+	const bool ok = PhoneComposerPlayback::play(buffer, noteCount,
+	                                            DefaultBpm,
+	                                            /*loopForever=*/false,
+	                                            /*name=*/"COMPOSER");
+	if(!ok) {
+		if(softKeys) softKeys->flashLeft();
+	}
+	refreshHints();
+}
+
+bool PhoneComposer::saveToActiveSlot() {
+	const bool ok = PhoneComposerStorage::saveSlot(activeSlot,
+	                                               buffer, noteCount,
+	                                               /*name=*/"COMPOSER",
+	                                               DefaultBpm);
+	if(!ok) {
+		if(softKeys) softKeys->flashRight();
+		return false;
+	}
+	if(softKeys) softKeys->flashLeft();
+	refreshHints();
+	return true;
+}
+
+bool PhoneComposer::loadFromActiveSlot() {
+	if(!PhoneComposerStorage::hasSlot(activeSlot)) {
+		// Empty slot -- flash and bail without touching the buffer.
+		if(softKeys) softKeys->flashRight();
+		return false;
+	}
+
+	Note loaded[MaxNotes] = {};
+	uint8_t loadedCount = 0;
+	uint16_t bpm = 0;
+	const bool ok = PhoneComposerStorage::loadSlot(activeSlot,
+	                                               loaded, MaxNotes,
+	                                               &loadedCount,
+	                                               /*outName=*/nullptr,
+	                                               /*outNameLen=*/0,
+	                                               &bpm);
+	if(!ok) {
+		if(softKeys) softKeys->flashRight();
+		return false;
+	}
+
+	// Stop any in-flight preview so the engine doesn't keep playing
+	// the stale buffer past the load.
+	PhoneComposerPlayback::stop();
+
+	clearAll();
+	for(uint8_t i = 0; i < loadedCount; ++i) {
+		appendNote(loaded[i]);
+	}
+
+	// If the load came back empty (saved-empty slot) the screen still
+	// updates so the user sees the slot indicator's "*" mark react to
+	// future saves.
+	cursor = (noteCount > 0) ? (uint8_t)(noteCount - 1) : 0;
+
+	refreshCaption();
+	refreshPreview();
+	refreshRibbon();
+	refreshSoftKeys();
+	refreshHints();
+	if(softKeys) softKeys->flashLeft();
+	return true;
 }

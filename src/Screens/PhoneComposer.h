@@ -106,6 +106,22 @@ public:
 	/** RTTTL-style durations available via the *-key cycle. */
 	static constexpr uint8_t  LengthCount  = 6;
 
+	/** S123 — number of save slots reachable from the screen. Mirrors
+	 *  PhoneComposerStorage::MaxSlots so the slot-cycle gesture wraps
+	 *  cleanly at the same boundary the storage layer enforces. */
+	static constexpr uint8_t  SaveSlotCount = 4;
+
+	/** Long-press threshold for the new S123 bindings (play / save /
+	 *  load / cycle-slot). Same hold time as BTN_BACK so muscle memory
+	 *  transfers between every long-press the screen recognises. */
+	static constexpr uint16_t SlotHoldMs   = 600;
+
+	/** Default tempo committed alongside a save. The composer itself
+	 *  doesn't expose a BPM editor (yet), so every save is stamped
+	 *  with this value; later sessions can wire a tempo widget to the
+	 *  same field without touching the storage layer. */
+	static constexpr uint16_t DefaultBpm   = 63;
+
 	/** A single composed note. Fields are tone / sharp / octave /
 	 *  length / dotted so a future S122 RTTTL serializer can build
 	 *  the canonical "8c#5." token in one strncpy chain. */
@@ -136,6 +152,29 @@ public:
 	bool          insertNoteAt(uint8_t i, const Note& n);
 	bool          deleteNoteAt(uint8_t i);
 	void          clearAll();
+
+	/** S123 — slot index the screen is currently pointed at (0..3).
+	 *  The view changes when the user long-presses the LEFT softkey
+	 *  to cycle through slots. */
+	uint8_t       getActiveSlot() const { return activeSlot; }
+
+	/** S123 — replace the buffer with the contents of the active slot
+	 *  via PhoneComposerStorage. Returns false if the slot was empty
+	 *  or could not be loaded. The screen still repaints in either
+	 *  case so the caption / softkeys reflect the latest state. */
+	bool          loadFromActiveSlot();
+
+	/** S123 — persist the current buffer into the active slot via
+	 *  PhoneComposerStorage. Returns false if NVS rejected the write
+	 *  (out of space, partition unmounted, etc.). */
+	bool          saveToActiveSlot();
+
+	/** S123 — kick off / cancel a buzzer preview of the current
+	 *  buffer through PhoneComposerPlayback. `togglePreview()`
+	 *  stops a running preview if one is already in flight, so the
+	 *  same key acts as both play and stop. */
+	void          togglePreview();
+	bool          isPreviewing() const;
 
 	/** Returns the canonical 1-char tone label for `tone`:
 	 *    'C' 'D' 'E' 'F' 'G' 'A' 'B' -> the same character
@@ -174,6 +213,16 @@ private:
 	bool     stampSharp  = false;
 	bool     stampDotted = false;
 	bool     backLongFired = false;
+	// S123 -- which slot the screen currently targets for save/load
+	// + a record of whether a long-press of the LEFT softkey already
+	// cycled the slot (so the short-press CLR semantics still fire
+	// only on real short presses). The "Played the preview as a
+	// hold" flag does the same for BTN_9.
+	uint8_t  activeSlot     = 0;
+	bool     leftLongFired  = false;
+	bool     dupLongFired   = false;
+	bool     enterLongFired = false;
+	bool     cycleLongFired = false;
 
 	// ---- builders ----
 	void buildHeader();
@@ -187,6 +236,10 @@ private:
 	void refreshStamp();
 	void refreshRibbon();
 	void refreshSoftKeys();
+	// S123 -- repaints the second hint line so the slot indicator
+	// always reflects the active slot index and the play/stop
+	// gesture's current outcome.
+	void refreshHints();
 
 	// ---- key actions ----
 	void onToneKey(char tone);              // 'C'..'B' (uppercase) or 'P'
