@@ -193,6 +193,7 @@ void PhoneThemeScreen::rebuildSwatch() {
 		case Theme::Nokia3310:  drawNokia3310Swatch();  break;
 		case Theme::GameBoyDMG: drawGameBoyDMGSwatch(); break;
 		case Theme::AmberCRT:   drawAmberCRTSwatch();   break;
+		case Theme::SonyEricssonAqua: drawSonyEricssonAquaSwatch(); break;
 		default:                drawDefaultSwatch();    break;  // defensive
 	}
 }
@@ -478,6 +479,99 @@ void PhoneThemeScreen::drawAmberCRTSwatch() {
 		lv_obj_set_pos(px, bx + parts[i].dx, by + parts[i].dy);
 		lv_obj_set_style_bg_color(px, parts[i].hot ? AMBER_CRT_HOT : AMBER_CRT_GLOW, 0);
 		lv_obj_set_style_bg_opa(px, parts[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+
+void PhoneThemeScreen::drawSonyEricssonAquaSwatch() {
+	// Aqua panel: deep navy -> mid-ocean blue vertical gradient covering
+	// the full swatch (the Aqua menu screen, like the Nokia / DMG / CRT
+	// panels, is a single flat surface — no horizon).
+	lv_obj_t* panel = lv_obj_create(swatchInner);
+	lv_obj_remove_style_all(panel);
+	lv_obj_set_size(panel, SwatchW, SwatchH);
+	lv_obj_set_pos(panel, 0, 0);
+	lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_set_style_bg_color(panel, AQUA_BG_DEEP, 0);
+	lv_obj_set_style_bg_grad_color(panel, AQUA_BG_MID, 0);
+	lv_obj_set_style_bg_grad_dir(panel, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(panel, 0, 0);
+	lv_obj_set_style_border_width(panel, 0, 0);
+
+	// Foam current streaks: three short low-opacity ripples scattered
+	// across the swatch in AQUA_FOAM, mirroring the wallpaper.
+	struct Ripple { lv_coord_t y; lv_coord_t x; lv_coord_t w; lv_opa_t opa; };
+	const Ripple ripples[] = {
+			{  9,  6, 28, LV_OPA_30 },
+			{ 19, 42, 32, LV_OPA_20 },
+			{ 33, 12, 40, LV_OPA_30 },
+	};
+	for(uint8_t i = 0; i < sizeof(ripples) / sizeof(ripples[0]); i++) {
+		lv_obj_t* rp = lv_obj_create(panel);
+		lv_obj_remove_style_all(rp);
+		lv_obj_set_size(rp, ripples[i].w, 1);
+		lv_obj_set_pos(rp, ripples[i].x, ripples[i].y);
+		lv_obj_set_style_bg_color(rp, AQUA_FOAM, 0);
+		lv_obj_set_style_bg_opa(rp, ripples[i].opa, 0);
+		lv_obj_set_style_radius(rp, 0, 0);
+		lv_obj_set_style_border_width(rp, 0, 0);
+	}
+
+	// Bubble specks: four 1-2 px foam dots scattered across the swatch.
+	struct Bubble { lv_coord_t x; lv_coord_t y; uint8_t s; lv_opa_t opa; };
+	const Bubble bubbles[] = {
+			{ 10, 24, 1, LV_OPA_60 },
+			{ 28,  5, 2, LV_OPA_60 },
+			{ 56, 14, 1, LV_OPA_60 },
+			{ 68, 28, 2, LV_OPA_60 },
+	};
+	for(uint8_t i = 0; i < sizeof(bubbles) / sizeof(bubbles[0]); i++) {
+		lv_obj_t* bb = lv_obj_create(panel);
+		lv_obj_remove_style_all(bb);
+		lv_obj_set_size(bb, bubbles[i].s, bubbles[i].s);
+		lv_obj_set_pos(bb, bubbles[i].x, bubbles[i].y);
+		lv_obj_set_style_bg_color(bb, AQUA_FOAM, 0);
+		lv_obj_set_style_bg_opa(bb, bubbles[i].opa, 0);
+		lv_obj_set_style_radius(bb, 0, 0);
+		lv_obj_set_style_border_width(bb, 0, 0);
+	}
+
+	// Water-droplet glyph centred in the swatch. Mirrors the wallpaper's
+	// bottom-right glyph but pulled to the centre so it reads as the
+	// theme's signature glyph rather than incidental decor — exactly
+	// how drawNokia3310Swatch / drawGameBoyDMGSwatch / drawAmberCRTSwatch
+	// position their glyphs.
+	const lv_coord_t bx = SwatchW / 2 - 3;
+	const lv_coord_t by = SwatchH / 2 - 5;
+
+	struct PixelRect { int8_t dx, dy; uint8_t w, h; bool shine; lv_opa_t opa; };
+	const PixelRect droplet[] = {
+			{ 3, 0, 1, 1, false, LV_OPA_COVER },
+			{ 2, 1, 3, 1, false, LV_OPA_COVER },
+			{ 2, 2, 3, 1, false, LV_OPA_COVER },
+			{ 1, 3, 5, 1, false, LV_OPA_COVER },
+			{ 1, 4, 5, 1, false, LV_OPA_COVER },
+			{ 0, 5, 7, 1, false, LV_OPA_COVER },
+			{ 0, 6, 7, 1, false, LV_OPA_COVER },
+			{ 1, 7, 5, 1, false, LV_OPA_COVER },
+			{ 2, 8, 3, 1, false, LV_OPA_COVER },
+			// Chrome shine pixels
+			{ 4, 3, 1, 1, true,  LV_OPA_COVER },
+			{ 4, 4, 1, 1, true,  LV_OPA_COVER },
+			// Foam afterglow underneath
+			{ 1, 9, 5, 1, false, LV_OPA_30 },
+	};
+	const uint8_t partCount = sizeof(droplet) / sizeof(droplet[0]);
+	for(uint8_t i = 0; i < partCount; i++){
+		lv_obj_t* px = lv_obj_create(panel);
+		lv_obj_remove_style_all(px);
+		lv_obj_set_size(px, droplet[i].w, droplet[i].h);
+		lv_obj_set_pos(px, bx + droplet[i].dx, by + droplet[i].dy);
+		lv_obj_set_style_bg_color(px,
+		                          droplet[i].shine ? AQUA_CHROME : AQUA_GLOW, 0);
+		lv_obj_set_style_bg_opa(px, droplet[i].opa, 0);
 		lv_obj_set_style_radius(px, 0, 0);
 		lv_obj_set_style_border_width(px, 0, 0);
 	}

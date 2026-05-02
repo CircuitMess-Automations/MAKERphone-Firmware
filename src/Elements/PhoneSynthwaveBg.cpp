@@ -54,6 +54,14 @@ PhoneSynthwaveBg::Style PhoneSynthwaveBg::resolveStyleFromSettings(){
 	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::AmberCRT){
 		return Style::AmberCRT;
 	}
+	// S107 - dispatch the Sony Ericsson Aqua style override the same
+	// way. The wallpaperStyle byte stays persisted underneath so
+	// flipping the theme back to Default / Nokia / DMG / Amber CRT
+	// restores the previously chosen Synthwave variant unchanged,
+	// exactly like the prior branches above.
+	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::SonyEricssonAqua){
+		return Style::SonyEricssonAqua;
+	}
 	return styleFromByte(Settings.get().wallpaperStyle);
 }
 
@@ -123,6 +131,16 @@ PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent, Style style) : LVObject(par
 	// AMBER_CRT palette out of every Synthwave hot-path.
 	if(style == Style::AmberCRT){
 		buildAmberCRTWallpaper();
+		return;
+	}
+
+	// S107 - the Sony Ericsson Aqua theme owns its wallpaper end to
+	// end the same way: it bypasses every Synthwave builder and paints
+	// a flat ocean-gradient panel with foam currents + bubble specks +
+	// a water-droplet motif instead. Returning early keeps the AQUA_*
+	// palette out of every Synthwave hot-path.
+	if(style == Style::SonyEricssonAqua){
+		buildSonyEricssonAquaWallpaper();
 		return;
 	}
 
@@ -927,6 +945,167 @@ void PhoneSynthwaveBg::buildAmberCRTWallpaper(){
 		lv_obj_set_style_bg_color(px,
 		                          promptParts[i].hot ? AMBER_CRT_HOT : AMBER_CRT_GLOW, 0);
 		lv_obj_set_style_bg_opa(px, promptParts[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+
+
+void PhoneSynthwaveBg::buildSonyEricssonAquaWallpaper(){
+	// ----- Aqua panel: deep navy -> mid-ocean blue vertical gradient -----
+	//
+	// Painted on the same `sky` member pointer the Synthwave variant
+	// uses, mirroring the Nokia / DMG / Amber CRT builders so a
+	// future caller iterating wallpaper children can rely on a
+	// single named root regardless of theme. The container covers
+	// the entire 160x128 area - the Aqua menu screen, like the LCD
+	// and CRT panels, is a single flat surface with no horizon.
+	sky = lv_obj_create(obj);
+	lv_obj_remove_style_all(sky);
+	lv_obj_clear_flag(sky, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(sky, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(sky, BgWidth, BgHeight);
+	lv_obj_set_pos(sky, 0, 0);
+	lv_obj_set_style_bg_color(sky, AQUA_BG_DEEP, 0);
+	lv_obj_set_style_bg_grad_color(sky, AQUA_BG_MID, 0);
+	lv_obj_set_style_bg_grad_dir(sky, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(sky, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(sky, 0, 0);
+	lv_obj_set_style_pad_all(sky, 0, 0);
+	lv_obj_set_style_border_width(sky, 0, 0);
+
+	// ----- Foam current streaks: 1 px tall horizontal ripples -----
+	//
+	// Six short low-opacity ripples scattered across the panel in
+	// AQUA_FOAM. They suggest the iconic Sony Ericsson Aqua "ocean
+	// current" cue without animating - the visible whitespace gap
+	// between streaks reads as the spaces between waves. Each rect
+	// is parented to `sky` so when the wallpaper is destroyed LVGL
+	// auto-removes them. y-positions are spaced so a streak never
+	// sits behind the status bar (y < 12) or the soft-key bar
+	// (y > BgHeight - 12).
+	struct Ripple { lv_coord_t y; lv_coord_t x; lv_coord_t w; lv_opa_t opa; };
+	const Ripple ripples[] = {
+			{ 22,  16, 36, LV_OPA_20 },
+			{ 38,  88, 50, LV_OPA_20 },
+			{ 56,  10, 70, LV_OPA_30 },
+			{ 74,  68, 60, LV_OPA_20 },
+			{ 92,  20, 50, LV_OPA_20 },
+			{ 106, 96, 44, LV_OPA_20 },
+	};
+	const uint8_t rippleCount = sizeof(ripples) / sizeof(ripples[0]);
+	for(uint8_t i = 0; i < rippleCount; i++){
+		lv_obj_t* rp = lv_obj_create(sky);
+		lv_obj_remove_style_all(rp);
+		lv_obj_clear_flag(rp, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(rp, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(rp, ripples[i].w, 1);
+		lv_obj_set_pos(rp, ripples[i].x, ripples[i].y);
+		lv_obj_set_style_bg_color(rp, AQUA_FOAM, 0);
+		lv_obj_set_style_bg_opa(rp, ripples[i].opa, 0);
+		lv_obj_set_style_radius(rp, 0, 0);
+		lv_obj_set_style_border_width(rp, 0, 0);
+	}
+
+	// ----- Bubble specks: tiny 1-2 px dots scattered for upward cue -----
+	//
+	// Eight foam-coloured dots; the larger ones (2 px) tend to sit
+	// closer to the top of the panel, the smaller ones near the
+	// bottom, a subtle 'rising bubble depth' cue. Drawn as flat
+	// rects (no LV_RADIUS_CIRCLE - at this size LVGL rounds to a
+	// pixel rect anyway).
+	struct Bubble { lv_coord_t x; lv_coord_t y; uint8_t s; lv_opa_t opa; };
+	const Bubble bubbles[] = {
+			{  20,  44, 1, LV_OPA_60 },
+			{  64,  28, 2, LV_OPA_60 },
+			{ 110,  62, 1, LV_OPA_60 },
+			{ 138,  44, 2, LV_OPA_60 },
+			{  44,  84, 1, LV_OPA_50 },
+			{  88,  90, 2, LV_OPA_60 },
+			{ 122,  98, 1, LV_OPA_50 },
+			{  16, 100, 1, LV_OPA_50 },
+	};
+	const uint8_t bubbleCount = sizeof(bubbles) / sizeof(bubbles[0]);
+	for(uint8_t i = 0; i < bubbleCount; i++){
+		lv_obj_t* bb = lv_obj_create(sky);
+		lv_obj_remove_style_all(bb);
+		lv_obj_clear_flag(bb, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(bb, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(bb, bubbles[i].s, bubbles[i].s);
+		lv_obj_set_pos(bb, bubbles[i].x, bubbles[i].y);
+		lv_obj_set_style_bg_color(bb, AQUA_FOAM, 0);
+		lv_obj_set_style_bg_opa(bb, bubbles[i].opa, 0);
+		lv_obj_set_style_radius(bb, 0, 0);
+		lv_obj_set_style_border_width(bb, 0, 0);
+	}
+
+	// ----- Water-droplet motif (bottom-right corner) -----
+	//
+	// Anchored ~14 px clear of the right edge and ~22 px clear of the
+	// bottom edge, in the patch the soft-key bar will cover during
+	// normal use. The droplet is a 7x9 pixel-art shape with a
+	// pointed top tapering into a rounded base - the canonical
+	// "water drop" silhouette every late-2000s Aqua-skinned phone
+	// shipped on its idle / lock screen. A 2-pixel chrome shine
+	// runs down the upper-right of the body, suggesting reflected
+	// light - without it the glyph reads as a flat blob rather than
+	// a 3D droplet. The whole motif fits in a 7x10 bounding box; the
+	// soft-key bar's 10 px height fully covers it on screens that
+	// draw one, on screens that omit the soft-key bar (boot splash,
+	// lock screen) it peeks through as the theme's signature glyph.
+	const lv_coord_t dropX = BgWidth  - 14;   // 146
+	const lv_coord_t dropY = BgHeight - 22;   // 106
+
+	struct PixelRect {
+		int8_t   dx;
+		int8_t   dy;
+		uint8_t  w;
+		uint8_t  h;
+		bool     shine;     // true -> AQUA_CHROME, false -> AQUA_GLOW
+		lv_opa_t opa;
+	};
+
+	// Pixel layout (7 wide x 9 tall):
+	//    ...#...    row 0  - point top
+	//    ..###..    row 1
+	//    ..###..    row 2
+	//    .#####.    row 3
+	//    .#####.    row 4
+	//    #######    row 5  - widest
+	//    #######    row 6
+	//    .#####.    row 7  - bottom rounding
+	//    ..###..    row 8
+	const PixelRect dropletParts[] = {
+			{ 3, 0, 1, 1, false, LV_OPA_COVER },          // tip
+			{ 2, 1, 3, 1, false, LV_OPA_COVER },
+			{ 2, 2, 3, 1, false, LV_OPA_COVER },
+			{ 1, 3, 5, 1, false, LV_OPA_COVER },
+			{ 1, 4, 5, 1, false, LV_OPA_COVER },
+			{ 0, 5, 7, 1, false, LV_OPA_COVER },
+			{ 0, 6, 7, 1, false, LV_OPA_COVER },
+			{ 1, 7, 5, 1, false, LV_OPA_COVER },
+			{ 2, 8, 3, 1, false, LV_OPA_COVER },
+			// Chrome shine pixels on the upper-right of the body
+			// (suggesting a light source from above-right, the
+			// standard 2007 Sony Ericsson skin convention).
+			{ 4, 3, 1, 1, true,  LV_OPA_COVER },
+			{ 4, 4, 1, 1, true,  LV_OPA_COVER },
+			// One faint phosphor-style afterglow underneath the
+			// bottom rounding so the droplet reads as 'sitting on
+			// the water surface' rather than 'floating in space'.
+			{ 1, 9, 5, 1, false, LV_OPA_30 },
+	};
+	const uint8_t dropletCount = sizeof(dropletParts) / sizeof(dropletParts[0]);
+	for(uint8_t i = 0; i < dropletCount; i++){
+		lv_obj_t* px = lv_obj_create(sky);
+		lv_obj_remove_style_all(px);
+		lv_obj_clear_flag(px, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(px, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(px, dropletParts[i].w, dropletParts[i].h);
+		lv_obj_set_pos(px, dropX + dropletParts[i].dx, dropY + dropletParts[i].dy);
+		lv_obj_set_style_bg_color(px,
+		                          dropletParts[i].shine ? AQUA_CHROME : AQUA_GLOW, 0);
+		lv_obj_set_style_bg_opa(px, dropletParts[i].opa, 0);
 		lv_obj_set_style_radius(px, 0, 0);
 		lv_obj_set_style_border_width(px, 0, 0);
 	}

@@ -117,6 +117,20 @@ public:
 		// as a real 1980s amber phosphor terminal rather than a
 		// tinted Synthwave.
 		AmberCRT  = 6,
+
+		// S107 - Sony Ericsson Aqua theme override. Same dispatch
+		// pattern as Nokia3310 / GameBoyDMG / AmberCRT: not part of
+		// the 4-style PhoneWallpaperScreen pager (StyleCount stays
+		// at 4 there); this value is only ever returned by
+		// resolveStyleFromSettings() when Settings.themeId picks the
+		// Sony Ericsson Aqua theme. Renders a flat ocean-gradient
+		// panel (deep navy -> mid-ocean blue) with a few horizontal
+		// foam-current streaks + scattered bubble specks + a small
+		// pixel-art water-droplet motif anchored bottom-right,
+		// bypassing every Synthwave builder so the wallpaper reads
+		// as the late-2000s Sony Ericsson Aqua menu screen rather
+		// than a tinted Synthwave.
+		SonyEricssonAqua = 7,
 	};
 
 	/** Default ctor — picks the style from `Settings.get().wallpaperStyle`. */
@@ -220,6 +234,21 @@ private:
 	// scanline rects), no animations - matches the Nokia / DMG
 	// variants' still-image philosophy.
 	void buildAmberCRTWallpaper();
+
+	// S107 - Sony Ericsson Aqua wallpaper builder. Same dispatch
+	// pattern as buildNokia3310Wallpaper / buildGameBoyDMGWallpaper /
+	// buildAmberCRTWallpaper: paints a flat ocean-gradient panel
+	// covering the full 160x128 area (deep navy at top to mid-ocean
+	// blue at bottom), six low-opacity horizontal "foam current"
+	// streaks scattered across the panel for the iconic 'rippling
+	// water' Aqua cue, half a dozen bubble specks suggesting upward
+	// motion, and a small pixel-art water-droplet glyph (the Sony
+	// Ericsson Aqua signature symbol) anchored bottom-right in the
+	// patch the soft-key bar covers anyway. Uses the AQUA_* palette
+	// from MakerphoneTheme.h. ~30 LVGL primitives total, no
+	// animations - matches the Nokia / DMG / Amber CRT variants'
+	// still-image philosophy.
+	void buildSonyEricssonAquaWallpaper();
 
 	// Drives the per-star opacity animation. Free function semantics
 	// (matches LVGL's lv_anim_exec_xcb_t signature). Defined in the .cpp

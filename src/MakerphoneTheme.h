@@ -73,6 +73,25 @@ public:
 		// screen rather than a tinted Synthwave.
 		GameBoyDMG = 2,
 
+		// Sony Ericsson Aqua — early-2000s Sony Ericsson "Aqua" UI
+		// homage (W-series Walkman / W910i / W995 / K850i family).
+		// The skin that defined the late-feature-phone era: a deep
+		// ocean-blue panel pulling into a vivid aqua mid, glossy
+		// white-chrome icon strokes, bright cyan accents, and a
+		// signature water-droplet glyph anchored bottom-right. Six
+		// shades — deep navy (panel off), mid-ocean blue (gradient
+		// bottom), muted blue (idle borders), bright cyan glow
+		// (focus / accent), white chrome (icon strokes + body
+		// text), icy foam (timestamps + ripple highlights). Reads
+		// light-on-dark like the Default Synthwave + Amber CRT
+		// themes — the authentic 2007 Sony Ericsson reading
+		// direction (bright chrome icons on a deep aqua panel).
+		// Wallpaper bypasses every Synthwave builder and paints a
+		// flat ocean-gradient panel with a few horizontal current
+		// streaks + scattered bubble specks + the water-droplet
+		// motif anchored bottom-right.
+		SonyEricssonAqua = 4,
+
 		// Amber CRT — 1980s amber-phosphor monochrome terminal homage
 		// (think Apple ///, IBM 5151, vintage Wyse / DEC terminals).
 		// Palette inverts the Nokia / DMG dark-on-light convention
@@ -88,8 +107,7 @@ public:
 		// classic 1980s monochrome-terminal idle scene.
 		AmberCRT = 3,
 
-		// Reserved 4..15 for the upcoming Phase O themes:
-		//   4  Sony Ericsson Aqua (S107)
+		// Reserved 5..15 for the upcoming Phase O themes:
 		//   5  RAZR Hot Pink (S109)
 		//   6  Stealth Black (S111)
 		//   7  Y2K Silver   (S113)
@@ -99,7 +117,7 @@ public:
 	};
 
 	/** Total number of themes the picker should expose today. */
-	static constexpr uint8_t ThemeCount = 4;
+	static constexpr uint8_t ThemeCount = 5;
 
 	/**
 	 * Resolve a raw `Settings.themeId` byte to a clamped Theme. Bytes
@@ -166,6 +184,17 @@ public:
 	 *               DMG mapping back to light-on-dark - the authentic
 	 *               1980s phosphor-terminal reading direction (bright
 	 *               amber pixels on a black panel).
+	 *   SonyEricssonAqua:
+	 *               AQUA_BG_DEEP (deep navy panel) / AQUA_GLOW (bright
+	 *               cyan, accent / focus border) / AQUA_CHROME (white
+	 *               chrome, icon strokes + soft-key labels) / AQUA_DIM
+	 *               (muted blue, idle borders) / AQUA_CHROME (body
+	 *               text, the bright always-on chrome the W910i uses
+	 *               for its menu items) / AQUA_FOAM (icy mint,
+	 *               timestamps + placeholders). Light-on-dark like
+	 *               Default + Amber CRT - the authentic 2007 Sony
+	 *               Ericsson reading direction (bright chrome icons
+	 *               on a deep aqua panel).
 	 *
 	 * The Nokia mapping inverts the Synthwave dark-on-light
 	 * convention: the "background" role becomes a light olive and
@@ -204,6 +233,8 @@ public:
 	 *   Nokia3310:  iconStroke = N3310_PIXEL,  iconDetail = N3310_FRAME
 	 *   GameBoyDMG: iconStroke = GBDMG_INK,    iconDetail = GBDMG_INK_MID
 	 *   AmberCRT:   iconStroke = AMBER_CRT_GLOW, iconDetail = AMBER_CRT_HOT
+	 *   SonyEricssonAqua:
+	 *               iconStroke = AQUA_CHROME, iconDetail = AQUA_GLOW
 	 *
 	 * Default + Nokia mappings are byte-identical to what
 	 * `highlight()` / `accent()` already return for those themes, so
@@ -388,5 +419,65 @@ public:
 #define AMBER_CRT_DIM      lv_color_make(120,  68,   8)
 #define AMBER_CRT_GLOW     lv_color_make(255, 176,   0)
 #define AMBER_CRT_HOT      lv_color_make(255, 210,  90)
+
+
+/*
+ * ---------------------------------------------------------------------
+ * Sony Ericsson Aqua palette (S107).
+ *
+ * Approximates the iconic late-2000s Sony Ericsson "Aqua" UI shipped on
+ * the W-series Walkman line (W910i, W995), the K850i, and the C-series
+ * Cyber-shot phones — the skin that defined what a "premium feature
+ * phone" looked like in the years before iOS / Android took over.
+ * Unlike the Nokia and DMG palettes (dark ink on a pale LCD), Aqua
+ * renders bright chrome icons + cyan accents on a deep ocean-blue
+ * panel, so the role mapping aligns with the Synthwave / Amber CRT
+ * light-on-dark convention.
+ *
+ * Six shades, all in the cool ocean-blue gamut:
+ *
+ *   AQUA_BG_DEEP — deep navy, the panel-off colour. Top of the
+ *                  vertical gradient. Richer than synthwave purple,
+ *                  more saturated than the typical iOS navy. The
+ *                  signature panel colour of the W910i menu screen.
+ *   AQUA_BG_MID  — mid-ocean blue, the panel gradient bottom. Pulls
+ *                  the panel toward the iconic Sony Ericsson "aqua"
+ *                  hue without the menu chrome having to fight for
+ *                  contrast.
+ *   AQUA_DIM     — muted slate-blue, used for idle borders and
+ *                  inactive chevrons. ~40% of GLOW intensity so it
+ *                  reads as legible-but-not-shouting next to the
+ *                  brighter primary chrome.
+ *   AQUA_GLOW    — bright cyan glow, the focus / accent colour. The
+ *                  signature "energised highlight" hue Sony Ericsson
+ *                  used for the focused menu row, the active soft-key
+ *                  arrow, and the always-on Walkman LED. Calibrated
+ *                  toward the W995 reference shade — slightly more
+ *                  saturated than a generic sky blue.
+ *   AQUA_CHROME  — white chrome, the body-text + icon-stroke colour.
+ *                  The 2007 Sony Ericsson menu items were rendered
+ *                  in a bright off-white that read as polished
+ *                  metal rather than pure paper-white. Matches that.
+ *   AQUA_FOAM    — icy mint-cyan, used for ripple highlights, drop-
+ *                  shine pixels, and dim labels (timestamps,
+ *                  placeholders). Lighter than GLOW so a foam ripple
+ *                  reads as 'reflected light' rather than a focus
+ *                  accent.
+ *
+ * Stored as lv_color_make(R, G, B) so the values render identically on
+ * every LV_COLOR_DEPTH the firmware might be built against — same
+ * portability rationale as the Nokia / DMG / Amber CRT palettes.
+ *
+ * Naming follows the MP_* / N3310_* / GBDMG_* / AMBER_CRT_* convention
+ * so the part-2 icon-glyph swap in S108 only changes which header it
+ * includes, not how it spells colours.
+ * ---------------------------------------------------------------------
+ */
+#define AQUA_BG_DEEP  lv_color_make(  6,  22,  60)
+#define AQUA_BG_MID   lv_color_make( 20,  78, 142)
+#define AQUA_DIM      lv_color_make( 60, 110, 170)
+#define AQUA_GLOW     lv_color_make( 60, 200, 255)
+#define AQUA_CHROME   lv_color_make(220, 240, 255)
+#define AQUA_FOAM     lv_color_make(160, 230, 255)
 
 #endif // MAKERPHONE_THEME_H

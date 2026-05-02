@@ -137,6 +137,7 @@ private:
 	void drawNokia3310Swatch();
 	void drawGameBoyDMGSwatch();
 	void drawAmberCRTSwatch();
+	void drawSonyEricssonAquaSwatch();
 };
 
 #endif // MAKERPHONE_PHONETHEMESCREEN_H
