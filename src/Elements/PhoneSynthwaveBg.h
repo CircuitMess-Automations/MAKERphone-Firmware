@@ -131,6 +131,22 @@ public:
 		// as the late-2000s Sony Ericsson Aqua menu screen rather
 		// than a tinted Synthwave.
 		SonyEricssonAqua = 7,
+
+		// S109 - RAZR Hot Pink theme override. Same dispatch pattern
+		// as Nokia3310 / GameBoyDMG / AmberCRT / SonyEricssonAqua:
+		// not part of the 4-style PhoneWallpaperScreen pager
+		// (StyleCount stays at 4 there); this value is only ever
+		// returned by resolveStyleFromSettings() when Settings.themeId
+		// picks the RAZR Hot Pink theme. Renders a flat dark-magenta
+		// gradient panel (deep night-magenta -> warmer dark magenta)
+		// with a few horizontal "anodised aluminium" striation lines
+		// + scattered LED-backlight specks + a stylised pixel-art
+		// lightning-bolt motif anchored bottom-right (the universal
+		// "RAZR sharpness" brand cue, copyright-safe vs the RAZR
+		// wordmark itself), bypassing every Synthwave builder so the
+		// wallpaper reads as the mid-2000s Motorola RAZR V3 / V3i
+		// Pink idle screen rather than a tinted Synthwave.
+		RazrHotPink = 8,
 	};
 
 	/** Default ctor — picks the style from `Settings.get().wallpaperStyle`. */
@@ -249,6 +265,21 @@ private:
 	// animations - matches the Nokia / DMG / Amber CRT variants'
 	// still-image philosophy.
 	void buildSonyEricssonAquaWallpaper();
+
+	// S109 - RAZR Hot Pink wallpaper builder. Same dispatch pattern
+	// as the prior theme builders: paints a flat dark-magenta
+	// gradient panel covering the full 160x128 area (deep night-
+	// magenta at top to warmer dark magenta at bottom), five faint
+	// "anodised aluminium" horizontal striation lines for the
+	// brushed-metal cue, eight 1-2 px LED-backlight specks scattered
+	// across the panel suggesting the V3i Pink keypad's bleed-through
+	// glow, and a small pixel-art Z-shaped lightning-bolt motif (the
+	// universal "RAZR sharpness" brand cue) anchored bottom-right
+	// in the patch the soft-key bar covers anyway. Uses the RAZR_*
+	// palette from MakerphoneTheme.h. ~28 LVGL primitives total, no
+	// animations - matches the Nokia / DMG / Amber CRT / Aqua
+	// variants' still-image philosophy.
+	void buildRazrHotPinkWallpaper();
 
 	// Drives the per-star opacity animation. Free function semantics
 	// (matches LVGL's lv_anim_exec_xcb_t signature). Defined in the .cpp

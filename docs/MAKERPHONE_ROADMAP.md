@@ -169,7 +169,7 @@ Two sessions per theme: **part 1 = palette + wallpaper variant**, **part 2 = mat
 - [x] **S106** — Theme: Amber CRT — icon glyphs + accents.
 - [x] **S107** — Theme: Sony Ericsson Aqua — palette + wallpaper.
 - [x] **S108** — Theme: Sony Ericsson Aqua — icon glyphs + accents.
-- [ ] **S109** — Theme: RAZR Hot Pink — palette + wallpaper.
+- [x] **S109** — Theme: RAZR Hot Pink — palette + wallpaper.
 - [ ] **S110** — Theme: RAZR Hot Pink — icon glyphs + accents.
 - [ ] **S111** — Theme: Stealth Black — palette + wallpaper.
 - [ ] **S112** — Theme: Stealth Black — icon glyphs + accents.

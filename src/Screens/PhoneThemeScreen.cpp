@@ -194,6 +194,7 @@ void PhoneThemeScreen::rebuildSwatch() {
 		case Theme::GameBoyDMG: drawGameBoyDMGSwatch(); break;
 		case Theme::AmberCRT:   drawAmberCRTSwatch();   break;
 		case Theme::SonyEricssonAqua: drawSonyEricssonAquaSwatch(); break;
+		case Theme::RazrHotPink: drawRazrHotPinkSwatch(); break;
 		default:                drawDefaultSwatch();    break;  // defensive
 	}
 }
@@ -572,6 +573,107 @@ void PhoneThemeScreen::drawSonyEricssonAquaSwatch() {
 		lv_obj_set_style_bg_color(px,
 		                          droplet[i].shine ? AQUA_CHROME : AQUA_GLOW, 0);
 		lv_obj_set_style_bg_opa(px, droplet[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+
+void PhoneThemeScreen::drawRazrHotPinkSwatch() {
+	// RAZR panel: night-magenta -> dark magenta vertical gradient covering
+	// the full swatch (the RAZR menu screen, like the Nokia / DMG / CRT /
+	// Aqua panels, is a single flat surface — no horizon).
+	lv_obj_t* panel = lv_obj_create(swatchInner);
+	lv_obj_remove_style_all(panel);
+	lv_obj_set_size(panel, SwatchW, SwatchH);
+	lv_obj_set_pos(panel, 0, 0);
+	lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_set_style_bg_color(panel, RAZR_BG_DARK, 0);
+	lv_obj_set_style_bg_grad_color(panel, RAZR_BG_DEEP, 0);
+	lv_obj_set_style_bg_grad_dir(panel, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(panel, 0, 0);
+	lv_obj_set_style_border_width(panel, 0, 0);
+
+	// Anodised-aluminium striations: three faint full-width horizontal
+	// lines in RAZR_SHINE at low opacity, mirroring the wallpaper.
+	struct Striation { lv_coord_t y; lv_opa_t opa; };
+	const Striation striations[] = {
+			{  9, LV_OPA_20 },
+			{ 22, LV_OPA_30 },
+			{ 35, LV_OPA_20 },
+	};
+	for(uint8_t i = 0; i < sizeof(striations) / sizeof(striations[0]); i++) {
+		lv_obj_t* st = lv_obj_create(panel);
+		lv_obj_remove_style_all(st);
+		lv_obj_set_size(st, SwatchW, 1);
+		lv_obj_set_pos(st, 0, striations[i].y);
+		lv_obj_set_style_bg_color(st, RAZR_SHINE, 0);
+		lv_obj_set_style_bg_opa(st, striations[i].opa, 0);
+		lv_obj_set_style_radius(st, 0, 0);
+		lv_obj_set_style_border_width(st, 0, 0);
+	}
+
+	// LED-backlight specks: four 1-2 px chrome / shine dots scattered
+	// across the swatch.
+	struct Speck { lv_coord_t x; lv_coord_t y; uint8_t s; bool chrome; lv_opa_t opa; };
+	const Speck specks[] = {
+			{ 12,  6, 1, true,  LV_OPA_70 },
+			{ 30, 16, 2, false, LV_OPA_60 },
+			{ 58,  8, 1, true,  LV_OPA_70 },
+			{ 70, 30, 2, false, LV_OPA_60 },
+	};
+	for(uint8_t i = 0; i < sizeof(specks) / sizeof(specks[0]); i++) {
+		lv_obj_t* sp = lv_obj_create(panel);
+		lv_obj_remove_style_all(sp);
+		lv_obj_set_size(sp, specks[i].s, specks[i].s);
+		lv_obj_set_pos(sp, specks[i].x, specks[i].y);
+		lv_obj_set_style_bg_color(sp,
+		                          specks[i].chrome ? RAZR_CHROME : RAZR_SHINE, 0);
+		lv_obj_set_style_bg_opa(sp, specks[i].opa, 0);
+		lv_obj_set_style_radius(sp, 0, 0);
+		lv_obj_set_style_border_width(sp, 0, 0);
+	}
+
+	// Z-shaped lightning-bolt glyph centred in the swatch. Mirrors the
+	// wallpaper's bottom-right glyph but pulled to the centre so it
+	// reads as the theme's signature glyph — exactly how the prior
+	// per-theme swatch builders position their glyphs.
+	const lv_coord_t bx = SwatchW / 2 - 3;
+	const lv_coord_t by = SwatchH / 2 - 5;
+
+	struct PixelRect { int8_t dx, dy; uint8_t w, h; uint8_t layer; lv_opa_t opa; };
+	const PixelRect bolt[] = {
+			// Top bar (rows 0-1)
+			{ 0, 0, 6, 1, 0, LV_OPA_COVER },
+			{ 0, 1, 6, 1, 0, LV_OPA_COVER },
+			// Diagonal slash (rows 2-6)
+			{ 4, 2, 2, 1, 0, LV_OPA_COVER },
+			{ 3, 3, 2, 1, 0, LV_OPA_COVER },
+			{ 2, 4, 2, 1, 0, LV_OPA_COVER },
+			{ 1, 5, 2, 1, 0, LV_OPA_COVER },
+			{ 0, 6, 2, 1, 0, LV_OPA_COVER },
+			// Bottom bar (rows 7-8)
+			{ 0, 7, 6, 1, 0, LV_OPA_COVER },
+			{ 0, 8, 6, 1, 0, LV_OPA_COVER },
+			// Shine highlight + hot-pink afterglow
+			{ 0, -1, 6, 1, 2, LV_OPA_30 },
+			{ 1, 9, 4, 1, 1, LV_OPA_50 },
+	};
+	const uint8_t partCount = sizeof(bolt) / sizeof(bolt[0]);
+	for(uint8_t i = 0; i < partCount; i++){
+		lv_obj_t* px = lv_obj_create(panel);
+		lv_obj_remove_style_all(px);
+		lv_obj_set_size(px, bolt[i].w, bolt[i].h);
+		lv_obj_set_pos(px, bx + bolt[i].dx, by + bolt[i].dy);
+		lv_color_t fill;
+		switch(bolt[i].layer){
+			case 1:  fill = RAZR_GLOW;   break;
+			case 2:  fill = RAZR_SHINE;  break;
+			case 0:
+			default: fill = RAZR_CHROME; break;
+		}
+		lv_obj_set_style_bg_color(px, fill, 0);
+		lv_obj_set_style_bg_opa(px, bolt[i].opa, 0);
 		lv_obj_set_style_radius(px, 0, 0);
 		lv_obj_set_style_border_width(px, 0, 0);
 	}

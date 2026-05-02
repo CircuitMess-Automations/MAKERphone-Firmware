@@ -107,8 +107,27 @@ public:
 		// classic 1980s monochrome-terminal idle scene.
 		AmberCRT = 3,
 
-		// Reserved 5..15 for the upcoming Phase O themes:
-		//   5  RAZR Hot Pink (S109)
+		// RAZR Hot Pink — 2004-2006 Motorola RAZR V3 / V3i Pink
+		// homage. The phone that defined the mid-2000s "ultra-thin
+		// flip" era, and the first feature phone whose colour
+		// branding (Valentine's-Day pink anodised aluminium)
+		// became the product itself. Six shades - deep night-
+		// magenta panel off, warmer dark magenta gradient bottom,
+		// muted plum idle borders, hot magenta-pink accent / focus,
+		// warm silver chrome body text, light pink ripple highlights
+		// / etched-metal accents. Reads light-on-dark like the
+		// Default Synthwave + Amber CRT + Sony Ericsson Aqua themes
+		// - the authentic mid-2000s RAZR reading direction (bright
+		// chrome menu items on a hot-pink anodised back panel).
+		// Wallpaper bypasses every Synthwave builder and paints a
+		// flat dark-magenta gradient panel with a few horizontal
+		// "anodised aluminium" striation lines + scattered LED-
+		// backlight specks + a stylised lightning-bolt motif
+		// anchored bottom-right (the universal "RAZR sharpness"
+		// brand cue, copyright-safe vs the RAZR wordmark itself).
+		RazrHotPink = 5,
+
+		// Reserved 6..15 for the upcoming Phase O themes:
 		//   6  Stealth Black (S111)
 		//   7  Y2K Silver   (S113)
 		//   8  Cyberpunk Red (S115)
@@ -117,7 +136,7 @@ public:
 	};
 
 	/** Total number of themes the picker should expose today. */
-	static constexpr uint8_t ThemeCount = 5;
+	static constexpr uint8_t ThemeCount = 6;
 
 	/**
 	 * Resolve a raw `Settings.themeId` byte to a clamped Theme. Bytes
@@ -195,6 +214,18 @@ public:
 	 *               Default + Amber CRT - the authentic 2007 Sony
 	 *               Ericsson reading direction (bright chrome icons
 	 *               on a deep aqua panel).
+	 *   RazrHotPink:
+	 *               RAZR_BG_DARK (deep night-magenta panel) /
+	 *               RAZR_GLOW (hot magenta-pink, accent / focus
+	 *               border) / RAZR_CHROME (warm silver chrome, icon
+	 *               strokes + soft-key labels) / RAZR_DIM (muted
+	 *               plum, idle borders) / RAZR_CHROME (body text,
+	 *               the bright chrome RAZR menu items used) /
+	 *               RAZR_SHINE (light pink, timestamps + placeholders
+	 *               + etched-metal ripple highlights). Light-on-dark
+	 *               like Default + Amber CRT + Sony Ericsson Aqua -
+	 *               the authentic 2005 RAZR reading direction (bright
+	 *               chrome menu items on a hot-pink anodised panel).
 	 *
 	 * The Nokia mapping inverts the Synthwave dark-on-light
 	 * convention: the "background" role becomes a light olive and
@@ -235,6 +266,8 @@ public:
 	 *   AmberCRT:   iconStroke = AMBER_CRT_GLOW, iconDetail = AMBER_CRT_HOT
 	 *   SonyEricssonAqua:
 	 *               iconStroke = AQUA_CHROME, iconDetail = AQUA_GLOW
+	 *   RazrHotPink:
+	 *               iconStroke = RAZR_CHROME, iconDetail = RAZR_GLOW
 	 *
 	 * Default + Nokia mappings are byte-identical to what
 	 * `highlight()` / `accent()` already return for those themes, so
@@ -536,5 +569,66 @@ public:
 #define AQUA_GLOW     lv_color_make( 60, 200, 255)
 #define AQUA_CHROME   lv_color_make(220, 240, 255)
 #define AQUA_FOAM     lv_color_make(160, 230, 255)
+
+
+/*
+ * ---------------------------------------------------------------------
+ * RAZR Hot Pink palette (S109).
+ *
+ * Approximates the iconic mid-2000s Motorola RAZR V3 / V3i Pink — the
+ * Valentine's-Day pink anodised-aluminium ultra-thin flip phone that
+ * defined the era between the early-2000s feature phone and the late-
+ * 2000s touch-screen smartphone. Like the Sony Ericsson Aqua and Amber
+ * CRT palettes, RAZR Hot Pink reads light-on-dark: bright chrome menu
+ * items + hot-pink accents on a deep night-magenta back panel, the
+ * authentic RAZR-era menu reading direction.
+ *
+ * Six shades, all in the warm magenta-pink gamut:
+ *
+ *   RAZR_BG_DARK — deep night-magenta, the panel-off colour. Top of
+ *                  the vertical gradient. Almost black with a faint
+ *                  warm magenta bias - matches the V3i Pink's interior
+ *                  housing colour with the screen unlit.
+ *   RAZR_BG_DEEP — warmer dark magenta, the panel gradient bottom.
+ *                  Pulls the panel toward the iconic anodised-pink
+ *                  hue without the menu chrome having to fight for
+ *                  contrast.
+ *   RAZR_DIM     — muted plum, used for idle borders, sub-bright UI
+ *                  chrome, inactive chevrons. ~40 % of GLOW intensity
+ *                  so it reads as legible-but-not-shouting next to
+ *                  the brighter primary chrome.
+ *   RAZR_GLOW    — hot magenta-pink, the focus / accent colour. The
+ *                  signature "Valentine's-Day pink" hue Motorola used
+ *                  for the V3i Pink anodisation, calibrated so a
+ *                  focused menu row reads as 'lit by the back panel'
+ *                  rather than 'painted on top of it'.
+ *   RAZR_CHROME  — warm silver, the body-text + icon-stroke colour.
+ *                  The 2005 RAZR menu items rendered in a bright
+ *                  warm-toned silver that read as polished metal
+ *                  with a faint pink undertone (the back-panel
+ *                  colour bleeding through the keypad backlight).
+ *                  Matches that reading.
+ *   RAZR_SHINE   — light pink, used for ripple highlights, etched-
+ *                  aluminium striation accents, dim labels
+ *                  (timestamps, placeholders), and the LED-backlight
+ *                  bleed-through specks on the wallpaper. Lighter
+ *                  than GLOW so a SHINE pixel reads as 'reflected
+ *                  light' rather than a focus accent.
+ *
+ * Stored as lv_color_make(R, G, B) so the values render identically on
+ * every LV_COLOR_DEPTH the firmware might be built against — same
+ * portability rationale as the Nokia / DMG / Amber CRT / Aqua palettes.
+ *
+ * Naming follows the MP_* / N3310_* / GBDMG_* / AMBER_CRT_* / AQUA_*
+ * convention so the part-2 icon-glyph swap in S110 only changes which
+ * header it includes, not how it spells colours.
+ * ---------------------------------------------------------------------
+ */
+#define RAZR_BG_DARK  lv_color_make( 22,   8,  18)
+#define RAZR_BG_DEEP  lv_color_make( 48,  16,  36)
+#define RAZR_DIM      lv_color_make(120,  60,  92)
+#define RAZR_GLOW     lv_color_make(255,  40, 140)
+#define RAZR_CHROME   lv_color_make(232, 220, 224)
+#define RAZR_SHINE    lv_color_make(255, 120, 180)
 
 #endif // MAKERPHONE_THEME_H

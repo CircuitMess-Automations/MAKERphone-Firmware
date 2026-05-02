@@ -62,6 +62,14 @@ PhoneSynthwaveBg::Style PhoneSynthwaveBg::resolveStyleFromSettings(){
 	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::SonyEricssonAqua){
 		return Style::SonyEricssonAqua;
 	}
+	// S109 - dispatch the RAZR Hot Pink style override the same way.
+	// The wallpaperStyle byte stays persisted underneath so flipping
+	// the theme back to any prior theme restores the previously
+	// chosen Synthwave variant unchanged, exactly like the prior
+	// branches above.
+	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::RazrHotPink){
+		return Style::RazrHotPink;
+	}
 	return styleFromByte(Settings.get().wallpaperStyle);
 }
 
@@ -141,6 +149,17 @@ PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent, Style style) : LVObject(par
 	// palette out of every Synthwave hot-path.
 	if(style == Style::SonyEricssonAqua){
 		buildSonyEricssonAquaWallpaper();
+		return;
+	}
+
+	// S109 - the RAZR Hot Pink theme owns its wallpaper end to end
+	// the same way: it bypasses every Synthwave builder and paints a
+	// flat dark-magenta gradient panel with anodised-aluminium
+	// striations + LED-backlight specks + a Z-shaped lightning-bolt
+	// motif instead. Returning early keeps the RAZR_* palette out of
+	// every Synthwave hot-path.
+	if(style == Style::RazrHotPink){
+		buildRazrHotPinkWallpaper();
 		return;
 	}
 
@@ -1106,6 +1125,184 @@ void PhoneSynthwaveBg::buildSonyEricssonAquaWallpaper(){
 		lv_obj_set_style_bg_color(px,
 		                          dropletParts[i].shine ? AQUA_CHROME : AQUA_GLOW, 0);
 		lv_obj_set_style_bg_opa(px, dropletParts[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+
+void PhoneSynthwaveBg::buildRazrHotPinkWallpaper(){
+	// ----- RAZR panel: night-magenta -> dark magenta vertical gradient -----
+	//
+	// Painted on the same `sky` member pointer the Synthwave variant
+	// uses, mirroring the Nokia / DMG / Amber CRT / Sony Ericsson Aqua
+	// builders so a future caller iterating wallpaper children can
+	// rely on a single named root regardless of theme. The container
+	// covers the entire 160x128 area - the RAZR menu screen, like the
+	// LCD / CRT / Aqua panels, is a single flat surface with no
+	// horizon. The vertical gradient (RAZR_BG_DARK at top -> RAZR_BG_DEEP
+	// at bottom) reads as a hot-pink anodised back panel that gets
+	// slightly warmer toward the hinge - the cue every V3i Pink owner
+	// remembers from holding the closed flip in hand.
+	sky = lv_obj_create(obj);
+	lv_obj_remove_style_all(sky);
+	lv_obj_clear_flag(sky, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(sky, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(sky, BgWidth, BgHeight);
+	lv_obj_set_pos(sky, 0, 0);
+	lv_obj_set_style_bg_color(sky, RAZR_BG_DARK, 0);
+	lv_obj_set_style_bg_grad_color(sky, RAZR_BG_DEEP, 0);
+	lv_obj_set_style_bg_grad_dir(sky, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(sky, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(sky, 0, 0);
+	lv_obj_set_style_pad_all(sky, 0, 0);
+	lv_obj_set_style_border_width(sky, 0, 0);
+
+	// ----- Anodised-aluminium striation lines -----
+	//
+	// Five faint full-width horizontal lines in RAZR_SHINE at low
+	// opacity. Approximate the brushed-aluminium texture every RAZR
+	// owner ran a fingertip across - the back panel had a barely-
+	// visible horizontal grain that caught light at certain angles.
+	// Spaced 18-22 px apart so the eye reads them as a regular
+	// surface texture rather than a counted set. Drawn 1 px tall to
+	// stay subliminal at the 160x128 resolution; LVGL collapses
+	// 1 px rects to a single horizontal line on flush.
+	struct Striation { lv_coord_t y; lv_opa_t opa; };
+	const Striation striations[] = {
+			{  16, LV_OPA_10 },
+			{  38, LV_OPA_20 },
+			{  60, LV_OPA_10 },
+			{  82, LV_OPA_20 },
+			{ 104, LV_OPA_10 },
+	};
+	const uint8_t striationCount = sizeof(striations) / sizeof(striations[0]);
+	for(uint8_t i = 0; i < striationCount; i++){
+		lv_obj_t* st = lv_obj_create(sky);
+		lv_obj_remove_style_all(st);
+		lv_obj_clear_flag(st, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(st, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(st, BgWidth, 1);
+		lv_obj_set_pos(st, 0, striations[i].y);
+		lv_obj_set_style_bg_color(st, RAZR_SHINE, 0);
+		lv_obj_set_style_bg_opa(st, striations[i].opa, 0);
+		lv_obj_set_style_radius(st, 0, 0);
+		lv_obj_set_style_border_width(st, 0, 0);
+	}
+
+	// ----- LED-backlight specks: tiny 1-2 px chrome dots -----
+	//
+	// Eight RAZR_CHROME / RAZR_SHINE dots scattered across the panel,
+	// suggesting the keypad's blue-white EL backlight bleeding through
+	// the chemically-etched aluminium - the iconic V3 / V3i visual cue.
+	// y-positions are spaced so a speck never sits behind the status
+	// bar (y < 12) or the soft-key bar (y > BgHeight - 12). Drawn as
+	// flat rects (no LV_RADIUS_CIRCLE - at this size LVGL rounds to a
+	// pixel rect anyway).
+	struct Speck { lv_coord_t x; lv_coord_t y; uint8_t s; bool chrome; lv_opa_t opa; };
+	const Speck specks[] = {
+			{  18,  26, 1, true,  LV_OPA_70 },
+			{  72,  20, 2, true,  LV_OPA_60 },
+			{ 124,  32, 1, false, LV_OPA_70 },
+			{  44,  54, 2, false, LV_OPA_60 },
+			{  98,  66, 1, true,  LV_OPA_70 },
+			{  28,  92, 1, false, LV_OPA_60 },
+			{  82, 102, 2, true,  LV_OPA_60 },
+			{ 134,  88, 1, false, LV_OPA_70 },
+	};
+	const uint8_t speckCount = sizeof(specks) / sizeof(specks[0]);
+	for(uint8_t i = 0; i < speckCount; i++){
+		lv_obj_t* sp = lv_obj_create(sky);
+		lv_obj_remove_style_all(sp);
+		lv_obj_clear_flag(sp, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(sp, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(sp, specks[i].s, specks[i].s);
+		lv_obj_set_pos(sp, specks[i].x, specks[i].y);
+		lv_obj_set_style_bg_color(sp,
+		                          specks[i].chrome ? RAZR_CHROME : RAZR_SHINE, 0);
+		lv_obj_set_style_bg_opa(sp, specks[i].opa, 0);
+		lv_obj_set_style_radius(sp, 0, 0);
+		lv_obj_set_style_border_width(sp, 0, 0);
+	}
+
+	// ----- Z-shaped lightning-bolt motif (bottom-right corner) -----
+	//
+	// Anchored ~14 px clear of the right edge and ~22 px clear of the
+	// bottom edge, in the patch the soft-key bar will cover during
+	// normal use. The bolt is a 6 wide x 9 tall pixel-art Z silhouette
+	// in RAZR_CHROME (warm silver) - the universal "razor sharpness"
+	// / "lightning speed" brand cue you saw on every mid-2000s RAZR
+	// teaser ad and Motorola Originals interstitial. Crucially the
+	// glyph is NOT the trademarked RAZR wordmark; it's the
+	// hold-it-up-to-the-light "Z-bolt" silhouette that any 2005
+	// flip-phone owner reads as 'this thing is fast'.
+	//
+	// A single RAZR_GLOW pixel sits one row below the bolt as a
+	// 'spark' / hot-pink afterglow, plus a faint LV_OPA_30 RAZR_SHINE
+	// halo along the upper edge of the top horizontal so the bolt
+	// reads as 'lit by the back panel' rather than 'painted on'.
+	const lv_coord_t boltX = BgWidth  - 14;   // 146
+	const lv_coord_t boltY = BgHeight - 22;   // 106
+
+	struct PixelRect {
+		int8_t   dx;
+		int8_t   dy;
+		uint8_t  w;
+		uint8_t  h;
+		uint8_t  layer;     // 0 = chrome, 1 = glow, 2 = shine
+		lv_opa_t opa;
+	};
+
+	// Pixel layout (6 wide x 9 tall) - a Z-shaped lightning bolt:
+	//    ######    row 0 - top horizontal bar
+	//    ######    row 1
+	//    ....##    row 2 - down-left diagonal start (far right)
+	//    ...##.    row 3
+	//    ..##..    row 4
+	//    .##...    row 5
+	//    ##....    row 6 - down-left diagonal end (far left)
+	//    ######    row 7 - bottom horizontal bar
+	//    ######    row 8
+	const PixelRect boltParts[] = {
+			// Top bar (rows 0-1)
+			{ 0, 0, 6, 1, 0, LV_OPA_COVER },
+			{ 0, 1, 6, 1, 0, LV_OPA_COVER },
+			// Diagonal slash (rows 2-6)
+			{ 4, 2, 2, 1, 0, LV_OPA_COVER },
+			{ 3, 3, 2, 1, 0, LV_OPA_COVER },
+			{ 2, 4, 2, 1, 0, LV_OPA_COVER },
+			{ 1, 5, 2, 1, 0, LV_OPA_COVER },
+			{ 0, 6, 2, 1, 0, LV_OPA_COVER },
+			// Bottom bar (rows 7-8)
+			{ 0, 7, 6, 1, 0, LV_OPA_COVER },
+			{ 0, 8, 6, 1, 0, LV_OPA_COVER },
+
+			// Hot-pink shine highlight along the upper edge of the
+			// top bar (suggesting the back panel's anodised colour
+			// bleeding into the chrome glyph from above).
+			{ 0, -1, 6, 1, 2, LV_OPA_30 },
+
+			// Hot-pink 'spark' afterglow row beneath the bottom bar
+			// (the bolt's electrical aftertrail - sells the 'this
+			// thing just fired' read).
+			{ 1, 9, 4, 1, 1, LV_OPA_50 },
+	};
+	const uint8_t boltCount = sizeof(boltParts) / sizeof(boltParts[0]);
+	for(uint8_t i = 0; i < boltCount; i++){
+		lv_obj_t* px = lv_obj_create(sky);
+		lv_obj_remove_style_all(px);
+		lv_obj_clear_flag(px, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(px, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(px, boltParts[i].w, boltParts[i].h);
+		lv_obj_set_pos(px, boltX + boltParts[i].dx, boltY + boltParts[i].dy);
+		lv_color_t fill;
+		switch(boltParts[i].layer){
+			case 1:  fill = RAZR_GLOW;   break;
+			case 2:  fill = RAZR_SHINE;  break;
+			case 0:
+			default: fill = RAZR_CHROME; break;
+		}
+		lv_obj_set_style_bg_color(px, fill, 0);
+		lv_obj_set_style_bg_opa(px, boltParts[i].opa, 0);
 		lv_obj_set_style_radius(px, 0, 0);
 		lv_obj_set_style_border_width(px, 0, 0);
 	}

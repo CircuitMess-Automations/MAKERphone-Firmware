@@ -138,6 +138,7 @@ private:
 	void drawGameBoyDMGSwatch();
 	void drawAmberCRTSwatch();
 	void drawSonyEricssonAquaSwatch();
+	void drawRazrHotPinkSwatch();
 };
 
 #endif // MAKERPHONE_PHONETHEMESCREEN_H
