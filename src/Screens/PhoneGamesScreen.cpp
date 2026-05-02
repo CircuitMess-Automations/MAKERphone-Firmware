@@ -39,6 +39,7 @@
 #include "PhoneSudoku.h"
 #include "PhoneWordle.h"
 #include "PhoneSimon.h"
+#include "PhoneSnakesLadders.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -110,6 +111,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "SUDOKU",   nullptr,                   GameKind::Screen },  // S95
 	{ "WORDLE",   nullptr,                   GameKind::Screen },  // S96
 	{ "SIMON",    nullptr,                   GameKind::Screen },  // S97
+	{ "S&L",     nullptr,                   GameKind::Screen },  // S98
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -1031,6 +1033,41 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 16, 12, 11, 8, yellowDim);
 			break;
 		}
+		case 26: { // S&L - tiny board grid with a snake + ladder overlay
+			// S98: a stylised glance of Snakes & Ladders -- a faint
+			// 4x4 grid hint, a green ladder rail rising on the left,
+			// and a red snake squiggle dropping on the right. Colours
+			// match the in-game palette so the glyph foreshadows the
+			// screen.
+			const lv_color_t green  = lv_color_make(120, 220, 110);
+			const lv_color_t red    = lv_color_make(240,  90,  90);
+			const lv_color_t cream  = lv_color_make(255, 220, 180);
+
+			// Faint 4x4 grid lines (bottom of card).
+			px(g,  4,  4, 22, 1, MP_DIM);
+			px(g,  4,  9, 22, 1, MP_DIM);
+			px(g,  4, 14, 22, 1, MP_DIM);
+			px(g,  4, 19, 22, 1, MP_DIM);
+			px(g,  4,  4,  1, 16, MP_DIM);
+			px(g, 25,  4,  1, 16, MP_DIM);
+
+			// Ladder on the left -- two rails + three rungs.
+			px(g,  6,  6, 1, 13, green);
+			px(g,  9,  6, 1, 13, green);
+			px(g,  6,  8, 4, 1, green);
+			px(g,  6, 12, 4, 1, green);
+			px(g,  6, 16, 4, 1, green);
+
+			// Snake on the right -- a stair-step descent.
+			px(g, 22,  6, 3, 2, red);
+			px(g, 22,  8, 1, 3, red);
+			px(g, 19, 11, 3, 2, red);
+			px(g, 19, 13, 1, 3, red);
+			px(g, 16, 16, 3, 2, red);
+			// Snake "head" highlight.
+			px(g, 23,  5, 2, 1, cream);
+			break;
+		}
 		default:
 			break;
 	}
@@ -1188,6 +1225,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 23: push(new PhoneSudoku()); break;
 			case 24: push(new PhoneWordle()); break;
 			case 25: push(new PhoneSimon()); break;
+			case 26: push(new PhoneSnakesLadders()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
