@@ -138,6 +138,27 @@ private:
 	                          //          Cyberpunk 2077's red-V / cyan-Arasaka HUD). Rides the
 	                          //          same opacity as the rim itself. Fully transparent under
 	                          //          every non-Cyberpunk-Red theme.
+	lv_obj_t* ornamentGlint;    // S118 - Christmas / Festive ornament accent: a 2x2
+	                            //          XMAS_CRIMSON dot anchored to the top-LEFT corner of
+	                            //          the tile body. Distinct from `shine` (top edge
+	                            //          horizontal), `edgeGlow` (bottom edge horizontal),
+	                            //          `statusLed` (top-right 2x2 corner dot), `luciteJewel`
+	                            //          (bottom-left 3x3 corner jewel), and `neonRim`
+	                            //          (right edge vertical) along the top-left-corner-
+	                            //          anchor axis. The six icon-glyph overlay axes (top
+	                            //          edge / bottom edge / top-right corner / bottom-left
+	                            //          corner / right edge vertical / top-left corner) stay
+	                            //          disjoint so a future theme can combine any subset
+	                            //          without overpainting. Fully transparent under every
+	                            //          non-Christmas theme.
+	lv_obj_t* ornamentGlintHi;  // S118 - Christmas / Festive ornament reflection peak: a 1x1
+	                            //          XMAS_GOLD highlight pixel anchored to the upper-left
+	                            //          of the 2x2 ornament dot, suggesting candle-glow
+	                            //          reflection on the curved surface of a glass bauble
+	                            //          (the cue your eye uses to resolve 'is this a flat
+	                            //          painted dot or a reflective volumetric ornament').
+	                            //          Rides the same opacity as the ornament itself.
+	                            //          Fully transparent under every non-Christmas theme.
 	lv_obj_t* iconLayer;   // 16x16 transparent container that holds the pixel rectangles
 	lv_obj_t* labelEl;     // optional pixelbasic7 label below the icon (nullable)
 
@@ -148,6 +169,7 @@ private:
 	void buildStatusLed();
 	void buildLuciteJewel();
 	void buildNeonRim();
+	void buildOrnamentGlint();
 	void buildIconLayer();
 	void buildLabel(const char* label);
 	void refreshSelection();

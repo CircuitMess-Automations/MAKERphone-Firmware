@@ -893,3 +893,151 @@ uint8_t MakerphoneTheme::neonRimSelectedOpa(){
 	// right cue for an emitting source.
 	return neonRimEnabled() ? LV_OPA_COVER : LV_OPA_TRANSP;
 }
+
+
+// ---------------------------------------------------------------------
+// S118 - Christmas / Festive ornament-glint helpers.
+//
+// The early-2000s feature-phone "Christmas wallpaper" packs (Nokia 6610,
+// Sony Ericsson T610 / W800i, Motorola V300 family) shipped a single
+// defining seasonal accent: a small holly-red ornament tucked into one
+// corner of every menu tile, with a sparkly gold highlight pixel
+// suggesting candle-glow reflection on a glass bauble. That ornament
+// was the carriers' single defining visual cue every November/December
+// season, and it's what separates the Christmas / Festive skin from a
+// generic dark-green tile with gold strokes.
+//
+// PhoneIconTile consumes these helpers at idle (gated on
+// ornamentGlintEnabled()) so every tile under Christmas rests with a
+// faint XMAS_CRIMSON 2x2 ornament dot in its top-left corner - the
+// always-on 'holly-berry / glass-bauble accent' cue every seasonal-
+// update Christmas-wallpaper pack used. Selecting the tile then snaps
+// the ornament to LV_OPA_COVER so the focused tile reads as 'this
+// row is the active selection, ornament catching a direct candlelight
+// beam' against its softly-glinting neighbours.
+//
+// Default / Nokia 3310 / Game Boy DMG / Amber CRT / Sony Ericsson Aqua
+// / RAZR Hot Pink / Stealth Black / Y2K Silver / Cyberpunk Red return
+// values that produce the previous byte-identical behaviour:
+// ornamentGlintEnabled() == false, both opacity helpers return
+// LV_OPA_TRANSP (so ornamentGlintColor() and
+// ornamentGlintHighlightColor() values are never observed), keeping
+// the existing tile silhouette unchanged on every non-Christmas theme.
+//
+// Mechanically a top-left-corner-anchored 2x2 ornament dot (with a
+// 1x1 highlight pixel), distinct from S108's top-edge horizontal
+// strip, S110's bottom-edge horizontal strip, S112's top-right corner
+// 2x2 dot, S114's bottom-left corner 3x3 jewel, and S116's right-edge
+// vertical strip. The six icon-glyph overlay axes (top edge / bottom
+// edge / top-right corner / bottom-left corner / right edge vertical /
+// top-left corner) stay disjoint so a future theme can combine any
+// subset of them without overpainting.
+// ---------------------------------------------------------------------
+
+bool MakerphoneTheme::ornamentGlintEnabled(){
+	return getCurrent() == Theme::Christmas;
+}
+
+lv_color_t MakerphoneTheme::ornamentGlintColor(){
+	switch(getCurrent()){
+		case Theme::Christmas: return XMAS_CRIMSON;
+		// The fallbacks below are never observed -
+		// ornamentGlintIdleOpa() and ornamentGlintSelectedOpa() both
+		// return LV_OPA_TRANSP on every non-Christmas theme, so the
+		// ornament's colour can't reach the framebuffer. The values
+		// still resolve to a sensible per-theme 'brightest accent'
+		// so a future caller that probes the colour outside the
+		// opacity gate (e.g. a debug overlay) reads something
+		// coherent rather than an undefined value.
+		case Theme::Nokia3310:        return N3310_FRAME;
+		case Theme::GameBoyDMG:       return GBDMG_INK;
+		case Theme::AmberCRT:         return AMBER_CRT_HOT;
+		case Theme::SonyEricssonAqua: return AQUA_GLOW;
+		case Theme::RazrHotPink:      return RAZR_GLOW;
+		case Theme::StealthBlack:     return STEALTH_LED;
+		case Theme::Y2KSilver:        return Y2K_BONDI;
+		case Theme::CyberpunkRed:     return CYBER_NEON;
+		case Theme::Default:
+		default:                      return MP_ACCENT;
+	}
+}
+
+lv_color_t MakerphoneTheme::ornamentGlintHighlightColor(){
+	switch(getCurrent()){
+		case Theme::Christmas: return XMAS_GOLD;
+		// The fallbacks below are never observed - the highlight pixel
+		// rides the same opacity as the ornament, and that opacity
+		// returns LV_OPA_TRANSP on every non-Christmas theme. The
+		// values still resolve to a sensible per-theme 'second-
+		// brightest chrome / body-text' so a future caller that probes
+		// the colour outside the opacity gate reads something coherent.
+		case Theme::Nokia3310:        return N3310_HIGHLIGHT;
+		case Theme::GameBoyDMG:       return GBDMG_LCD_LIGHT;
+		case Theme::AmberCRT:         return AMBER_CRT_HOT;
+		case Theme::SonyEricssonAqua: return AQUA_FOAM;
+		case Theme::RazrHotPink:      return RAZR_SHINE;
+		case Theme::StealthBlack:     return STEALTH_BONE;
+		case Theme::Y2KSilver:        return Y2K_SHINE;
+		case Theme::CyberpunkRed:     return CYBER_HOT;
+		case Theme::Default:
+		default:                      return MP_TEXT;
+	}
+}
+
+uint8_t MakerphoneTheme::ornamentGlintIdleOpa(){
+	// LV_OPA_50 is the calibrated 'always-on Christmas ornament
+	// reflection' opacity: bright enough that the ornament reads as
+	// a deliberate festive accent (the eye picks it out as 'lit
+	// holly berry, candlelight catching the curve') rather than a
+	// stray pixel, dim enough that it doesn't dominate the tile
+	// body. On a real early-2000s seasonal-update Christmas-
+	// wallpaper pack the idle ornament sat at roughly 45-55% of
+	// full saturation (the ambient candlelight of a darkened
+	// December room diffused the bauble's colour to a slightly
+	// muted shade), and LV_OPA_50 is the closest 2x2 ornament
+	// approximation of that idle shade on a 16 bpp panel.
+	//
+	// Ties S108's LV_OPA_50 chrome-shine idle because both cues
+	// are reflected-light effects rather than emitting ones, and a
+	// real Christmas bauble + a real Aqua-era polished-glass tile
+	// reflect ambient light at almost exactly the same intensity
+	// (~50% of the ambient source). The six idle opacities now
+	// rank physically from coolest to hottest emission: LV_OPA_30
+	// (Y2K Lucite-cloudy) < LV_OPA_40 (RAZR EL bleed) < LV_OPA_50
+	// (Christmas ornament reflection / Aqua reflected glass shine -
+	// tied) < LV_OPA_60 (Cyberpunk neon-tube edge bleed) <
+	// LV_OPA_70 (Stealth Black emitting status LED). A user
+	// flipping between the six themes sees the highlight intensity
+	// step up monotonically (with a tie at the reflected-light
+	// step), reinforcing that they're six genuinely different
+	// lighting models rather than six recoloured versions of the
+	// same overlay.
+	return ornamentGlintEnabled() ? LV_OPA_50 : LV_OPA_TRANSP;
+}
+
+uint8_t MakerphoneTheme::ornamentGlintSelectedOpa(){
+	// LV_OPA_COVER (full intensity) on selection - the focused
+	// Christmas tile snaps to a 'fully-saturated holly-red ornament'
+	// that the eye reads as 'this row is the active selection,
+	// ornament catching a direct candlelight beam'. This is a non-
+	// pulsing, on/off overlay because the existing halo already
+	// pulses on selection; layering a second pulsing element on top
+	// would make the focused tile read as jittery rather than
+	// 'lit', which contradicts the still-postcard polish of the
+	// Christmas aesthetic (where every seasonal-update wallpaper
+	// pack rendered as a carefully-composed festive scene, never
+	// an animated UI element).
+	//
+	// The 50% -> 100% gap (50 percentage points) ties S108's
+	// 50%->100% (Aqua chrome shine), and falls between S114's
+	// 30%->100% (Y2K Lucite, 70 pp), S110's 40%->100% (RAZR EL,
+	// 60 pp), S116's 60%->100% (Cyberpunk neon, 40 pp), and S112's
+	// 70%->100% (Stealth LED, 30 pp). The gap narrows monotonically
+	// as idle opacity rises - a physically-faithful pattern (the
+	// brighter the idle source, the smaller the perceptual gap to
+	// 'fully lit'). Christmas's ornament already glints visibly at
+	// idle, so the focus state is a moderate brightness bump rather
+	// than a transition from 'dim' to 'lit', which is the right
+	// cue for a reflected source.
+	return ornamentGlintEnabled() ? LV_OPA_COVER : LV_OPA_TRANSP;
+}

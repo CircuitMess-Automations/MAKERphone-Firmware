@@ -34,7 +34,7 @@
 #define MP_ICON_DETAIL (MakerphoneTheme::iconDetail())
 
 PhoneIconTile::PhoneIconTile(lv_obj_t* parent, Icon icon, const char* label)
-		: LVObject(parent), icon(icon), halo(nullptr), shine(nullptr), edgeGlow(nullptr), statusLed(nullptr), statusLedHi(nullptr), luciteJewel(nullptr), luciteJewelHi(nullptr), neonRim(nullptr), neonRimHi(nullptr), iconLayer(nullptr), labelEl(nullptr){
+		: LVObject(parent), icon(icon), halo(nullptr), shine(nullptr), edgeGlow(nullptr), statusLed(nullptr), statusLedHi(nullptr), luciteJewel(nullptr), luciteJewelHi(nullptr), neonRim(nullptr), neonRimHi(nullptr), ornamentGlint(nullptr), ornamentGlintHi(nullptr), iconLayer(nullptr), labelEl(nullptr){
 
 	// The tile is a fixed-size widget that flows naturally inside a flex
 	// or grid parent (no IGNORE_LAYOUT flag, see header notes).
@@ -47,6 +47,7 @@ PhoneIconTile::PhoneIconTile(lv_obj_t* parent, Icon icon, const char* label)
 	buildStatusLed();
 	buildLuciteJewel();
 	buildNeonRim();
+	buildOrnamentGlint();
 	buildIconLayer();
 	buildLabel(label);
 
@@ -427,6 +428,105 @@ void PhoneIconTile::buildNeonRim(){
 	lv_obj_set_style_bg_opa(neonRimHi, LV_OPA_TRANSP, 0);
 }
 
+// ---------------------------------------------------------------------
+// S118 - Christmas / Festive ornament-glint builder.
+//
+// A 2x2 XMAS_CRIMSON ornament dot anchored to the top-LEFT corner of
+// the tile body, with a 1x1 XMAS_GOLD highlight pixel in the upper-
+// left of the ornament (the 'candle-glow reflection' - the cue your
+// eye uses to resolve 'is this a flat painted dot or a reflective
+// volumetric ornament', the way every photographed Christmas bauble
+// always exhibits a near-white reflection peak in its upper-left
+// where ambient candlelight catches the curved glass surface). Lives
+// as two children of the tile alongside `shine`, `edgeGlow`,
+// `statusLed`, `luciteJewel`, and `neonRim`, drawn just below the
+// icon layer so the ornament never occludes any of the per-icon
+// rectangles. Colour + opacity resolve through
+// MakerphoneTheme::ornamentGlint*() so the ornament is fully
+// transparent under Default / Nokia 3310 / Game Boy DMG / Amber CRT
+// / Sony Ericsson Aqua / RAZR Hot Pink / Stealth Black / Y2K Silver
+// / Cyberpunk Red (byte-identical to the previous behaviour) and
+// only becomes visible under Christmas.
+//
+// Distinct from PhoneIconTile::buildShine() (top edge),
+// PhoneIconTile::buildEdgeGlow() (bottom edge),
+// PhoneIconTile::buildStatusLed() (top-right corner),
+// PhoneIconTile::buildLuciteJewel() (bottom-left corner), and
+// PhoneIconTile::buildNeonRim() (right edge vertical) along the
+// top-left-corner-anchor axis - the ornament occupies a 2x2 box in
+// the tile's top-left corner, which is disjoint from all five
+// existing overlays, so the six cue geometries (top edge / bottom
+// edge / top-right corner / bottom-left corner / right edge vertical
+// / top-left corner) stay non-overlapping and a future theme can
+// combine any subset of them without overpainting. The top-left
+// anchor is also physically faithful: every early-2000s seasonal-
+// update Christmas-wallpaper pack placed its festive ornament cue
+// in the top-left of the menu tile (a placement convention that
+// mirrored the 'wreath in the corner of the door' decoration
+// tradition), so anchoring the ornament to the top-left of the tile
+// captures that placement convention directly.
+//
+// Sized 2x2 (matching S112's status-LED dot rather than S114's 3x3
+// Lucite jewel) because a real Christmas-wallpaper-pack ornament
+// rendered closer to a focused-LED accent than a translucent volume
+// jewel - the bauble was always small, sharp, and saturated, not
+// soft and diffuse, and the size differential between the 2x2
+// ornament and the 3x3 Lucite jewel helps a viewer flipping between
+// the Y2K Silver and Christmas themes distinguish the two cues by
+// silhouette as well as colour. The size match with the Stealth
+// Black tactical-LED dot is intentional: both cues are 'small,
+// sharp, saturated accent pixels in opposite corners', and the
+// silhouette match reinforces the festive-vs-tactical-LED visual
+// rhyme without making the two themes confusable (the corner
+// placement + colour pair are radically different).
+void PhoneIconTile::buildOrnamentGlint(){
+	// Outer 2x2 ornament dot.
+	ornamentGlint = lv_obj_create(obj);
+	lv_obj_remove_style_all(ornamentGlint);
+	lv_obj_clear_flag(ornamentGlint, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(ornamentGlint, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(ornamentGlint, 2, 2);
+	lv_obj_set_align(ornamentGlint, LV_ALIGN_TOP_LEFT);
+	// Inset 2 px from the left edge and 2 px from the top edge so the
+	// dot sits cleanly inside the 1 px tile border without overpainting
+	// it (the border carries the selection cue, so the ornament must
+	// never touch it). Mirrors S112's status-LED inset semantics
+	// (top-right anchor, x = -2, y = 2) but flipped to the top-left
+	// anchor (x = 2, y = 2).
+	lv_obj_set_pos(ornamentGlint, 2, 2);
+	lv_obj_set_style_radius(ornamentGlint, 0, 0);
+	lv_obj_set_style_border_width(ornamentGlint, 0, 0);
+	lv_obj_set_style_pad_all(ornamentGlint, 0, 0);
+	lv_obj_set_style_bg_color(ornamentGlint, MakerphoneTheme::ornamentGlintColor(), 0);
+	// Idle opacity is wired in refreshSelection() (which runs once at
+	// the end of the constructor), so this initial set just keeps the
+	// ornament invisible until refreshSelection() decides per-theme.
+	lv_obj_set_style_bg_opa(ornamentGlint, LV_OPA_TRANSP, 0);
+
+	// Inner 1x1 highlight pixel - the candle-glow reflection peak.
+	ornamentGlintHi = lv_obj_create(obj);
+	lv_obj_remove_style_all(ornamentGlintHi);
+	lv_obj_clear_flag(ornamentGlintHi, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(ornamentGlintHi, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(ornamentGlintHi, 1, 1);
+	lv_obj_set_align(ornamentGlintHi, LV_ALIGN_TOP_LEFT);
+	// One pixel inset deeper than the ornament dot so the highlight
+	// pixel occupies the upper-left of the 2x2 ornament (origin
+	// x = 2 = the ornament's left column; origin y = 2 = the
+	// ornament's top row). The result reads as 'candle-glow reflection
+	// on a curved glass surface' the way a real photographed
+	// Christmas bauble looks under an evening living-room shot: the
+	// bauble itself is a saturated holly red, but the upper-left of
+	// the bauble exhibits a sharp warm-gold reflection where ambient
+	// candlelight catches the curved glass.
+	lv_obj_set_pos(ornamentGlintHi, 2, 2);
+	lv_obj_set_style_radius(ornamentGlintHi, 0, 0);
+	lv_obj_set_style_border_width(ornamentGlintHi, 0, 0);
+	lv_obj_set_style_pad_all(ornamentGlintHi, 0, 0);
+	lv_obj_set_style_bg_color(ornamentGlintHi, MakerphoneTheme::ornamentGlintHighlightColor(), 0);
+	lv_obj_set_style_bg_opa(ornamentGlintHi, LV_OPA_TRANSP, 0);
+}
+
 void PhoneIconTile::buildIconLayer(){
 	// 16x16 transparent container that holds the per-icon pixel rectangles.
 	// Centered horizontally; sits 3 px from the top of the tile so the
@@ -554,6 +654,22 @@ void PhoneIconTile::refreshSelection(){
 		lv_obj_set_style_bg_opa(neonRim, (lv_opa_t) MakerphoneTheme::neonRimSelectedOpa(), 0);
 		lv_obj_set_style_bg_color(neonRimHi, MakerphoneTheme::neonRimHighlightColor(), 0);
 		lv_obj_set_style_bg_opa(neonRimHi, (lv_opa_t) MakerphoneTheme::neonRimSelectedOpa(), 0);
+		// S118 - Christmas: focused tile burns the top-left ornament
+		// glint to full saturation (LV_OPA_COVER under Christmas,
+		// LV_OPA_TRANSP everywhere else - same byte as the idle non-
+		// Christmas state, so non-Christmas themes never see an
+		// ornament flash). The cue reads as 'this row is the active
+		// selection, ornament catching a direct candlelight beam' -
+		// the focus-feedback signature of every early-2000s seasonal-
+		// update Christmas-wallpaper pack, where the holly-red accent
+		// suddenly read as fully-saturated crimson rather than its
+		// usual idle candlelight-tinted shade. The gold highlight
+		// pixel rides the same opacity, so the candle-glow reflection
+		// peak stays visible (and bright) on focus.
+		lv_obj_set_style_bg_color(ornamentGlint, MakerphoneTheme::ornamentGlintColor(), 0);
+		lv_obj_set_style_bg_opa(ornamentGlint, (lv_opa_t) MakerphoneTheme::ornamentGlintSelectedOpa(), 0);
+		lv_obj_set_style_bg_color(ornamentGlintHi, MakerphoneTheme::ornamentGlintHighlightColor(), 0);
+		lv_obj_set_style_bg_opa(ornamentGlintHi, (lv_opa_t) MakerphoneTheme::ornamentGlintSelectedOpa(), 0);
 
 		lv_anim_t a;
 		lv_anim_init(&a);
@@ -644,6 +760,25 @@ void PhoneIconTile::refreshSelection(){
 		lv_obj_set_style_bg_opa(neonRim, (lv_opa_t) MakerphoneTheme::neonRimIdleOpa(), 0);
 		lv_obj_set_style_bg_color(neonRimHi, MakerphoneTheme::neonRimHighlightColor(), 0);
 		lv_obj_set_style_bg_opa(neonRimHi, (lv_opa_t) MakerphoneTheme::neonRimIdleOpa(), 0);
+		// S118 - Christmas: idle tile rests with a faint XMAS_CRIMSON
+		// 2x2 ornament dot in its top-left corner (LV_OPA_50 under
+		// Christmas, LV_OPA_TRANSP everywhere else - so non-Christmas
+		// themes still render a perfectly flat tile body, byte-
+		// identical to the pre-S118 behaviour). The cue reads as
+		// 'holly-red ornament accent, candlelight reflection diffusing
+		// the colour' - the soft festive bauble every early-2000s
+		// seasonal-update Christmas-wallpaper pack kept tucked into
+		// the top-left corner of every menu tile. The gold highlight
+		// pixel rides the same idle opacity so the candle-glow
+		// reflection peak shows through even at the soft idle
+		// brightness, the way a real photographed Christmas bauble
+		// always exhibits a near-white reflection in its upper-left
+		// even when the rest of the bauble reads as a slightly muted
+		// soft-crimson under ambient room light.
+		lv_obj_set_style_bg_color(ornamentGlint, MakerphoneTheme::ornamentGlintColor(), 0);
+		lv_obj_set_style_bg_opa(ornamentGlint, (lv_opa_t) MakerphoneTheme::ornamentGlintIdleOpa(), 0);
+		lv_obj_set_style_bg_color(ornamentGlintHi, MakerphoneTheme::ornamentGlintHighlightColor(), 0);
+		lv_obj_set_style_bg_opa(ornamentGlintHi, (lv_opa_t) MakerphoneTheme::ornamentGlintIdleOpa(), 0);
 	}
 }
 

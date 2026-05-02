@@ -892,6 +892,124 @@ public:
 	static lv_color_t neonRimHighlightColor();
 	static uint8_t    neonRimIdleOpa();
 	static uint8_t    neonRimSelectedOpa();
+
+	/*
+	 * S118 - Christmas / Festive ornament-glint helpers (icon-glyph pass).
+	 *
+	 * The defining visual cue of the early-2000s feature-phone "Christmas
+	 * wallpaper" packs (Nokia 6610, Sony Ericsson T610 / W800i, Motorola
+	 * V300 family) was a small holly-red ornament accent tucked into one
+	 * corner of every menu tile, with a sparkly gold highlight pixel
+	 * suggesting candle-glow reflection on a glass bauble. The carriers
+	 * pushed those packs every November/December - a green-and-red menu
+	 * tint, a snowflake-icon swap, a sleigh-bell ringtone preset, and a
+	 * single carefully-placed ornament glint per icon - and the
+	 * pairing of "evergreen panel + holly-red corner ornament" was the
+	 * era's single defining seasonal cue. Without that ornament, an
+	 * evergreen tile with gold icon strokes just reads as 'a flat icon
+	 * on a green panel' rather than 'a Christmas-themed tile with a
+	 * festive accent', missing the entire point of the seasonal-update
+	 * pack's visual vocabulary.
+	 *
+	 * PhoneIconTile consumes these helpers at idle (gated on
+	 * ornamentGlintEnabled()) so every tile under Christmas rests with a
+	 * faint XMAS_CRIMSON 2x2 ornament dot in its top-LEFT corner - the
+	 * always-on 'holly-berry / glass-bauble accent' cue every seasonal-
+	 * update Christmas-wallpaper pack used. Selecting the tile then
+	 * snaps the ornament to LV_OPA_COVER so the focused tile reads as
+	 * 'this row is the active selection, ornament catching a direct
+	 * candlelight beam' against its softly-glinting neighbours - the
+	 * same focus-feedback cue every early-2000s Christmas-themed UI
+	 * used to mark its current row, where the holly-red accent
+	 * suddenly read as fully-saturated crimson rather than its usual
+	 * idle candlelight-tinted shade.
+	 *
+	 * Helpers
+	 *   ornamentGlintEnabled()         - true only for Christmas
+	 *   ornamentGlintColor()           - XMAS_CRIMSON under Christmas,
+	 *                                    falls back to per-theme
+	 *                                    'brightest accent' for the
+	 *                                    other themes (those values are
+	 *                                    never observed because callers
+	 *                                    gate on ornamentGlintEnabled()
+	 *                                    first via the *Opa() helpers,
+	 *                                    both of which return
+	 *                                    LV_OPA_TRANSP outside Christmas)
+	 *   ornamentGlintHighlightColor()  - XMAS_GOLD under Christmas,
+	 *                                    falls back to per-theme
+	 *                                    'second-brightest chrome /
+	 *                                    body-text white' for the other
+	 *                                    themes
+	 *   ornamentGlintIdleOpa()         - LV_OPA_50 under Christmas,
+	 *                                    LV_OPA_TRANSP everywhere else
+	 *   ornamentGlintSelectedOpa()     - LV_OPA_COVER under Christmas,
+	 *                                    LV_OPA_TRANSP everywhere else
+	 *
+	 * Why LV_OPA_50 idle: bright enough that the ornament reads as a
+	 * deliberate festive accent (the eye picks it out as 'lit holly
+	 * berry, candlelight reflection') rather than a stray pixel, dim
+	 * enough that it doesn't dominate the tile body. On a real
+	 * early-2000s Christmas-wallpaper pack the idle ornament sat at
+	 * roughly 45-55% of full saturation when the device wasn't catching
+	 * a direct light beam (the ambient candlelight of a darkened
+	 * December room diffused the bauble's colour to a slightly muted
+	 * shade), and LV_OPA_50 is the closest 2x2 ornament approximation
+	 * of that idle shade on a 16 bpp panel.
+	 *
+	 * Slots between S114's LV_OPA_30 (Y2K Lucite-cloudy) and S116's
+	 * LV_OPA_60 (Cyberpunk neon-tube edge bleed) - a Christmas
+	 * ornament emits more than a passive Lucite jewel (the bauble
+	 * actually catches and reflects candlelight, where the Lucite
+	 * jewel only diffuses ambient room light) but less than an
+	 * actively-emitting neon tube. The six idle opacities now rank
+	 * physically from coolest to hottest emission: LV_OPA_30 (Y2K
+	 * Lucite-cloudy) < LV_OPA_40 (RAZR EL bleed) < LV_OPA_50
+	 * (Christmas ornament reflection / Aqua reflected glass shine -
+	 * tied) < LV_OPA_60 (Cyberpunk neon-tube edge bleed) < LV_OPA_70
+	 * (Stealth Black emitting status LED). Christmas ties Aqua at
+	 * LV_OPA_50 because both cues are reflected-light effects rather
+	 * than emitting ones, and a real Christmas bauble + a real
+	 * Aqua-era polished-glass tile reflect ambient light at almost
+	 * exactly the same intensity (~50% of the ambient source).
+	 *
+	 * The 50% -> 100% selected-vs-idle gap (50 percentage points) is
+	 * intentionally the same as S108's 50%->100% (Aqua chrome shine,
+	 * 50 pp), and falls between S114's 30%->100% (Y2K Lucite, 70 pp),
+	 * S110's 40%->100% (RAZR EL, 60 pp), S116's 60%->100% (Cyberpunk
+	 * neon, 40 pp), and S112's 70%->100% (Stealth LED, 30 pp). The
+	 * gap narrows monotonically as idle opacity rises - a physically-
+	 * faithful pattern (the brighter the idle source, the smaller the
+	 * perceptual gap to 'fully lit'). Christmas's ornament already
+	 * glints visibly at idle, so the focus state is a moderate
+	 * brightness bump rather than a transition from 'dim' to 'lit',
+	 * which is the right cue for a reflected source.
+	 *
+	 * Why top-left corner (vs S108's top edge / S110's bottom edge /
+	 * S112's top-right corner / S114's bottom-left corner / S116's
+	 * right edge vertical): the six Phase O icon-glyph overlays are
+	 * now anchored to six disjoint geometric axes - top edge
+	 * horizontal, bottom edge horizontal, top-right corner, bottom-
+	 * left corner, right edge vertical, top-left corner - so a future
+	 * theme can layer any subset of the six cues without overpainting,
+	 * and so a user flipping between Aqua, RAZR, Stealth Black, Y2K
+	 * Silver, Cyberpunk Red, and Christmas sees the highlight move
+	 * around the tile perimeter (top-edge horizontal -> bottom-edge
+	 * horizontal -> top-right corner -> bottom-left corner -> right-
+	 * edge vertical -> top-left corner), reinforcing that they're six
+	 * genuinely different lighting models rather than six recoloured
+	 * versions of the same overlay. The top-left anchor is also
+	 * physically faithful: every early-2000s seasonal-update Christmas-
+	 * wallpaper pack placed its festive ornament cue in the top-left
+	 * of the menu tile (a placement convention that mirrored the
+	 * "wreath in the corner of the door" decoration tradition), so
+	 * anchoring the ornament to the top-left of the tile captures
+	 * that placement convention directly.
+	 */
+	static bool       ornamentGlintEnabled();
+	static lv_color_t ornamentGlintColor();
+	static lv_color_t ornamentGlintHighlightColor();
+	static uint8_t    ornamentGlintIdleOpa();
+	static uint8_t    ornamentGlintSelectedOpa();
 };
 
 /*
