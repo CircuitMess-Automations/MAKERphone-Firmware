@@ -24,6 +24,7 @@
 #include "../Screens/PhoneWallpaperScreen.h"
 #include "../Screens/PhoneDateTimeScreen.h"
 #include "../Screens/PhoneAboutScreen.h"
+#include "../Screens/PhoneThemeScreen.h"
 #include "../Screens/PhoneGamesScreen.h"
 #include "../Interface/LVScreen.h"
 #include "../Interface/PhoneTransitions.h"
@@ -215,6 +216,17 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// uptime, and paired peer count, with the heap + uptime
 						// fields refreshed at 1 Hz so the user sees a live readout.
 						self->push(new PhoneAboutScreen());
+						break;
+					case PhoneSettingsScreen::Item::Theme:
+						// S101: global theme picker drills into the Default
+						// Synthwave / Nokia 3310 Monochrome pair (Phase O
+						// grows the list to 10 themes by S119). Each theme
+						// bundles a palette + wallpaper variant; selecting a
+						// non-default theme overrides the wallpaperStyle byte
+						// for as long as it is selected, so the next screen
+						// push picks up the matching palette + wallpaper via
+						// PhoneSynthwaveBg::resolveStyleFromSettings().
+						self->push(new PhoneThemeScreen());
 						break;
 					default:
 						// Defensive: any future row that is added to

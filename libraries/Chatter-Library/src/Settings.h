@@ -52,6 +52,16 @@ struct SettingsData {
 	// outside [0..3] are clamped to Synthwave at the wallpaper layer to be
 	// defensive against NVS-resize wipes that read the new byte as garbage.
 	uint8_t wallpaperStyle = 0;
+	// S101 — global theme selector (0 = Default / Synthwave, 1 = Nokia 3310
+	// Monochrome). Phase O (S101–S120) bundles each theme as a palette +
+	// wallpaper pair (S101, S103, ...) plus a matching icon-glyph + accent
+	// pass (S102, S104, ...). The wallpaper layer (PhoneSynthwaveBg)
+	// consults this byte before falling back to wallpaperStyle so a user
+	// who picks a non-default theme automatically sees the matching
+	// wallpaper variant on every subsequent screen push. Out-of-range
+	// values clamp to Default at the theme layer; same defensive pattern
+	// the existing wallpaperStyle / soundProfile readers use.
+	uint8_t themeId = 0;
 	// S68 — haptic-style nav-key ticks toggle. When `true` the BuzzerService
 	// emits a very short (~5 ms), very high-pitched click on D-pad / numpad
 	// navigation buttons (LEFT, RIGHT, 2, 4, 6, 8, ENTER, BACK) -- a "you

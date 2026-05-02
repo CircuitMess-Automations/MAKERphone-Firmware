@@ -82,6 +82,16 @@ public:
 		Plain     = 1,
 		GridOnly  = 2,
 		Stars     = 3,
+		// S101 — Nokia 3310 Monochrome theme override. Not part of the
+		// 4-style PhoneWallpaperScreen pager (StyleCount stays at 4
+		// there); this value is selected exclusively by
+		// `resolveStyleFromSettings()` when Settings.themeId picks the
+		// Nokia 3310 theme. Renders a flat pea-green LCD panel with a
+		// faint scanline pattern + a small pixel-art antenna motif,
+		// bypassing every Synthwave builder (sky/ground/sun/rays/grid
+		// /stars) so the wallpaper reads as a real Nokia 3310 idle
+		// screen rather than a tinted Synthwave.
+		Nokia3310 = 4,
 	};
 
 	/** Default ctor — picks the style from `Settings.get().wallpaperStyle`. */
@@ -94,6 +104,22 @@ public:
 
 	/** Resolve a raw `Settings.wallpaperStyle` byte to a clamped Style. */
 	static Style styleFromByte(uint8_t raw);
+
+	/**
+	 * S101 — resolve the *effective* Style by consulting both the
+	 * global theme (Settings.themeId) and the per-theme wallpaper
+	 * choice (Settings.wallpaperStyle).
+	 *
+	 * Returns Style::Nokia3310 whenever the user has the Nokia 3310
+	 * Monochrome theme selected; in every other case it falls through
+	 * to styleFromByte(Settings.wallpaperStyle), preserving the
+	 * existing per-Synthwave-variant behaviour. The default
+	 * constructor uses this resolver, so dropping `new
+	 * PhoneSynthwaveBg(obj)` in any screen automatically picks up
+	 * the user's current theme without callers having to know the
+	 * wiring.
+	 */
+	static Style resolveStyleFromSettings();
 
 	static constexpr uint16_t BgWidth   = 160;
 	static constexpr uint16_t BgHeight  = 128;
@@ -133,6 +159,16 @@ private:
 	void buildRays();
 	void buildHorizontals();
 	void buildStars();
+
+	// S101 — Nokia 3310 Monochrome wallpaper builder. Bypasses
+	// buildSky / buildGround entirely (those paint the Synthwave
+	// gradient) and instead lays down a single pea-green LCD panel
+	// with a faint scanline pattern + a tiny pixel-art antenna motif
+	// anchored bottom-right. Uses the Nokia palette from
+	// MakerphoneTheme.h. ~12 LVGL primitives total, no animations -
+	// the Nokia 3310's idle screen is famously static, so a still
+	// preview is the authentic look.
+	void buildNokia3310Wallpaper();
 
 	// Drives the per-star opacity animation. Free function semantics
 	// (matches LVGL's lv_anim_exec_xcb_t signature). Defined in the .cpp

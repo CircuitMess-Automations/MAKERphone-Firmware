@@ -161,7 +161,7 @@ A proper retro-arcade carousel for `PhoneGames`. Each entry is one self-containe
 ## Phase O — Themes & Icon Sets (S101–S120)
 Two sessions per theme: **part 1 = palette + wallpaper variant**, **part 2 = matching icon glyphs + soft-key tint + lock-screen accent**. All themes pickable from `Settings → Theme`.
 
-- [ ] **S101** — Theme: Nokia 3310 Monochrome — palette + wallpaper.
+- [x] **S101** — Theme: Nokia 3310 Monochrome — palette + wallpaper.
 - [ ] **S102** — Theme: Nokia 3310 Monochrome — icon glyphs + accents.
 - [ ] **S103** — Theme: Game Boy DMG (4-shade green) — palette + wallpaper.
 - [ ] **S104** — Theme: Game Boy DMG — icon glyphs + accents.

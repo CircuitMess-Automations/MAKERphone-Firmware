@@ -1,6 +1,7 @@
 #include "PhoneSynthwaveBg.h"
 #include <stdio.h>
 #include <Settings.h>
+#include "../MakerphoneTheme.h"
 
 // MAKERphone retro palette (kept consistent with PhoneStatusBar /
 // PhoneSoftKeyBar / PhoneClockFace).
@@ -28,11 +29,28 @@ PhoneSynthwaveBg::Style PhoneSynthwaveBg::styleFromByte(uint8_t raw){
 	}
 }
 
+PhoneSynthwaveBg::Style PhoneSynthwaveBg::resolveStyleFromSettings(){
+	// S101 - the global theme overrides the per-Synthwave wallpaperStyle:
+	// if the user has selected a non-default theme (Nokia 3310 today),
+	// the wallpaper is the theme's variant regardless of which Synthwave
+	// style the user previously picked. Their wallpaperStyle byte stays
+	// persisted, so flipping the theme back to Default restores the
+	// previously chosen Synthwave variant without resetting it.
+	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::Nokia3310){
+		return Style::Nokia3310;
+	}
+	return styleFromByte(Settings.get().wallpaperStyle);
+}
+
 PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent)
-		: PhoneSynthwaveBg(parent, styleFromByte(Settings.get().wallpaperStyle)) {
-	// Delegating ctor - reads the persisted style on every drop so every
-	// new screen picks up the user's current preference without each
-	// caller having to know the wiring.
+		: PhoneSynthwaveBg(parent, resolveStyleFromSettings()) {
+	// Delegating ctor - reads both the persisted theme and the
+	// per-Synthwave wallpaperStyle on every drop, so every new screen
+	// picks up the user's current preference without each caller
+	// having to know the wiring. The resolver short-circuits to
+	// Style::Nokia3310 whenever Settings.themeId picks the Nokia 3310
+	// theme (S101) so the screen renders the LCD-green wallpaper
+	// instead of a tinted Synthwave.
 }
 
 PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent, Style style) : LVObject(parent){
@@ -64,8 +82,19 @@ PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent, Style style) : LVObject(par
 	lv_obj_set_style_border_width(obj, 0, 0);
 	lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
 
-	// Sky + ground are the foundation of every variant - they always run
-	// so the screen never falls back to the default LVGL theme color.
+	// S101 - the Nokia 3310 Monochrome theme owns its wallpaper end
+	// to end: it bypasses every Synthwave builder (sky/ground/sun/rays
+	// /grid/stars) and paints a flat pea-green LCD panel instead.
+	// Returns early so none of the Synthwave palette ever touches the
+	// canvas while the Nokia theme is active.
+	if(style == Style::Nokia3310){
+		buildNokia3310Wallpaper();
+		return;
+	}
+
+	// Sky + ground are the foundation of every Synthwave variant -
+	// they always run so the screen never falls back to the default
+	// LVGL theme color.
 	buildSky();
 	buildGround();
 
@@ -407,4 +436,156 @@ void PhoneSynthwaveBg::gridScrollExec(void* var, int32_t v){
 	if(opa < 0)    opa = 0;
 	if(opa > 0xFF) opa = 0xFF;
 	lv_obj_set_style_bg_opa(line, (lv_opa_t) opa, 0);
+}
+
+// ----- Nokia 3310 Monochrome wallpaper (S101) -------------------------
+//
+// The Nokia 3310's idle screen is a flat pea-green LCD panel with the
+// operator name banded across the top and (sometimes) a tiny
+// pixel-art motif. Our PhoneStatusBar already owns the top 10 px and
+// PhoneSoftKeyBar the bottom 10 px, so the wallpaper's job here is to
+// paint:
+//
+//   1. A solid LCD-green vertical gradient covering the full 160×128
+//      area. The gradient is intentionally subtle - the LCD panel
+//      itself is more or less flat - but a touch of saturation tilt
+//      from top to bottom keeps it from reading as a flat green fill
+//      and helps the foreground text feel anchored to a real surface.
+//
+//   2. A faint horizontal scanline pattern (8 dim olive 1 px lines
+//      spaced ~16 px apart) to suggest the LCD's row structure
+//      without overwhelming foreground content. Same trick the real
+//      PhoneSynthwaveBg uses for its scan lines across the sun, just
+//      stretched across the whole panel.
+//
+//   3. A small pixel-art antenna+wave motif anchored at the bottom-
+//      right. The motif sits in the corner the soft-key bar covers
+//      anyway, so it does not compete with foreground content during
+//      normal use - but on screens that omit the soft-key bar (boot
+//      splash, lock screen) it shows through, giving the LCD panel
+//      the iconic "phone idle" silhouette. About a dozen 1-2 px
+//      rectangles in N3310_PIXEL with descending opacity to fake the
+//      receding "wave" arcs.
+//
+// Everything runs static - no animations - because the Nokia 3310's
+// idle screen is famously calm. ~12 LVGL primitives total, well below
+// the budget the Synthwave variant's animated stars + grid need.
+void PhoneSynthwaveBg::buildNokia3310Wallpaper(){
+	// ----- LCD panel: solid pea-green vertical gradient -----
+	//
+	// Painted on the same `sky` member pointer the Synthwave variant
+	// uses, so that a future caller iterating wallpaper children can
+	// rely on a single named root regardless of theme. The container
+	// covers the entire 160×128 area - there is no horizon to split.
+	sky = lv_obj_create(obj);
+	lv_obj_remove_style_all(sky);
+	lv_obj_clear_flag(sky, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(sky, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(sky, BgWidth, BgHeight);
+	lv_obj_set_pos(sky, 0, 0);
+	lv_obj_set_style_bg_color(sky, N3310_BG_LIGHT, 0);
+	lv_obj_set_style_bg_grad_color(sky, N3310_BG_DEEP, 0);
+	lv_obj_set_style_bg_grad_dir(sky, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(sky, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(sky, 0, 0);
+	lv_obj_set_style_pad_all(sky, 0, 0);
+	lv_obj_set_style_border_width(sky, 0, 0);
+
+	// ----- LCD scanline pattern: 8 dim 1 px horizontal lines -----
+	//
+	// Spaced ~16 px apart starting at y=7. Drawn as N3310_PIXEL_DIM at
+	// LV_OPA_30 so the scanlines are visible but never compete with
+	// foreground text. Each line is a 1 px tall rect rather than an
+	// lv_line widget because lv_line requires an external point array
+	// that has to outlive the widget; rects are cheaper and don't
+	// need the storage.
+	const lv_coord_t scanlineSpacing = 16;
+	const lv_coord_t scanlineY0      = 7;
+	const uint8_t    scanlineCount   = 8;
+	for(uint8_t i = 0; i < scanlineCount; i++){
+		lv_obj_t* sl = lv_obj_create(sky);
+		lv_obj_remove_style_all(sl);
+		lv_obj_clear_flag(sl, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(sl, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(sl, BgWidth, 1);
+		lv_obj_set_pos(sl, 0, scanlineY0 + scanlineSpacing * i);
+		lv_obj_set_style_bg_color(sl, N3310_PIXEL_DIM, 0);
+		lv_obj_set_style_bg_opa(sl, LV_OPA_30, 0);
+		lv_obj_set_style_radius(sl, 0, 0);
+		lv_obj_set_style_border_width(sl, 0, 0);
+	}
+
+	// ----- Pixel-art antenna + waves motif (bottom-right corner) -----
+	//
+	// Anchored ~6 px clear of the right edge and ~6 px clear of the
+	// bottom edge, in the patch the soft-key bar will cover during
+	// normal use. The mast is a 1×10 dark olive bar; a 5×2 base sits
+	// underneath it; six tiny "wave" rectangles flank the mast at
+	// descending opacity for the receding-arc effect. The whole motif
+	// fits in a 16×18 bounding box, so the soft-key bar's 10 px height
+	// fully covers it on screens that draw one.
+	const lv_coord_t motifAnchorX = BgWidth  - 22;   // 138
+	const lv_coord_t motifAnchorY = BgHeight - 24;   // 104
+
+	// Antenna mast (1×10 vertical bar)
+	{
+		lv_obj_t* mast = lv_obj_create(sky);
+		lv_obj_remove_style_all(mast);
+		lv_obj_clear_flag(mast, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(mast, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(mast, 1, 10);
+		lv_obj_set_pos(mast, motifAnchorX + 8, motifAnchorY + 6);
+		lv_obj_set_style_bg_color(mast, N3310_PIXEL, 0);
+		lv_obj_set_style_bg_opa(mast, LV_OPA_70, 0);
+		lv_obj_set_style_radius(mast, 0, 0);
+		lv_obj_set_style_border_width(mast, 0, 0);
+	}
+	// Antenna base (5×2 dark olive plate)
+	{
+		lv_obj_t* base = lv_obj_create(sky);
+		lv_obj_remove_style_all(base);
+		lv_obj_clear_flag(base, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(base, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(base, 5, 2);
+		lv_obj_set_pos(base, motifAnchorX + 6, motifAnchorY + 16);
+		lv_obj_set_style_bg_color(base, N3310_PIXEL, 0);
+		lv_obj_set_style_bg_opa(base, LV_OPA_70, 0);
+		lv_obj_set_style_radius(base, 0, 0);
+		lv_obj_set_style_border_width(base, 0, 0);
+	}
+	// Three pairs of "wave" rects flanking the mast at descending
+	// opacity. Closest pair (1 px tall, ~LV_OPA_70) sits right next
+	// to the mast; mid pair (3 px tall, ~LV_OPA_50) one column out;
+	// outer pair (5 px tall, ~LV_OPA_30) two columns out. Reads as
+	// concentric arcs receding away from the antenna.
+	struct Wave {
+		int8_t   dx;
+		int8_t   dy;
+		uint8_t  w;
+		uint8_t  h;
+		lv_opa_t opa;
+	};
+	const Wave waves[] = {
+			// left side (closer -> farther)
+			{ -2,  6, 1, 1, LV_OPA_70 },
+			{ -4,  4, 1, 3, LV_OPA_50 },
+			{ -6,  2, 1, 5, LV_OPA_30 },
+			// right side (mirrored)
+			{  2,  6, 1, 1, LV_OPA_70 },
+			{  4,  4, 1, 3, LV_OPA_50 },
+			{  6,  2, 1, 5, LV_OPA_30 },
+	};
+	const uint8_t waveCount = sizeof(waves) / sizeof(waves[0]);
+	for(uint8_t i = 0; i < waveCount; i++){
+		lv_obj_t* w = lv_obj_create(sky);
+		lv_obj_remove_style_all(w);
+		lv_obj_clear_flag(w, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(w, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(w, waves[i].w, waves[i].h);
+		lv_obj_set_pos(w, motifAnchorX + 8 + waves[i].dx, motifAnchorY + waves[i].dy);
+		lv_obj_set_style_bg_color(w, N3310_PIXEL, 0);
+		lv_obj_set_style_bg_opa(w, waves[i].opa, 0);
+		lv_obj_set_style_radius(w, 0, 0);
+		lv_obj_set_style_border_width(w, 0, 0);
+	}
 }

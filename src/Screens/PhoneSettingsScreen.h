@@ -81,6 +81,11 @@ public:
 		Haptics    = 3,        // S68 (key-click haptic ticks toggle)
 		DateTime   = 4,        // S54
 		About      = 5,        // S55
+		// S101 - global theme picker (Default Synthwave / Nokia 3310 today;
+		// Phase O grows the list to 10 themes by S119). Sits in the
+		// DISPLAY group right under Wallpaper so theme + wallpaper-style
+		// edits live next to each other in the user's mental model.
+		Theme      = 6,        // S101
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);
@@ -130,7 +135,7 @@ public:
 	void flashRightSoftKey();
 
 	/** Number of selectable rows (excludes group headers). */
-	static constexpr uint8_t ItemCount = 6;
+	static constexpr uint8_t ItemCount = 7;
 
 	// --- Geometry, exposed for unit-test friendliness. -----------------
 
@@ -141,14 +146,21 @@ public:
 	 */
 	static constexpr lv_coord_t ListY  = 20;
 	/**
-	 * Per-row height (selectable rows). Trimmed to 11 px in S68 (was
-	 * 12) so 6 rows + 3 headers tile to exactly the 96 px window
-	 * between ListY=20 and the soft-key bar at y=118. pixelbasic7 is
-	 * 7 px tall so the row still has 4 px halo for the highlight rect.
+	 * Per-row height (selectable rows). Trimmed to 10 px in S101 (was
+	 * 11) so 7 rows + 3 headers (the new Theme row joins DISPLAY) tile
+	 * cleanly into the 98 px window between ListY=20 and the soft-key
+	 * bar at y=118 - 3*9 + 7*10 = 97 px with 1 px slack. pixelbasic7
+	 * is 7 px tall so the row still has 3 px halo for the highlight
+	 * rect; tighter than the pre-S101 4 px but still legible.
 	 */
-	static constexpr lv_coord_t RowH   = 11;
-	/** Per-header height (group titles). */
-	static constexpr lv_coord_t HdrH   = 10;
+	static constexpr lv_coord_t RowH   = 10;
+	/**
+	 * Per-header height (group titles). Trimmed to 9 px in S101 (was
+	 * 10) for the same fit reason as RowH above. pixelbasic7 leaves
+	 * 2 px halo, enough that the dim-purple group caption stays
+	 * crisp without the row labels reading as squashed.
+	 */
+	static constexpr lv_coord_t HdrH   = 9;
 	/** Width of the list container (full screen minus 4 px margins). */
 	static constexpr lv_coord_t ListW  = 152;
 

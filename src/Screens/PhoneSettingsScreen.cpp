@@ -53,6 +53,12 @@ const Section kLayout[] = {
 	{ true,  "DISPLAY",            nullptr,       PhoneSettingsScreen::Item::Brightness },
 	{ false, "Brightness",         "BRIGHTNESS",  PhoneSettingsScreen::Item::Brightness },
 	{ false, "Wallpaper",          "WALLPAPER",   PhoneSettingsScreen::Item::Wallpaper  },
+	// S101 - Theme picker drills into the per-theme palette + wallpaper
+	// pair (Default Synthwave / Nokia 3310 Monochrome today; Phase O
+	// grows the list to 10 themes by S119). Sits right after Wallpaper
+	// because the two settings co-modulate: a non-default theme
+	// overrides the wallpaperStyle byte for as long as it is selected.
+	{ false, "Theme",              "THEME",       PhoneSettingsScreen::Item::Theme      },
 	{ true,  "SOUND",              nullptr,       PhoneSettingsScreen::Item::Sound      },
 	{ false, "Sound & Vibration",  "SOUND",       PhoneSettingsScreen::Item::Sound      },
 	// S68 - haptic-style nav-key tick toggle. Listed in the SOUND
