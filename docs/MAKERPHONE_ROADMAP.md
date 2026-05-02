@@ -192,7 +192,7 @@ Composer is broken into three sessions because it needs (a) keypad note-entry UI
 - [x] **S125** — `PhoneTimers` — multi-timer countdown list (extends S62).
 - [x] **S126** — `PhoneCurrencyConverter` — offline rate table, two-column converter.
 - [x] **S127** — `PhoneUnitConverter` — length / mass / temperature / volume.
-- [ ] **S128** — `PhoneWorldClock` — six-zone clock grid.
+- [x] **S128** — `PhoneWorldClock` — six-zone clock grid.
 - [ ] **S129** — `PhoneVirtualPet` — Tamagotchi-style feed/sleep/play, persists hunger/age across reboots.
 - [ ] **S130** — `PhoneMagic8Ball` — shake + reveal answer.
 - [ ] **S131** — `PhoneDiceRoller` — 1d4 → 2d20.
