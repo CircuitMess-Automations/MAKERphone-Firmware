@@ -203,6 +203,23 @@ public:
 		// 1980s / early-2020s neon-saturated cyberpunk idle screen
 		// rather than a tinted Synthwave.
 		CyberpunkRed = 11,
+
+		// S117 - Christmas Festive seasonal theme override.
+		// Same dispatch pattern as the prior theme overrides: not part
+		// of the 4-style PhoneWallpaperScreen pager (StyleCount stays
+		// at 4 there); this value is only ever returned by
+		// resolveStyleFromSettings() when Settings.themeId picks the
+		// Christmas Festive theme. Renders a flat pine-green gradient
+		// panel (XMAS_BG_PINE at top -> XMAS_BG_NIGHT at bottom)
+		// covering the full 160x128 area, a few horizontal candy-cane
+		// stripe accents, a sparse constellation of XMAS_SNOW
+		// snowflake specks, and a small stylised pixel-art Christmas
+		// tree motif anchored bottom-right (the trademark-safe
+		// equivalent of every northern-hemisphere Christmas idle
+		// screen ever rendered), bypassing every Synthwave builder
+		// so the wallpaper reads as a festive idle scene rather than
+		// a tinted Synthwave.
+		Christmas = 12,
 	};
 
 	/** Default ctor — picks the style from `Settings.get().wallpaperStyle`. */
@@ -403,6 +420,29 @@ private:
 	// neon-warning iconography that defined Akira, Blade Runner,
 	// Ghost in the Shell, and Cyberpunk 2077.
 	void buildCyberpunkRedWallpaper();
+
+	// S117 - Christmas Festive seasonal wallpaper builder. Same
+	// dispatch pattern as the prior theme builders: paints a flat
+	// pine-green gradient panel (XMAS_BG_PINE at top -> XMAS_BG_NIGHT
+	// at bottom) covering the full 160x128 area, four faint horizontal
+	// candy-cane stripe accents (alternating XMAS_CRIMSON / XMAS_SNOW
+	// at low opacity) suggesting wrapped-ribbon trim, eight 1-2 px
+	// XMAS_SNOW snowflake specks scattered across the panel, and a
+	// small stylised pixel-art Christmas tree motif anchored bottom-
+	// right (a 5-wide / 4-tall stack of tapered XMAS_HOLLY tiers with
+	// an XMAS_GOLD star pixel at the apex suggesting the tree-topper,
+	// an XMAS_DIM trunk pixel at the base, plus a single XMAS_CRIMSON
+	// ornament pixel on the middle tier and an XMAS_SNOW halo row
+	// beneath suggesting reflected light on the panel below). Uses
+	// the XMAS_* palette from MakerphoneTheme.h. ~26 LVGL primitives
+	// total, no animations - matches the Nokia / DMG / Amber CRT /
+	// Aqua / RAZR / Stealth Black / Y2K Silver / Cyberpunk Red
+	// variants' still-image philosophy. The tree is the theme's
+	// signature glyph - the trademark-safe equivalent of the
+	// universal Christmas-tree silhouette every northern-hemisphere
+	// festive UI prints in (no specific commercial Christmas-brand
+	// silhouette).
+	void buildChristmasWallpaper();
 
 	// Drives the per-star opacity animation. Free function semantics
 	// (matches LVGL's lv_anim_exec_xcb_t signature). Defined in the .cpp

@@ -177,7 +177,7 @@ Two sessions per theme: **part 1 = palette + wallpaper variant**, **part 2 = mat
 - [x] **S114** — Theme: Y2K Silver — icon glyphs + accents.
 - [x] **S115** — Theme: Cyberpunk Red — palette + wallpaper.
 - [x] **S116** — Theme: Cyberpunk Red — icon glyphs + accents.
-- [ ] **S117** — Theme: Christmas / Festive — palette + wallpaper.
+- [x] **S117** — Theme: Christmas / Festive — palette + wallpaper.
 - [ ] **S118** — Theme: Christmas / Festive — icon glyphs + accents.
 - [ ] **S119** — Theme: Surprise / Daily-Cycle — engine + palette.
 - [ ] **S120** — Theme: Surprise / Daily-Cycle — rotation logic + icon variants.

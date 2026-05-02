@@ -94,6 +94,14 @@ PhoneSynthwaveBg::Style PhoneSynthwaveBg::resolveStyleFromSettings(){
 	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::CyberpunkRed){
 		return Style::CyberpunkRed;
 	}
+	// S117 - dispatch the Christmas Festive style override the same
+	// way. The wallpaperStyle byte stays persisted underneath so
+	// flipping the theme back to any prior theme restores the
+	// previously chosen Synthwave variant unchanged, exactly like
+	// the prior branches above.
+	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::Christmas){
+		return Style::Christmas;
+	}
 	return styleFromByte(Settings.get().wallpaperStyle);
 }
 
@@ -217,6 +225,17 @@ PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent, Style style) : LVObject(par
 	// hot-path.
 	if(style == Style::CyberpunkRed){
 		buildCyberpunkRedWallpaper();
+		return;
+	}
+
+	// S117 - the Christmas Festive theme owns its wallpaper end to
+	// end the same way: it bypasses every Synthwave builder and
+	// paints a flat pine-green gradient panel with candy-cane stripe
+	// accents + snowflake specks + a stylised Christmas tree motif
+	// instead. Returning early keeps the XMAS_* palette out of every
+	// Synthwave hot-path.
+	if(style == Style::Christmas){
+		buildChristmasWallpaper();
 		return;
 	}
 
@@ -1884,6 +1903,202 @@ void PhoneSynthwaveBg::buildCyberpunkRedWallpaper(){
 		}
 		lv_obj_set_style_bg_color(px, fill, 0);
 		lv_obj_set_style_bg_opa(px, chevParts[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+
+
+
+void PhoneSynthwaveBg::buildChristmasWallpaper(){
+	// ----- Pine panel: pine-green -> midnight-green vertical gradient -----
+	//
+	// Painted on the same `sky` member pointer the Synthwave variant
+	// uses, mirroring the prior theme builders so a future caller
+	// iterating wallpaper children can rely on a single named root
+	// regardless of theme. The container covers the entire 160x128
+	// area - the festive idle screen, like the Stealth Black /
+	// Cyberpunk Red / Amber CRT / RAZR / Aqua / Y2K Silver panels,
+	// is a single flat surface with no horizon. The vertical gradient
+	// (XMAS_BG_PINE at top -> XMAS_BG_NIGHT at bottom) reads as a
+	// 'wreath under fairy lights, snowy night sky bleeding in below'
+	// - the cue every northern-hemisphere Christmas-themed UI
+	// rendered when the candle / fairy-light glow tapered toward
+	// the lower edge of the panel. Calibrated darker than a typical
+	// UI green so the gold/red/snow accents pop rather than competing
+	// with the panel itself.
+	sky = lv_obj_create(obj);
+	lv_obj_remove_style_all(sky);
+	lv_obj_clear_flag(sky, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(sky, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(sky, BgWidth, BgHeight);
+	lv_obj_set_pos(sky, 0, 0);
+	lv_obj_set_style_bg_color(sky, XMAS_BG_PINE, 0);
+	lv_obj_set_style_bg_grad_color(sky, XMAS_BG_NIGHT, 0);
+	lv_obj_set_style_bg_grad_dir(sky, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(sky, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(sky, 0, 0);
+	lv_obj_set_style_pad_all(sky, 0, 0);
+	lv_obj_set_style_border_width(sky, 0, 0);
+
+	// ----- Candy-cane stripe accents -----
+	//
+	// Four faint full-width horizontal lines alternating XMAS_CRIMSON
+	// (Santa-suit red) and XMAS_SNOW (snow white) at low opacity.
+	// Approximate the wrapped-ribbon / candy-cane trim every Christmas
+	// UI hinted at across the surface chrome - barely visible, but the
+	// eye registers 'this is a wrapped festive panel, not a flat green
+	// surface'. Spaced ~26 px apart so the eye reads them as a regular
+	// substrate texture rather than a counted set. Drawn 1 px tall to
+	// stay subliminal at the 160x128 resolution; LVGL collapses 1 px
+	// rects to a single horizontal line on flush.
+	//
+	// Mechanically the same pattern S111's Stealth Black wallpaper
+	// uses (low-opacity 1 px horizontal rasters), tuned for a green-on-
+	// dark theme: alternating crimson / snow stripes read as
+	// 'festive ribbon trim' against the pine panel rather than as a
+	// faint metal grain.
+	struct Stripe { lv_coord_t y; uint8_t kind; lv_opa_t opa; };
+	const Stripe stripes[] = {
+			{  18, 0, LV_OPA_30 },   // 0 = crimson
+			{  46, 1, LV_OPA_20 },   // 1 = snow
+			{  74, 0, LV_OPA_30 },
+			{ 102, 1, LV_OPA_20 },
+	};
+	const uint8_t stripeCount = sizeof(stripes) / sizeof(stripes[0]);
+	for(uint8_t i = 0; i < stripeCount; i++){
+		lv_obj_t* s = lv_obj_create(sky);
+		lv_obj_remove_style_all(s);
+		lv_obj_clear_flag(s, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(s, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(s, BgWidth, 1);
+		lv_obj_set_pos(s, 0, stripes[i].y);
+		lv_color_t fill = (stripes[i].kind == 0) ? XMAS_CRIMSON : XMAS_SNOW;
+		lv_obj_set_style_bg_color(s, fill, 0);
+		lv_obj_set_style_bg_opa(s, stripes[i].opa, 0);
+		lv_obj_set_style_radius(s, 0, 0);
+		lv_obj_set_style_border_width(s, 0, 0);
+	}
+
+	// ----- Snowflake specks -----
+	//
+	// Eight 1-2 px XMAS_SNOW specks scattered across the panel
+	// suggesting drifting snowflakes against the pine-green / night-
+	// green panel. y-positions stay clear of the status bar (y < 12)
+	// and soft-key bar (y > BgHeight - 12) regions so a snowflake
+	// pixel never reads as a stuck pixel inside a chrome strip. Drawn
+	// as flat rects (no LV_RADIUS_CIRCLE - at this size LVGL rounds
+	// to a pixel rect anyway). Opacity varies between 60 and 80% so
+	// the constellation reads as 'falling snow at varying depths'
+	// rather than 'pixel-perfect dots painted on glass'.
+	struct Flake { lv_coord_t x; lv_coord_t y; uint8_t s; lv_opa_t opa; };
+	const Flake flakes[] = {
+			{  22,  24, 1, LV_OPA_70 },
+			{  68,  18, 2, LV_OPA_80 },
+			{ 124,  34, 1, LV_OPA_70 },
+			{  38,  58, 1, LV_OPA_60 },
+			{  96,  64, 2, LV_OPA_80 },
+			{  18,  88, 1, LV_OPA_70 },
+			{  82,  96, 1, LV_OPA_60 },
+			{ 132, 102, 1, LV_OPA_70 },
+	};
+	const uint8_t flakeCount = sizeof(flakes) / sizeof(flakes[0]);
+	for(uint8_t i = 0; i < flakeCount; i++){
+		lv_obj_t* f = lv_obj_create(sky);
+		lv_obj_remove_style_all(f);
+		lv_obj_clear_flag(f, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(f, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(f, flakes[i].s, flakes[i].s);
+		lv_obj_set_pos(f, flakes[i].x, flakes[i].y);
+		lv_obj_set_style_bg_color(f, XMAS_SNOW, 0);
+		lv_obj_set_style_bg_opa(f, flakes[i].opa, 0);
+		lv_obj_set_style_radius(f, 0, 0);
+		lv_obj_set_style_border_width(f, 0, 0);
+	}
+
+	// ----- Christmas tree motif (bottom-right corner) -----
+	//
+	// Anchored ~14 px clear of the right edge and ~26 px clear of the
+	// bottom edge, in the patch the soft-key bar will cover during
+	// normal use. The tree is a 5-wide / 4-tall tapered stack of
+	// XMAS_HOLLY tiers (1 px peak row, 3 px upper-mid row, 5 px lower-
+	// mid row, 5 px base row), with an XMAS_GOLD star pixel painted
+	// over the apex suggesting the tree-topper, a single XMAS_CRIMSON
+	// ornament pixel on the middle tier suggesting a hung bauble, an
+	// XMAS_DIM trunk pixel at the base of the tree (1 px wide, 2 px
+	// tall, sat directly under the central column), and a single
+	// LV_OPA_30 XMAS_GOLD halo row two pixels beneath the trunk
+	// suggesting the reflected fairy-light glow on the panel directly
+	// below the tree. The glyph is the trademark-safe universal
+	// 'Christmas-tree silhouette' brand cue - it's NOT any specific
+	// commercial Christmas-brand mark (no Coca-Cola Santa, no Hallmark
+	// star, no Macy's wreath); it's the generic 'tapered tree on
+	// panel' silhouette every northern-hemisphere reader recognises
+	// as 'festive', the same way the Y2K raindrop reads as
+	// 'translucent Lucite' or the Cyberpunk chevron reads as 'neon
+	// hazard sign'.
+	const lv_coord_t treeX = BgWidth  - 14;   // 146
+	const lv_coord_t treeY = BgHeight - 26;   // 102
+
+	struct PixelRect {
+		int8_t   dx;
+		int8_t   dy;
+		uint8_t  w;
+		uint8_t  h;
+		uint8_t  layer;     // 0 = tree body, 1 = star, 2 = ornament,
+		                    // 3 = trunk, 4 = halo
+		lv_opa_t opa;
+	};
+
+	// Pixel layout (5 wide x 4 tall tapered tree + 1 star + 1 ornament
+	// + 1 px-wide / 2 px-tall trunk + 5 px halo row):
+	//   ..#..    row 0 - tree peak (and star highlight)
+	//   .###.    row 1 - tree upper-mid
+	//   #####    row 2 - tree lower-mid (with crimson ornament at col 3)
+	//   #####    row 3 - tree base
+	//   ..#..    row 4 - trunk top (1 px)
+	//   ..#..    row 5 - trunk bottom (1 px)
+	//   .....    row 6 - 1 px gap (panel)
+	//   #####    row 7 - reflected halo (5 wide, opa 30)
+	const PixelRect treeParts[] = {
+			// Tree peak (row 0, centre pixel)
+			{ 2, 0, 1, 1, 0, LV_OPA_COVER },
+			// Tree upper-mid (row 1, 3 px centred)
+			{ 1, 1, 3, 1, 0, LV_OPA_COVER },
+			// Tree lower-mid (row 2, full 5 px)
+			{ 0, 2, 5, 1, 0, LV_OPA_COVER },
+			// Tree base (row 3, full 5 px)
+			{ 0, 3, 5, 1, 0, LV_OPA_COVER },
+			// Star highlight pixel (sits over the peak)
+			{ 2, 0, 1, 1, 1, LV_OPA_COVER },
+			// Crimson ornament (row 2, col 3 - over the lower-mid tier)
+			{ 3, 2, 1, 1, 2, LV_OPA_COVER },
+			// Trunk top (row 4, centre pixel)
+			{ 2, 4, 1, 1, 3, LV_OPA_COVER },
+			// Trunk bottom (row 5, centre pixel)
+			{ 2, 5, 1, 1, 3, LV_OPA_COVER },
+			// Reflected halo on the panel two rows below the trunk
+			{ 0, 7, 5, 1, 4, LV_OPA_30 },
+	};
+	const uint8_t treeCount = sizeof(treeParts) / sizeof(treeParts[0]);
+	for(uint8_t i = 0; i < treeCount; i++){
+		lv_obj_t* px = lv_obj_create(sky);
+		lv_obj_remove_style_all(px);
+		lv_obj_clear_flag(px, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(px, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(px, treeParts[i].w, treeParts[i].h);
+		lv_obj_set_pos(px, treeX + treeParts[i].dx, treeY + treeParts[i].dy);
+		lv_color_t fill;
+		switch(treeParts[i].layer){
+			case 1:  fill = XMAS_GOLD;    break;   // star
+			case 2:  fill = XMAS_CRIMSON; break;   // ornament
+			case 3:  fill = XMAS_DIM;     break;   // trunk
+			case 4:  fill = XMAS_GOLD;    break;   // halo
+			case 0:
+			default: fill = XMAS_HOLLY;   break;   // tree body
+		}
+		lv_obj_set_style_bg_color(px, fill, 0);
+		lv_obj_set_style_bg_opa(px, treeParts[i].opa, 0);
 		lv_obj_set_style_radius(px, 0, 0);
 		lv_obj_set_style_border_width(px, 0, 0);
 	}

@@ -212,13 +212,39 @@ public:
 		// warning iconography).
 		CyberpunkRed = 8,
 
-		// Reserved 9..15 for the upcoming Phase O themes:
-		//   9  Christmas    (S117)
+		// Christmas Festive — copyright-safe seasonal homage
+		// (Christmas tree / wreath / candy cane / snowy night
+		// vocabulary, calibrated against the generic festive colour
+		// language rather than any specific commercial Christmas
+		// brand palette). The skin that defined every northern-
+		// hemisphere December: a deep pine-green panel pulling into
+		// a midnight-green night-sky bottom, warm tinsel-gold body
+		// chrome, vibrant holly-green focus accents, Santa-suit
+		// crimson ribbon ties, snow-white highlights / snowflake
+		// speckles. Seven shades — pine green (panel off), midnight
+		// green (gradient bottom), muted holly (idle borders),
+		// vibrant holly (focus / accent), crimson (secondary
+		// accent / ribbon), tinsel gold (body text + icon strokes),
+		// snow white (ripple highlights + snowflake specks).
+		// Reads light-on-dark like the Default Synthwave + Amber
+		// CRT + Sony Ericsson Aqua + RAZR Hot Pink + Stealth Black
+		// + Cyberpunk Red themes — the authentic festive reading
+		// direction (gold ornaments + bright accents on a dark
+		// wreath / mantle / tree panel). Wallpaper bypasses every
+		// Synthwave builder and paints a flat pine-green gradient
+		// panel with a few horizontal candy-cane stripe accents +
+		// scattered snowflake specks + a small stylised Christmas
+		// tree motif anchored bottom-right (the universal festive
+		// brand cue, copyright-safe vs any specific commercial
+		// Christmas-tree silhouette).
+		Christmas = 9,
+
+		// Reserved 10..15 for the upcoming Phase O themes:
 		//  10  Surprise/Daily-Cycle (S119)
 	};
 
 	/** Total number of themes the picker should expose today. */
-	static constexpr uint8_t ThemeCount = 9;
+	static constexpr uint8_t ThemeCount = 10;
 
 	/**
 	 * Resolve a raw `Settings.themeId` byte to a clamped Theme. Bytes
@@ -1376,5 +1402,105 @@ public:
  * ---------------------------------------------------------------------
  */
 #define CYBER_TEAL      lv_color_make( 64, 220, 220)
+
+
+
+
+/*
+ * ---------------------------------------------------------------------
+ * Christmas Festive palette (S117).
+ *
+ * Approximates the iconic Christmas / festive-season visual vocabulary —
+ * the deep pine green of a wreath in dim light, the crimson red of a
+ * Santa-suit sash, the warm tinsel-gold of a bauble catching candle
+ * light, and the pure snow white of a fresh winter night. Like the
+ * Default Synthwave + Amber CRT + Sony Ericsson Aqua + RAZR Hot Pink
+ * + Stealth Black + Cyberpunk Red palettes, Christmas Festive reads
+ * light-on-dark: warm tinsel-gold body text + green/red accents on a
+ * deep pine-green panel, the authentic Christmas reading direction
+ * (gold ornaments and bright accents on a dark wreath / mantle / tree
+ * panel) — and the visual pole opposite the Nokia 3310 + Game Boy DMG
+ * + Y2K Silver dark-on-light themes.
+ *
+ * Seven shades, all in the pine-green / crimson / gold gamut:
+ *
+ *   XMAS_BG_PINE   — deep pine-green, the panel-off colour. Top of
+ *                    the vertical gradient. A rich saturated forest
+ *                    green that reads as 'wreath in dim light' rather
+ *                    than 'flat green panel'. Calibrated darker than
+ *                    a typical UI green so the gold/red accents pop
+ *                    rather than competing with the panel itself.
+ *   XMAS_BG_NIGHT  — deep midnight-green, the panel gradient bottom.
+ *                    Pulls the lower half of the panel toward the
+ *                    'snowy night sky' end of the gamut without the
+ *                    menu chrome having to fight for contrast — the
+ *                    cue every Christmas-themed UI rendered when the
+ *                    ambient candle / fairy-light glow tapered off
+ *                    toward the lower edge of the panel.
+ *   XMAS_DIM       — muted holly green, used for idle borders and
+ *                    inactive chevrons. ~40 % of HOLLY intensity so it
+ *                    reads as legible-but-not-shouting next to the
+ *                    brighter primary chrome — the holly-leaf trim
+ *                    every festive UI used for inactive affordances,
+ *                    calibrated cooler than the main panel green so
+ *                    the theme reads as 'wreath in idle light' rather
+ *                    than 'flat green-on-green'.
+ *   XMAS_HOLLY     — vibrant holly-leaf green, the focus / accent
+ *                    colour. The single splash of saturated green
+ *                    that defines the 'fresh wreath' cue every
+ *                    Christmas UI prints in. Calibrated brighter
+ *                    than XMAS_BG_PINE so a focused menu row reads
+ *                    as 'lit by a string of fairy lights' rather
+ *                    than 'painted on top of the wreath'.
+ *   XMAS_CRIMSON   — Santa-suit crimson red, the secondary accent.
+ *                    Used for ribbon ties, ornament caps, the
+ *                    candy-cane stripe layer of the wallpaper, and
+ *                    the matched accent on icon glyphs in the S118
+ *                    icon-glyph pass. Saturated enough to read as a
+ *                    deliberate festive accent against the green
+ *                    panel rather than a stray colour fringe.
+ *   XMAS_GOLD      — warm tinsel-gold, the body-text + icon-stroke
+ *                    colour. The 'baubles catching candle light' off-
+ *                    white-with-warm-yellow that every Christmas UI
+ *                    printed against the green panel. Warmer than
+ *                    the MP_TEXT cream and the AQUA_CHROME white,
+ *                    cooler than the AMBER_CRT_GLOW phosphor — sits
+ *                    in the 'gold leaf on dark green' part of the
+ *                    gamut.
+ *   XMAS_SNOW      — pure snow-white, the highlight / shine colour.
+ *                    Used for snowflake speckles on the wallpaper,
+ *                    ripple highlights on icon strokes, and dim
+ *                    labels (timestamps, placeholders). Almost pure
+ *                    white with a hint of cool-blue bias so a SNOW
+ *                    pixel reads as 'reflected fairy-light scatter'
+ *                    or 'fresh snowflake' rather than a focus
+ *                    accent.
+ *
+ * Stored as lv_color_make(R, G, B) so the values render identically on
+ * every LV_COLOR_DEPTH the firmware might be built against — same
+ * portability rationale as the prior palettes.
+ *
+ * Naming follows the MP_* / N3310_* / GBDMG_* / AMBER_CRT_* / AQUA_* /
+ * RAZR_* / STEALTH_* / Y2K_* / CYBER_* convention so the part-2 icon-
+ * glyph swap in S118 only changes which header it includes, not how
+ * it spells colours.
+ *
+ * Trademark / copyright notes: every shade is calibrated against the
+ * generic 'Christmas tree / wreath / Santa suit / snow' colour
+ * vocabulary that is universal to every northern-hemisphere winter
+ * holiday — not against any specific commercial Christmas brand
+ * palette (no Coca-Cola red, no Hallmark gold, no Macy's wreath
+ * green). The result is a copyright-safe festive theme that any
+ * Chatter owner can flip on without invoking a specific brand
+ * identity.
+ * ---------------------------------------------------------------------
+ */
+#define XMAS_BG_PINE   lv_color_make( 12,  44,  20)
+#define XMAS_BG_NIGHT  lv_color_make(  6,  20,  10)
+#define XMAS_DIM       lv_color_make( 36,  88,  44)
+#define XMAS_HOLLY     lv_color_make( 60, 180,  80)
+#define XMAS_CRIMSON   lv_color_make(220,  40,  44)
+#define XMAS_GOLD      lv_color_make(248, 212, 110)
+#define XMAS_SNOW      lv_color_make(248, 252, 255)
 
 #endif // MAKERPHONE_THEME_H

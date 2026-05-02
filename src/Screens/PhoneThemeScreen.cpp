@@ -198,6 +198,7 @@ void PhoneThemeScreen::rebuildSwatch() {
 		case Theme::StealthBlack: drawStealthBlackSwatch(); break;
 		case Theme::Y2KSilver:  drawY2KSilverSwatch();  break;
 		case Theme::CyberpunkRed: drawCyberpunkRedSwatch(); break;
+		case Theme::Christmas:  drawChristmasSwatch();  break;
 		default:                drawDefaultSwatch();    break;  // defensive
 	}
 }
@@ -970,6 +971,114 @@ void PhoneThemeScreen::drawCyberpunkRedSwatch() {
 		}
 		lv_obj_set_style_bg_color(px, fill, 0);
 		lv_obj_set_style_bg_opa(px, chev[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+
+
+void PhoneThemeScreen::drawChristmasSwatch() {
+	// Pine panel: pine-green -> midnight-green vertical gradient
+	// covering the full swatch (the festive idle screen, like the
+	// prior light-on-dark Stealth Black / Cyberpunk Red / Aqua /
+	// RAZR panels, is a single flat surface — no horizon).
+	lv_obj_t* panel = lv_obj_create(swatchInner);
+	lv_obj_remove_style_all(panel);
+	lv_obj_set_size(panel, SwatchW, SwatchH);
+	lv_obj_set_pos(panel, 0, 0);
+	lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_set_style_bg_color(panel, XMAS_BG_PINE, 0);
+	lv_obj_set_style_bg_grad_color(panel, XMAS_BG_NIGHT, 0);
+	lv_obj_set_style_bg_grad_dir(panel, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(panel, 0, 0);
+	lv_obj_set_style_border_width(panel, 0, 0);
+
+	// Candy-cane stripe accents: two faint full-width horizontal lines
+	// alternating XMAS_CRIMSON / XMAS_SNOW at low opacity, mirroring
+	// the wallpaper's wrapped-ribbon trim.
+	struct Stripe { lv_coord_t y; uint8_t kind; lv_opa_t opa; };
+	const Stripe stripes[] = {
+			{ 12, 0, LV_OPA_30 },   // 0 = crimson
+			{ 30, 1, LV_OPA_20 },   // 1 = snow
+	};
+	for(uint8_t i = 0; i < sizeof(stripes) / sizeof(stripes[0]); i++) {
+		lv_obj_t* s = lv_obj_create(panel);
+		lv_obj_remove_style_all(s);
+		lv_obj_set_size(s, SwatchW, 1);
+		lv_obj_set_pos(s, 0, stripes[i].y);
+		lv_color_t fill = (stripes[i].kind == 0) ? XMAS_CRIMSON : XMAS_SNOW;
+		lv_obj_set_style_bg_color(s, fill, 0);
+		lv_obj_set_style_bg_opa(s, stripes[i].opa, 0);
+		lv_obj_set_style_radius(s, 0, 0);
+		lv_obj_set_style_border_width(s, 0, 0);
+	}
+
+	// Snowflake specks: four 1-2 px XMAS_SNOW dots scattered across
+	// the swatch.
+	struct Flake { lv_coord_t x; lv_coord_t y; uint8_t s; lv_opa_t opa; };
+	const Flake flakes[] = {
+			{ 14,  6, 1, LV_OPA_70 },
+			{ 30, 22, 2, LV_OPA_80 },
+			{ 56, 10, 1, LV_OPA_70 },
+			{ 68, 32, 1, LV_OPA_60 },
+	};
+	for(uint8_t i = 0; i < sizeof(flakes) / sizeof(flakes[0]); i++) {
+		lv_obj_t* f = lv_obj_create(panel);
+		lv_obj_remove_style_all(f);
+		lv_obj_set_size(f, flakes[i].s, flakes[i].s);
+		lv_obj_set_pos(f, flakes[i].x, flakes[i].y);
+		lv_obj_set_style_bg_color(f, XMAS_SNOW, 0);
+		lv_obj_set_style_bg_opa(f, flakes[i].opa, 0);
+		lv_obj_set_style_radius(f, 0, 0);
+		lv_obj_set_style_border_width(f, 0, 0);
+	}
+
+	// Christmas tree motif centred in the swatch. Mirrors the
+	// wallpaper's bottom-right glyph but pulled to the centre so it
+	// reads as the theme's signature glyph — exactly how the prior
+	// per-theme swatch builders position their glyphs.
+	const lv_coord_t cx = SwatchW / 2 - 2;
+	const lv_coord_t cy = SwatchH / 2 - 4;
+
+	struct PixelRect { int8_t dx, dy; uint8_t w, h; uint8_t layer; lv_opa_t opa; };
+	const PixelRect tree[] = {
+			// Tree peak (row 0, centre)
+			{ 2, 0, 1, 1, 0, LV_OPA_COVER },
+			// Upper-mid (row 1, 3 px)
+			{ 1, 1, 3, 1, 0, LV_OPA_COVER },
+			// Lower-mid (row 2, 5 px)
+			{ 0, 2, 5, 1, 0, LV_OPA_COVER },
+			// Base (row 3, 5 px)
+			{ 0, 3, 5, 1, 0, LV_OPA_COVER },
+			// Star highlight at the apex
+			{ 2, 0, 1, 1, 1, LV_OPA_COVER },
+			// Crimson ornament on the lower-mid tier
+			{ 3, 2, 1, 1, 2, LV_OPA_COVER },
+			// Trunk top
+			{ 2, 4, 1, 1, 3, LV_OPA_COVER },
+			// Trunk bottom
+			{ 2, 5, 1, 1, 3, LV_OPA_COVER },
+			// Reflected halo two rows below the trunk
+			{ 0, 7, 5, 1, 4, LV_OPA_30 },
+	};
+	const uint8_t partCount = sizeof(tree) / sizeof(tree[0]);
+	for(uint8_t i = 0; i < partCount; i++){
+		lv_obj_t* px = lv_obj_create(panel);
+		lv_obj_remove_style_all(px);
+		lv_obj_set_size(px, tree[i].w, tree[i].h);
+		lv_obj_set_pos(px, cx + tree[i].dx, cy + tree[i].dy);
+		lv_color_t fill;
+		switch(tree[i].layer){
+			case 1:  fill = XMAS_GOLD;    break;   // star
+			case 2:  fill = XMAS_CRIMSON; break;   // ornament
+			case 3:  fill = XMAS_DIM;     break;   // trunk
+			case 4:  fill = XMAS_GOLD;    break;   // halo
+			case 0:
+			default: fill = XMAS_HOLLY;   break;   // tree body
+		}
+		lv_obj_set_style_bg_color(px, fill, 0);
+		lv_obj_set_style_bg_opa(px, tree[i].opa, 0);
 		lv_obj_set_style_radius(px, 0, 0);
 		lv_obj_set_style_border_width(px, 0, 0);
 	}

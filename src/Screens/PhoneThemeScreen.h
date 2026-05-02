@@ -142,6 +142,7 @@ private:
 	void drawStealthBlackSwatch();
 	void drawY2KSilverSwatch();
 	void drawCyberpunkRedSwatch();
+	void drawChristmasSwatch();
 };
 
 #endif // MAKERPHONE_PHONETHEMESCREEN_H
