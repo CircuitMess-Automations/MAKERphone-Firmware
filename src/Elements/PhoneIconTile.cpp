@@ -34,7 +34,7 @@
 #define MP_ICON_DETAIL (MakerphoneTheme::iconDetail())
 
 PhoneIconTile::PhoneIconTile(lv_obj_t* parent, Icon icon, const char* label)
-		: LVObject(parent), icon(icon), halo(nullptr), shine(nullptr), edgeGlow(nullptr), statusLed(nullptr), statusLedHi(nullptr), luciteJewel(nullptr), luciteJewelHi(nullptr), neonRim(nullptr), neonRimHi(nullptr), ornamentGlint(nullptr), ornamentGlintHi(nullptr), iconLayer(nullptr), labelEl(nullptr){
+		: LVObject(parent), icon(icon), halo(nullptr), shine(nullptr), edgeGlow(nullptr), statusLed(nullptr), statusLedHi(nullptr), luciteJewel(nullptr), luciteJewelHi(nullptr), neonRim(nullptr), neonRimHi(nullptr), ornamentGlint(nullptr), ornamentGlintHi(nullptr), moodSpec(nullptr), moodSpecHi(nullptr), iconLayer(nullptr), labelEl(nullptr){
 
 	// The tile is a fixed-size widget that flows naturally inside a flex
 	// or grid parent (no IGNORE_LAYOUT flag, see header notes).
@@ -48,6 +48,7 @@ PhoneIconTile::PhoneIconTile(lv_obj_t* parent, Icon icon, const char* label)
 	buildLuciteJewel();
 	buildNeonRim();
 	buildOrnamentGlint();
+	buildMoodSpec();
 	buildIconLayer();
 	buildLabel(label);
 
@@ -527,6 +528,77 @@ void PhoneIconTile::buildOrnamentGlint(){
 	lv_obj_set_style_bg_opa(ornamentGlintHi, LV_OPA_TRANSP, 0);
 }
 
+// S120 - Surprise / Daily-Cycle 'mood spec' overlay.
+//
+// 2x2 dot + 1x1 highlight pixel anchored to one of seven disjoint
+// perimeter positions that orbit the tile clockwise as the day-of-cycle
+// advances (top-mid -> top-right -> right-mid -> bottom-right ->
+// bottom-mid -> bottom-left -> left-mid). The orbit path makes the spec
+// walk around the tile perimeter across the seven days, the strongest
+// non-colour cue we can ship without per-day icon-glyph art.
+//
+// All the positioning + colour heavy lifting happens inside
+// MakerphoneTheme::moodSpec*() - this function just creates the LV
+// objects, applies the per-day anchor + offset, and leaves the opacities
+// at LV_OPA_TRANSP so refreshSelection() can decide per-theme.
+//
+// Sized to match the Stealth Black tactical-LED dot (2x2 + 1x1
+// highlight), the Christmas ornament glint (2x2 + 1x1), and the
+// Cyberpunk neon-rim highlight pixel (1x1) so the icon-glyph pass
+// silhouettes stay consistent across themes and the spec doesn't read
+// as a 'foreign element' against the prior themes the user has been
+// flipping between.
+//
+// Default / Nokia 3310 / Game Boy DMG / Amber CRT / Sony Ericsson Aqua
+// / RAZR Hot Pink / Stealth Black / Y2K Silver / Cyberpunk Red /
+// Christmas all keep the spec at LV_OPA_TRANSP via moodSpecIdleOpa() /
+// moodSpecSelectedOpa(), so this function is a pure visual addition
+// for the Surprise theme and a pure no-op for every other theme.
+void PhoneIconTile::buildMoodSpec(){
+	// Outer 2x2 mood-spec dot. Anchor + offsets sampled at construction
+	// time (not at every frame) so the dot stays at the same anchor
+	// for the lifetime of the tile - the next time the day-of-cycle
+	// rolls over, any newly-built tile will pick up the new anchor.
+	// Same eventual-consistency model the role helpers use (a screen
+	// rebuild is what propagates a theme / mood change to its tiles).
+	moodSpec = lv_obj_create(obj);
+	lv_obj_remove_style_all(moodSpec);
+	lv_obj_clear_flag(moodSpec, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(moodSpec, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(moodSpec, 2, 2);
+	lv_obj_set_align(moodSpec, MakerphoneTheme::moodSpecAnchor());
+	lv_obj_set_pos(moodSpec, MakerphoneTheme::moodSpecOffsetX(),
+	                          MakerphoneTheme::moodSpecOffsetY());
+	lv_obj_set_style_radius(moodSpec, 0, 0);
+	lv_obj_set_style_border_width(moodSpec, 0, 0);
+	lv_obj_set_style_pad_all(moodSpec, 0, 0);
+	lv_obj_set_style_bg_color(moodSpec, MakerphoneTheme::moodSpecColor(), 0);
+	// Idle opacity is wired in refreshSelection() (which runs once at
+	// the end of the constructor), so this initial set just keeps the
+	// dot invisible until refreshSelection() decides per-theme.
+	lv_obj_set_style_bg_opa(moodSpec, LV_OPA_TRANSP, 0);
+
+	// Inner 1x1 highlight pixel - the emission peak. Rides the same
+	// anchor + offset as the spec dot so the two move together as the
+	// day-of-cycle rolls over. The highlight pixel sits at the spec's
+	// origin (top-left of the 2x2), the same way every other Phase O
+	// icon-glyph overlay (Stealth LED highlight, Christmas ornament
+	// highlight, Y2K Lucite-jewel highlight) places its peak.
+	moodSpecHi = lv_obj_create(obj);
+	lv_obj_remove_style_all(moodSpecHi);
+	lv_obj_clear_flag(moodSpecHi, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(moodSpecHi, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(moodSpecHi, 1, 1);
+	lv_obj_set_align(moodSpecHi, MakerphoneTheme::moodSpecAnchor());
+	lv_obj_set_pos(moodSpecHi, MakerphoneTheme::moodSpecOffsetX(),
+	                            MakerphoneTheme::moodSpecOffsetY());
+	lv_obj_set_style_radius(moodSpecHi, 0, 0);
+	lv_obj_set_style_border_width(moodSpecHi, 0, 0);
+	lv_obj_set_style_pad_all(moodSpecHi, 0, 0);
+	lv_obj_set_style_bg_color(moodSpecHi, MakerphoneTheme::moodSpecHighlightColor(), 0);
+	lv_obj_set_style_bg_opa(moodSpecHi, LV_OPA_TRANSP, 0);
+}
+
 void PhoneIconTile::buildIconLayer(){
 	// 16x16 transparent container that holds the per-icon pixel rectangles.
 	// Centered horizontally; sits 3 px from the top of the tile so the
@@ -670,6 +742,21 @@ void PhoneIconTile::refreshSelection(){
 		lv_obj_set_style_bg_opa(ornamentGlint, (lv_opa_t) MakerphoneTheme::ornamentGlintSelectedOpa(), 0);
 		lv_obj_set_style_bg_color(ornamentGlintHi, MakerphoneTheme::ornamentGlintHighlightColor(), 0);
 		lv_obj_set_style_bg_opa(ornamentGlintHi, (lv_opa_t) MakerphoneTheme::ornamentGlintSelectedOpa(), 0);
+		// S120 - Surprise / Daily-Cycle: focused tile burns the mood
+		// spec to full saturation (LV_OPA_COVER under SurpriseDailyCycle,
+		// LV_OPA_TRANSP everywhere else - same byte as the idle non-
+		// Surprise state, so non-Surprise themes never see a spec
+		// flash). The cue reads as 'this row is the active selection,
+		// today's mood emitting at full output' - the focus-feedback
+		// signature of the Surprise theme, where the orbiting accent
+		// suddenly burns to its full saturation rather than its usual
+		// LV_OPA_60 idle emission. The highlight pixel rides the same
+		// opacity, so the emission peak stays visible (and bright) on
+		// focus.
+		lv_obj_set_style_bg_color(moodSpec, MakerphoneTheme::moodSpecColor(), 0);
+		lv_obj_set_style_bg_opa(moodSpec, (lv_opa_t) MakerphoneTheme::moodSpecSelectedOpa(), 0);
+		lv_obj_set_style_bg_color(moodSpecHi, MakerphoneTheme::moodSpecHighlightColor(), 0);
+		lv_obj_set_style_bg_opa(moodSpecHi, (lv_opa_t) MakerphoneTheme::moodSpecSelectedOpa(), 0);
 
 		lv_anim_t a;
 		lv_anim_init(&a);
@@ -779,6 +866,22 @@ void PhoneIconTile::refreshSelection(){
 		lv_obj_set_style_bg_opa(ornamentGlint, (lv_opa_t) MakerphoneTheme::ornamentGlintIdleOpa(), 0);
 		lv_obj_set_style_bg_color(ornamentGlintHi, MakerphoneTheme::ornamentGlintHighlightColor(), 0);
 		lv_obj_set_style_bg_opa(ornamentGlintHi, (lv_opa_t) MakerphoneTheme::ornamentGlintIdleOpa(), 0);
+		// S120 - Surprise / Daily-Cycle: idle tile rests with a faint
+		// accent-coloured 2x2 spec at one of seven perimeter positions
+		// (LV_OPA_60 under SurpriseDailyCycle, LV_OPA_TRANSP everywhere
+		// else - so non-Surprise themes still render a perfectly flat
+		// tile body, byte-identical to the pre-S120 behaviour). The
+		// cue reads as 'today's mood marker, always-on emission' - the
+		// soft accent every Phone* widget paints when the user has the
+		// Surprise theme selected and the day-of-cycle is at its
+		// current index. The highlight pixel rides the same idle
+		// opacity so the emission peak shows through even at the soft
+		// idle brightness, the way a real photographed neon-tube
+		// always exhibits a brighter spec at its core.
+		lv_obj_set_style_bg_color(moodSpec, MakerphoneTheme::moodSpecColor(), 0);
+		lv_obj_set_style_bg_opa(moodSpec, (lv_opa_t) MakerphoneTheme::moodSpecIdleOpa(), 0);
+		lv_obj_set_style_bg_color(moodSpecHi, MakerphoneTheme::moodSpecHighlightColor(), 0);
+		lv_obj_set_style_bg_opa(moodSpecHi, (lv_opa_t) MakerphoneTheme::moodSpecIdleOpa(), 0);
 	}
 }
 

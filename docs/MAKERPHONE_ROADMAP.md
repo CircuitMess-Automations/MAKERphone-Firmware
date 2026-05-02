@@ -180,7 +180,7 @@ Two sessions per theme: **part 1 = palette + wallpaper variant**, **part 2 = mat
 - [x] **S117** — Theme: Christmas / Festive — palette + wallpaper.
 - [x] **S118** — Theme: Christmas / Festive — icon glyphs + accents.
 - [x] **S119** — Theme: Surprise / Daily-Cycle — engine + palette.
-- [ ] **S120** — Theme: Surprise / Daily-Cycle — rotation logic + icon variants.
+- [x] **S120** — Theme: Surprise / Daily-Cycle — rotation logic + icon variants.
 
 ## Phase P — More Apps (S121–S135)
 Composer is broken into three sessions because it needs (a) keypad note-entry UI, (b) RTTTL parser, (c) save-slot wiring to `PhoneRingtoneEngine`. Tamagotchi-style virtual pet adds persistent state via the existing `Storage` layer.

@@ -1075,6 +1075,127 @@ public:
 	static lv_color_t ornamentGlintHighlightColor();
 	static uint8_t    ornamentGlintIdleOpa();
 	static uint8_t    ornamentGlintSelectedOpa();
+
+	/*
+	 * S120 - Surprise / Daily-Cycle rotation logic + icon-glyph
+	 * variants.
+	 *
+	 * S119 shipped the engine (palette table + surpriseDayIndex /
+	 * surpriseDayName) and plumbed the role helpers (bgDark / accent /
+	 * highlight / dim / text / labelDim) so every Phone* widget already
+	 * reads the day's mood palette without per-call branching. S120
+	 * adds two missing bits on top: (1) rotation-cadence helpers that
+	 * let the rest of the firmware *see* the cycle (preview tomorrow's
+	 * mood, schedule a refresh against the rollover deadline), and
+	 * (2) a per-day icon-glyph overlay that orbits the tile perimeter
+	 * so each day reads as a visually distinct variant rather than
+	 * just a recoloured tile.
+	 *
+	 * Rotation cadence:
+	 *   surpriseTomorrowIndex()       - 0..6 day-of-cycle index that
+	 *                                   surpriseDayIndex() will return
+	 *                                   *after* the next 24-hour
+	 *                                   rollover. Wraps from 6 -> 0
+	 *                                   the same way today's index
+	 *                                   wraps. Useful for a 'tomorrow'
+	 *                                   chip on the upcoming theme
+	 *                                   picker, or for any UI element
+	 *                                   that wants to preview the next
+	 *                                   palette before it hits.
+	 *   surpriseMillisUntilRollover() - milliseconds remaining until
+	 *                                   surpriseDayIndex() flips to
+	 *                                   surpriseTomorrowIndex(). 0 at
+	 *                                   the exact rollover instant,
+	 *                                   86_400_000-1 immediately after.
+	 *                                   A future LVGL timer that wants
+	 *                                   to refresh every screen on
+	 *                                   rollover can call this once at
+	 *                                   boot and again whenever it
+	 *                                   fires; the helper is cheap
+	 *                                   (one millis() read + one
+	 *                                   modulo).
+	 *
+	 * Per-day icon-glyph variant ('mood spec'):
+	 *   The seven moods are visually distinct at the role-colour level
+	 *   already (bgDark / accent / highlight all rotate around the
+	 *   colour wheel), but a user picking the phone up on consecutive
+	 *   days needs to see *more* than a recolouring to feel the cycle.
+	 *   The mood-spec overlay is a 2x2 dot (with a 1x1 highlight
+	 *   pixel) painted in today's accent + highlight pair, anchored to
+	 *   one of seven disjoint perimeter positions that orbit the tile
+	 *   monotonically (top-mid -> top-right corner -> right-mid ->
+	 *   bottom-right corner -> bottom-mid -> bottom-left corner ->
+	 *   left-mid). Anchoring monotonically means the user sees the
+	 *   spec walking around the tile perimeter as the days advance,
+	 *   which is the strongest non-colour cue we can ship without
+	 *   per-day icon-glyph art (the icon-stroke pixels are still
+	 *   drawn from the shared MP_ICON_STROKE palette, the same way
+	 *   every Phase O theme renders its glyphs).
+	 *
+	 *   Helpers
+	 *     moodSpecEnabled()         - true only for SurpriseDailyCycle
+	 *     moodSpecColor()           - surpriseToday(SR_ACCENT) under
+	 *                                 SurpriseDailyCycle, falls back
+	 *                                 to per-theme 'brightest accent'
+	 *                                 elsewhere (never observed because
+	 *                                 callers gate on
+	 *                                 moodSpecEnabled() first via the
+	 *                                 *Opa() helpers, both of which
+	 *                                 return LV_OPA_TRANSP outside
+	 *                                 SurpriseDailyCycle)
+	 *     moodSpecHighlightColor()  - surpriseToday(SR_HIGHLIGHT) under
+	 *                                 SurpriseDailyCycle, fallback per
+	 *                                 theme - never observed outside
+	 *                                 SurpriseDailyCycle because the
+	 *                                 highlight pixel rides the same
+	 *                                 opacity as the spec
+	 *     moodSpecAnchor()          - lv_align_t for the spec's
+	 *                                 anchor. Returns one of seven
+	 *                                 disjoint perimeter positions
+	 *                                 depending on surpriseDayIndex().
+	 *                                 Defaults to LV_ALIGN_TOP_MID off
+	 *                                 SurpriseDailyCycle so the spec
+	 *                                 sits in a deterministic spot
+	 *                                 outside Surprise (still
+	 *                                 transparent, never observed).
+	 *     moodSpecOffsetX()         - signed pixel offset along x.
+	 *                                 Calibrated to keep the spec 2 px
+	 *                                 inside the tile body on every
+	 *                                 anchor, so the marker reads as
+	 *                                 a deliberate accent at every
+	 *                                 day index rather than a stray
+	 *                                 pixel leaking off the tile.
+	 *     moodSpecOffsetY()         - signed pixel offset along y. See
+	 *                                 moodSpecOffsetX() for the
+	 *                                 calibration rationale.
+	 *     moodSpecIdleOpa()         - LV_OPA_60 under
+	 *                                 SurpriseDailyCycle, LV_OPA_TRANSP
+	 *                                 everywhere else (so non-Surprise
+	 *                                 themes still render a perfectly
+	 *                                 flat tile body, byte-identical
+	 *                                 to the pre-S120 behaviour)
+	 *     moodSpecSelectedOpa()     - LV_OPA_COVER under
+	 *                                 SurpriseDailyCycle, LV_OPA_TRANSP
+	 *                                 everywhere else
+	 *
+	 * The 60% -> 100% selected-vs-idle gap matches S116's Cyberpunk
+	 * neon-rim gap because both cues are 'always-on emitting accent
+	 * that brightens on focus' rather than 'reflected highlight that
+	 * snaps to fully lit on focus' - the spec reads as 'today's mood
+	 * emitting' the way a neon tube emits, not the way a polished
+	 * glass tile reflects.
+	 */
+	static uint8_t    surpriseTomorrowIndex();
+	static uint32_t   surpriseMillisUntilRollover();
+
+	static bool       moodSpecEnabled();
+	static lv_color_t moodSpecColor();
+	static lv_color_t moodSpecHighlightColor();
+	static uint8_t    moodSpecAnchor();
+	static int8_t     moodSpecOffsetX();
+	static int8_t     moodSpecOffsetY();
+	static uint8_t    moodSpecIdleOpa();
+	static uint8_t    moodSpecSelectedOpa();
 };
 
 /*

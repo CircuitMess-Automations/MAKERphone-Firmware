@@ -159,6 +159,23 @@ private:
 	                            //          painted dot or a reflective volumetric ornament').
 	                            //          Rides the same opacity as the ornament itself.
 	                            //          Fully transparent under every non-Christmas theme.
+	lv_obj_t* moodSpec;         // S120 - Surprise / Daily-Cycle mood-spec accent: a 2x2 dot
+	                            //          painted in today's surprise-palette ACCENT, anchored
+	                            //          to one of seven disjoint perimeter positions that
+	                            //          orbit the tile clockwise as the day-of-cycle advances
+	                            //          (top-mid -> top-right -> right-mid -> bottom-right ->
+	                            //          bottom-mid -> bottom-left -> left-mid). The orbit
+	                            //          path makes the spec walk around the tile perimeter
+	                            //          across the seven days, the strongest non-colour cue
+	                            //          we can ship without per-day icon-glyph art. Fully
+	                            //          transparent under every non-Surprise theme.
+	lv_obj_t* moodSpecHi;       // S120 - Surprise / Daily-Cycle mood-spec emission peak: a 1x1
+	                            //          highlight pixel painted in today's surprise-palette
+	                            //          HIGHLIGHT, layered onto the upper-left of the 2x2
+	                            //          spec dot to suggest the way a real emitting accent
+	                            //          shows a brighter hot-spot at its core. Rides the
+	                            //          same opacity as the spec dot itself. Fully
+	                            //          transparent under every non-Surprise theme.
 	lv_obj_t* iconLayer;   // 16x16 transparent container that holds the pixel rectangles
 	lv_obj_t* labelEl;     // optional pixelbasic7 label below the icon (nullable)
 
@@ -170,6 +187,7 @@ private:
 	void buildLuciteJewel();
 	void buildNeonRim();
 	void buildOrnamentGlint();
+	void buildMoodSpec();
 	void buildIconLayer();
 	void buildLabel(const char* label);
 	void refreshSelection();

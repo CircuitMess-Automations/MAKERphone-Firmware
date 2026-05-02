@@ -1,6 +1,7 @@
 #include "MakerphoneTheme.h"
 #include "MakerphonePalette.h"
 #include <Settings.h>
+#include <lvgl.h>
 
 MakerphoneTheme::Theme MakerphoneTheme::themeFromByte(uint8_t raw){
 	// Defensive clamp - any persisted byte outside the known enum range
@@ -1186,4 +1187,215 @@ uint8_t MakerphoneTheme::ornamentGlintSelectedOpa(){
 	// than a transition from 'dim' to 'lit', which is the right
 	// cue for a reflected source.
 	return ornamentGlintEnabled() ? LV_OPA_COVER : LV_OPA_TRANSP;
+}
+
+
+// ---------------------------------------------------------------------
+// S120 - Surprise / Daily-Cycle rotation logic + icon-glyph variants.
+//
+// Two complementary mechanisms ride on top of the S119 engine:
+//
+//  1. Rotation-cadence helpers (surpriseTomorrowIndex /
+//     surpriseMillisUntilRollover) let the rest of the firmware see
+//     the cycle - preview tomorrow's mood, schedule a refresh against
+//     the rollover deadline. Both derive from millis() the same way
+//     surpriseDayIndex() does, so the swap to a future RTC-backed
+//     implementation stays mechanical (replace the millis() call with
+//     a localtime tm_yday lookup and the helpers below remain
+//     correct).
+//
+//  2. Per-day icon-glyph 'mood spec' overlay. PhoneIconTile builds a
+//     2x2 dot + 1x1 highlight pixel using moodSpecColor() /
+//     moodSpecHighlightColor(), anchors them via moodSpecAnchor() +
+//     moodSpecOffsetX/Y(), and rides the standard idle/selected
+//     opacity pattern. The seven anchor positions orbit the tile
+//     perimeter monotonically (top-mid -> top-right -> right-mid ->
+//     bottom-right -> bottom-mid -> bottom-left -> left-mid) so the
+//     user sees the spec walking around the tile as the days advance.
+//     This is the strongest non-colour cue we can ship without
+//     committing to per-day icon-glyph art.
+// ---------------------------------------------------------------------
+
+uint8_t MakerphoneTheme::surpriseTomorrowIndex(){
+	// Today + 1 modulo SurpriseDayCount. Wraps from 6 -> 0 the same
+	// way today's index wraps. Cheap (one addition + one modulo) so
+	// callers can re-read it on every screen build without caching.
+	return static_cast<uint8_t>((surpriseDayIndex() + 1U) % SurpriseDayCount);
+}
+
+uint32_t MakerphoneTheme::surpriseMillisUntilRollover(){
+	// Milliseconds remaining inside the current 24-hour day-of-cycle
+	// window. (millis() % 86_400_000) gives the elapsed-in-day count;
+	// subtract from 86_400_000 to get the remaining count. Caller-side
+	// uint32_t arithmetic keeps the divisor on the AVR / ESP32 hot
+	// path 32-bit-clean (the outer modulo prevents the subtraction
+	// from going negative).
+	const uint32_t dayMs = 86400000UL;
+	return dayMs - static_cast<uint32_t>(millis() % dayMs);
+}
+
+bool MakerphoneTheme::moodSpecEnabled(){
+	return getCurrent() == Theme::SurpriseDailyCycle;
+}
+
+lv_color_t MakerphoneTheme::moodSpecColor(){
+	switch(getCurrent()){
+		case Theme::SurpriseDailyCycle:
+		                              return surpriseToday(SR_ACCENT);
+		// The fallbacks below are never observed - moodSpecIdleOpa()
+		// and moodSpecSelectedOpa() both return LV_OPA_TRANSP on every
+		// non-Surprise theme, so the spec's colour can't reach the
+		// framebuffer. The values still resolve to a sensible per-theme
+		// 'brightest accent' so a future caller that probes the colour
+		// outside the opacity gate (e.g. a debug overlay) reads
+		// something coherent rather than an undefined value. Mirrors
+		// the ornamentGlintColor / neonRimColor / luciteJewelColor /
+		// statusLedColor / edgeGlowColor / chromeShineColor fallback
+		// patterns.
+		case Theme::Nokia3310:        return N3310_FRAME;
+		case Theme::GameBoyDMG:       return GBDMG_INK;
+		case Theme::AmberCRT:         return AMBER_CRT_HOT;
+		case Theme::SonyEricssonAqua: return AQUA_GLOW;
+		case Theme::RazrHotPink:      return RAZR_GLOW;
+		case Theme::StealthBlack:     return STEALTH_LED;
+		case Theme::Y2KSilver:        return Y2K_BONDI;
+		case Theme::CyberpunkRed:     return CYBER_NEON;
+		case Theme::Christmas:        return XMAS_HOLLY;
+		case Theme::Default:
+		default:                      return MP_ACCENT;
+	}
+}
+
+lv_color_t MakerphoneTheme::moodSpecHighlightColor(){
+	switch(getCurrent()){
+		case Theme::SurpriseDailyCycle:
+		                              return surpriseToday(SR_HIGHLIGHT);
+		// The fallbacks below are never observed - the highlight pixel
+		// rides the same opacity as the spec dot, and that opacity
+		// returns LV_OPA_TRANSP on every non-Surprise theme. The values
+		// still resolve to a sensible per-theme 'second-brightest
+		// chrome / body-text' so a future caller that probes the
+		// colour outside the opacity gate reads something coherent.
+		// Mirrors the ornamentGlintHighlightColor / neonRimHighlightColor
+		// / luciteJewelHighlightColor / statusLedHighlightColor
+		// fallback patterns.
+		case Theme::Nokia3310:        return N3310_HIGHLIGHT;
+		case Theme::GameBoyDMG:       return GBDMG_LCD_LIGHT;
+		case Theme::AmberCRT:         return AMBER_CRT_HOT;
+		case Theme::SonyEricssonAqua: return AQUA_FOAM;
+		case Theme::RazrHotPink:      return RAZR_SHINE;
+		case Theme::StealthBlack:     return STEALTH_BONE;
+		case Theme::Y2KSilver:        return Y2K_SHINE;
+		case Theme::CyberpunkRed:     return CYBER_HOT;
+		case Theme::Christmas:        return XMAS_GOLD;
+		case Theme::Default:
+		default:                      return MP_TEXT;
+	}
+}
+
+uint8_t MakerphoneTheme::moodSpecAnchor(){
+	// Seven disjoint perimeter positions, walked monotonically as the
+	// day-of-cycle advances. The orbit goes clockwise around the tile
+	// perimeter starting at top-mid - the user sees the spec stepping
+	// to the next position (top-mid -> top-right -> right-mid ->
+	// bottom-right -> bottom-mid -> bottom-left -> left-mid) every
+	// 24 hours of uptime, then wrapping back to top-mid for the
+	// SOLAR/idx=0 day on the eighth day.
+	//
+	// Off SurpriseDailyCycle we still return a deterministic anchor
+	// (LV_ALIGN_TOP_MID) so the LV object has a defined alignment
+	// even though the *Opa() helpers will keep it transparent. This
+	// matches the moodSpecColor / moodSpecHighlightColor 'sensible
+	// fallback' convention for the existing icon-glyph helpers.
+	if(!moodSpecEnabled()) return LV_ALIGN_TOP_MID;
+
+	switch(surpriseDayIndex()){
+		case 0:  return LV_ALIGN_TOP_MID;          // SOLAR
+		case 1:  return LV_ALIGN_TOP_RIGHT;        // CITRUS
+		case 2:  return LV_ALIGN_RIGHT_MID;        // TWILIGHT
+		case 3:  return LV_ALIGN_BOTTOM_RIGHT;     // FOREST
+		case 4:  return LV_ALIGN_BOTTOM_MID;       // REEF
+		case 5:  return LV_ALIGN_BOTTOM_LEFT;      // CARNIVAL
+		case 6:  return LV_ALIGN_LEFT_MID;         // FROST
+		default: return LV_ALIGN_TOP_MID;
+	}
+}
+
+int8_t MakerphoneTheme::moodSpecOffsetX(){
+	// Pixel offset along x for the mood spec, calibrated so the 2x2
+	// spec sits roughly 2 px inside the tile perimeter at every
+	// anchor (rather than flush on the edge - an edge-flush spec
+	// reads as 'a stray pixel leaking off the tile' rather than
+	// 'a deliberate marker just inside the boundary').
+	//
+	// LV align semantics: positive x moves right, negative x moves
+	// left, regardless of the anchor. So a TOP_RIGHT-anchored spec
+	// uses a negative x to pull it left into the tile body, while
+	// a TOP_LEFT-anchored spec uses a positive x to push it right.
+	// The seven values below encode that calibration directly.
+	if(!moodSpecEnabled()) return 0;
+
+	switch(surpriseDayIndex()){
+		case 0:  return  0;        // SOLAR / TOP_MID - no x offset
+		case 1:  return -2;        // CITRUS / TOP_RIGHT - pull left
+		case 2:  return -2;        // TWILIGHT / RIGHT_MID - pull left
+		case 3:  return -2;        // FOREST / BOTTOM_RIGHT - pull left
+		case 4:  return  0;        // REEF / BOTTOM_MID - no x offset
+		case 5:  return  2;        // CARNIVAL / BOTTOM_LEFT - push right
+		case 6:  return  2;        // FROST / LEFT_MID - push right
+		default: return  0;
+	}
+}
+
+int8_t MakerphoneTheme::moodSpecOffsetY(){
+	// Pixel offset along y for the mood spec. Same calibration
+	// rationale as moodSpecOffsetX(): keeps the 2x2 spec roughly
+	// 2 px inside the tile perimeter at every anchor.
+	//
+	// LV align semantics: positive y moves down, negative y moves
+	// up. So a TOP_*-anchored spec uses a positive y to pull it
+	// down into the tile body, while a BOTTOM_*-anchored spec uses
+	// a negative y to push it up.
+	if(!moodSpecEnabled()) return 0;
+
+	switch(surpriseDayIndex()){
+		case 0:  return  2;        // SOLAR / TOP_MID - push down
+		case 1:  return  2;        // CITRUS / TOP_RIGHT - push down
+		case 2:  return  0;        // TWILIGHT / RIGHT_MID - no y offset
+		case 3:  return -2;        // FOREST / BOTTOM_RIGHT - pull up
+		case 4:  return -2;        // REEF / BOTTOM_MID - pull up
+		case 5:  return -2;        // CARNIVAL / BOTTOM_LEFT - pull up
+		case 6:  return  0;        // FROST / LEFT_MID - no y offset
+		default: return  0;
+	}
+}
+
+uint8_t MakerphoneTheme::moodSpecIdleOpa(){
+	// LV_OPA_60 is the calibrated 'always-on emitting accent'
+	// opacity: bright enough that the spec reads as a deliberate
+	// marker (the eye picks it out as 'today's mood emitting')
+	// rather than a stray pixel, dim enough that it doesn't
+	// dominate the tile body. Matches S116's Cyberpunk neon-rim
+	// idle opacity because both cues are 'always-on emitting
+	// accent that brightens on focus' - the spec emits the way
+	// a neon tube emits, not the way a polished glass tile
+	// reflects.
+	return moodSpecEnabled() ? LV_OPA_60 : LV_OPA_TRANSP;
+}
+
+uint8_t MakerphoneTheme::moodSpecSelectedOpa(){
+	// LV_OPA_COVER (full intensity) on selection - the focused
+	// Surprise tile snaps the spec to its full saturation, the
+	// 'this row is the active selection, today's mood emitting at
+	// full output' cue. Non-pulsing on/off overlay to match the
+	// other Phase O icon-glyph helpers (the existing halo already
+	// pulses on selection; layering a second pulsing element on
+	// top would make the focused tile read as jittery rather than
+	// 'lit').
+	//
+	// The 60% -> 100% gap matches S116's 60%->100% Cyberpunk
+	// neon-rim gap - both are emitting-accent overlays that
+	// brighten on focus rather than reflected highlights that snap
+	// from dim to lit.
+	return moodSpecEnabled() ? LV_OPA_COVER : LV_OPA_TRANSP;
 }
