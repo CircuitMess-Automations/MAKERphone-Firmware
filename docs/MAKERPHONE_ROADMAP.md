@@ -145,7 +145,7 @@ A proper retro-arcade carousel for `PhoneGames`. Each entry is one self-containe
 - [x] **S86** — `PhonePinball+` (split) — second table + leaderboard.
 - [x] **S87** — `PhoneHangman` — uses existing T9 input + inline word list.
 - [x] **S88** — `PhoneConnectFour` — vs CPU.
-- [ ] **S89** — `PhoneReversi` — Othello vs CPU.
+- [x] **S89** — `PhoneReversi` — Othello vs CPU.
 - [ ] **S90** — `PhoneWhackAMole` — dialer-key reaction game.
 - [ ] **S91** — `PhoneLunarLander` — fuel/thrust physics.
 - [ ] **S92** — `PhoneHelicopter` — endless side-scrolling avoidance.

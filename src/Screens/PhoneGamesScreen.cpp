@@ -30,6 +30,7 @@
 #include "PhonePinball.h"
 #include "PhoneHangman.h"
 #include "PhoneConnectFour.h"
+#include "PhoneReversi.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -92,6 +93,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "PINBALL",  nullptr,                   GameKind::Screen },  // S85
 	{ "HANGMAN",  nullptr,                   GameKind::Screen },  // S87
 	{ "CONNECT4", nullptr,                   GameKind::Screen },  // S88
+	{ "REVERSI",  nullptr,                   GameKind::Screen },  // S89
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -691,6 +693,46 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g,  3, 17, 22, 1, purple);
 			break;
 		}
+		case 17: { // REVERSI - mini board silhouette with cyan + orange discs
+		           // arranged like the Othello opening cluster.
+			// S89: a stylised 4x3 dot grid representing the empty
+			// board, with a 2x2 cluster of alternating cyan/orange
+			// discs in the centre to telegraph the standard Reversi
+			// opening. A single cyan disc sits adjacent to the cluster
+			// to suggest the player's next legal placement.
+			const lv_color_t purple = lv_color_make(70, 56, 100);
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t orange = lv_color_make(255, 140, 30);
+
+			// Faint "felt" backdrop band so the discs read against a
+			// board, not against the wallpaper. 24 px wide / 14 tall
+			// matches the dot grid below.
+			px(g,  3,  4, 24, 14, purple);
+
+			// 6x4 dot grid covering the backdrop. 4 px pitch starting
+			// at (4, 5) -- this leaves a 1 px frame on every side of
+			// the felt and gives the discs a recognisable Othello-grid
+			// feel even at 30x22 px.
+			for(uint8_t r = 0; r < 4; ++r) {
+				for(uint8_t c = 0; c < 6; ++c) {
+					const uint8_t dx = static_cast<uint8_t>(4 + c * 4);
+					const uint8_t dy = static_cast<uint8_t>(5 + r * 3);
+					px(g, dx, dy, 2, 2, MP_BG_DARK);
+				}
+			}
+
+			// Centre 2x2 opening cluster -- alternating colours on the
+			// diagonal, exactly the standard Reversi opening.
+			px(g, 12,  8, 3, 3, orange);
+			px(g, 16,  8, 3, 3, cyan);
+			px(g, 12, 12, 3, 3, cyan);
+			px(g, 16, 12, 3, 3, orange);
+
+			// Player's pending move: a faint cyan disc to the right of
+			// the cluster, telegraphing "your next placement here".
+			px(g, 20, 10, 3, 3, cyan);
+			break;
+		}
 		default:
 			break;
 	}
@@ -839,6 +881,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 14: push(new PhonePinball()); break;
 			case 15: push(new PhoneHangman()); break;
 			case 16: push(new PhoneConnectFour()); break;
+			case 17: push(new PhoneReversi()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
