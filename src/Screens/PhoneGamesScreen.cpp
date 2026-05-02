@@ -37,6 +37,7 @@
 #include "Phone2048.h"
 #include "PhoneSolitaire.h"
 #include "PhoneSudoku.h"
+#include "PhoneWordle.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -106,6 +107,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "2048",     nullptr,                   GameKind::Screen },  // S93
 	{ "SOLITAIR", nullptr,                   GameKind::Screen },  // S94
 	{ "SUDOKU",   nullptr,                   GameKind::Screen },  // S95
+	{ "WORDLE",   nullptr,                   GameKind::Screen },  // S96
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -959,6 +961,50 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 23, 10,  1,  5, orange);
 			break;
 		}
+		case 24: { // WORDLE - five-letter row of mixed-status tiles
+		           // telegraphs the daily-guess colour-feedback game.
+			// S96: a stylised glance of one Wordle row -- a green hit
+			// (correct slot), a yellow present (right letter, wrong
+			// slot), a grey miss, plus two empty cells with a thin
+			// orange focus border on the left-most empty slot to
+			// telegraph "your cursor is here". Reads as Wordle even at
+			// 30x22 px without us drawing real glyphs in pixel-art.
+			const lv_color_t green  = lv_color_make(120, 200, 110);
+			const lv_color_t yellow = lv_color_make(230, 200,  70);
+			const lv_color_t grey   = lv_color_make( 70,  56, 100);
+			const lv_color_t orange = lv_color_make(255, 140,  30);
+			const lv_color_t cream  = lv_color_make(255, 220, 180);
+
+			// Top row of five tiles (mid-game guess).
+			px(g,  3,  4, 4, 5, green);
+			px(g,  8,  4, 4, 5, yellow);
+			px(g, 13,  4, 4, 5, grey);
+			px(g, 18,  4, 4, 5, MP_BG_DARK);
+			// orange focus border on the left empty cell.
+			px(g, 18,  4, 4, 1, orange);
+			px(g, 18,  8, 4, 1, orange);
+			px(g, 18,  4, 1, 5, orange);
+			px(g, 21,  4, 1, 5, orange);
+			px(g, 23,  4, 4, 5, MP_BG_DARK);
+
+			// Middle row -- two more tiles (one fresh hit + one yellow).
+			px(g,  3, 11, 4, 5, MP_BG_DARK);
+			px(g,  8, 11, 4, 5, MP_BG_DARK);
+			px(g, 13, 11, 4, 5, green);
+			px(g, 18, 11, 4, 5, MP_BG_DARK);
+			px(g, 23, 11, 4, 5, yellow);
+
+			// Bottom row -- five empty tiles (faintly outlined).
+			for(uint8_t c = 0; c < 5; ++c) {
+				const uint8_t x = static_cast<uint8_t>(3 + c * 5);
+				px(g, x, 18, 4, 1, grey);
+			}
+
+			// One cream pixel highlight on the centre green tile so the
+			// silhouette reads as glossy plastic rather than flat blocks.
+			px(g, 14, 12, 1, 1, cream);
+			break;
+		}
 		default:
 			break;
 	}
@@ -1114,6 +1160,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 21: push(new Phone2048()); break;
 			case 22: push(new PhoneSolitaire()); break;
 			case 23: push(new PhoneSudoku()); break;
+			case 24: push(new PhoneWordle()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
