@@ -10,6 +10,7 @@ MakerphoneTheme::Theme MakerphoneTheme::themeFromByte(uint8_t raw){
 	switch(raw){
 		case static_cast<uint8_t>(Theme::Nokia3310):  return Theme::Nokia3310;
 		case static_cast<uint8_t>(Theme::GameBoyDMG): return Theme::GameBoyDMG;
+		case static_cast<uint8_t>(Theme::AmberCRT):   return Theme::AmberCRT;
 		case static_cast<uint8_t>(Theme::Default):
 		default:                                      return Theme::Default;
 	}
@@ -24,6 +25,7 @@ const char* MakerphoneTheme::getName(Theme t){
 		case Theme::Default:    return "SYNTHWAVE";
 		case Theme::Nokia3310:  return "NOKIA 3310";
 		case Theme::GameBoyDMG: return "GAME BOY";
+		case Theme::AmberCRT:   return "AMBER CRT";
 		default:                return "DEFAULT";
 	}
 }
@@ -57,6 +59,7 @@ lv_color_t MakerphoneTheme::bgDark(){
 	switch(getCurrent()){
 		case Theme::Nokia3310:  return N3310_BG_LIGHT;
 		case Theme::GameBoyDMG: return GBDMG_LCD_LIGHT;
+		case Theme::AmberCRT:   return AMBER_CRT_BG_DARK;
 		case Theme::Default:
 		default:                return MP_BG_DARK;
 	}
@@ -66,6 +69,7 @@ lv_color_t MakerphoneTheme::accent(){
 	switch(getCurrent()){
 		case Theme::Nokia3310:  return N3310_FRAME;
 		case Theme::GameBoyDMG: return GBDMG_INK;
+		case Theme::AmberCRT:   return AMBER_CRT_HOT;
 		case Theme::Default:
 		default:                return MP_ACCENT;
 	}
@@ -75,6 +79,7 @@ lv_color_t MakerphoneTheme::highlight(){
 	switch(getCurrent()){
 		case Theme::Nokia3310:  return N3310_PIXEL;
 		case Theme::GameBoyDMG: return GBDMG_INK_MID;
+		case Theme::AmberCRT:   return AMBER_CRT_GLOW;
 		case Theme::Default:
 		default:                return MP_HIGHLIGHT;
 	}
@@ -84,6 +89,7 @@ lv_color_t MakerphoneTheme::dim(){
 	switch(getCurrent()){
 		case Theme::Nokia3310:  return N3310_PIXEL_DIM;
 		case Theme::GameBoyDMG: return GBDMG_LCD_MID;
+		case Theme::AmberCRT:   return AMBER_CRT_DIM;
 		case Theme::Default:
 		default:                return MP_DIM;
 	}
@@ -93,6 +99,7 @@ lv_color_t MakerphoneTheme::text(){
 	switch(getCurrent()){
 		case Theme::Nokia3310:  return N3310_PIXEL;
 		case Theme::GameBoyDMG: return GBDMG_INK;
+		case Theme::AmberCRT:   return AMBER_CRT_GLOW;
 		case Theme::Default:
 		default:                return MP_TEXT;
 	}
@@ -102,6 +109,7 @@ lv_color_t MakerphoneTheme::labelDim(){
 	switch(getCurrent()){
 		case Theme::Nokia3310:  return N3310_PIXEL_DIM;
 		case Theme::GameBoyDMG: return GBDMG_INK_MID;
+		case Theme::AmberCRT:   return AMBER_CRT_DIM;
 		case Theme::Default:
 		default:                return MP_LABEL_DIM;
 	}
@@ -126,6 +134,7 @@ lv_color_t MakerphoneTheme::iconStroke(){
 	switch(getCurrent()){
 		case Theme::Nokia3310:  return N3310_PIXEL;
 		case Theme::GameBoyDMG: return GBDMG_INK;
+		case Theme::AmberCRT:   return AMBER_CRT_GLOW;
 		case Theme::Default:
 		default:                return MP_HIGHLIGHT;
 	}
@@ -135,6 +144,7 @@ lv_color_t MakerphoneTheme::iconDetail(){
 	switch(getCurrent()){
 		case Theme::Nokia3310:  return N3310_FRAME;
 		case Theme::GameBoyDMG: return GBDMG_INK_MID;
+		case Theme::AmberCRT:   return AMBER_CRT_HOT;
 		case Theme::Default:
 		default:                return MP_ACCENT;
 	}

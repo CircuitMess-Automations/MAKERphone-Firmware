@@ -46,6 +46,14 @@ PhoneSynthwaveBg::Style PhoneSynthwaveBg::resolveStyleFromSettings(){
 	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::GameBoyDMG){
 		return Style::GameBoyDMG;
 	}
+	// S105 - dispatch the Amber CRT style override the same way.
+	// The wallpaperStyle byte stays persisted underneath so flipping
+	// the theme back to Default / Nokia / DMG restores the previously
+	// chosen Synthwave variant unchanged, exactly like the Nokia and
+	// DMG branches above.
+	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::AmberCRT){
+		return Style::AmberCRT;
+	}
 	return styleFromByte(Settings.get().wallpaperStyle);
 }
 
@@ -105,6 +113,16 @@ PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent, Style style) : LVObject(par
 	// the GBDMG palette out of every Synthwave hot-path.
 	if(style == Style::GameBoyDMG){
 		buildGameBoyDMGWallpaper();
+		return;
+	}
+
+	// S105 - the Amber CRT theme owns its wallpaper end to end the
+	// same way: it bypasses every Synthwave builder and paints a flat
+	// near-black warm-brown CRT panel with horizontal scanlines + a
+	// '>_' terminal prompt motif instead. Returning early keeps the
+	// AMBER_CRT palette out of every Synthwave hot-path.
+	if(style == Style::AmberCRT){
+		buildAmberCRTWallpaper();
 		return;
 	}
 
@@ -747,6 +765,168 @@ void PhoneSynthwaveBg::buildGameBoyDMGWallpaper(){
 		lv_obj_set_style_bg_color(px,
 		                          boyParts[i].mid ? GBDMG_INK_MID : GBDMG_INK, 0);
 		lv_obj_set_style_bg_opa(px, boyParts[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+
+
+// ----- Amber CRT phosphor wallpaper (S105) ---------------------------
+//
+// The 1980s amber-phosphor monochrome CRT (Apple ///, IBM 5151, Wyse
+// 50, DEC VT320 amber, etc.) is the visual opposite of the Nokia /
+// DMG LCDs: bright amber pixels burning on a near-black warm-brown
+// panel, with the iconic horizontal-scanline structure visible across
+// the entire panel (every CRT row is a discrete electron-beam pass).
+// Same constraint as the Nokia + DMG variants: PhoneStatusBar already
+// owns the top 10 px and PhoneSoftKeyBar the bottom 10 px, so this
+// wallpaper paints
+//
+//   1. A near-black CRT panel covering the full 160x128 area. Top half
+//      uses AMBER_CRT_BG_DARK, bottom tilts toward AMBER_CRT_BG_DEEP
+//      via a vertical gradient. The tilt is intentionally subtle - a
+//      real CRT panel reads almost flat at idle - but enough warm-
+//      brown saturation shift to keep it from rendering as a
+//      pure-black void.
+//
+//   2. A horizontal scanline pattern: every 2nd row (y % 2 == 1) gets
+//      a 1 px wide AMBER_CRT_DIM strip at LV_OPA_30. Reads as the
+//      authentic 'every CRT row is a separate electron-beam pass'
+//      texture without overwhelming foreground content. The strips
+//      are skipped over the rows where the status bar / soft-key bar
+//      paint to avoid double-painting that area at boot.
+//
+//   3. A small pixel-art '>_' terminal-prompt motif anchored at the
+//      bottom-right corner - the classic '1980s monochrome terminal
+//      idle scene'. The motif is built from ~12 1-2 px rectangles in
+//      AMBER_CRT_GLOW (the prompt chevron + underscore cursor) and
+//      AMBER_CRT_HOT (the brightest pixel of the cursor, mid-blink).
+//      The whole motif fits in a 14x10 bounding box, fully covered by
+//      the soft-key bar's 10 px height during normal use; on screens
+//      that omit the soft-key bar (boot splash, lock screen) it peeks
+//      through as the theme's signature glyph.
+//
+// Everything runs static - no animations - matching the Nokia / DMG
+// variants' still-image philosophy. Real CRT terminals had a slowly
+// blinking cursor, but pulsing it would tie the wallpaper into the
+// LVGL animation timeline, which the Nokia + DMG variants
+// deliberately stay out of for power-budget reasons. ~70 LVGL
+// primitives total (mostly the scanline rects).
+void PhoneSynthwaveBg::buildAmberCRTWallpaper(){
+	// ----- CRT panel: near-black warm-brown vertical gradient -----
+	//
+	// Painted on the same `sky` member pointer the Synthwave variant
+	// uses, mirroring the Nokia + DMG builders so a future caller
+	// iterating wallpaper children can rely on a single named root
+	// regardless of theme. The container covers the entire 160x128
+	// area - there is no horizon to split.
+	sky = lv_obj_create(obj);
+	lv_obj_remove_style_all(sky);
+	lv_obj_clear_flag(sky, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(sky, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(sky, BgWidth, BgHeight);
+	lv_obj_set_pos(sky, 0, 0);
+	lv_obj_set_style_bg_color(sky, AMBER_CRT_BG_DARK, 0);
+	lv_obj_set_style_bg_grad_color(sky, AMBER_CRT_BG_DEEP, 0);
+	lv_obj_set_style_bg_grad_dir(sky, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(sky, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(sky, 0, 0);
+	lv_obj_set_style_pad_all(sky, 0, 0);
+	lv_obj_set_style_border_width(sky, 0, 0);
+
+	// ----- CRT scanline pattern: dim amber 1 px strips every 2 rows -----
+	//
+	// One 1 px tall strip every 2 rows starting at y=12 and stopping
+	// at y=BgHeight-12 (clear of the status bar / soft-key bar
+	// rectangles). Drawn as AMBER_CRT_DIM at LV_OPA_30. This is the
+	// signature visual cue of the theme - without it the wallpaper
+	// would read as 'plain dark' rather than 'amber phosphor CRT'.
+	//
+	// Rect-per-strip rather than lv_line widget: lv_line requires an
+	// external point array that has to outlive the widget; rects are
+	// cheaper at this density (58 strips) and need no storage.
+	const lv_coord_t scanlineSpacing = 2;
+	const lv_coord_t scanlineY0      = 12;          // clear of status bar
+	const lv_coord_t scanlineYEnd    = BgHeight - 12; // clear of soft-key bar
+	for(lv_coord_t y = scanlineY0; y < scanlineYEnd; y += scanlineSpacing){
+		lv_obj_t* sl = lv_obj_create(sky);
+		lv_obj_remove_style_all(sl);
+		lv_obj_clear_flag(sl, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(sl, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(sl, BgWidth, 1);
+		lv_obj_set_pos(sl, 0, y);
+		lv_obj_set_style_bg_color(sl, AMBER_CRT_DIM, 0);
+		lv_obj_set_style_bg_opa(sl, LV_OPA_30, 0);
+		lv_obj_set_style_radius(sl, 0, 0);
+		lv_obj_set_style_border_width(sl, 0, 0);
+	}
+
+	// ----- '>_' terminal prompt motif (bottom-right corner) -----
+	//
+	// Anchored ~6 px clear of the right edge and ~6 px clear of the
+	// bottom edge, in the patch the soft-key bar will cover during
+	// normal use. The chevron is a 5-pixel '>' shape; the cursor is
+	// a 4x1 underscore burning slightly hotter than the chevron. The
+	// whole motif fits in a 14x10 bounding box, so the soft-key bar's
+	// 10 px height fully covers it on screens that draw one.
+	const lv_coord_t promptX = BgWidth  - 22;   // 138
+	const lv_coord_t promptY = BgHeight - 22;   // 106
+
+	struct PixelRect {
+		int8_t   dx;
+		int8_t   dy;
+		uint8_t  w;
+		uint8_t  h;
+		bool     hot;       // true -> AMBER_CRT_HOT, false -> AMBER_CRT_GLOW
+		lv_opa_t opa;
+	};
+
+	// 12 rectangles - approximation of '>_' rendered in a 5x7 cell
+	// (chevron) followed by a 1-cell gap and a 4x1 cursor underline.
+	// dx/dy are local to (promptX, promptY); w/h are pixel sizes.
+	// Chevron pixel layout (each # is one rect):
+	//   #..
+	//   .#.
+	//   ..#
+	//   .#.
+	//   #..
+	const PixelRect promptParts[] = {
+			// Chevron '>' - 5 stacked diagonal pixels
+			{ 0, 0, 1, 1, false, LV_OPA_COVER },
+			{ 1, 1, 1, 1, false, LV_OPA_COVER },
+			{ 2, 2, 1, 1, false, LV_OPA_COVER },
+			{ 1, 3, 1, 1, false, LV_OPA_COVER },
+			{ 0, 4, 1, 1, false, LV_OPA_COVER },
+			// Faint mid-tone glow inside the chevron's 'mouth' so it
+			// reads as a phosphor-rendered glyph rather than a flat
+			// pixel cluster.
+			{ 1, 2, 1, 1, false, LV_OPA_30 },
+			// Cursor underscore '_' to the right of the chevron - 4 px
+			// wide, brightest amber (the active prompt cursor on a
+			// real terminal would be the hottest pixel on the panel).
+			{ 6, 5, 1, 1, true,  LV_OPA_COVER },
+			{ 7, 5, 1, 1, true,  LV_OPA_COVER },
+			{ 8, 5, 1, 1, true,  LV_OPA_COVER },
+			{ 9, 5, 1, 1, true,  LV_OPA_COVER },
+			// Faint dim trail under the cursor, suggesting the
+			// phosphor's slow decay after the beam has passed (every
+			// CRT does this; it's part of the look).
+			{ 6, 6, 4, 1, false, LV_OPA_30 },
+			// Tiny baseline pixel under the chevron to anchor the
+			// glyph to the same line as the cursor underscore.
+			{ 0, 5, 1, 1, false, LV_OPA_30 },
+	};
+	const uint8_t promptPartCount = sizeof(promptParts) / sizeof(promptParts[0]);
+	for(uint8_t i = 0; i < promptPartCount; i++){
+		lv_obj_t* px = lv_obj_create(sky);
+		lv_obj_remove_style_all(px);
+		lv_obj_clear_flag(px, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(px, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(px, promptParts[i].w, promptParts[i].h);
+		lv_obj_set_pos(px, promptX + promptParts[i].dx, promptY + promptParts[i].dy);
+		lv_obj_set_style_bg_color(px,
+		                          promptParts[i].hot ? AMBER_CRT_HOT : AMBER_CRT_GLOW, 0);
+		lv_obj_set_style_bg_opa(px, promptParts[i].opa, 0);
 		lv_obj_set_style_radius(px, 0, 0);
 		lv_obj_set_style_border_width(px, 0, 0);
 	}

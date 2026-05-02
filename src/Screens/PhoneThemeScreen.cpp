@@ -192,6 +192,7 @@ void PhoneThemeScreen::rebuildSwatch() {
 		case Theme::Default:    drawDefaultSwatch();    break;
 		case Theme::Nokia3310:  drawNokia3310Swatch();  break;
 		case Theme::GameBoyDMG: drawGameBoyDMGSwatch(); break;
+		case Theme::AmberCRT:   drawAmberCRTSwatch();   break;
 		default:                drawDefaultSwatch();    break;  // defensive
 	}
 }
@@ -406,6 +407,76 @@ void PhoneThemeScreen::drawGameBoyDMGSwatch() {
 		lv_obj_set_size(px, parts[i].w, parts[i].h);
 		lv_obj_set_pos(px, bx + parts[i].dx, by + parts[i].dy);
 		lv_obj_set_style_bg_color(px, parts[i].mid ? GBDMG_INK_MID : GBDMG_INK, 0);
+		lv_obj_set_style_bg_opa(px, parts[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+
+
+void PhoneThemeScreen::drawAmberCRTSwatch() {
+	// CRT panel: near-black warm-brown vertical gradient covering the
+	// full swatch (the CRT panel, like the Nokia / DMG, is a single
+	// flat surface — no horizon).
+	lv_obj_t* panel = lv_obj_create(swatchInner);
+	lv_obj_remove_style_all(panel);
+	lv_obj_set_size(panel, SwatchW, SwatchH);
+	lv_obj_set_pos(panel, 0, 0);
+	lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_set_style_bg_color(panel, AMBER_CRT_BG_DARK, 0);
+	lv_obj_set_style_bg_grad_color(panel, AMBER_CRT_BG_DEEP, 0);
+	lv_obj_set_style_bg_grad_dir(panel, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(panel, 0, 0);
+	lv_obj_set_style_border_width(panel, 0, 0);
+
+	// Horizontal scanlines: a 1 px strip every 2 rows in dim amber.
+	// The signature visual cue of the theme - without it the swatch
+	// would read as 'plain dark' rather than 'amber phosphor CRT'.
+	for(lv_coord_t y = 1; y < SwatchH; y += 2){
+		lv_obj_t* sl = lv_obj_create(panel);
+		lv_obj_remove_style_all(sl);
+		lv_obj_set_size(sl, SwatchW, 1);
+		lv_obj_set_pos(sl, 0, y);
+		lv_obj_set_style_bg_color(sl, AMBER_CRT_DIM, 0);
+		lv_obj_set_style_bg_opa(sl, LV_OPA_30, 0);
+		lv_obj_set_style_radius(sl, 0, 0);
+		lv_obj_set_style_border_width(sl, 0, 0);
+	}
+
+	// '>_' terminal-prompt motif, centred in the swatch. Mirrors the
+	// wallpaper's bottom-right glyph but pulled to the centre so it
+	// reads as the theme's signature glyph rather than incidental
+	// decor — exactly how drawNokia3310Swatch / drawGameBoyDMGSwatch
+	// position their glyphs.
+	const lv_coord_t bx = SwatchW / 2 - 5;
+	const lv_coord_t by = SwatchH / 2 - 4;
+
+	struct PixelRect { int8_t dx, dy; uint8_t w, h; bool hot; lv_opa_t opa; };
+	const PixelRect parts[] = {
+			// Chevron '>' - 5 stacked diagonal pixels
+			{ 0, 0, 1, 1, false, LV_OPA_COVER },
+			{ 1, 1, 1, 1, false, LV_OPA_COVER },
+			{ 2, 2, 1, 1, false, LV_OPA_COVER },
+			{ 1, 3, 1, 1, false, LV_OPA_COVER },
+			{ 0, 4, 1, 1, false, LV_OPA_COVER },
+			{ 1, 2, 1, 1, false, LV_OPA_30 },
+			// Cursor underscore '_'
+			{ 6, 5, 1, 1, true,  LV_OPA_COVER },
+			{ 7, 5, 1, 1, true,  LV_OPA_COVER },
+			{ 8, 5, 1, 1, true,  LV_OPA_COVER },
+			{ 9, 5, 1, 1, true,  LV_OPA_COVER },
+			// Phosphor decay trail
+			{ 6, 6, 4, 1, false, LV_OPA_30 },
+			{ 0, 5, 1, 1, false, LV_OPA_30 },
+	};
+	const uint8_t partCount = sizeof(parts) / sizeof(parts[0]);
+	for(uint8_t i = 0; i < partCount; i++){
+		lv_obj_t* px = lv_obj_create(panel);
+		lv_obj_remove_style_all(px);
+		lv_obj_set_size(px, parts[i].w, parts[i].h);
+		lv_obj_set_pos(px, bx + parts[i].dx, by + parts[i].dy);
+		lv_obj_set_style_bg_color(px, parts[i].hot ? AMBER_CRT_HOT : AMBER_CRT_GLOW, 0);
 		lv_obj_set_style_bg_opa(px, parts[i].opa, 0);
 		lv_obj_set_style_radius(px, 0, 0);
 		lv_obj_set_style_border_width(px, 0, 0);

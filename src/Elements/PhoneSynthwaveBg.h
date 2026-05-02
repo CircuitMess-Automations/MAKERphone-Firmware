@@ -104,6 +104,19 @@ public:
 		// Synthwave builder so the wallpaper reads as a real DMG-01
 		// idle screen rather than a tinted Synthwave.
 		GameBoyDMG = 5,
+
+		// S105 - Amber CRT phosphor theme override. Same dispatch
+		// pattern as Nokia3310 / GameBoyDMG: not part of the 4-style
+		// PhoneWallpaperScreen pager (StyleCount stays at 4 there);
+		// this value is only ever returned by
+		// resolveStyleFromSettings() when Settings.themeId picks the
+		// Amber CRT theme. Renders a flat near-black warm-brown CRT
+		// panel with horizontal scanlines + a subtle vignette + a
+		// small ">_" terminal prompt motif anchored bottom-right,
+		// bypassing every Synthwave builder so the wallpaper reads
+		// as a real 1980s amber phosphor terminal rather than a
+		// tinted Synthwave.
+		AmberCRT  = 6,
 	};
 
 	/** Default ctor — picks the style from `Settings.get().wallpaperStyle`. */
@@ -194,6 +207,19 @@ private:
 	// MakerphoneTheme.h. ~22 LVGL primitives total, no animations -
 	// matches the Nokia variant's still-image philosophy.
 	void buildGameBoyDMGWallpaper();
+
+	// S105 - Amber CRT phosphor wallpaper builder. Same dispatch
+	// pattern as buildNokia3310Wallpaper / buildGameBoyDMGWallpaper:
+	// paints a flat near-black warm-brown CRT panel covering the
+	// full 160x128 area, a faint horizontal scanline pattern across
+	// the panel (every 2nd row, AMBER_CRT_DIM at low opacity) for
+	// the iconic phosphor scanline cue, and a small pixel-art
+	// '>_' terminal prompt motif anchored bottom-right in the patch
+	// the soft-key bar covers anyway. Uses the AMBER_CRT_* palette
+	// from MakerphoneTheme.h. ~70 LVGL primitives total (mostly
+	// scanline rects), no animations - matches the Nokia / DMG
+	// variants' still-image philosophy.
+	void buildAmberCRTWallpaper();
 
 	// Drives the per-star opacity animation. Free function semantics
 	// (matches LVGL's lv_anim_exec_xcb_t signature). Defined in the .cpp

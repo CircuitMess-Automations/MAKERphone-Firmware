@@ -165,7 +165,7 @@ Two sessions per theme: **part 1 = palette + wallpaper variant**, **part 2 = mat
 - [x] **S102** — Theme: Nokia 3310 Monochrome — icon glyphs + accents.
 - [x] **S103** — Theme: Game Boy DMG (4-shade green) — palette + wallpaper.
 - [x] **S104** — Theme: Game Boy DMG — icon glyphs + accents.
-- [ ] **S105** — Theme: Amber CRT — palette + wallpaper.
+- [x] **S105** — Theme: Amber CRT — palette + wallpaper.
 - [ ] **S106** — Theme: Amber CRT — icon glyphs + accents.
 - [ ] **S107** — Theme: Sony Ericsson Aqua — palette + wallpaper.
 - [ ] **S108** — Theme: Sony Ericsson Aqua — icon glyphs + accents.

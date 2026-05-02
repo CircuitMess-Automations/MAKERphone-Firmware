@@ -73,8 +73,22 @@ public:
 		// screen rather than a tinted Synthwave.
 		GameBoyDMG = 2,
 
-		// Reserved 3..15 for the upcoming Phase O themes:
-		//   3  Amber CRT    (S105)
+		// Amber CRT — 1980s amber-phosphor monochrome terminal homage
+		// (think Apple ///, IBM 5151, vintage Wyse / DEC terminals).
+		// Palette inverts the Nokia / DMG dark-on-light convention
+		// back to light-on-dark: a near-black warm-brown backdrop with
+		// the iconic 'burning amber' phosphor ink in the foreground.
+		// Five shades — deep CRT black (panel off), a dim amber for
+		// sub-bright UI chrome, classic amber phosphor for body text
+		// + icon strokes, hot amber for accents / borders, and a
+		// faint warm-brown gradient bottom for the panel curvature
+		// cue. Wallpaper bypasses every Synthwave builder and paints
+		// a flat dark panel with horizontal scanlines + a small
+		// pixel-art ">_" terminal prompt anchored bottom-right - the
+		// classic 1980s monochrome-terminal idle scene.
+		AmberCRT = 3,
+
+		// Reserved 4..15 for the upcoming Phase O themes:
 		//   4  Sony Ericsson Aqua (S107)
 		//   5  RAZR Hot Pink (S109)
 		//   6  Stealth Black (S111)
@@ -85,7 +99,7 @@ public:
 	};
 
 	/** Total number of themes the picker should expose today. */
-	static constexpr uint8_t ThemeCount = 3;
+	static constexpr uint8_t ThemeCount = 4;
 
 	/**
 	 * Resolve a raw `Settings.themeId` byte to a clamped Theme. Bytes
@@ -142,6 +156,16 @@ public:
 	 *               GBDMG_INK_MID. The DMG palette mirrors the Nokia
 	 *               mapping (dark ink on a pale LCD panel), keeping
 	 *               the part-2 icon-glyph swap in S104 mechanical.
+	 *   AmberCRT:   AMBER_CRT_BG_DARK (CRT panel off, near-black) /
+	 *               AMBER_CRT_HOT (hot amber, accent / focus border) /
+	 *               AMBER_CRT_GLOW (classic amber phosphor, icon
+	 *               strokes + body text) / AMBER_CRT_DIM (sub-bright
+	 *               amber, idle borders / inactive chevrons) /
+	 *               AMBER_CRT_GLOW (body text) / AMBER_CRT_DIM
+	 *               (timestamps + placeholders). Inverts the Nokia /
+	 *               DMG mapping back to light-on-dark - the authentic
+	 *               1980s phosphor-terminal reading direction (bright
+	 *               amber pixels on a black panel).
 	 *
 	 * The Nokia mapping inverts the Synthwave dark-on-light
 	 * convention: the "background" role becomes a light olive and
@@ -179,6 +203,7 @@ public:
 	 *   Default:    iconStroke = MP_HIGHLIGHT, iconDetail = MP_ACCENT
 	 *   Nokia3310:  iconStroke = N3310_PIXEL,  iconDetail = N3310_FRAME
 	 *   GameBoyDMG: iconStroke = GBDMG_INK,    iconDetail = GBDMG_INK_MID
+	 *   AmberCRT:   iconStroke = AMBER_CRT_GLOW, iconDetail = AMBER_CRT_HOT
 	 *
 	 * Default + Nokia mappings are byte-identical to what
 	 * `highlight()` / `accent()` already return for those themes, so
@@ -267,5 +292,55 @@ public:
 #define GBDMG_LCD_MID    lv_color_make(107, 142,  15)
 #define GBDMG_INK_MID    lv_color_make( 48,  98,  48)
 #define GBDMG_INK        lv_color_make( 15,  56,  15)
+
+
+/*
+ * ---------------------------------------------------------------------
+ * Amber CRT phosphor palette (S105).
+ *
+ * Approximates the warm amber-phosphor monochrome CRTs of the early-
+ * 80s — the iconic Apple /// monitor, the IBM 5151, the Wyse 50, the
+ * DEC VT320 amber variant. Unlike the Nokia and DMG palettes (dark
+ * ink on a pale LCD), an amber CRT renders bright amber pixels on a
+ * near-black panel, so the role mapping inverts back to the Synthwave
+ * dark-on-light convention.
+ *
+ * Five shades, all in the warm-amber gamut:
+ *
+ *   AMBER_CRT_BG_DARK  — CRT panel off, near-black with a faint warm-
+ *                        brown bias (the unenergised phosphor's natural
+ *                        colour). Top of the panel gradient.
+ *   AMBER_CRT_BG_DEEP  — slightly deeper warm-brown for the panel
+ *                        gradient bottom (CRT bulge cue, same role
+ *                        N3310_BG_DEEP plays for the Nokia).
+ *   AMBER_CRT_DIM      — sub-bright amber for idle borders, inactive
+ *                        chevrons, dim timestamps. ~40% of GLOW
+ *                        intensity so it reads as legible-but-not-
+ *                        shouting next to the brighter primary text.
+ *   AMBER_CRT_GLOW     — classic amber phosphor — body text, icon
+ *                        strokes, the LCD "on" pixel equivalent. The
+ *                        signature colour of the theme. Calibrated to
+ *                        the Apple /// reference grade (~580 nm
+ *                        wavelength when seen on a real CRT).
+ *   AMBER_CRT_HOT      — hot amber 'burn' for accents, focus borders,
+ *                        the halo pulse, the focused soft-key arrow.
+ *                        Slightly more saturated than GLOW so a focused
+ *                        element reads as 'lit brighter' than its
+ *                        neighbours.
+ *
+ * Stored as lv_color_make(R, G, B) so the values render identically on
+ * every LV_COLOR_DEPTH the firmware might be built against — same
+ * portability rationale as the Nokia and DMG palettes.
+ *
+ * Naming follows the MP_* / N3310_* / GBDMG_* convention so the part-2
+ * icon-glyph swap in S106 only changes which header it includes, not
+ * how it spells colours.
+ * ---------------------------------------------------------------------
+ */
+#define AMBER_CRT_BG_DARK  lv_color_make( 14,   8,   2)
+#define AMBER_CRT_BG_DEEP  lv_color_make( 26,  14,   4)
+#define AMBER_CRT_DIM      lv_color_make(120,  68,   8)
+#define AMBER_CRT_GLOW     lv_color_make(255, 176,   0)
+#define AMBER_CRT_HOT      lv_color_make(255, 210,  90)
 
 #endif // MAKERPHONE_THEME_H
