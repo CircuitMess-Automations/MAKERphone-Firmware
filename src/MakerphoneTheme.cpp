@@ -733,3 +733,143 @@ uint8_t MakerphoneTheme::luciteJewelSelectedOpa(){
 	// animated state.
 	return luciteJewelEnabled() ? LV_OPA_COVER : LV_OPA_TRANSP;
 }
+
+
+// ---------------------------------------------------------------------
+// S116 - Cyberpunk Red neon-rim helpers.
+//
+// The defining visual cue of every cyberpunk-noir UI from Blade Runner
+// (1982) onwards is a saturated neon-tube edge that visibly bleeds
+// light into the surrounding panel: real neon tubes don't sit on a
+// surface like a painted sticker, they push their colour outward into
+// the bezel as a soft rim glow that the eye reads as 'lit, alive,
+// transmitting'. PhoneIconTile consumes these helpers at idle (gated
+// on neonRimEnabled()) so every tile under CyberpunkRed rests with a
+// faint CYBER_NEON 1 px strip running down its right edge - the
+// always-on neon-tube edge glow cue. Selecting the tile then snaps the
+// strip to LV_OPA_COVER so the focused tile reads as 'this row is the
+// active selection, neon tube driven at full output' against its
+// softly-rimmed neighbours.
+//
+// Default / Nokia 3310 / Game Boy DMG / Amber CRT / Sony Ericsson Aqua
+// / RAZR Hot Pink / Stealth Black / Y2K Silver return values that
+// produce the previous byte-identical behaviour: neonRimEnabled() ==
+// false, both opacity helpers return LV_OPA_TRANSP (so neonRimColor()
+// and neonRimHighlightColor() values are never observed), keeping the
+// existing tile silhouette unchanged on every non-Cyberpunk theme.
+//
+// Mechanically a right-edge vertical 1-px strip, distinct from S108's
+// top-edge horizontal strip, S110's bottom-edge horizontal strip,
+// S112's top-right 2x2 corner dot, and S114's bottom-left 3x3 corner
+// jewel. The five icon-glyph overlay axes (top edge / bottom edge /
+// top-right corner / bottom-left corner / right edge vertical) stay
+// disjoint so a future theme can combine any subset of them without
+// overpainting, and a user flipping between the five themes sees the
+// highlight move around the tile perimeter rather than re-colouring
+// the same anchor. The right-edge anchor is also physically faithful:
+// vertical neon-kanji-style signage is the cyberpunk genre's most
+// iconic signage geometry, so anchoring the rim to the right edge of
+// the tile captures that placement convention directly.
+// ---------------------------------------------------------------------
+
+bool MakerphoneTheme::neonRimEnabled(){
+	return getCurrent() == Theme::CyberpunkRed;
+}
+
+lv_color_t MakerphoneTheme::neonRimColor(){
+	switch(getCurrent()){
+		case Theme::CyberpunkRed: return CYBER_NEON;
+		// The fallbacks below are never observed - neonRimIdleOpa() and
+		// neonRimSelectedOpa() both return LV_OPA_TRANSP on every non-
+		// Cyberpunk-Red theme, so the strip's colour can't reach the
+		// framebuffer. The values still resolve to a sensible per-theme
+		// 'brightest accent' so a future caller that probes the colour
+		// outside the opacity gate (e.g. a debug overlay) reads
+		// something coherent rather than an undefined value.
+		case Theme::Nokia3310:        return N3310_FRAME;
+		case Theme::GameBoyDMG:       return GBDMG_INK;
+		case Theme::AmberCRT:         return AMBER_CRT_HOT;
+		case Theme::SonyEricssonAqua: return AQUA_GLOW;
+		case Theme::RazrHotPink:      return RAZR_GLOW;
+		case Theme::StealthBlack:     return STEALTH_LED;
+		case Theme::Y2KSilver:        return Y2K_BONDI;
+		case Theme::Default:
+		default:                      return MP_ACCENT;
+	}
+}
+
+lv_color_t MakerphoneTheme::neonRimHighlightColor(){
+	switch(getCurrent()){
+		case Theme::CyberpunkRed: return CYBER_TEAL;
+		// The fallbacks below are never observed - the highlight pixel
+		// rides the same opacity as the rim, and that opacity returns
+		// LV_OPA_TRANSP on every non-Cyberpunk-Red theme. The values
+		// still resolve to a sensible per-theme 'second-brightest
+		// chrome / body-text' so a future caller that probes the colour
+		// outside the opacity gate reads something coherent.
+		case Theme::Nokia3310:        return N3310_HIGHLIGHT;
+		case Theme::GameBoyDMG:       return GBDMG_LCD_LIGHT;
+		case Theme::AmberCRT:         return AMBER_CRT_HOT;
+		case Theme::SonyEricssonAqua: return AQUA_FOAM;
+		case Theme::RazrHotPink:      return RAZR_SHINE;
+		case Theme::StealthBlack:     return STEALTH_BONE;
+		case Theme::Y2KSilver:        return Y2K_SHINE;
+		case Theme::Default:
+		default:                      return MP_TEXT;
+	}
+}
+
+uint8_t MakerphoneTheme::neonRimIdleOpa(){
+	// LV_OPA_60 is the calibrated 'always-on neon-tube edge bleed'
+	// opacity: bright enough that the rim reads as a deliberate
+	// emitting tube (the eye picks it out as 'lit, alive,
+	// transmitting') rather than a stray pixel, dim enough that it
+	// doesn't dominate the tile body. On a real cyberpunk-noir
+	// establishing shot the idle neon-tube rim sits at roughly
+	// 50-65% of full intensity (the tube is always emitting but
+	// its edge bleed falls off into the surrounding panel) and
+	// LV_OPA_60 is the closest 1-pixel-strip approximation of that
+	// bleed on a 16 bpp panel.
+	//
+	// Slots between S108's LV_OPA_50 chrome-shine idle and S112's
+	// LV_OPA_70 status-LED idle because a neon tube emits more than
+	// a passive glass reflection but less than a focused tactical
+	// LED dot - the rim is bright but spread along an entire edge,
+	// while the LED is concentrated onto a 2 x 2 corner cell. The
+	// five idle opacities now rank physically from coolest to
+	// hottest emission: 30 (Y2K Lucite cloudy) < 40 (RAZR EL bleed)
+	// < 50 (Aqua reflected glass shine) < 60 (Cyberpunk neon-tube
+	// edge bleed) < 70 (Stealth Black emitting status LED). A user
+	// flipping between the five themes sees the highlight intensity
+	// step up monotonically, reinforcing that they're five genuinely
+	// different lighting models rather than five recoloured versions
+	// of the same overlay.
+	return neonRimEnabled() ? LV_OPA_60 : LV_OPA_TRANSP;
+}
+
+uint8_t MakerphoneTheme::neonRimSelectedOpa(){
+	// LV_OPA_COVER (full intensity) on selection - the focused
+	// Cyberpunk Red tile snaps to a 'fully-driven neon tube' that
+	// the eye reads as 'this row is the active selection, neon
+	// tube at full output'. This is a non-pulsing, on/off overlay
+	// because the existing halo already pulses on selection;
+	// layering a second pulsing element on top would make the
+	// focused tile read as jittery rather than 'lit at full
+	// output', which contradicts the deliberate composition of a
+	// cyberpunk-noir establishing shot (where each neon sign reads
+	// as a steady source, never a flicker - flicker is reserved
+	// for the distant signage in the wallpaper background, not the
+	// foreground HUD).
+	//
+	// The 60% -> 100% gap is intentionally narrower than S114's
+	// 30%->100% (Y2K Lucite, 70 pp), S110's 40%->100% (RAZR EL,
+	// 60 pp), and S108's 50%->100% (Aqua chrome, 50 pp), and
+	// slightly wider than S112's 70%->100% (Stealth LED, 30 pp).
+	// The gap narrows monotonically as idle opacity rises - the
+	// brighter the idle source, the smaller the perceptual gap to
+	// 'fully lit'. Cyberpunk's neon rim already glows visibly at
+	// idle, so the focus state is a moderate brightness bump
+	// rather than a transition from 'dim' to 'lit', which is the
+	// right cue for an emitting source.
+	return neonRimEnabled() ? LV_OPA_COVER : LV_OPA_TRANSP;
+}

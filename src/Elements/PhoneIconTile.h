@@ -117,6 +117,27 @@ private:
 	                          //          a translucent volumetric jewel'). Rides the same
 	                          //          opacity as the jewel itself. Fully transparent under
 	                          //          every non-Y2K-Silver theme.
+	lv_obj_t* neonRim;       // S116 - Cyberpunk Red neon-tube edge-glow strip: a 1 px CYBER_NEON
+	                          //          vertical strip running down the right edge of the tile
+	                          //          body (TileHeight - 2 px tall, 1 px wide). Distinct from
+	                          //          `shine` (top edge horizontal), `edgeGlow` (bottom edge
+	                          //          horizontal), `statusLed` (top-right 2x2 corner dot),
+	                          //          and `luciteJewel` (bottom-left 3x3 corner jewel) along
+	                          //          the right-edge-vertical axis. The five icon-glyph
+	                          //          overlay axes (top edge / bottom edge / top-right corner
+	                          //          / bottom-left corner / right edge vertical) stay
+	                          //          disjoint so a future theme can combine any subset
+	                          //          without overpainting. Fully transparent under every
+	                          //          non-Cyberpunk-Red theme.
+	lv_obj_t* neonRimHi;     // S116 - Cyberpunk Red neon-rim teal accent: a 1 px CYBER_TEAL
+	                          //          highlight pixel anchored to the centre of the neon-rim
+	                          //          strip, suggesting the secondary-tube-colour every
+	                          //          cyberpunk-noir UI uses for two-tone neon signage (the
+	                          //          trademark-safe equivalent of Blade Runner's red+cyan
+	                          //          signage pairings, Akira's pink+cyan billboard set,
+	                          //          Cyberpunk 2077's red-V / cyan-Arasaka HUD). Rides the
+	                          //          same opacity as the rim itself. Fully transparent under
+	                          //          every non-Cyberpunk-Red theme.
 	lv_obj_t* iconLayer;   // 16x16 transparent container that holds the pixel rectangles
 	lv_obj_t* labelEl;     // optional pixelbasic7 label below the icon (nullable)
 
@@ -126,6 +147,7 @@ private:
 	void buildEdgeGlow();
 	void buildStatusLed();
 	void buildLuciteJewel();
+	void buildNeonRim();
 	void buildIconLayer();
 	void buildLabel(const char* label);
 	void refreshSelection();

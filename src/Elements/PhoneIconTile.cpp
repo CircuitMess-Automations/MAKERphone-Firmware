@@ -34,7 +34,7 @@
 #define MP_ICON_DETAIL (MakerphoneTheme::iconDetail())
 
 PhoneIconTile::PhoneIconTile(lv_obj_t* parent, Icon icon, const char* label)
-		: LVObject(parent), icon(icon), halo(nullptr), shine(nullptr), edgeGlow(nullptr), statusLed(nullptr), statusLedHi(nullptr), luciteJewel(nullptr), luciteJewelHi(nullptr), iconLayer(nullptr), labelEl(nullptr){
+		: LVObject(parent), icon(icon), halo(nullptr), shine(nullptr), edgeGlow(nullptr), statusLed(nullptr), statusLedHi(nullptr), luciteJewel(nullptr), luciteJewelHi(nullptr), neonRim(nullptr), neonRimHi(nullptr), iconLayer(nullptr), labelEl(nullptr){
 
 	// The tile is a fixed-size widget that flows naturally inside a flex
 	// or grid parent (no IGNORE_LAYOUT flag, see header notes).
@@ -46,6 +46,7 @@ PhoneIconTile::PhoneIconTile(lv_obj_t* parent, Icon icon, const char* label)
 	buildEdgeGlow();
 	buildStatusLed();
 	buildLuciteJewel();
+	buildNeonRim();
 	buildIconLayer();
 	buildLabel(label);
 
@@ -336,6 +337,96 @@ void PhoneIconTile::buildLuciteJewel(){
 	lv_obj_set_style_bg_opa(luciteJewelHi, LV_OPA_TRANSP, 0);
 }
 
+// ---------------------------------------------------------------------
+// S116 - Cyberpunk Red neon-rim builder.
+//
+// Tucks two children into the tile body alongside `shine`, `edgeGlow`,
+// `statusLed`, and `luciteJewel`, drawn just below the icon layer so
+// the rim never occludes any of the per-icon rectangles. Colour +
+// opacity resolve through MakerphoneTheme::neonRim*() so the rim is
+// fully transparent under Default / Nokia 3310 / Game Boy DMG / Amber
+// CRT / Sony Ericsson Aqua / RAZR Hot Pink / Stealth Black / Y2K
+// Silver (byte-identical to the previous behaviour) and only becomes
+// visible under CyberpunkRed.
+//
+// Distinct from PhoneIconTile::buildShine() (top edge),
+// PhoneIconTile::buildEdgeGlow() (bottom edge),
+// PhoneIconTile::buildStatusLed() (top-right corner), and
+// PhoneIconTile::buildLuciteJewel() (bottom-left corner) along the
+// right-edge-vertical axis - the rim is a 1 px wide TileHeight - 2 px
+// tall vertical strip running down the tile's right edge, which is
+// disjoint from all four existing overlays, so the five cue
+// geometries (top edge / bottom edge / top-right corner / bottom-left
+// corner / right edge vertical) stay non-overlapping and a future
+// theme can combine any subset of them without overpainting. The
+// right-edge anchor is also physically faithful: vertical neon-kanji-
+// style signage is the cyberpunk genre's most iconic signage geometry
+// (every Blade Runner / Akira / Cyberpunk 2077 establishing shot
+// shows a wall of vertical neon signs running down the right wall of
+// an alley), so anchoring the rim to the right edge of the tile
+// captures that placement convention directly.
+//
+// Sized 1 px wide so the rim reads as a single neon tube edge rather
+// than a panel - the cyberpunk genre's signage uses thin tube lines,
+// not filled blocks, and the 1 px width keeps the rim faithful to that
+// linear geometry. Height inset 1 px on top + bottom so the rim never
+// touches the 1 px tile border (which carries the selection cue, just
+// like the prior overlays).
+void PhoneIconTile::buildNeonRim(){
+	// Outer 1 px-wide vertical neon-tube edge strip.
+	neonRim = lv_obj_create(obj);
+	lv_obj_remove_style_all(neonRim);
+	lv_obj_clear_flag(neonRim, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(neonRim, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	// Inset by 2 px top + 2 px bottom so the rim never overpaints the
+	// 1 px tile border at the top + bottom corners (the border carries
+	// the selection cue), and so the rim leaves a 1 px gap clear of
+	// `shine` (top-edge horizontal strip) and `edgeGlow` (bottom-edge
+	// horizontal strip) where those overlays would otherwise touch
+	// the right edge of the tile body.
+	lv_obj_set_size(neonRim, 1, TileHeight - 4);
+	lv_obj_set_align(neonRim, LV_ALIGN_RIGHT_MID);
+	// Inset 1 px from the right edge so the rim sits cleanly inside
+	// the 1 px tile border without overpainting it. The rim is the
+	// cue, not the border.
+	lv_obj_set_x(neonRim, -1);
+	lv_obj_set_style_radius(neonRim, 0, 0);
+	lv_obj_set_style_border_width(neonRim, 0, 0);
+	lv_obj_set_style_pad_all(neonRim, 0, 0);
+	lv_obj_set_style_bg_color(neonRim, MakerphoneTheme::neonRimColor(), 0);
+	// Idle opacity is wired in refreshSelection() (which runs once at
+	// the end of the constructor), so this initial set just keeps the
+	// rim invisible until refreshSelection() decides per-theme.
+	lv_obj_set_style_bg_opa(neonRim, LV_OPA_TRANSP, 0);
+
+	// Inner 1x1 highlight pixel - the secondary teal tube accent. Sits
+	// at the vertical centre of the rim, suggesting the secondary tube
+	// of a two-colour neon sign every cyberpunk-noir UI uses for its
+	// signage (the trademark-safe equivalent of Blade Runner's red +
+	// cyan signage pairings, Akira's pink + cyan billboard set, and
+	// Cyberpunk 2077's red-V / cyan-Arasaka HUD palette). Without the
+	// teal accent, the rim would read as a single-colour neon strip
+	// rather than the two-tone signage that defines the cyberpunk
+	// genre.
+	neonRimHi = lv_obj_create(obj);
+	lv_obj_remove_style_all(neonRimHi);
+	lv_obj_clear_flag(neonRimHi, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(neonRimHi, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(neonRimHi, 1, 1);
+	lv_obj_set_align(neonRimHi, LV_ALIGN_RIGHT_MID);
+	// Same x as the rim itself (so the teal pixel rides the same right-
+	// edge column), y = 0 so the pixel sits at the rim's vertical
+	// centre - the eye reads 'this neon strip has a brighter teal node
+	// in the middle', the cue every two-tone neon-tube sign exhibits
+	// where its red and cyan tubes intersect.
+	lv_obj_set_pos(neonRimHi, -1, 0);
+	lv_obj_set_style_radius(neonRimHi, 0, 0);
+	lv_obj_set_style_border_width(neonRimHi, 0, 0);
+	lv_obj_set_style_pad_all(neonRimHi, 0, 0);
+	lv_obj_set_style_bg_color(neonRimHi, MakerphoneTheme::neonRimHighlightColor(), 0);
+	lv_obj_set_style_bg_opa(neonRimHi, LV_OPA_TRANSP, 0);
+}
+
 void PhoneIconTile::buildIconLayer(){
 	// 16x16 transparent container that holds the per-icon pixel rectangles.
 	// Centered horizontally; sits 3 px from the top of the tile so the
@@ -448,6 +539,21 @@ void PhoneIconTile::refreshSelection(){
 		lv_obj_set_style_bg_opa(luciteJewel, (lv_opa_t) MakerphoneTheme::luciteJewelSelectedOpa(), 0);
 		lv_obj_set_style_bg_color(luciteJewelHi, MakerphoneTheme::luciteJewelHighlightColor(), 0);
 		lv_obj_set_style_bg_opa(luciteJewelHi, (lv_opa_t) MakerphoneTheme::luciteJewelSelectedOpa(), 0);
+		// S116 - Cyberpunk Red: focused tile burns the right-edge neon
+		// rim to full saturation (LV_OPA_COVER under CyberpunkRed,
+		// LV_OPA_TRANSP everywhere else - same byte as the idle non-
+		// Cyberpunk state, so non-Cyberpunk themes never see a rim
+		// flash). The cue reads as 'this row is the active selection,
+		// neon tube driven at full output' - the focus-feedback
+		// signature of every cyberpunk-noir UI, where the neon rim
+		// suddenly burns to its full saturation rather than its usual
+		// idle bleed shade. The teal highlight pixel rides the same
+		// opacity, so the secondary-tube accent stays visible (and
+		// bright) on focus.
+		lv_obj_set_style_bg_color(neonRim, MakerphoneTheme::neonRimColor(), 0);
+		lv_obj_set_style_bg_opa(neonRim, (lv_opa_t) MakerphoneTheme::neonRimSelectedOpa(), 0);
+		lv_obj_set_style_bg_color(neonRimHi, MakerphoneTheme::neonRimHighlightColor(), 0);
+		lv_obj_set_style_bg_opa(neonRimHi, (lv_opa_t) MakerphoneTheme::neonRimSelectedOpa(), 0);
 
 		lv_anim_t a;
 		lv_anim_init(&a);
@@ -521,6 +627,23 @@ void PhoneIconTile::refreshSelection(){
 		lv_obj_set_style_bg_opa(luciteJewel, (lv_opa_t) MakerphoneTheme::luciteJewelIdleOpa(), 0);
 		lv_obj_set_style_bg_color(luciteJewelHi, MakerphoneTheme::luciteJewelHighlightColor(), 0);
 		lv_obj_set_style_bg_opa(luciteJewelHi, (lv_opa_t) MakerphoneTheme::luciteJewelIdleOpa(), 0);
+		// S116 - Cyberpunk Red: idle tile rests with a faint CYBER_NEON
+		// 1 px vertical strip running down its right edge (LV_OPA_60
+		// under CyberpunkRed, LV_OPA_TRANSP everywhere else - so non-
+		// Cyberpunk themes still render a perfectly flat tile body,
+		// byte-identical to the pre-S116 behaviour). The cue reads as
+		// 'neon tube edge bleed, always-on emission' - the soft red
+		// rim every cyberpunk-noir UI exhibits along its signage edges
+		// when the tube is idle but the panel is powered. The teal
+		// highlight pixel rides the same idle opacity so the
+		// secondary-tube accent shows through even at the soft idle
+		// brightness, the way a real two-tone neon sign always
+		// exhibits its second tube's colour as a brighter spec at
+		// the intersection point.
+		lv_obj_set_style_bg_color(neonRim, MakerphoneTheme::neonRimColor(), 0);
+		lv_obj_set_style_bg_opa(neonRim, (lv_opa_t) MakerphoneTheme::neonRimIdleOpa(), 0);
+		lv_obj_set_style_bg_color(neonRimHi, MakerphoneTheme::neonRimHighlightColor(), 0);
+		lv_obj_set_style_bg_opa(neonRimHi, (lv_opa_t) MakerphoneTheme::neonRimIdleOpa(), 0);
 	}
 }
 

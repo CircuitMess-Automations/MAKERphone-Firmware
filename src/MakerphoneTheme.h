@@ -753,6 +753,119 @@ public:
 	static lv_color_t luciteJewelHighlightColor();
 	static uint8_t    luciteJewelIdleOpa();
 	static uint8_t    luciteJewelSelectedOpa();
+
+	/*
+	 * S116 - Cyberpunk Red neon-rim helpers (icon-glyph pass).
+	 *
+	 * The defining visual cue of every cyberpunk-noir UI - Blade Runner's
+	 * TYRELL holo-displays, Akira's neo-Tokyo billboard panels,
+	 * Cyberpunk 2077's V's-apartment HUD, every red-on-black neon-tube
+	 * sign hanging off a rain-slick alley wall - is a saturated neon
+	 * tube edge that visibly bleeds light into the panel underneath.
+	 * Real neon tubes are emitting light sources: they don't just sit
+	 * on the panel like a painted sticker, they push their colour
+	 * outward into the surrounding bezel as a soft rim glow that the
+	 * eye reads as 'lit, alive, transmitting'. That rim is the single
+	 * visual that defines every cyberpunk-genre UI element since
+	 * Blade Runner (1982), and it's what separates the Cyberpunk Red
+	 * skin from a generic dark-magenta tile.
+	 *
+	 * PhoneIconTile consumes these helpers at idle (gated on
+	 * neonRimEnabled()) so every tile under CyberpunkRed rests with
+	 * a faint CYBER_NEON 1 px strip running down its right edge - the
+	 * always-on 'neon-tube edge glow' cue every cyberpunk-noir UI
+	 * exhibits. Selecting the tile then snaps the strip to
+	 * LV_OPA_COVER so the focused tile reads as 'this row is the
+	 * active selection, neon tube driven at full output' against its
+	 * softly-rimmed neighbours - the same focus-feedback cue every
+	 * cyberpunk dystopia uses to mark its current row, where the
+	 * neon-rim suddenly burns to its full saturation rather than its
+	 * usual idle bleed shade.
+	 *
+	 * Helpers
+	 *   neonRimEnabled()       - true only for CyberpunkRed
+	 *   neonRimColor()         - CYBER_NEON under CyberpunkRed, falls
+	 *                            back to N3310_FRAME / GBDMG_INK /
+	 *                            AMBER_CRT_HOT / AQUA_GLOW / RAZR_GLOW
+	 *                            / STEALTH_LED / Y2K_BONDI / MP_ACCENT
+	 *                            for the other themes (those values
+	 *                            are never observed because callers
+	 *                            gate on neonRimEnabled() first via
+	 *                            the *Opa() helpers, both of which
+	 *                            return LV_OPA_TRANSP outside
+	 *                            CyberpunkRed)
+	 *   neonRimHighlightColor() - CYBER_TEAL under CyberpunkRed, falls
+	 *                            back to per-theme 'second-brightest
+	 *                            accent' - never observed outside
+	 *                            CyberpunkRed because the highlight
+	 *                            pixel rides the same opacity as the
+	 *                            main rim
+	 *   neonRimIdleOpa()       - LV_OPA_60 under CyberpunkRed,
+	 *                            LV_OPA_TRANSP everywhere else
+	 *   neonRimSelectedOpa()   - LV_OPA_COVER under CyberpunkRed,
+	 *                            LV_OPA_TRANSP everywhere else
+	 *
+	 * Why LV_OPA_60 idle: bright enough that the rim reads as a
+	 * deliberate neon-tube edge glow (the eye picks it out as 'lit,
+	 * alive, transmitting'), dim enough that it doesn't dominate the
+	 * tile body. On a real neon-noir UI the idle rim sits at roughly
+	 * 50-65% of full intensity (the tube is always emitting, but its
+	 * edge bleed falls off into the surrounding panel), and LV_OPA_60
+	 * is the closest 1-pixel-strip approximation of that bleed on a
+	 * 16 bpp panel.
+	 *
+	 * The five idle opacities now rank physically from coolest to
+	 * hottest emission: LV_OPA_30 (Y2K Lucite-cloudy) < LV_OPA_40
+	 * (RAZR EL bleed) < LV_OPA_50 (Aqua reflected glass shine) <
+	 * LV_OPA_60 (Cyberpunk neon-tube edge bleed) < LV_OPA_70 (Stealth
+	 * Black emitting status LED). A user flipping between the five
+	 * themes sees the highlight intensity step up monotonically,
+	 * reinforcing that they're five genuinely different lighting
+	 * models rather than five recoloured versions of the same
+	 * overlay. Cyberpunk slots between Aqua and Stealth Black because
+	 * a neon tube emits more than a passive glass reflection but
+	 * less than a focused tactical LED dot - the rim is bright but
+	 * spread along an entire edge, while the LED is concentrated
+	 * onto a 2 x 2 corner cell.
+	 *
+	 * The 60% -> 100% selected-vs-idle gap (40 percentage points) is
+	 * intentionally narrower than S114's 30%->100% (Y2K Lucite, 70
+	 * pp), S110's 40%->100% (RAZR EL, 60 pp), and S108's 50%->100%
+	 * (Aqua chrome, 50 pp), and slightly wider than S112's 70%->100%
+	 * (Stealth LED, 30 pp). The gap narrows monotonically as idle
+	 * opacity rises - a physically-faithful pattern (the brighter
+	 * the idle source, the smaller the perceptual gap to 'fully
+	 * lit'). Cyberpunk's neon rim already glows visibly at idle, so
+	 * the focus state is a moderate brightness bump rather than a
+	 * transition from 'dim' to 'lit', which is the right cue for
+	 * an emitting source.
+	 *
+	 * Why right-edge vertical strip (vs S108's top edge / S110's
+	 * bottom edge / S112's top-right corner / S114's bottom-left
+	 * corner): the five Phase O icon-glyph overlays are now anchored
+	 * to five disjoint geometric axes - top edge horizontal, bottom
+	 * edge horizontal, top-right corner, bottom-left corner, right
+	 * edge vertical - so a future theme can layer any subset of the
+	 * five cues without overpainting, and so a user flipping
+	 * between Aqua, RAZR, Stealth Black, Y2K Silver, and Cyberpunk
+	 * Red sees the highlight move around the tile perimeter
+	 * (top-edge horizontal -> bottom-edge horizontal -> top-right
+	 * corner -> bottom-left corner -> right-edge vertical),
+	 * reinforcing that they're five genuinely different lighting
+	 * models rather than five recoloured versions of the same
+	 * overlay. The right-edge anchor is also physically faithful:
+	 * vertical neon-tube signage is the cyberpunk genre's most
+	 * iconic signage geometry - every Blade Runner / Akira /
+	 * Cyberpunk 2077 establishing shot shows a wall of vertical
+	 * neon kanji-style signs running down the right wall of an
+	 * alley, so anchoring the rim to the right edge of the tile
+	 * captures that placement convention directly.
+	 */
+	static bool       neonRimEnabled();
+	static lv_color_t neonRimColor();
+	static lv_color_t neonRimHighlightColor();
+	static uint8_t    neonRimIdleOpa();
+	static uint8_t    neonRimSelectedOpa();
 };
 
 /*
