@@ -80,11 +80,14 @@ private:
 	bool selected = false;
 
 	lv_obj_t* halo;        // outer glow ring (visible only when selected)
+	lv_obj_t* shine;       // S108 - Sony Ericsson Aqua chrome-shine strip across the top edge
+	                        //          of the tile body. Fully transparent under every other theme.
 	lv_obj_t* iconLayer;   // 16x16 transparent container that holds the pixel rectangles
 	lv_obj_t* labelEl;     // optional pixelbasic7 label below the icon (nullable)
 
 	void buildBackground();
 	void buildHalo();
+	void buildShine();
 	void buildIconLayer();
 	void buildLabel(const char* label);
 	void refreshSelection();

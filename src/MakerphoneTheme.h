@@ -292,6 +292,63 @@ public:
 	static uint8_t    phosphorGlowOpa();
 	static uint8_t    phosphorPulseLow();
 	static uint8_t    phosphorPulseHigh();
+
+	/*
+	 * S108 - Sony Ericsson Aqua chrome-shine helpers (icon-glyph pass).
+	 *
+	 * The defining visual cue of the late-2000s Sony Ericsson "Aqua"
+	 * UI was its glossy menu chrome: every tile, every soft-key, every
+	 * focus row carried a thin bright highlight along its upper edge,
+	 * suggesting reflected light from above-right. That highlight is
+	 * what made an Aqua menu icon read as a polished glass / chrome
+	 * panel rather than a flat coloured square - the W910i, W995,
+	 * K850i and the C-series Cyber-shot phones all leaned on the same
+	 * cue, and it's the single visual that separates the Aqua look
+	 * from a generic dark-blue tile.
+	 *
+	 * Phase O folds that effect into PhoneIconTile via a per-theme
+	 * 'chrome-shine' overlay - a 1 px AQUA_FOAM strip rendered along
+	 * the very top of every tile body. On themes that don't have a
+	 * chrome-shine convention (Default Synthwave purple, Nokia 3310
+	 * LCD, Game Boy DMG LCD, Amber CRT phosphor) the strip stays
+	 * fully transparent, byte-identical to the previous behaviour.
+	 * On Sony Ericsson Aqua, the strip rests at a moderate idle
+	 * opacity so every tile - whether selected or not - reads as
+	 * 'glass tile catching ambient light from above', and the
+	 * selected tile snaps the strip to full intensity so the focused
+	 * tile reads as 'a single tile catching a direct sunbeam' against
+	 * its softly-glowing neighbours - the same wet-shine cue Sony
+	 * Ericsson used to mark the focused row on the W910i menu
+	 * carousel.
+	 *
+	 *   chromeShineEnabled()     - true only for SonyEricssonAqua
+	 *   chromeShineColor()       - AQUA_FOAM under SonyEricssonAqua,
+	 *                              MP_HIGHLIGHT otherwise (the latter
+	 *                              is a fallback that's never observed
+	 *                              because callers gate on
+	 *                              chromeShineEnabled() first via the
+	 *                              opacity helpers below)
+	 *   chromeShineIdleOpa()     - LV_OPA_50 under SonyEricssonAqua,
+	 *                              LV_OPA_TRANSP otherwise (so the
+	 *                              existing tiles render byte-
+	 *                              identically on every other theme)
+	 *   chromeShineSelectedOpa() - LV_OPA_COVER under SonyEricssonAqua,
+	 *                              LV_OPA_TRANSP otherwise
+	 *
+	 * The selected-vs-idle opacity gap is intentionally large
+	 * (50% -> 100%): an Aqua-era focused tile read as visibly 'wet
+	 * with light' next to the rest of the menu, not just slightly
+	 * brighter, and the doubled opacity captures that without needing
+	 * a per-tile colour shift. PhoneIconTile applies this static
+	 * (non-pulsing) overlay rather than animating it because the
+	 * existing halo already pulses on selection - layering a second
+	 * pulsing element on top would make the focused tile read as
+	 * jittery rather than 'lit', which contradicts the Aqua aesthetic.
+	 */
+	static bool       chromeShineEnabled();
+	static lv_color_t chromeShineColor();
+	static uint8_t    chromeShineIdleOpa();
+	static uint8_t    chromeShineSelectedOpa();
 };
 
 /*

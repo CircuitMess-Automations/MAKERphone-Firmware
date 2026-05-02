@@ -42,6 +42,7 @@ PhoneIconTile::PhoneIconTile(lv_obj_t* parent, Icon icon, const char* label)
 
 	buildBackground();
 	buildHalo();
+	buildShine();
 	buildIconLayer();
 	buildLabel(label);
 
@@ -97,6 +98,38 @@ void PhoneIconTile::buildHalo(){
 	// Send to back so it sits behind the tile body and only its border
 	// pokes out around the edges, simulating a glow ring.
 	lv_obj_move_background(halo);
+}
+
+// S108 - Sony Ericsson Aqua chrome-shine strip.
+// A 1-pixel AQUA_FOAM line painted across the top edge of the tile
+// body, suggesting reflected light from above (the iconic 'glass tile
+// catching ambient light' cue that defined the W910i / W995 / K850i
+// menu). Lives as the LAST child of the tile so it draws above the
+// background but below the halo's border + the icon layer; the strip
+// only covers the very top row of the body so it never occludes any
+// of the per-icon rectangles. Colour + opacity resolve through
+// MakerphoneTheme::chromeShine*() so the strip is fully transparent
+// under Default / Nokia 3310 / Game Boy DMG / Amber CRT (byte-
+// identical to the previous behaviour) and only becomes visible
+// under SonyEricssonAqua.
+void PhoneIconTile::buildShine(){
+	shine = lv_obj_create(obj);
+	lv_obj_remove_style_all(shine);
+	lv_obj_clear_flag(shine, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(shine, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	// Inset 1 px on either side so the strip never overpaints the
+	// tile's existing border (which carries the selection cue).
+	lv_obj_set_size(shine, TileWidth - 2, 1);
+	lv_obj_set_align(shine, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(shine, 1);
+	lv_obj_set_style_radius(shine, 0, 0);
+	lv_obj_set_style_border_width(shine, 0, 0);
+	lv_obj_set_style_pad_all(shine, 0, 0);
+	lv_obj_set_style_bg_color(shine, MakerphoneTheme::chromeShineColor(), 0);
+	// Idle opacity is wired in refreshSelection() (which runs once at
+	// the end of the constructor), so this initial set just keeps the
+	// strip invisible until refreshSelection() decides per-theme.
+	lv_obj_set_style_bg_opa(shine, LV_OPA_TRANSP, 0);
 }
 
 void PhoneIconTile::buildIconLayer(){
@@ -167,6 +200,12 @@ void PhoneIconTile::refreshSelection(){
 		if(labelEl != nullptr){
 			lv_obj_set_style_text_color(labelEl, MP_TEXT, 0);
 		}
+		// S108 - SE Aqua: focused tile burns the chrome shine to full
+		// intensity (LV_OPA_COVER under Aqua, LV_OPA_TRANSP everywhere
+		// else - same byte as the idle non-Aqua state, so non-Aqua
+		// themes never see a shine flash).
+		lv_obj_set_style_bg_color(shine, MakerphoneTheme::chromeShineColor(), 0);
+		lv_obj_set_style_bg_opa(shine, (lv_opa_t) MakerphoneTheme::chromeShineSelectedOpa(), 0);
 
 		lv_anim_t a;
 		lv_anim_init(&a);
@@ -190,6 +229,12 @@ void PhoneIconTile::refreshSelection(){
 		if(labelEl != nullptr){
 			lv_obj_set_style_text_color(labelEl, MP_LABEL_DIM, 0);
 		}
+		// S108 - SE Aqua: idle tile rests with a faint AQUA_FOAM strip
+		// across its top edge (LV_OPA_50 under Aqua, LV_OPA_TRANSP
+		// everywhere else - so non-Aqua themes still render a perfectly
+		// flat tile body, byte-identical to the pre-S108 behaviour).
+		lv_obj_set_style_bg_color(shine, MakerphoneTheme::chromeShineColor(), 0);
+		lv_obj_set_style_bg_opa(shine, (lv_opa_t) MakerphoneTheme::chromeShineIdleOpa(), 0);
 	}
 }
 

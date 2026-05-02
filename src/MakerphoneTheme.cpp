@@ -216,3 +216,75 @@ uint8_t MakerphoneTheme::phosphorPulseLow(){
 uint8_t MakerphoneTheme::phosphorPulseHigh(){
 	return phosphorGlowEnabled() ? LV_OPA_COVER : LV_OPA_80;
 }
+
+
+// ---------------------------------------------------------------------
+// S108 - Sony Ericsson Aqua chrome-shine helpers.
+//
+// The late-2000s Sony Ericsson "Aqua" UI rendered every menu tile, soft-
+// key and focus row with a thin bright highlight along its upper edge -
+// a reflected-light cue that suggested polished glass / chrome rather
+// than a flat coloured panel. That's the single visual that defined the
+// Aqua look on the W910i, W995, K850i and C-series Cyber-shot phones,
+// and it's what separates the Aqua skin from a generic dark-blue tile.
+//
+// PhoneIconTile consumes these helpers at idle (gated on
+// chromeShineEnabled()) so every tile under SonyEricssonAqua rests with
+// a faint AQUA_FOAM strip across the top of its body - the always-on
+// 'glass catching ambient light' cue. Selecting the tile then snaps the
+// strip to LV_OPA_COVER so the focused tile reads as 'lit by a direct
+// sunbeam' against its softly-shining neighbours - the same wet-shine
+// cue Sony Ericsson used to mark the focused row on the W910i menu
+// carousel.
+//
+// Default / Nokia 3310 / Game Boy DMG / Amber CRT return values that
+// produce the previous byte-identical behaviour: chromeShineEnabled()
+// == false, both opacity helpers return LV_OPA_TRANSP (so
+// chromeShineColor()'s value is never observed), keeping the existing
+// tile silhouette unchanged on every non-Aqua theme.
+// ---------------------------------------------------------------------
+
+bool MakerphoneTheme::chromeShineEnabled(){
+	return getCurrent() == Theme::SonyEricssonAqua;
+}
+
+lv_color_t MakerphoneTheme::chromeShineColor(){
+	switch(getCurrent()){
+		case Theme::SonyEricssonAqua: return AQUA_FOAM;
+		// The fallbacks below are never observed - chromeShineIdleOpa()
+		// and chromeShineSelectedOpa() both return LV_OPA_TRANSP on
+		// every non-Aqua theme, so the strip's colour can't reach the
+		// framebuffer. The values still resolve to a sensible per-theme
+		// 'lightest accent' so a future caller that probes the colour
+		// outside the opacity gate (e.g. a debug overlay) reads
+		// something coherent rather than an undefined value.
+		case Theme::Nokia3310:  return N3310_HIGHLIGHT;
+		case Theme::GameBoyDMG: return GBDMG_LCD_LIGHT;
+		case Theme::AmberCRT:   return AMBER_CRT_HOT;
+		case Theme::Default:
+		default:                return MP_HIGHLIGHT;
+	}
+}
+
+uint8_t MakerphoneTheme::chromeShineIdleOpa(){
+	// LV_OPA_50 is the calibrated 'always-on glass shine' opacity:
+	// bright enough that the strip reads as a deliberate highlight
+	// rather than a stray pixel, dim enough that the tile body
+	// underneath stays the dominant colour. On a real W910i the
+	// idle chrome edge sat roughly half-way between the panel
+	// colour and pure white; LV_OPA_50 with AQUA_FOAM as the source
+	// is the closest one-pixel-strip approximation of that
+	// blend on a 16 bpp panel.
+	return chromeShineEnabled() ? LV_OPA_50 : LV_OPA_TRANSP;
+}
+
+uint8_t MakerphoneTheme::chromeShineSelectedOpa(){
+	// LV_OPA_COVER (full intensity) on selection - the focused Aqua
+	// tile snaps to a 'wet bright top edge' that the eye reads as
+	// 'this tile is currently catching the light'. This is a
+	// non-pulsing, on/off overlay because the existing halo already
+	// pulses on selection; layering a second pulsing element on top
+	// would make the focused tile read as jittery rather than
+	// confidently 'lit'.
+	return chromeShineEnabled() ? LV_OPA_COVER : LV_OPA_TRANSP;
+}
