@@ -34,7 +34,7 @@
 #define MP_ICON_DETAIL (MakerphoneTheme::iconDetail())
 
 PhoneIconTile::PhoneIconTile(lv_obj_t* parent, Icon icon, const char* label)
-		: LVObject(parent), icon(icon), halo(nullptr), iconLayer(nullptr), labelEl(nullptr){
+		: LVObject(parent), icon(icon), halo(nullptr), shine(nullptr), edgeGlow(nullptr), iconLayer(nullptr), labelEl(nullptr){
 
 	// The tile is a fixed-size widget that flows naturally inside a flex
 	// or grid parent (no IGNORE_LAYOUT flag, see header notes).
@@ -43,6 +43,7 @@ PhoneIconTile::PhoneIconTile(lv_obj_t* parent, Icon icon, const char* label)
 	buildBackground();
 	buildHalo();
 	buildShine();
+	buildEdgeGlow();
 	buildIconLayer();
 	buildLabel(label);
 
@@ -132,6 +133,44 @@ void PhoneIconTile::buildShine(){
 	lv_obj_set_style_bg_opa(shine, LV_OPA_TRANSP, 0);
 }
 
+// S110 - RAZR Hot Pink EL-backlight edge-glow strip.
+// A 1-pixel RAZR_GLOW line painted across the bottom edge of the tile
+// body, suggesting hot magenta-pink electroluminescent panel light
+// bleeding up from under the etched-chrome keypad icon (the iconic
+// 'EL backlight haloing the chrome character from below' cue that
+// defined the V3 / V3i keypad). Lives as a child of the tile alongside
+// `shine` and is drawn just below the icon layer so the strip never
+// occludes any of the per-icon rectangles. Colour + opacity resolve
+// through MakerphoneTheme::edgeGlow*() so the strip is fully
+// transparent under Default / Nokia 3310 / Game Boy DMG / Amber CRT /
+// Sony Ericsson Aqua (byte-identical to the previous behaviour) and
+// only becomes visible under RazrHotPink.
+//
+// Mirrors PhoneIconTile::buildShine() exactly, but anchored to
+// LV_ALIGN_BOTTOM_MID instead of LV_ALIGN_TOP_MID. The two cues
+// occupy disjoint pixel rows (top row vs bottom row) so they coexist
+// without overpainting on any future theme that wants both - though
+// today only one of the two is ever non-transparent.
+void PhoneIconTile::buildEdgeGlow(){
+	edgeGlow = lv_obj_create(obj);
+	lv_obj_remove_style_all(edgeGlow);
+	lv_obj_clear_flag(edgeGlow, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(edgeGlow, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	// Inset 1 px on either side so the strip never overpaints the
+	// tile's existing border (which carries the selection cue).
+	lv_obj_set_size(edgeGlow, TileWidth - 2, 1);
+	lv_obj_set_align(edgeGlow, LV_ALIGN_BOTTOM_MID);
+	lv_obj_set_y(edgeGlow, -1);
+	lv_obj_set_style_radius(edgeGlow, 0, 0);
+	lv_obj_set_style_border_width(edgeGlow, 0, 0);
+	lv_obj_set_style_pad_all(edgeGlow, 0, 0);
+	lv_obj_set_style_bg_color(edgeGlow, MakerphoneTheme::edgeGlowColor(), 0);
+	// Idle opacity is wired in refreshSelection() (which runs once at
+	// the end of the constructor), so this initial set just keeps the
+	// strip invisible until refreshSelection() decides per-theme.
+	lv_obj_set_style_bg_opa(edgeGlow, LV_OPA_TRANSP, 0);
+}
+
 void PhoneIconTile::buildIconLayer(){
 	// 16x16 transparent container that holds the per-icon pixel rectangles.
 	// Centered horizontally; sits 3 px from the top of the tile so the
@@ -206,6 +245,15 @@ void PhoneIconTile::refreshSelection(){
 		// themes never see a shine flash).
 		lv_obj_set_style_bg_color(shine, MakerphoneTheme::chromeShineColor(), 0);
 		lv_obj_set_style_bg_opa(shine, (lv_opa_t) MakerphoneTheme::chromeShineSelectedOpa(), 0);
+		// S110 - RAZR Hot Pink: focused tile burns the EL-backlight
+		// bottom strip to full intensity (LV_OPA_COVER under RAZR,
+		// LV_OPA_TRANSP everywhere else - same byte as the idle non-
+		// RAZR state, so non-RAZR themes never see an edge-glow
+		// flash). The cue reads as 'this key is currently pressed
+		// and the EL panel is lit at full brightness underneath it' -
+		// the press-feedback signature of every mid-2000s RAZR.
+		lv_obj_set_style_bg_color(edgeGlow, MakerphoneTheme::edgeGlowColor(), 0);
+		lv_obj_set_style_bg_opa(edgeGlow, (lv_opa_t) MakerphoneTheme::edgeGlowSelectedOpa(), 0);
 
 		lv_anim_t a;
 		lv_anim_init(&a);
@@ -235,6 +283,16 @@ void PhoneIconTile::refreshSelection(){
 		// flat tile body, byte-identical to the pre-S108 behaviour).
 		lv_obj_set_style_bg_color(shine, MakerphoneTheme::chromeShineColor(), 0);
 		lv_obj_set_style_bg_opa(shine, (lv_opa_t) MakerphoneTheme::chromeShineIdleOpa(), 0);
+		// S110 - RAZR Hot Pink: idle tile rests with a faint RAZR_GLOW
+		// strip across its bottom edge (LV_OPA_40 under RAZR,
+		// LV_OPA_TRANSP everywhere else - so non-RAZR themes still
+		// render a perfectly flat tile body, byte-identical to the
+		// pre-S110 behaviour). The cue reads as 'EL keypad backlight
+		// always-on bleed' - the soft pink halo every RAZR owner saw
+		// at the base of every chrome character whenever the panel
+		// was lit.
+		lv_obj_set_style_bg_color(edgeGlow, MakerphoneTheme::edgeGlowColor(), 0);
+		lv_obj_set_style_bg_opa(edgeGlow, (lv_opa_t) MakerphoneTheme::edgeGlowIdleOpa(), 0);
 	}
 }
 

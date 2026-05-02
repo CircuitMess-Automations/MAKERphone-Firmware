@@ -82,12 +82,17 @@ private:
 	lv_obj_t* halo;        // outer glow ring (visible only when selected)
 	lv_obj_t* shine;       // S108 - Sony Ericsson Aqua chrome-shine strip across the top edge
 	                        //          of the tile body. Fully transparent under every other theme.
+	lv_obj_t* edgeGlow;    // S110 - RAZR Hot Pink EL-backlight bleed strip across the bottom
+	                        //          edge of the tile body. Mirrors `shine` (top edge) on the
+	                        //          opposite axis so the two cues read as physically distinct
+	                        //          lighting models. Fully transparent under every non-RAZR theme.
 	lv_obj_t* iconLayer;   // 16x16 transparent container that holds the pixel rectangles
 	lv_obj_t* labelEl;     // optional pixelbasic7 label below the icon (nullable)
 
 	void buildBackground();
 	void buildHalo();
 	void buildShine();
+	void buildEdgeGlow();
 	void buildIconLayer();
 	void buildLabel(const char* label);
 	void refreshSelection();

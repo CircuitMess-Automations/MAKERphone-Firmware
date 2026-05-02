@@ -382,6 +382,77 @@ public:
 	static lv_color_t chromeShineColor();
 	static uint8_t    chromeShineIdleOpa();
 	static uint8_t    chromeShineSelectedOpa();
+
+	/*
+	 * S110 - RAZR Hot Pink edge-glow helpers (icon-glyph pass).
+	 *
+	 * The defining visual cue of the mid-2000s Motorola RAZR V3 / V3i
+	 * keypad was its electroluminescent (EL) backlight: a thin pink-
+	 * white panel sat under the etched-chrome keypad, and when the
+	 * phone woke the EL bled hot magenta-pink light around the
+	 * boundaries of every chrome character. The icons + numerals
+	 * weren't 'lit' so much as 'haloed from below' - the chrome was
+	 * dark, the pink leak was bright, and the result was a fingerprint
+	 * silhouette of every key against a glowing pink panel. That
+	 * bottom-edge bleed is the single visual that defined the RAZR
+	 * keypad look; without it, an etched-chrome icon on a dark
+	 * magenta panel just reads as 'an icon on dark purple', missing
+	 * the entire point of the era's signature flip phone.
+	 *
+	 * Phase O folds that effect into PhoneIconTile via a per-theme
+	 * 'edge-glow' overlay - a 1 px RAZR_GLOW strip rendered along the
+	 * very bottom of every tile body. Mechanically the mirror of the
+	 * S108 chrome-shine top strip, but tuned to read as 'EL backlight
+	 * leaking up from beneath the icon' rather than 'glass catching
+	 * sunlight from above'. On themes that don't have an EL-bleed
+	 * convention (Default Synthwave purple, Nokia 3310 LCD, Game Boy
+	 * DMG LCD, Amber CRT phosphor, Sony Ericsson Aqua glass) the strip
+	 * stays fully transparent, byte-identical to the previous
+	 * behaviour. On RAZR Hot Pink, the strip rests at a moderate idle
+	 * opacity (the always-on EL keypad backlight cue) and the selected
+	 * tile burns the strip to full intensity (the 'this key is
+	 * pressed - panel lit at full' cue every RAZR owner saw whenever
+	 * they thumbed the d-pad).
+	 *
+	 *   edgeGlowEnabled()     - true only for RazrHotPink
+	 *   edgeGlowColor()       - RAZR_GLOW under RazrHotPink, MP_ACCENT
+	 *                           otherwise (the latter is a fallback
+	 *                           that's never observed because callers
+	 *                           gate on edgeGlowEnabled() first via
+	 *                           the opacity helpers below)
+	 *   edgeGlowIdleOpa()     - LV_OPA_40 under RazrHotPink,
+	 *                           LV_OPA_TRANSP otherwise (so the
+	 *                           existing tiles render byte-identically
+	 *                           on every other theme)
+	 *   edgeGlowSelectedOpa() - LV_OPA_COVER under RazrHotPink,
+	 *                           LV_OPA_TRANSP otherwise
+	 *
+	 * The selected-vs-idle opacity gap (40% -> 100%) captures the
+	 * 'EL keypad lit at full' cue that defined the RAZR press-feedback
+	 * loop: every key on a real V3 went from dimly-haloed-pink to
+	 * white-pink-glowing the instant your thumb made contact. The
+	 * doubled-plus opacity reproduces that snap without needing a
+	 * per-tile colour shift. PhoneIconTile applies this static (non-
+	 * pulsing) overlay rather than animating it because the existing
+	 * halo already pulses on selection - layering a second pulsing
+	 * element on top would make the focused tile read as jittery
+	 * rather than 'pressed', which contradicts the snappy RAZR
+	 * feel.
+	 *
+	 * Why bottom edge (vs S108's top edge): the EL backlight panel
+	 * sat *under* the keypad, so the bleed-through always read as
+	 * 'lifting up from below' on a real V3. Mirroring the strip from
+	 * top to bottom keeps the cue physically faithful and gives the
+	 * RAZR theme a visual axis that's distinct from the SE Aqua
+	 * top-shine - so a user flipping between the two themes sees
+	 * the highlight strip swap edges, not just colours, reinforcing
+	 * that they're two genuinely different lighting models rather
+	 * than two re-coloured versions of the same overlay.
+	 */
+	static bool       edgeGlowEnabled();
+	static lv_color_t edgeGlowColor();
+	static uint8_t    edgeGlowIdleOpa();
+	static uint8_t    edgeGlowSelectedOpa();
 };
 
 /*

@@ -301,3 +301,98 @@ uint8_t MakerphoneTheme::chromeShineSelectedOpa(){
 	// confidently 'lit'.
 	return chromeShineEnabled() ? LV_OPA_COVER : LV_OPA_TRANSP;
 }
+
+
+// ---------------------------------------------------------------------
+// S110 - RAZR Hot Pink edge-glow helpers.
+//
+// The mid-2000s Motorola RAZR V3 / V3i keypad sat over an
+// electroluminescent (EL) backlight panel: a thin pink-white sheet that
+// always lit when the phone was awake and bled hot magenta-pink around
+// the boundaries of every etched-chrome character. The result was a
+// distinctive 'icon haloed from below' look - the chrome strokes stayed
+// dark, the EL leak burned bright pink underneath them, and every key
+// read as a fingerprint silhouette against a glowing panel. That
+// bottom-edge bleed is the single visual that defined the RAZR keypad,
+// and it's what separates the RAZR Hot Pink skin from a generic dark-
+// magenta tile.
+//
+// PhoneIconTile consumes these helpers at idle (gated on
+// edgeGlowEnabled()) so every tile under RazrHotPink rests with a faint
+// RAZR_GLOW strip across the bottom of its body - the always-on EL
+// backlight cue. Selecting the tile then snaps the strip to LV_OPA_COVER
+// so the focused tile reads as 'this key is pressed and the panel is
+// lit at full intensity' against its softly-haloed neighbours - the
+// same press-feedback cue every RAZR owner felt when their thumb hit
+// the d-pad.
+//
+// Default / Nokia 3310 / Game Boy DMG / Amber CRT / Sony Ericsson Aqua
+// return values that produce the previous byte-identical behaviour:
+// edgeGlowEnabled() == false, both opacity helpers return LV_OPA_TRANSP
+// (so edgeGlowColor()'s value is never observed), keeping the existing
+// tile silhouette unchanged on every non-RAZR theme.
+//
+// Mechanically the strip is the mirror of S108's chrome-shine top
+// strip, but the bottom-edge anchor + RAZR_GLOW colour give the RAZR
+// theme a visual axis that's distinct from the Aqua look - so a user
+// flipping between Aqua and RAZR sees the highlight strip swap edges
+// (top -> bottom) and hue (foam -> hot pink), reinforcing that they're
+// two genuinely different lighting models rather than two recoloured
+// versions of the same overlay.
+// ---------------------------------------------------------------------
+
+bool MakerphoneTheme::edgeGlowEnabled(){
+	return getCurrent() == Theme::RazrHotPink;
+}
+
+lv_color_t MakerphoneTheme::edgeGlowColor(){
+	switch(getCurrent()){
+		case Theme::RazrHotPink: return RAZR_GLOW;
+		// The fallbacks below are never observed - edgeGlowIdleOpa()
+		// and edgeGlowSelectedOpa() both return LV_OPA_TRANSP on every
+		// non-RAZR theme, so the strip's colour can't reach the
+		// framebuffer. The values still resolve to a sensible per-theme
+		// 'brightest accent' so a future caller that probes the colour
+		// outside the opacity gate (e.g. a debug overlay) reads
+		// something coherent rather than an undefined value.
+		case Theme::Nokia3310:        return N3310_FRAME;
+		case Theme::GameBoyDMG:       return GBDMG_INK;
+		case Theme::AmberCRT:         return AMBER_CRT_HOT;
+		case Theme::SonyEricssonAqua: return AQUA_GLOW;
+		case Theme::Default:
+		default:                      return MP_ACCENT;
+	}
+}
+
+uint8_t MakerphoneTheme::edgeGlowIdleOpa(){
+	// LV_OPA_40 is the calibrated 'always-on EL backlight' opacity:
+	// bright enough that the strip reads as a deliberate halo - the
+	// pink panel light visibly leaking out from under the chrome key -
+	// dim enough that the tile body underneath stays the dominant
+	// dark-magenta colour. On a real V3 the EL keypad rested at
+	// roughly 35-45% of full brightness when idle (the panel never
+	// fully dimmed during use - that was the whole reason RAZR
+	// owners loved typing in the dark) and LV_OPA_40 is the closest
+	// 1-pixel-strip approximation of that bleed on a 16 bpp panel.
+	// One step deeper than S108's LV_OPA_50 chrome-shine idle so the
+	// idle RAZR halo reads as 'soft EL bleed' rather than 'lit chrome'
+	// - the visual difference between an electroluminescent panel
+	// (warm, diffuse, soft) and a polished chrome reflection (cool,
+	// crisp, bright).
+	return edgeGlowEnabled() ? LV_OPA_40 : LV_OPA_TRANSP;
+}
+
+uint8_t MakerphoneTheme::edgeGlowSelectedOpa(){
+	// LV_OPA_COVER (full intensity) on selection - the focused RAZR
+	// tile snaps to a 'fully lit pink panel under the icon' that the
+	// eye reads as 'this key is currently pressed'. This is a non-
+	// pulsing, on/off overlay because the existing halo already pulses
+	// on selection; layering a second pulsing element on top would
+	// make the focused tile read as jittery rather than 'pressed',
+	// which contradicts the snappy RAZR feel (a real V3's keypad
+	// transitioned cleanly between idle-EL-bleed and full-press
+	// brightness, no soft fade in between - the EL panel had no
+	// gradient, only on-or-off behind each key region).
+	return edgeGlowEnabled() ? LV_OPA_COVER : LV_OPA_TRANSP;
+}
+
