@@ -36,6 +36,7 @@
 #include "PhoneHelicopter.h"
 #include "Phone2048.h"
 #include "PhoneSolitaire.h"
+#include "PhoneSudoku.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -104,6 +105,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "COPTER",   nullptr,                   GameKind::Screen },  // S92
 	{ "2048",     nullptr,                   GameKind::Screen },  // S93
 	{ "SOLITAIR", nullptr,                   GameKind::Screen },  // S94
+	{ "SUDOKU",   nullptr,                   GameKind::Screen },  // S95
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -916,6 +918,47 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 20, 12, 2, 2, cyan);
 			break;
 		}
+		case 23: { // SUDOKU - mini 3x3 box of digits + a focused cell
+		           // telegraphs "fill the board" puzzle gameplay.
+			// S95: a stylised mini sudoku tile. We paint a single
+			// 3x3 sub-box at the centre of the glyph: dim purple
+			// grid lines, two cyan "given" pixel digits, one orange
+			// player-placed digit, and a sunset-orange focused cell
+			// outline so the silhouette reads as "sudoku" at icon
+			// scale without us trying to render real glyphs in 30x22.
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t orange = lv_color_make(255, 140,  30);
+			const lv_color_t purple = lv_color_make( 70,  56, 100);
+
+			// Outer frame.
+			px(g,  6,  4, 19,  1, cyan);
+			px(g,  6, 18, 19,  1, cyan);
+			px(g,  6,  4,  1, 15, cyan);
+			px(g, 24,  4,  1, 15, cyan);
+
+			// Two interior grid lines carving the area into a 3x3
+			// of small cells.
+			px(g, 12,  4,  1, 15, purple);
+			px(g, 18,  4,  1, 15, purple);
+			px(g,  6,  9, 19,  1, purple);
+			px(g,  6, 14, 19,  1, purple);
+
+			// Three "given" digits as cyan pips dotted into cells.
+			px(g,  8,  6,  3,  2, cyan);  // top-left cell
+			px(g, 20,  6,  3,  2, cyan);  // top-right cell
+			px(g,  8, 16,  3,  2, cyan);  // bottom-left cell
+
+			// One player-placed digit (orange) in the middle row.
+			px(g, 14, 11,  3,  2, orange);
+
+			// Focused-cell highlight - sunset-orange border on the
+			// centre-right cell to telegraph the cursor.
+			px(g, 19, 10,  5,  1, orange);
+			px(g, 19, 14,  5,  1, orange);
+			px(g, 19, 10,  1,  5, orange);
+			px(g, 23, 10,  1,  5, orange);
+			break;
+		}
 		default:
 			break;
 	}
@@ -1070,6 +1113,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 20: push(new PhoneHelicopter()); break;
 			case 21: push(new Phone2048()); break;
 			case 22: push(new PhoneSolitaire()); break;
+			case 23: push(new PhoneSudoku()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud

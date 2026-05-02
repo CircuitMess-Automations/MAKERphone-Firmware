@@ -151,7 +151,7 @@ A proper retro-arcade carousel for `PhoneGames`. Each entry is one self-containe
 - [x] **S92** — `PhoneHelicopter` — endless side-scrolling avoidance.
 - [x] **S93** — `Phone2048`.
 - [x] **S94** — `PhoneSolitaire` — Klondike, dialer-driven column select.
-- [ ] **S95** — `PhoneSudoku` — three difficulty packs, generated.
+- [x] **S95** — `PhoneSudoku` — three difficulty packs, generated.
 - [ ] **S96** — `PhoneWordle` — daily 5-letter guess.
 - [ ] **S97** — `PhoneSimon` — memory + buzzer-tone Simon Says.
 - [ ] **S98** — `PhoneSnakesLadders` — vs CPU.
