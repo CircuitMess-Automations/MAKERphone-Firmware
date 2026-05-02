@@ -32,6 +32,7 @@
 #include "PhoneConnectFour.h"
 #include "PhoneReversi.h"
 #include "PhoneWhackAMole.h"
+#include "PhoneLunarLander.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -96,6 +97,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "CONNECT4", nullptr,                   GameKind::Screen },  // S88
 	{ "REVERSI",  nullptr,                   GameKind::Screen },  // S89
 	{ "WHACK",    nullptr,                   GameKind::Screen },  // S90
+	{ "LANDER",   nullptr,                   GameKind::Screen },  // S91
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -764,6 +766,45 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 15, 13, 1, 5, orange);
 			break;
 		}
+		case 19: { // LANDER - tiny lander craft, jagged surface, cyan flame
+			// S91: stylised glance of the lunar-lander game. A small
+			// cream lander silhouette sits in the upper-right with a
+			// short orange flame trailing beneath it; a jagged cyan
+			// horizon plus a single sunset-orange flat pad anchors the
+			// scene. Reads as "spacecraft over rough terrain" at 30x22.
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t cream  = lv_color_make(255, 220, 180);
+			const lv_color_t orange = lv_color_make(255, 140,  30);
+			const lv_color_t flame  = lv_color_make(255, 200,  80);
+
+			// Jagged terrain silhouette across the bottom: pixel slabs
+			// at varying heights so the surface reads as broken rock.
+			px(g,  0, 18, 3,  4, cyan);
+			px(g,  3, 16, 3,  6, cyan);
+			px(g,  6, 19, 2,  3, cyan);
+			px(g,  8, 17, 3,  5, cyan);
+			px(g, 11, 20, 4,  2, cyan);   // dip with the flat pad
+			px(g, 11, 20, 4,  1, orange); // pad highlight stripe
+			px(g, 15, 18, 3,  4, cyan);
+			px(g, 18, 16, 2,  6, cyan);
+			px(g, 20, 19, 3,  3, cyan);
+			px(g, 23, 17, 4,  5, cyan);
+			px(g, 27, 20, 3,  2, cyan);
+
+			// Lander body: 4x3 cream rectangle with a 2x1 orange leg
+			// strip and a single cyan dome pixel. Sits in the upper
+			// right so the silhouette reads as "descending toward the
+			// pad below".
+			px(g, 19,  4, 5, 3, cream);
+			px(g, 20,  3, 3, 1, cyan);
+			px(g, 19,  7, 5, 1, orange);
+			px(g, 19,  8, 1, 2, orange);
+			px(g, 23,  8, 1, 2, orange);
+
+			// Trailing flame between the legs.
+			px(g, 21,  9, 1, 2, flame);
+			break;
+		}
 		default:
 			break;
 	}
@@ -914,6 +955,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 16: push(new PhoneConnectFour()); break;
 			case 17: push(new PhoneReversi()); break;
 			case 18: push(new PhoneWhackAMole()); break;
+			case 19: push(new PhoneLunarLander()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud

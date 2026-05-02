@@ -147,7 +147,7 @@ A proper retro-arcade carousel for `PhoneGames`. Each entry is one self-containe
 - [x] **S88** — `PhoneConnectFour` — vs CPU.
 - [x] **S89** — `PhoneReversi` — Othello vs CPU.
 - [x] **S90** — `PhoneWhackAMole` — dialer-key reaction game.
-- [ ] **S91** — `PhoneLunarLander` — fuel/thrust physics.
+- [x] **S91** — `PhoneLunarLander` — fuel/thrust physics.
 - [ ] **S92** — `PhoneHelicopter` — endless side-scrolling avoidance.
 - [ ] **S93** — `Phone2048`.
 - [ ] **S94** — `PhoneSolitaire` — Klondike, dialer-driven column select.
