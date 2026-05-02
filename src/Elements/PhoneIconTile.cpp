@@ -141,11 +141,29 @@ void PhoneIconTile::setSelected(bool sel){
 // ----- internal -----
 
 void PhoneIconTile::refreshSelection(){
-	// Idle look: muted purple border, dim label, transparent halo, no anim.
-	// Selected look: orange border, cream label, halo border opacity pulses
-	//                between LV_OPA_30 and LV_OPA_80 forever.
+	// Idle look: muted-theme border, dim label, transparent halo, no anim.
+	// Selected look: theme-accent border, cream/text label, halo border
+	//                opacity pulses between phosphorPulseLow() and
+	//                phosphorPulseHigh() forever.
+	//
+	// S106 - on Amber CRT, the idle halo rests at a low dim-amber opacity
+	// (the always-on phosphor bloom around lit pixels) and the selected
+	// pulse range bumps to 50/100% so a selected tile reads as 'beam
+	// intensity at full energy' against its softly-glowing neighbours.
+	// Default / Nokia / DMG resolve to LV_OPA_TRANSP idle + 30/80% pulse,
+	// byte-identical to the previous behaviour.
+	const bool      glowOn      = MakerphoneTheme::phosphorGlowEnabled();
+	const lv_color_t glowColor  = MakerphoneTheme::phosphorGlow();
+	const lv_opa_t  glowOpaIdle = (lv_opa_t) MakerphoneTheme::phosphorGlowOpa();
+	const lv_opa_t  pulseLow    = (lv_opa_t) MakerphoneTheme::phosphorPulseLow();
+	const lv_opa_t  pulseHigh   = (lv_opa_t) MakerphoneTheme::phosphorPulseHigh();
+
 	if(selected){
 		lv_obj_set_style_border_color(obj, MP_ACCENT, 0);
+		// Selected halo always uses the bright accent (AMBER_CRT_HOT under
+		// Amber CRT). The pulse animation overrides the idle border opa
+		// below, so we only need to set the colour here.
+		lv_obj_set_style_border_color(halo, MP_ACCENT, 0);
 		if(labelEl != nullptr){
 			lv_obj_set_style_text_color(labelEl, MP_TEXT, 0);
 		}
@@ -153,7 +171,7 @@ void PhoneIconTile::refreshSelection(){
 		lv_anim_t a;
 		lv_anim_init(&a);
 		lv_anim_set_var(&a, halo);
-		lv_anim_set_values(&a, LV_OPA_30, LV_OPA_80);
+		lv_anim_set_values(&a, pulseLow, pulseHigh);
 		lv_anim_set_time(&a, HaloPulsePeriod);
 		lv_anim_set_playback_time(&a, HaloPulsePeriod);
 		lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
@@ -161,9 +179,13 @@ void PhoneIconTile::refreshSelection(){
 		lv_anim_set_exec_cb(&a, haloPulseExec);
 		lv_anim_start(&a);
 	}else{
-		// Cancel any running pulse and snap the halo back to invisible.
+		// Cancel any running pulse and snap the halo back to its idle
+		// rest state. On non-Amber themes this is fully transparent so
+		// only the tile body shows; on Amber CRT it stays at a faint
+		// AMBER_CRT_DIM phosphor bleed around the tile.
 		lv_anim_del(halo, haloPulseExec);
-		lv_obj_set_style_border_opa(halo, LV_OPA_TRANSP, 0);
+		lv_obj_set_style_border_color(halo, glowOn ? glowColor : MP_ACCENT, 0);
+		lv_obj_set_style_border_opa(halo, glowOpaIdle, 0);
 		lv_obj_set_style_border_color(obj, MP_DIM, 0);
 		if(labelEl != nullptr){
 			lv_obj_set_style_text_color(labelEl, MP_LABEL_DIM, 0);

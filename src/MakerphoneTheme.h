@@ -215,6 +215,52 @@ public:
 	 */
 	static lv_color_t iconStroke();
 	static lv_color_t iconDetail();
+
+	/*
+	 * S106 - phosphor-bloom halo (Amber CRT icon-glyph pass).
+	 *
+	 * Real 1980s amber-phosphor CRTs exhibit a faint always-on halo
+	 * around bright pixels: the energised phosphor 'bleeds' about a
+	 * pixel into surrounding panel area, so an icon never sits as a
+	 * hard-edged graphic against a dead-black panel - it always has
+	 * a soft warm edge spreading into the bezel. That bloom is the
+	 * single defining visual cue of the era; without it, an "amber"
+	 * icon just looks like an orange icon on a black background.
+	 *
+	 * Phase O folds that effect into PhoneIconTile via a per-theme
+	 * idle-halo mode. On themes that don't have a phosphor (Default
+	 * Synthwave, Nokia 3310 LCD, Game Boy DMG LCD) the idle halo
+	 * stays fully transparent, byte-identical to the previous
+	 * behaviour. On Amber CRT, the halo always rests at a low
+	 * opacity in the dim-amber colour so every tile - whether
+	 * selected or not - reads as 'lit phosphor bleeding into the
+	 * surrounding panel'. Selecting the tile then pulses the halo
+	 * at a brighter pulse range, mimicking the 'energised phosphor
+	 * burns harder' cue you see on a real CRT when the cursor row
+	 * is drawn at full beam intensity.
+	 *
+	 *   phosphorGlowEnabled() - true only for AmberCRT
+	 *   phosphorGlow()        - dim halo colour (AMBER_CRT_DIM under
+	 *                           AmberCRT, MP_DIM otherwise - the
+	 *                           latter is a fallback that's never
+	 *                           observed because callers gate on
+	 *                           phosphorGlowEnabled() first)
+	 *   phosphorGlowOpa()     - LV_OPA_20 under AmberCRT, _TRANSP
+	 *                           otherwise
+	 *
+	 * Selected-pulse range:
+	 *   phosphorPulseLow()  - LV_OPA_30 default, LV_OPA_50 AmberCRT
+	 *   phosphorPulseHigh() - LV_OPA_80 default, LV_OPA_COVER AmberCRT
+	 *
+	 * The pulse-range bump (50/100% vs 30/80%) makes a selected
+	 * Amber CRT tile read as visibly 'hotter' than its idle
+	 * neighbours.
+	 */
+	static bool       phosphorGlowEnabled();
+	static lv_color_t phosphorGlow();
+	static uint8_t    phosphorGlowOpa();
+	static uint8_t    phosphorPulseLow();
+	static uint8_t    phosphorPulseHigh();
 };
 
 /*

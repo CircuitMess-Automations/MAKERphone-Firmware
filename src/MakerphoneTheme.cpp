@@ -149,3 +149,58 @@ lv_color_t MakerphoneTheme::iconDetail(){
 		default:                return MP_ACCENT;
 	}
 }
+
+
+// ---------------------------------------------------------------------
+// S106 - Amber CRT phosphor-bloom halo helpers.
+//
+// Real 1980s amber-phosphor CRTs exhibit a faint always-on halo around
+// bright pixels: the energised phosphor 'bleeds' about a pixel into
+// surrounding panel area, so an icon never sits as a hard-edged
+// graphic against a dead-black panel - it always has a soft warm edge
+// spreading into the bezel. PhoneIconTile consumes these helpers at
+// idle (gated on phosphorGlowEnabled()) so every tile under Amber CRT
+// rests with a faint AMBER_CRT_DIM border peeking past the tile body,
+// and the selected-pulse range bumps to 50%-100% so a selected tile
+// reads as 'hotter' than its idle neighbours - the same beam-intensity
+// cue you'd see on a real Apple ///, IBM 5151, or Wyse 50 terminal
+// when the cursor row redraws at full energy.
+//
+// Default / Nokia 3310 / Game Boy DMG return values that produce the
+// previous byte-identical behaviour: phosphorGlowEnabled() == false,
+// phosphorGlowOpa() == LV_OPA_TRANSP (so phosphorGlow()'s colour is
+// never observed), pulse range stays 30%-80% so the existing tile
+// pulse cadence is unchanged.
+// ---------------------------------------------------------------------
+
+bool MakerphoneTheme::phosphorGlowEnabled(){
+	return getCurrent() == Theme::AmberCRT;
+}
+
+lv_color_t MakerphoneTheme::phosphorGlow(){
+	switch(getCurrent()){
+		case Theme::AmberCRT:   return AMBER_CRT_DIM;
+		case Theme::Nokia3310:  return N3310_PIXEL_DIM;
+		case Theme::GameBoyDMG: return GBDMG_LCD_MID;
+		case Theme::Default:
+		default:                return MP_DIM;
+	}
+}
+
+uint8_t MakerphoneTheme::phosphorGlowOpa(){
+	// LV_OPA_20 is intentionally low: the bloom should be visible
+	// but never compete with the icon strokes themselves. On a real
+	// CRT the bloom is brightest immediately adjacent to the lit
+	// pixel and falls off rapidly with distance; LVGL only gives us
+	// a single border layer so a single dim opacity is the closest
+	// approximation we can achieve without a per-pixel canvas pass.
+	return phosphorGlowEnabled() ? LV_OPA_20 : LV_OPA_TRANSP;
+}
+
+uint8_t MakerphoneTheme::phosphorPulseLow(){
+	return phosphorGlowEnabled() ? LV_OPA_50 : LV_OPA_30;
+}
+
+uint8_t MakerphoneTheme::phosphorPulseHigh(){
+	return phosphorGlowEnabled() ? LV_OPA_COVER : LV_OPA_80;
+}
