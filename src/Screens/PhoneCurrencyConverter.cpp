@@ -2,7 +2,7 @@
 
 #include <Input/Input.h>
 #include <Pins.hpp>
-#include <math.h>
+#include <cmath>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -131,7 +131,7 @@ void PhoneCurrencyConverter::formatAmount(double value,
 	// overflow exponent ("1e+12" etc.). The display column is 8 chars
 	// wide, so anything beyond ~99,999,999 is not useful as a number
 	// the user can read at a glance. Fall back to "----" instead.
-	if(!isfinite(value) || v >= 1.0e9) {
+	if(!std::isfinite(value) || v >= 1.0e9) {
 		const char* placeholder = "----";
 		size_t n = strlen(placeholder);
 		if(n >= outLen) n = outLen - 1;
@@ -354,8 +354,8 @@ void PhoneCurrencyConverter::seedEntryFromValue(double value) {
 	// want by clearing first. Bound the magnitude so a giant computed
 	// value (e.g. 1.5M JPY converted to USD) does not splat thousands of
 	// digits into the entry buffer.
-	if(!isfinite(value) || value < 0.0) value = 0.0;
-	double rounded = floor(value + 0.5);
+	if(!std::isfinite(value) || value < 0.0) value = 0.0;
+	double rounded = std::floor(value + 0.5);
 	if(rounded >= 1.0e7) rounded = 1.0e7 - 1;   // cap at MaxEntryDigits
 
 	uint64_t whole = (uint64_t) rounded;
