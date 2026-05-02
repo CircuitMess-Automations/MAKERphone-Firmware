@@ -33,6 +33,7 @@
 #include "PhoneReversi.h"
 #include "PhoneWhackAMole.h"
 #include "PhoneLunarLander.h"
+#include "PhoneHelicopter.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -98,6 +99,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "REVERSI",  nullptr,                   GameKind::Screen },  // S89
 	{ "WHACK",    nullptr,                   GameKind::Screen },  // S90
 	{ "LANDER",   nullptr,                   GameKind::Screen },  // S91
+	{ "COPTER",   nullptr,                   GameKind::Screen },  // S92
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -805,6 +807,47 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 21,  9, 1, 2, flame);
 			break;
 		}
+		case 20: { // COPTER - tiny helicopter banking over a pillar gap
+			// S92: stylised glance of the helicopter game. A small
+			// cream chopper silhouette banks across the upper-left,
+			// while a pair of cyan pillars flank an open gap on the
+			// right. Reads as "fly through the gap" at 30x22.
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t cream  = lv_color_make(255, 220, 180);
+			const lv_color_t orange = lv_color_make(255, 140,  30);
+			const lv_color_t purple = lv_color_make( 70,  56, 100);
+
+			// Ceiling + floor accent bands so the silhouette reads
+			// as a tunnel.
+			px(g,  0,  2, 30, 1, cyan);
+			px(g,  0, 19, 30, 1, orange);
+
+			// A pair of pillars on the right with a gap in the middle.
+			// Top half of pillar.
+			px(g, 16,  3, 4, 6, purple);
+			px(g, 16,  3, 4, 1, cyan);
+			// Bottom half of pillar (gap is rows 9..13).
+			px(g, 16, 14, 4, 5, purple);
+			px(g, 16, 18, 4, 1, orange);
+
+			// Second pillar farther right (just the silhouette tip).
+			px(g, 25,  3, 3, 4, purple);
+			px(g, 25, 16, 3, 3, purple);
+
+			// Helicopter body banking through the gap on the left.
+			// Body block (cream).
+			px(g,  4,  9, 5, 3, cream);
+			// Cockpit dome (cyan).
+			px(g,  5, 10, 1, 1, cyan);
+			// Tail boom + tail rotor.
+			px(g,  9, 10, 3, 1, cream);
+			px(g, 12,  9, 1, 3, orange);
+			// Main rotor blur (cyan, slightly wider than body).
+			px(g,  3,  8, 7, 1, cyan);
+			// Skids.
+			px(g,  4, 12, 5, 1, orange);
+			break;
+		}
 		default:
 			break;
 	}
@@ -956,6 +999,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 17: push(new PhoneReversi()); break;
 			case 18: push(new PhoneWhackAMole()); break;
 			case 19: push(new PhoneLunarLander()); break;
+			case 20: push(new PhoneHelicopter()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud

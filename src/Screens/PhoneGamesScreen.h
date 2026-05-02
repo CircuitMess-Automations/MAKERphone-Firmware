@@ -85,7 +85,7 @@ public:
 	// .cpp file can size itself off the same constant the class uses
 	// internally without a friend declaration. Bump this whenever a
 	// Phase-N session adds another game to the carousel.
-	static constexpr uint8_t kGameCount = 20;
+	static constexpr uint8_t kGameCount = 21;
 
 private:
 	PhoneSynthwaveBg* wallpaper;
