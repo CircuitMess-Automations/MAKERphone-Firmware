@@ -147,6 +147,22 @@ public:
 		// wallpaper reads as the mid-2000s Motorola RAZR V3 / V3i
 		// Pink idle screen rather than a tinted Synthwave.
 		RazrHotPink = 8,
+
+		// S111 - Stealth Black tactical-handset theme override.
+		// Same dispatch pattern as the prior theme overrides: not
+		// part of the 4-style PhoneWallpaperScreen pager (StyleCount
+		// stays at 4 there); this value is only ever returned by
+		// resolveStyleFromSettings() when Settings.themeId picks the
+		// Stealth Black theme. Renders a flat near-obsidian gradient
+		// panel (pure obsidian -> warm charcoal) with a few barely-
+		// visible horizontal "carbon-fibre weave" raster lines + a
+		// few etched-bezel specks + a small solid red status LED
+		// motif anchored bottom-right (the trademark-safe equivalent
+		// of the era's signature red status indicator), bypassing
+		// every Synthwave builder so the wallpaper reads as the
+		// early-2010s blacked-out tactical-handset idle screen
+		// rather than a tinted Synthwave.
+		StealthBlack = 9,
 	};
 
 	/** Default ctor — picks the style from `Settings.get().wallpaperStyle`. */
@@ -280,6 +296,28 @@ private:
 	// animations - matches the Nokia / DMG / Amber CRT / Aqua
 	// variants' still-image philosophy.
 	void buildRazrHotPinkWallpaper();
+
+	// S111 - Stealth Black tactical-handset wallpaper builder. Same
+	// dispatch pattern as the prior theme builders: paints a flat
+	// near-obsidian gradient panel (pure obsidian at top -> warm
+	// charcoal at bottom) covering the full 160x128 area, six faint
+	// "carbon-fibre weave" horizontal raster lines (very low opacity
+	// STEALTH_GUNMETAL) for the brushed-carbon back-panel cue, four
+	// 1-2 px STEALTH_STEEL etched-bezel specks scattered across the
+	// panel suggesting the iconic obsidian-glass micro-glints, and a
+	// small pixel-art tactical-red status LED motif anchored
+	// bottom-right (a 3x3 STEALTH_LED LED pad with a STEALTH_BONE
+	// 1 px highlight pixel in the upper-left corner suggesting the
+	// LED's emission peak, plus a faint STEALTH_LED halo row beneath
+	// suggesting the reflected glow on the polished obsidian glass
+	// directly below the LED). Uses the STEALTH_* palette from
+	// MakerphoneTheme.h. ~22 LVGL primitives total, no animations -
+	// matches the Nokia / DMG / Amber CRT / Aqua / RAZR variants'
+	// still-image philosophy. The LED is the theme's signature
+	// glyph - the trademark-safe equivalent of the early-2010s
+	// "red dot" status indicator that defined the blacked-out
+	// tactical-handset look.
+	void buildStealthBlackWallpaper();
 
 	// Drives the per-star opacity animation. Free function semantics
 	// (matches LVGL's lv_anim_exec_xcb_t signature). Defined in the .cpp

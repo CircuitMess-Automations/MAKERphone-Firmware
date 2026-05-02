@@ -70,6 +70,14 @@ PhoneSynthwaveBg::Style PhoneSynthwaveBg::resolveStyleFromSettings(){
 	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::RazrHotPink){
 		return Style::RazrHotPink;
 	}
+	// S111 - dispatch the Stealth Black style override the same way.
+	// The wallpaperStyle byte stays persisted underneath so flipping
+	// the theme back to any prior theme restores the previously
+	// chosen Synthwave variant unchanged, exactly like the prior
+	// branches above.
+	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::StealthBlack){
+		return Style::StealthBlack;
+	}
 	return styleFromByte(Settings.get().wallpaperStyle);
 }
 
@@ -160,6 +168,17 @@ PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent, Style style) : LVObject(par
 	// every Synthwave hot-path.
 	if(style == Style::RazrHotPink){
 		buildRazrHotPinkWallpaper();
+		return;
+	}
+
+	// S111 - the Stealth Black theme owns its wallpaper end to end
+	// the same way: it bypasses every Synthwave builder and paints a
+	// flat near-obsidian gradient panel with carbon-fibre-weave
+	// rasters + etched-bezel specks + a tactical-red status LED
+	// motif instead. Returning early keeps the STEALTH_* palette out
+	// of every Synthwave hot-path.
+	if(style == Style::StealthBlack){
+		buildStealthBlackWallpaper();
 		return;
 	}
 
@@ -1307,3 +1326,162 @@ void PhoneSynthwaveBg::buildRazrHotPinkWallpaper(){
 		lv_obj_set_style_border_width(px, 0, 0);
 	}
 }
+
+void PhoneSynthwaveBg::buildStealthBlackWallpaper(){
+	// ----- Obsidian panel: pure obsidian -> warm charcoal vertical gradient -----
+	//
+	// Painted on the same `sky` member pointer the Synthwave variant
+	// uses, mirroring the Nokia / DMG / Amber CRT / Sony Ericsson Aqua
+	// / RAZR Hot Pink builders so a future caller iterating wallpaper
+	// children can rely on a single named root regardless of theme.
+	// The container covers the entire 160x128 area - the early-2010s
+	// tactical-handset menu screen, like the LCD / CRT / Aqua / RAZR
+	// panels, is a single flat surface with no horizon. The vertical
+	// gradient (STEALTH_BG_OBSIDIAN at top -> STEALTH_BG_CHARCOAL at
+	// bottom) reads as a polished obsidian glass front panel with a
+	// faint subsurface circuit-board glow leaking up from the lower
+	// edge - the cue every 8800 Carbon Arte / Bold 9900 Stealth owner
+	// remembers from the device waking and the OLED panel beginning to
+	// draw power into the bottom rows first.
+	sky = lv_obj_create(obj);
+	lv_obj_remove_style_all(sky);
+	lv_obj_clear_flag(sky, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(sky, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(sky, BgWidth, BgHeight);
+	lv_obj_set_pos(sky, 0, 0);
+	lv_obj_set_style_bg_color(sky, STEALTH_BG_OBSIDIAN, 0);
+	lv_obj_set_style_bg_grad_color(sky, STEALTH_BG_CHARCOAL, 0);
+	lv_obj_set_style_bg_grad_dir(sky, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(sky, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(sky, 0, 0);
+	lv_obj_set_style_pad_all(sky, 0, 0);
+	lv_obj_set_style_border_width(sky, 0, 0);
+
+	// ----- Carbon-fibre weave rasters -----
+	//
+	// Six faint full-width horizontal lines in STEALTH_GUNMETAL at
+	// very low opacity. Approximate the 0/90 carbon-fibre weave
+	// texture every blacked-out tactical-handset back panel exhibited
+	// under direct light - barely visible, but the eye registers
+	// "this is woven, not extruded". Spaced ~18 px apart so the eye
+	// reads them as a regular texture rather than a counted set.
+	// Drawn 1 px tall to stay subliminal at the 160x128 resolution;
+	// LVGL collapses 1 px rects to a single horizontal line on flush.
+	struct Raster { lv_coord_t y; lv_opa_t opa; };
+	const Raster rasters[] = {
+			{  14, LV_OPA_10 },
+			{  32, LV_OPA_20 },
+			{  50, LV_OPA_10 },
+			{  68, LV_OPA_20 },
+			{  86, LV_OPA_10 },
+			{ 104, LV_OPA_20 },
+	};
+	const uint8_t rasterCount = sizeof(rasters) / sizeof(rasters[0]);
+	for(uint8_t i = 0; i < rasterCount; i++){
+		lv_obj_t* r = lv_obj_create(sky);
+		lv_obj_remove_style_all(r);
+		lv_obj_clear_flag(r, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(r, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(r, BgWidth, 1);
+		lv_obj_set_pos(r, 0, rasters[i].y);
+		lv_obj_set_style_bg_color(r, STEALTH_GUNMETAL, 0);
+		lv_obj_set_style_bg_opa(r, rasters[i].opa, 0);
+		lv_obj_set_style_radius(r, 0, 0);
+		lv_obj_set_style_border_width(r, 0, 0);
+	}
+
+	// ----- Etched-bezel micro-glints -----
+	//
+	// Four 1-2 px STEALTH_STEEL specks scattered across the panel
+	// suggesting the iconic obsidian-glass micro-glints that defined
+	// the era's polished tactical handsets. y-positions stay clear of
+	// the status bar (y < 12) and soft-key bar (y > BgHeight - 12)
+	// regions so a glint never reads as a stuck pixel inside a chrome
+	// strip. Drawn as flat rects (no LV_RADIUS_CIRCLE - at this size
+	// LVGL rounds to a pixel rect anyway).
+	struct Glint { lv_coord_t x; lv_coord_t y; uint8_t s; lv_opa_t opa; };
+	const Glint glints[] = {
+			{  22,  24, 1, LV_OPA_50 },
+			{  92,  44, 2, LV_OPA_40 },
+			{  56,  78, 1, LV_OPA_50 },
+			{ 128,  96, 2, LV_OPA_40 },
+	};
+	const uint8_t glintCount = sizeof(glints) / sizeof(glints[0]);
+	for(uint8_t i = 0; i < glintCount; i++){
+		lv_obj_t* g = lv_obj_create(sky);
+		lv_obj_remove_style_all(g);
+		lv_obj_clear_flag(g, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(g, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(g, glints[i].s, glints[i].s);
+		lv_obj_set_pos(g, glints[i].x, glints[i].y);
+		lv_obj_set_style_bg_color(g, STEALTH_STEEL, 0);
+		lv_obj_set_style_bg_opa(g, glints[i].opa, 0);
+		lv_obj_set_style_radius(g, 0, 0);
+		lv_obj_set_style_border_width(g, 0, 0);
+	}
+
+	// ----- Tactical-red status LED motif (bottom-right corner) -----
+	//
+	// Anchored ~12 px clear of the right edge and ~22 px clear of the
+	// bottom edge, in the patch the soft-key bar will cover during
+	// normal use. The LED is a 3 x 3 STEALTH_LED pad with a single
+	// STEALTH_BONE highlight pixel in the upper-left corner
+	// suggesting the LED's emission peak (the bright spot every
+	// surface-mount red LED exhibits dead-centre) plus a single
+	// LV_OPA_30 STEALTH_LED halo row two pixels beneath the pad
+	// suggesting the reflected glow on the polished obsidian glass
+	// directly below the LED indicator. Crucially the glyph is NOT a
+	// trademarked logo (Vertu's exact red-dot mark, BlackBerry's
+	// Stealth indicator); it's the universal "this device is on
+	// standby and watching" tactical-handset cue any 2011 owner
+	// reads as 'armed status indicator'.
+	const lv_coord_t ledX = BgWidth  - 12;   // 148
+	const lv_coord_t ledY = BgHeight - 22;   // 106
+
+	struct PixelRect {
+		int8_t   dx;
+		int8_t   dy;
+		uint8_t  w;
+		uint8_t  h;
+		uint8_t  layer;     // 0 = LED body, 1 = bone highlight, 2 = halo
+		lv_opa_t opa;
+	};
+
+	// Pixel layout (3 wide x 3 tall LED pad + 1 highlight + 1 halo):
+	//   ###     row 0 - LED body
+	//   ###     row 1
+	//   ###     row 2
+	//   ...     row 3 - 1 px gap (polished glass)
+	//   .H.     row 4 - reflected halo (3 wide, opa 30)
+	const PixelRect ledParts[] = {
+			// LED body (rows 0-2)
+			{ 0, 0, 3, 1, 0, LV_OPA_COVER },
+			{ 0, 1, 3, 1, 0, LV_OPA_COVER },
+			{ 0, 2, 3, 1, 0, LV_OPA_COVER },
+			// Bone-white emission peak (upper-left pixel of the LED)
+			{ 0, 0, 1, 1, 1, LV_OPA_COVER },
+			// Reflected halo on the polished glass two rows below
+			{ 0, 4, 3, 1, 2, LV_OPA_30 },
+	};
+	const uint8_t ledCount = sizeof(ledParts) / sizeof(ledParts[0]);
+	for(uint8_t i = 0; i < ledCount; i++){
+		lv_obj_t* px = lv_obj_create(sky);
+		lv_obj_remove_style_all(px);
+		lv_obj_clear_flag(px, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(px, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(px, ledParts[i].w, ledParts[i].h);
+		lv_obj_set_pos(px, ledX + ledParts[i].dx, ledY + ledParts[i].dy);
+		lv_color_t fill;
+		switch(ledParts[i].layer){
+			case 1:  fill = STEALTH_BONE; break;
+			case 2:  fill = STEALTH_LED;  break;
+			case 0:
+			default: fill = STEALTH_LED;  break;
+		}
+		lv_obj_set_style_bg_color(px, fill, 0);
+		lv_obj_set_style_bg_opa(px, ledParts[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+

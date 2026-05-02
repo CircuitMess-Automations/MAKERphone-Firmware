@@ -195,6 +195,7 @@ void PhoneThemeScreen::rebuildSwatch() {
 		case Theme::AmberCRT:   drawAmberCRTSwatch();   break;
 		case Theme::SonyEricssonAqua: drawSonyEricssonAquaSwatch(); break;
 		case Theme::RazrHotPink: drawRazrHotPinkSwatch(); break;
+		case Theme::StealthBlack: drawStealthBlackSwatch(); break;
 		default:                drawDefaultSwatch();    break;  // defensive
 	}
 }
@@ -674,6 +675,101 @@ void PhoneThemeScreen::drawRazrHotPinkSwatch() {
 		}
 		lv_obj_set_style_bg_color(px, fill, 0);
 		lv_obj_set_style_bg_opa(px, bolt[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+
+void PhoneThemeScreen::drawStealthBlackSwatch() {
+	// Obsidian panel: pure obsidian -> warm charcoal vertical gradient
+	// covering the full swatch (the early-2010s tactical-handset menu
+	// screen, like the Nokia / DMG / CRT / Aqua / RAZR panels, is a
+	// single flat surface — no horizon).
+	lv_obj_t* panel = lv_obj_create(swatchInner);
+	lv_obj_remove_style_all(panel);
+	lv_obj_set_size(panel, SwatchW, SwatchH);
+	lv_obj_set_pos(panel, 0, 0);
+	lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_set_style_bg_color(panel, STEALTH_BG_OBSIDIAN, 0);
+	lv_obj_set_style_bg_grad_color(panel, STEALTH_BG_CHARCOAL, 0);
+	lv_obj_set_style_bg_grad_dir(panel, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(panel, 0, 0);
+	lv_obj_set_style_border_width(panel, 0, 0);
+
+	// Carbon-fibre weave rasters: three faint full-width horizontal
+	// lines in STEALTH_GUNMETAL at low opacity, mirroring the
+	// wallpaper.
+	struct Raster { lv_coord_t y; lv_opa_t opa; };
+	const Raster rasters[] = {
+			{  9, LV_OPA_20 },
+			{ 22, LV_OPA_30 },
+			{ 35, LV_OPA_20 },
+	};
+	for(uint8_t i = 0; i < sizeof(rasters) / sizeof(rasters[0]); i++) {
+		lv_obj_t* r = lv_obj_create(panel);
+		lv_obj_remove_style_all(r);
+		lv_obj_set_size(r, SwatchW, 1);
+		lv_obj_set_pos(r, 0, rasters[i].y);
+		lv_obj_set_style_bg_color(r, STEALTH_GUNMETAL, 0);
+		lv_obj_set_style_bg_opa(r, rasters[i].opa, 0);
+		lv_obj_set_style_radius(r, 0, 0);
+		lv_obj_set_style_border_width(r, 0, 0);
+	}
+
+	// Etched-bezel micro-glints: four 1-2 px STEALTH_STEEL specks
+	// scattered across the swatch.
+	struct Glint { lv_coord_t x; lv_coord_t y; uint8_t s; lv_opa_t opa; };
+	const Glint glints[] = {
+			{ 12,  6, 1, LV_OPA_50 },
+			{ 30, 16, 2, LV_OPA_40 },
+			{ 58,  8, 1, LV_OPA_50 },
+			{ 70, 30, 2, LV_OPA_40 },
+	};
+	for(uint8_t i = 0; i < sizeof(glints) / sizeof(glints[0]); i++) {
+		lv_obj_t* g = lv_obj_create(panel);
+		lv_obj_remove_style_all(g);
+		lv_obj_set_size(g, glints[i].s, glints[i].s);
+		lv_obj_set_pos(g, glints[i].x, glints[i].y);
+		lv_obj_set_style_bg_color(g, STEALTH_STEEL, 0);
+		lv_obj_set_style_bg_opa(g, glints[i].opa, 0);
+		lv_obj_set_style_radius(g, 0, 0);
+		lv_obj_set_style_border_width(g, 0, 0);
+	}
+
+	// Tactical-red status LED motif centred in the swatch. Mirrors
+	// the wallpaper's bottom-right glyph but pulled to the centre so
+	// it reads as the theme's signature glyph — exactly how the prior
+	// per-theme swatch builders position their glyphs.
+	const lv_coord_t lx = SwatchW / 2 - 1;
+	const lv_coord_t ly = SwatchH / 2 - 2;
+
+	struct PixelRect { int8_t dx, dy; uint8_t w, h; uint8_t layer; lv_opa_t opa; };
+	const PixelRect led[] = {
+			// LED body (rows 0-2)
+			{ 0, 0, 3, 1, 0, LV_OPA_COVER },
+			{ 0, 1, 3, 1, 0, LV_OPA_COVER },
+			{ 0, 2, 3, 1, 0, LV_OPA_COVER },
+			// Bone-white emission peak (upper-left)
+			{ 0, 0, 1, 1, 1, LV_OPA_COVER },
+			// Reflected halo two rows below
+			{ 0, 4, 3, 1, 2, LV_OPA_30 },
+	};
+	const uint8_t partCount = sizeof(led) / sizeof(led[0]);
+	for(uint8_t i = 0; i < partCount; i++){
+		lv_obj_t* px = lv_obj_create(panel);
+		lv_obj_remove_style_all(px);
+		lv_obj_set_size(px, led[i].w, led[i].h);
+		lv_obj_set_pos(px, lx + led[i].dx, ly + led[i].dy);
+		lv_color_t fill;
+		switch(led[i].layer){
+			case 1:  fill = STEALTH_BONE; break;
+			case 2:  fill = STEALTH_LED;  break;
+			case 0:
+			default: fill = STEALTH_LED;  break;
+		}
+		lv_obj_set_style_bg_color(px, fill, 0);
+		lv_obj_set_style_bg_opa(px, led[i].opa, 0);
 		lv_obj_set_style_radius(px, 0, 0);
 		lv_obj_set_style_border_width(px, 0, 0);
 	}

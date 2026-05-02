@@ -127,8 +127,33 @@ public:
 		// brand cue, copyright-safe vs the RAZR wordmark itself).
 		RazrHotPink = 5,
 
-		// Reserved 6..15 for the upcoming Phase O themes:
-		//   6  Stealth Black (S111)
+		// Stealth Black - early-2010s "blacked-out" tactical-handset
+		// homage (Vertu Constellation Black, BlackBerry Bold 9900
+		// Stealth, Nokia 8800 Carbon Arte, the obsidian-slab era
+		// before the late-2010s glass-sandwich smartphone took over).
+		// The skin that defined the "phone as concealed instrument"
+		// look - a slab of obsidian glass with a single warm-red
+		// tactical LED indicator and ghosted gunmetal menu chrome.
+		// Six shades - pure obsidian (panel off), warm charcoal
+		// (panel gradient bottom, suggesting faint subsurface
+		// circuit-board glow), gunmetal (idle borders), tactical-red
+		// LED (focus / accent - the single splash of colour against
+		// a sea of black), bright bone-white (icon strokes + body
+		// text), cool steel (dim labels / etched-bezel highlights).
+		// Reads light-on-dark like the Default Synthwave + Amber CRT
+		// + Sony Ericsson Aqua + RAZR Hot Pink themes - the
+		// authentic early-2010s reading direction (bone-white menu
+		// items on a void-black panel, with a single red LED
+		// standing in for the device's status indicator). Wallpaper
+		// bypasses every Synthwave builder and paints a flat
+		// near-black panel with a faint subsurface gradient + a
+		// few barely-visible horizontal carbon-fibre-weave rasters
+		// + a tiny solid red status LED motif anchored bottom-right
+		// (the trademark-safe equivalent of the era's signature
+		// red status indicator).
+		StealthBlack = 6,
+
+		// Reserved 7..15 for the upcoming Phase O themes:
 		//   7  Y2K Silver   (S113)
 		//   8  Cyberpunk Red (S115)
 		//   9  Christmas    (S117)
@@ -136,7 +161,7 @@ public:
 	};
 
 	/** Total number of themes the picker should expose today. */
-	static constexpr uint8_t ThemeCount = 6;
+	static constexpr uint8_t ThemeCount = 7;
 
 	/**
 	 * Resolve a raw `Settings.themeId` byte to a clamped Theme. Bytes
@@ -226,6 +251,21 @@ public:
 	 *               like Default + Amber CRT + Sony Ericsson Aqua -
 	 *               the authentic 2005 RAZR reading direction (bright
 	 *               chrome menu items on a hot-pink anodised panel).
+	 *   StealthBlack:
+	 *               STEALTH_BG_OBSIDIAN (pure obsidian panel) /
+	 *               STEALTH_LED (tactical-red LED, accent / focus
+	 *               border) / STEALTH_BONE (bone-white, icon strokes
+	 *               + soft-key labels) / STEALTH_GUNMETAL (cool
+	 *               gunmetal, idle borders) / STEALTH_BONE (body
+	 *               text, the bright off-white tactical-handset
+	 *               menu chrome) / STEALTH_STEEL (cool steel,
+	 *               timestamps + placeholders + etched-bezel
+	 *               highlights). Light-on-dark like Default +
+	 *               Amber CRT + Sony Ericsson Aqua + RAZR Hot Pink -
+	 *               the authentic early-2010s tactical-handset
+	 *               reading direction (bone-white menu items on a
+	 *               void-black panel, with a single warm-red LED
+	 *               standing in for accent).
 	 *
 	 * The Nokia mapping inverts the Synthwave dark-on-light
 	 * convention: the "background" role becomes a light olive and
@@ -268,6 +308,8 @@ public:
 	 *               iconStroke = AQUA_CHROME, iconDetail = AQUA_GLOW
 	 *   RazrHotPink:
 	 *               iconStroke = RAZR_CHROME, iconDetail = RAZR_GLOW
+	 *   StealthBlack:
+	 *               iconStroke = STEALTH_BONE,  iconDetail = STEALTH_LED
 	 *
 	 * Default + Nokia mappings are byte-identical to what
 	 * `highlight()` / `accent()` already return for those themes, so
@@ -701,5 +743,80 @@ public:
 #define RAZR_GLOW     lv_color_make(255,  40, 140)
 #define RAZR_CHROME   lv_color_make(232, 220, 224)
 #define RAZR_SHINE    lv_color_make(255, 120, 180)
+
+
+
+/*
+ * ---------------------------------------------------------------------
+ * Stealth Black palette (S111).
+ *
+ * Approximates the early-2010s "blacked-out" tactical-handset aesthetic
+ * - the obsidian-slab era of the Vertu Constellation Black, the
+ * BlackBerry Bold 9900 Stealth, the Nokia 8800 Carbon Arte, and the
+ * jet-black-anodised concept hardware that bridged the late-2000s
+ * feature phone to the late-2010s glass-sandwich smartphone. Like the
+ * Sony Ericsson Aqua, Amber CRT, and RAZR Hot Pink palettes, Stealth
+ * Black reads light-on-dark: bone-white menu chrome + a single
+ * tactical-red LED accent on a pure obsidian panel, the authentic
+ * blacked-out-handset reading direction.
+ *
+ * Six shades, all in the cool obsidian / warm-LED gamut:
+ *
+ *   STEALTH_BG_OBSIDIAN — pure obsidian, the panel-off colour. Top of
+ *                         the vertical gradient. Almost pure black with
+ *                         a hint of cool-blue bias - matches the
+ *                         polished obsidian glass of a powered-off
+ *                         tactical handset (the screen has no light
+ *                         leakage at all when the device is asleep).
+ *   STEALTH_BG_CHARCOAL — warm charcoal, the panel gradient bottom.
+ *                         Pulls the panel toward a faint subsurface
+ *                         circuit-board glow without the menu chrome
+ *                         having to fight for contrast. The cue every
+ *                         8800 Carbon Arte owner saw when the phone
+ *                         woke and the OLED panel began drawing power
+ *                         into the lower edge first.
+ *   STEALTH_GUNMETAL    — cool gunmetal, used for idle borders and
+ *                         inactive chevrons. ~40 % of BONE intensity so
+ *                         it reads as legible-but-not-shouting next to
+ *                         the brighter primary chrome - the etched-
+ *                         metal trim every blacked-out handset used
+ *                         for inactive UI affordances.
+ *   STEALTH_LED         — tactical-red LED, the focus / accent colour.
+ *                         The single splash of colour against the sea
+ *                         of black; everything else in the palette is
+ *                         monochrome, so the LED accent reads as a
+ *                         status indicator rather than a hue accent.
+ *                         Calibrated toward the warm-red of an OLED
+ *                         standby pixel - hot enough to feel "armed",
+ *                         not so saturated that it becomes cherry red.
+ *   STEALTH_BONE        — bone-white, the body-text + icon-stroke
+ *                         colour. The early-2010s tactical menus
+ *                         rendered in a slightly warm off-white that
+ *                         read as "engraved bone on obsidian" rather
+ *                         than the cool paper-white of a modern OS.
+ *                         Matches that.
+ *   STEALTH_STEEL       — cool steel, used for ripple highlights,
+ *                         etched-bezel accents, and dim labels
+ *                         (timestamps, placeholders). Lighter than
+ *                         GUNMETAL but cooler than BONE so a STEEL
+ *                         pixel reads as 'reflected ambient light'
+ *                         rather than a body-text fill.
+ *
+ * Stored as lv_color_make(R, G, B) so the values render identically on
+ * every LV_COLOR_DEPTH the firmware might be built against - same
+ * portability rationale as the Nokia / DMG / Amber CRT / Aqua / RAZR
+ * palettes.
+ *
+ * Naming follows the MP_* / N3310_* / GBDMG_* / AMBER_CRT_* / AQUA_* /
+ * RAZR_* convention so the part-2 icon-glyph swap in S112 only changes
+ * which header it includes, not how it spells colours.
+ * ---------------------------------------------------------------------
+ */
+#define STEALTH_BG_OBSIDIAN  lv_color_make(  6,   8,  10)
+#define STEALTH_BG_CHARCOAL  lv_color_make( 18,  22,  28)
+#define STEALTH_GUNMETAL     lv_color_make( 78,  86,  98)
+#define STEALTH_LED          lv_color_make(220,  40,  30)
+#define STEALTH_BONE         lv_color_make(228, 226, 220)
+#define STEALTH_STEEL        lv_color_make(160, 168, 180)
 
 #endif // MAKERPHONE_THEME_H
