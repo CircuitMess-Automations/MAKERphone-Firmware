@@ -24,6 +24,7 @@
 #include "src/Services/ShutdownService.h"
 #include "src/Services/BuzzerService.h"
 #include "src/Services/PhoneRingtoneEngine.h"
+#include "src/Services/PhoneAlarmService.h"
 #include "src/JigHWTest/JigHWTest.h"
 #include "src/Games/GameEngine/Game.h"
 
@@ -161,6 +162,7 @@ void boot(){
 			Shutdown.begin();
 			Buzz.begin();
 			Ringtone.begin();
+			Alarms.begin();
 		});
 		intro->start();
 	});
