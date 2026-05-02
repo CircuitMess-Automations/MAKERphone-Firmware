@@ -34,6 +34,7 @@
 #include "PhoneWhackAMole.h"
 #include "PhoneLunarLander.h"
 #include "PhoneHelicopter.h"
+#include "Phone2048.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -100,6 +101,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "WHACK",    nullptr,                   GameKind::Screen },  // S90
 	{ "LANDER",   nullptr,                   GameKind::Screen },  // S91
 	{ "COPTER",   nullptr,                   GameKind::Screen },  // S92
+	{ "2048",     nullptr,                   GameKind::Screen },  // S93
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -848,6 +850,34 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g,  4, 12, 5, 1, orange);
 			break;
 		}
+		case 21: { // 2048 - stacked pixel tiles labelled with chunky digits
+			// S93: a stylised glance of the merge-tile puzzle. Four 7x6
+			// "tiles" arranged 2x2, each filled in a value-appropriate
+			// shade so the silhouette reads as "colourful tiles". The
+			// gold tile in the bottom-right hints at the 2048 prize the
+			// player is chasing.
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t green  = lv_color_make(140, 220, 100);
+			const lv_color_t orange = lv_color_make(255, 140,  30);
+			const lv_color_t gold   = lv_color_make(255, 215,  80);
+			const lv_color_t bgDeep = lv_color_make( 20,  12,  36);
+
+			// 2x2 mini-board of tiles + 1 px gaps. Each tile is 7x6 px.
+			// Top-left "2" tile (cyan).
+			px(g,  6,  4, 7, 6, cyan);
+			px(g,  8,  6, 3, 1, bgDeep);
+			px(g, 10,  7, 1, 1, bgDeep);
+			px(g,  8,  8, 3, 1, bgDeep);
+			// Top-right "8" tile (green).
+			px(g, 14,  4, 7, 6, green);
+			// Bottom-left "16" tile (orange).
+			px(g,  6, 11, 7, 6, orange);
+			// Bottom-right "2048" tile (gold) - the prize.
+			px(g, 14, 11, 7, 6, gold);
+			// Single gold-pixel sparkle to draw the eye to the prize.
+			px(g, 22,  9, 2, 2, gold);
+			break;
+		}
 		default:
 			break;
 	}
@@ -1000,6 +1030,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 18: push(new PhoneWhackAMole()); break;
 			case 19: push(new PhoneLunarLander()); break;
 			case 20: push(new PhoneHelicopter()); break;
+			case 21: push(new Phone2048()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
