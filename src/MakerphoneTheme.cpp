@@ -19,6 +19,8 @@ MakerphoneTheme::Theme MakerphoneTheme::themeFromByte(uint8_t raw){
 		                                              return Theme::StealthBlack;
 		case static_cast<uint8_t>(Theme::Y2KSilver):
 		                                              return Theme::Y2KSilver;
+		case static_cast<uint8_t>(Theme::CyberpunkRed):
+		                                              return Theme::CyberpunkRed;
 		case static_cast<uint8_t>(Theme::Default):
 		default:                                      return Theme::Default;
 	}
@@ -38,6 +40,7 @@ const char* MakerphoneTheme::getName(Theme t){
 		case Theme::RazrHotPink: return "RAZR PINK";
 		case Theme::StealthBlack: return "STEALTH";
 		case Theme::Y2KSilver:  return "Y2K SILVER";
+		case Theme::CyberpunkRed: return "CYBER RED";
 		default:                return "DEFAULT";
 	}
 }
@@ -76,6 +79,7 @@ lv_color_t MakerphoneTheme::bgDark(){
 		case Theme::RazrHotPink: return RAZR_BG_DARK;
 		case Theme::StealthBlack: return STEALTH_BG_OBSIDIAN;
 		case Theme::Y2KSilver:  return Y2K_BG_PEARL;
+		case Theme::CyberpunkRed:  return CYBER_BG_VOID;
 		case Theme::Default:
 		default:                return MP_BG_DARK;
 	}
@@ -90,6 +94,7 @@ lv_color_t MakerphoneTheme::accent(){
 		case Theme::RazrHotPink: return RAZR_GLOW;
 		case Theme::StealthBlack: return STEALTH_LED;
 		case Theme::Y2KSilver:  return Y2K_BONDI;
+		case Theme::CyberpunkRed:  return CYBER_NEON;
 		case Theme::Default:
 		default:                return MP_ACCENT;
 	}
@@ -104,6 +109,7 @@ lv_color_t MakerphoneTheme::highlight(){
 		case Theme::RazrHotPink: return RAZR_CHROME;
 		case Theme::StealthBlack: return STEALTH_BONE;
 		case Theme::Y2KSilver:  return Y2K_INK;
+		case Theme::CyberpunkRed:  return CYBER_TEXT;
 		case Theme::Default:
 		default:                return MP_HIGHLIGHT;
 	}
@@ -118,6 +124,7 @@ lv_color_t MakerphoneTheme::dim(){
 		case Theme::RazrHotPink: return RAZR_DIM;
 		case Theme::StealthBlack: return STEALTH_GUNMETAL;
 		case Theme::Y2KSilver:  return Y2K_FROST;
+		case Theme::CyberpunkRed:  return CYBER_DIM;
 		case Theme::Default:
 		default:                return MP_DIM;
 	}
@@ -132,6 +139,7 @@ lv_color_t MakerphoneTheme::text(){
 		case Theme::RazrHotPink: return RAZR_CHROME;
 		case Theme::StealthBlack: return STEALTH_BONE;
 		case Theme::Y2KSilver:  return Y2K_INK;
+		case Theme::CyberpunkRed:  return CYBER_TEXT;
 		case Theme::Default:
 		default:                return MP_TEXT;
 	}
@@ -146,6 +154,7 @@ lv_color_t MakerphoneTheme::labelDim(){
 		case Theme::RazrHotPink: return RAZR_SHINE;
 		case Theme::StealthBlack: return STEALTH_STEEL;
 		case Theme::Y2KSilver:  return Y2K_FROST;
+		case Theme::CyberpunkRed:  return CYBER_DIM;
 		case Theme::Default:
 		default:                return MP_LABEL_DIM;
 	}
@@ -175,6 +184,7 @@ lv_color_t MakerphoneTheme::iconStroke(){
 		case Theme::RazrHotPink: return RAZR_CHROME;
 		case Theme::StealthBlack: return STEALTH_BONE;
 		case Theme::Y2KSilver:  return Y2K_INK;
+		case Theme::CyberpunkRed:  return CYBER_TEXT;
 		case Theme::Default:
 		default:                return MP_HIGHLIGHT;
 	}
@@ -189,6 +199,7 @@ lv_color_t MakerphoneTheme::iconDetail(){
 		case Theme::RazrHotPink: return RAZR_GLOW;
 		case Theme::StealthBlack: return STEALTH_LED;
 		case Theme::Y2KSilver:  return Y2K_BONDI;
+		case Theme::CyberpunkRed:  return CYBER_NEON;
 		case Theme::Default:
 		default:                return MP_ACCENT;
 	}
@@ -230,6 +241,7 @@ lv_color_t MakerphoneTheme::phosphorGlow(){
 		case Theme::RazrHotPink: return RAZR_DIM;
 		case Theme::StealthBlack: return STEALTH_GUNMETAL;
 		case Theme::Y2KSilver:  return Y2K_FROST;
+		case Theme::CyberpunkRed:  return CYBER_DIM;
 		case Theme::Default:
 		default:                return MP_DIM;
 	}
@@ -300,6 +312,7 @@ lv_color_t MakerphoneTheme::chromeShineColor(){
 		case Theme::RazrHotPink: return RAZR_SHINE;
 		case Theme::StealthBlack: return STEALTH_STEEL;
 		case Theme::Y2KSilver:        return Y2K_SHINE;
+		case Theme::CyberpunkRed:        return CYBER_HOT;
 		case Theme::Default:
 		default:                return MP_HIGHLIGHT;
 	}
@@ -387,6 +400,7 @@ lv_color_t MakerphoneTheme::edgeGlowColor(){
 		case Theme::SonyEricssonAqua: return AQUA_GLOW;
 		case Theme::StealthBlack:     return STEALTH_LED;
 		case Theme::Y2KSilver:        return Y2K_BONDI;
+		case Theme::CyberpunkRed:        return CYBER_NEON;
 		case Theme::Default:
 		default:                      return MP_ACCENT;
 	}
@@ -488,6 +502,7 @@ lv_color_t MakerphoneTheme::statusLedColor(){
 		case Theme::SonyEricssonAqua: return AQUA_GLOW;
 		case Theme::RazrHotPink:      return RAZR_GLOW;
 		case Theme::Y2KSilver:        return Y2K_BONDI;
+		case Theme::CyberpunkRed:        return CYBER_NEON;
 		case Theme::Default:
 		default:                      return MP_ACCENT;
 	}
@@ -508,6 +523,7 @@ lv_color_t MakerphoneTheme::statusLedHighlightColor(){
 		case Theme::SonyEricssonAqua: return AQUA_CHROME;
 		case Theme::RazrHotPink:      return RAZR_CHROME;
 		case Theme::Y2KSilver:        return Y2K_SHINE;
+		case Theme::CyberpunkRed:        return CYBER_HOT;
 		case Theme::Default:
 		default:                      return MP_TEXT;
 	}
@@ -627,6 +643,7 @@ bool MakerphoneTheme::luciteJewelEnabled(){
 lv_color_t MakerphoneTheme::luciteJewelColor(){
 	switch(getCurrent()){
 		case Theme::Y2KSilver: return Y2K_BONDI;
+		case Theme::CyberpunkRed: return CYBER_NEON;
 		// The fallbacks below are never observed - luciteJewelIdleOpa()
 		// and luciteJewelSelectedOpa() both return LV_OPA_TRANSP on
 		// every non-Y2K-Silver theme, so the jewel's colour can't reach
@@ -648,6 +665,7 @@ lv_color_t MakerphoneTheme::luciteJewelColor(){
 lv_color_t MakerphoneTheme::luciteJewelHighlightColor(){
 	switch(getCurrent()){
 		case Theme::Y2KSilver: return Y2K_SHINE;
+		case Theme::CyberpunkRed: return CYBER_HOT;
 		// The fallbacks below are never observed - the highlight pixel
 		// rides the same opacity as the jewel, and that opacity returns
 		// LV_OPA_TRANSP on every non-Y2K-Silver theme. The values still

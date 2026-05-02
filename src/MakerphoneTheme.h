@@ -184,14 +184,41 @@ public:
 		// scroll-wheel ring).
 		Y2KSilver = 7,
 
-		// Reserved 8..15 for the upcoming Phase O themes:
-		//   8  Cyberpunk Red (S115)
+		// Cyberpunk Red — neon-on-void homage to the late-1980s /
+		// early-2020s "neo-Tokyo at night" cyberpunk aesthetic
+		// (Akira's red-on-black title plate, Blade Runner's neon-saturated
+		// alley signage, Ghost in the Shell's wired-circuit trace lines,
+		// the Cyberpunk 2077 brand identity, and the 1980s Tokyo arcade
+		// neon-tube glow that defined the whole genre's visual
+		// vocabulary). Six shades calibrated for a high-contrast neon
+		// red focus accent against an obsidian void: warm void-black
+		// panel-off, slightly red-shifted blood-black gradient bottom,
+		// muted maroon idle borders, neon-red focus accent (the single
+		// splash of glowing colour that defines every cyberpunk
+		// signage cue), hot magenta-pink rimlight highlights, and a
+		// near-white phosphor-pink body-text colour (the "neon glow
+		// burning into the retina" effect every cyberpunk UI prints in).
+		// Reads light-on-dark like the Default Synthwave + Amber CRT
+		// + Sony Ericsson Aqua + RAZR Hot Pink + Stealth Black themes
+		// — the authentic late-1980s / early-2020s cyberpunk reading
+		// direction (neon menu items on a void-black panel, with a
+		// glowing neon-red accent standing in for the era's signature
+		// neon-tube signage). Wallpaper bypasses every Synthwave
+		// builder and paints a flat near-void gradient panel with a
+		// few faint horizontal circuit-trace bus lines + a sparse
+		// constellation of neon glitch pixels + a small triangular
+		// hazard / "DANGER" chevron motif anchored bottom-right (the
+		// trademark-safe equivalent of the era's signature corporate-
+		// warning iconography).
+		CyberpunkRed = 8,
+
+		// Reserved 9..15 for the upcoming Phase O themes:
 		//   9  Christmas    (S117)
 		//  10  Surprise/Daily-Cycle (S119)
 	};
 
 	/** Total number of themes the picker should expose today. */
-	static constexpr uint8_t ThemeCount = 8;
+	static constexpr uint8_t ThemeCount = 9;
 
 	/**
 	 * Resolve a raw `Settings.themeId` byte to a clamped Theme. Bytes
@@ -1123,5 +1150,93 @@ public:
 #define Y2K_BONDI     lv_color_make( 30, 130, 220)
 #define Y2K_INK       lv_color_make( 32,  44,  68)
 #define Y2K_SHINE     lv_color_make(248, 252, 255)
+
+
+
+/*
+ * ---------------------------------------------------------------------
+ * Cyberpunk Red palette (S115).
+ *
+ * Approximates the iconic late-1980s / early-2020s "neo-Tokyo at night"
+ * cyberpunk aesthetic — the Akira red-on-black title plate, Blade
+ * Runner's neon-saturated rain-soaked alley signage, Ghost in the
+ * Shell's wired-circuit trace lines, the Cyberpunk 2077 brand identity,
+ * and the 1980s Tokyo arcade neon-tube glow that defined the whole
+ * genre's visual vocabulary. Like the Default Synthwave + Amber CRT
+ * + Sony Ericsson Aqua + RAZR Hot Pink + Stealth Black palettes,
+ * Cyberpunk Red reads light-on-dark: neon-red menu accents + bright
+ * phosphor-pink body text on a void-black panel, the authentic
+ * cyberpunk reading direction (and the visual pole opposite the
+ * Nokia 3310 + Game Boy DMG + Y2K Silver dark-on-light themes).
+ *
+ * Six shades, all in the void-black / neon-red gamut:
+ *
+ *   CYBER_BG_VOID   — warm void-black, the panel-off colour. Top of
+ *                     the vertical gradient. Almost pure black with a
+ *                     barely-perceptible warm-red bias — matches the
+ *                     "neo-Tokyo midnight" panel-off cue every
+ *                     cyberpunk handset rendered when the screen was
+ *                     idle (the void you want a neon-red accent to
+ *                     pop against, not the cool obsidian of the
+ *                     Stealth Black palette).
+ *   CYBER_BG_BLOOD  — deeper blood-shifted black, the panel gradient
+ *                     bottom. Pulls the lower half of the panel
+ *                     toward a faint blood-red subsurface glow without
+ *                     the menu chrome having to fight for contrast —
+ *                     the cue every Akira / Blade Runner / Cyberpunk
+ *                     2077 frame buffer rendered when the city's
+ *                     ambient red signage bled into the lower edge.
+ *   CYBER_DIM       — muted maroon, used for idle borders and
+ *                     inactive chevrons. ~40 % of NEON intensity so
+ *                     it reads as legible-but-not-shouting next to
+ *                     the brighter primary chrome — the etched-metal
+ *                     trim every cyberpunk UI used for inactive
+ *                     affordances, calibrated cooler than the RAZR
+ *                     dim-magenta but warmer than the Stealth
+ *                     gunmetal so the theme reads as "warning red,
+ *                     idle" rather than "tactical red, idle".
+ *   CYBER_NEON      — neon red, the focus / accent colour. The single
+ *                     splash of glowing colour that defines every
+ *                     cyberpunk signage cue — the Akira title-plate
+ *                     red, the Cyberpunk 2077 logo red, the Blade
+ *                     Runner replicant-warning red. Calibrated toward
+ *                     the saturated end of the red gamut so the
+ *                     accent reads as a glowing neon tube rather than
+ *                     a status LED, and bright enough that it pops
+ *                     off the void panel at every reading distance.
+ *   CYBER_HOT       — hot magenta-pink, used for rimlight highlights
+ *                     and anti-aliasing fringes around neon strokes.
+ *                     The "neon glow blooming around a glass tube"
+ *                     pixel every cyberpunk UI used to suggest the
+ *                     accent is glowing rather than flat-painted.
+ *                     Lighter and pinker than CYBER_NEON so a HOT
+ *                     pixel reads as 'reflected neon scatter' rather
+ *                     than a body fill.
+ *   CYBER_TEXT      — phosphor-pink body text + icon-stroke colour.
+ *                     The "neon glow burning into the retina" off-
+ *                     white every cyberpunk UI printed against the
+ *                     void — pinker than the Stealth bone-white,
+ *                     warmer than the MP cream — so the text reads
+ *                     as 'stained by the ambient neon' rather than
+ *                     freshly engraved on bone or printed in cream.
+ *                     Matches the Akira-logo phosphor-pink and the
+ *                     Blade Runner subtitle phosphor-cream blend.
+ *
+ * Stored as lv_color_make(R, G, B) so the values render identically on
+ * every LV_COLOR_DEPTH the firmware might be built against — same
+ * portability rationale as the prior palettes.
+ *
+ * Naming follows the MP_* / N3310_* / GBDMG_* / AMBER_CRT_* / AQUA_* /
+ * RAZR_* / STEALTH_* / Y2K_* convention so the part-2 icon-glyph swap
+ * in S116 only changes which header it includes, not how it spells
+ * colours.
+ * ---------------------------------------------------------------------
+ */
+#define CYBER_BG_VOID   lv_color_make(  8,   2,   6)
+#define CYBER_BG_BLOOD  lv_color_make( 28,   4,  10)
+#define CYBER_DIM       lv_color_make( 96,  18,  32)
+#define CYBER_NEON      lv_color_make(255,  30,  60)
+#define CYBER_HOT       lv_color_make(255, 110, 150)
+#define CYBER_TEXT      lv_color_make(255, 220, 224)
 
 #endif // MAKERPHONE_THEME_H

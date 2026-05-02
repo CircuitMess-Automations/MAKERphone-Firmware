@@ -184,6 +184,25 @@ public:
 		// translucent-chrome industrial-design idle screen rather
 		// than a tinted Synthwave.
 		Y2KSilver = 10,
+
+		// S115 - Cyberpunk Red neon-on-void theme override.
+		// Same dispatch pattern as the prior theme overrides: not part
+		// of the 4-style PhoneWallpaperScreen pager (StyleCount stays
+		// at 4 there); this value is only ever returned by
+		// resolveStyleFromSettings() when Settings.themeId picks the
+		// Cyberpunk Red theme. Renders a flat near-void gradient panel
+		// (CYBER_BG_VOID at top -> CYBER_BG_BLOOD at bottom) covering
+		// the full 160x128 area, six faint horizontal CYBER_DIM
+		// circuit-trace bus lines for the wired-cyberpunk cue, a
+		// sparse constellation of CYBER_NEON / CYBER_HOT 1-2 px neon
+		// glitch pixels suggesting flickering signage glow, and a
+		// small triangular CYBER_NEON hazard / "DANGER" chevron motif
+		// anchored bottom-right (the trademark-safe equivalent of the
+		// era's signature corporate-warning iconography), bypassing
+		// every Synthwave builder so the wallpaper reads as the late-
+		// 1980s / early-2020s neon-saturated cyberpunk idle screen
+		// rather than a tinted Synthwave.
+		CyberpunkRed = 11,
 	};
 
 	/** Default ctor — picks the style from `Settings.get().wallpaperStyle`. */
@@ -362,6 +381,28 @@ private:
 	// electronics aesthetic that defined the iMac G3, iPod 1G,
 	// VAIO PCG-505, and Sharp J-SH04 Frost Silver era.
 	void buildY2KSilverWallpaper();
+
+	// S115 - Cyberpunk Red neon-on-void wallpaper builder. Same
+	// dispatch pattern as the prior theme builders: paints a flat
+	// near-void gradient panel (CYBER_BG_VOID at top -> CYBER_BG_BLOOD
+	// at bottom) covering the full 160x128 area, six faint horizontal
+	// circuit-trace bus lines (low-opacity CYBER_DIM) for the wired-
+	// cyberpunk cue, eight 1-2 px CYBER_NEON / CYBER_HOT neon glitch
+	// pixels scattered across the panel suggesting flickering signage
+	// micro-glints, and a small triangular CYBER_NEON hazard / 'DANGER'
+	// chevron motif anchored bottom-right (a 5-wide / 4-tall warning-
+	// triangle silhouette with a CYBER_HOT 1 px highlight pixel at
+	// the apex suggesting reflected neon glow, plus a faint CYBER_DIM
+	// halo row beneath suggesting the reflected glow on the void
+	// panel directly below the chevron). Uses the CYBER_* palette
+	// from MakerphoneTheme.h. ~24 LVGL primitives total, no
+	// animations - matches the Nokia / DMG / Amber CRT / Aqua /
+	// RAZR / Stealth Black / Y2K Silver variants' still-image
+	// philosophy. The chevron is the theme's signature glyph - the
+	// trademark-safe equivalent of the late-1980s / early-2020s
+	// neon-warning iconography that defined Akira, Blade Runner,
+	// Ghost in the Shell, and Cyberpunk 2077.
+	void buildCyberpunkRedWallpaper();
 
 	// Drives the per-star opacity animation. Free function semantics
 	// (matches LVGL's lv_anim_exec_xcb_t signature). Defined in the .cpp

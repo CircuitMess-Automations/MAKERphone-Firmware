@@ -141,6 +141,7 @@ private:
 	void drawRazrHotPinkSwatch();
 	void drawStealthBlackSwatch();
 	void drawY2KSilverSwatch();
+	void drawCyberpunkRedSwatch();
 };
 
 #endif // MAKERPHONE_PHONETHEMESCREEN_H

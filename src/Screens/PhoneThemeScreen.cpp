@@ -197,6 +197,7 @@ void PhoneThemeScreen::rebuildSwatch() {
 		case Theme::RazrHotPink: drawRazrHotPinkSwatch(); break;
 		case Theme::StealthBlack: drawStealthBlackSwatch(); break;
 		case Theme::Y2KSilver:  drawY2KSilverSwatch();  break;
+		case Theme::CyberpunkRed: drawCyberpunkRedSwatch(); break;
 		default:                drawDefaultSwatch();    break;  // defensive
 	}
 }
@@ -870,6 +871,105 @@ void PhoneThemeScreen::drawY2KSilverSwatch() {
 		}
 		lv_obj_set_style_bg_color(px, fill, 0);
 		lv_obj_set_style_bg_opa(px, drop[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+
+void PhoneThemeScreen::drawCyberpunkRedSwatch() {
+	// Void panel: void-black -> blood-shifted black vertical gradient
+	// covering the full swatch (the cyberpunk neon-on-void menu screen,
+	// like the prior light-on-dark Stealth Black / Aqua / RAZR panels,
+	// is a single flat surface — no horizon).
+	lv_obj_t* panel = lv_obj_create(swatchInner);
+	lv_obj_remove_style_all(panel);
+	lv_obj_set_size(panel, SwatchW, SwatchH);
+	lv_obj_set_pos(panel, 0, 0);
+	lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_set_style_bg_color(panel, CYBER_BG_VOID, 0);
+	lv_obj_set_style_bg_grad_color(panel, CYBER_BG_BLOOD, 0);
+	lv_obj_set_style_bg_grad_dir(panel, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(panel, 0, 0);
+	lv_obj_set_style_border_width(panel, 0, 0);
+
+	// Circuit-trace bus lines: three faint full-width horizontal lines
+	// in CYBER_DIM at low opacity, mirroring the wallpaper.
+	struct Raster { lv_coord_t y; lv_opa_t opa; };
+	const Raster rasters[] = {
+			{  9, LV_OPA_30 },
+			{ 22, LV_OPA_40 },
+			{ 35, LV_OPA_30 },
+	};
+	for(uint8_t i = 0; i < sizeof(rasters) / sizeof(rasters[0]); i++) {
+		lv_obj_t* r = lv_obj_create(panel);
+		lv_obj_remove_style_all(r);
+		lv_obj_set_size(r, SwatchW, 1);
+		lv_obj_set_pos(r, 0, rasters[i].y);
+		lv_obj_set_style_bg_color(r, CYBER_DIM, 0);
+		lv_obj_set_style_bg_opa(r, rasters[i].opa, 0);
+		lv_obj_set_style_radius(r, 0, 0);
+		lv_obj_set_style_border_width(r, 0, 0);
+	}
+
+	// Neon glitch micro-glints: four 1-2 px specks in alternating
+	// CYBER_NEON / CYBER_HOT scattered across the swatch.
+	struct Glint { lv_coord_t x; lv_coord_t y; uint8_t s; lv_opa_t opa; uint8_t c; };
+	const Glint glints[] = {
+			{ 12,  6, 1, LV_OPA_80, 0 },
+			{ 30, 16, 2, LV_OPA_70, 1 },
+			{ 58,  8, 1, LV_OPA_80, 0 },
+			{ 70, 30, 2, LV_OPA_70, 1 },
+	};
+	for(uint8_t i = 0; i < sizeof(glints) / sizeof(glints[0]); i++) {
+		lv_obj_t* g = lv_obj_create(panel);
+		lv_obj_remove_style_all(g);
+		lv_obj_set_size(g, glints[i].s, glints[i].s);
+		lv_obj_set_pos(g, glints[i].x, glints[i].y);
+		lv_color_t fill = (glints[i].c == 0) ? CYBER_NEON : CYBER_HOT;
+		lv_obj_set_style_bg_color(g, fill, 0);
+		lv_obj_set_style_bg_opa(g, glints[i].opa, 0);
+		lv_obj_set_style_radius(g, 0, 0);
+		lv_obj_set_style_border_width(g, 0, 0);
+	}
+
+	// Hazard chevron motif centred in the swatch. Mirrors the
+	// wallpaper's bottom-right glyph but pulled to the centre so it
+	// reads as the theme's signature glyph — exactly how the prior
+	// per-theme swatch builders position their glyphs.
+	const lv_coord_t cx = SwatchW / 2 - 2;
+	const lv_coord_t cy = SwatchH / 2 - 2;
+
+	struct PixelRect { int8_t dx, dy; uint8_t w, h; uint8_t layer; lv_opa_t opa; };
+	const PixelRect chev[] = {
+			// Peak (row 0, centre)
+			{ 2, 0, 1, 1, 0, LV_OPA_COVER },
+			// Upper body (row 1, 3 px)
+			{ 1, 1, 3, 1, 0, LV_OPA_COVER },
+			// Lower body (row 2, 3 px)
+			{ 1, 2, 3, 1, 0, LV_OPA_COVER },
+			// Base (row 3, 5 px)
+			{ 0, 3, 5, 1, 0, LV_OPA_COVER },
+			// Apex highlight
+			{ 2, 0, 1, 1, 1, LV_OPA_COVER },
+			// Reflected halo two rows below
+			{ 0, 5, 5, 1, 2, LV_OPA_30 },
+	};
+	const uint8_t partCount = sizeof(chev) / sizeof(chev[0]);
+	for(uint8_t i = 0; i < partCount; i++){
+		lv_obj_t* px = lv_obj_create(panel);
+		lv_obj_remove_style_all(px);
+		lv_obj_set_size(px, chev[i].w, chev[i].h);
+		lv_obj_set_pos(px, cx + chev[i].dx, cy + chev[i].dy);
+		lv_color_t fill;
+		switch(chev[i].layer){
+			case 1:  fill = CYBER_HOT; break;
+			case 2:  fill = CYBER_DIM; break;
+			case 0:
+			default: fill = CYBER_NEON; break;
+		}
+		lv_obj_set_style_bg_color(px, fill, 0);
+		lv_obj_set_style_bg_opa(px, chev[i].opa, 0);
 		lv_obj_set_style_radius(px, 0, 0);
 		lv_obj_set_style_border_width(px, 0, 0);
 	}

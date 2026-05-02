@@ -86,6 +86,14 @@ PhoneSynthwaveBg::Style PhoneSynthwaveBg::resolveStyleFromSettings(){
 	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::Y2KSilver){
 		return Style::Y2KSilver;
 	}
+	// S115 - dispatch the Cyberpunk Red style override the same way.
+	// The wallpaperStyle byte stays persisted underneath so flipping
+	// the theme back to any prior theme restores the previously
+	// chosen Synthwave variant unchanged, exactly like the prior
+	// branches above.
+	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::CyberpunkRed){
+		return Style::CyberpunkRed;
+	}
 	return styleFromByte(Settings.get().wallpaperStyle);
 }
 
@@ -198,6 +206,17 @@ PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent, Style style) : LVObject(par
 	// palette out of every Synthwave hot-path.
 	if(style == Style::Y2KSilver){
 		buildY2KSilverWallpaper();
+		return;
+	}
+
+	// S115 - the Cyberpunk Red theme owns its wallpaper end to end
+	// the same way: it bypasses every Synthwave builder and paints a
+	// flat near-void gradient panel with circuit-trace bus lines +
+	// neon glitch specks + a triangular hazard chevron motif instead.
+	// Returning early keeps the CYBER_* palette out of every Synthwave
+	// hot-path.
+	if(style == Style::CyberpunkRed){
+		buildCyberpunkRedWallpaper();
 		return;
 	}
 
@@ -1674,6 +1693,197 @@ void PhoneSynthwaveBg::buildY2KSilverWallpaper(){
 		}
 		lv_obj_set_style_bg_color(px, fill, 0);
 		lv_obj_set_style_bg_opa(px, dropParts[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+
+
+
+void PhoneSynthwaveBg::buildCyberpunkRedWallpaper(){
+	// ----- Void panel: void-black -> blood-shifted black vertical gradient -----
+	//
+	// Painted on the same `sky` member pointer the Synthwave variant
+	// uses, mirroring the prior theme builders so a future caller
+	// iterating wallpaper children can rely on a single named root
+	// regardless of theme. The container covers the entire 160x128
+	// area - the late-1980s / early-2020s "neo-Tokyo at night" idle
+	// screen, like the Stealth Black / Amber CRT / RAZR / Aqua / Y2K
+	// Silver panels, is a single flat surface with no horizon. The
+	// vertical gradient (CYBER_BG_VOID at top -> CYBER_BG_BLOOD at
+	// bottom) reads as a void-black panel with a faint blood-red
+	// subsurface glow biased toward the lower edge - the cue every
+	// Akira / Blade Runner / Ghost in the Shell / Cyberpunk 2077
+	// frame buffer rendered when the city's ambient red signage bled
+	// into the lower edge. Calibrated warmer than the Stealth Black
+	// obsidian -> charcoal pair so the panel reads as 'neo-Tokyo
+	// midnight, neon bleed below' rather than 'tactical handset,
+	// dead screen'.
+	sky = lv_obj_create(obj);
+	lv_obj_remove_style_all(sky);
+	lv_obj_clear_flag(sky, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(sky, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(sky, BgWidth, BgHeight);
+	lv_obj_set_pos(sky, 0, 0);
+	lv_obj_set_style_bg_color(sky, CYBER_BG_VOID, 0);
+	lv_obj_set_style_bg_grad_color(sky, CYBER_BG_BLOOD, 0);
+	lv_obj_set_style_bg_grad_dir(sky, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(sky, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(sky, 0, 0);
+	lv_obj_set_style_pad_all(sky, 0, 0);
+	lv_obj_set_style_border_width(sky, 0, 0);
+
+	// ----- Circuit-trace bus lines -----
+	//
+	// Six faint full-width horizontal lines in CYBER_DIM at low
+	// opacity. Approximate the 'wired-circuit' substrate every
+	// cyberpunk UI hinted at beneath the surface chrome - barely
+	// visible, but the eye registers "this is a wired panel, not
+	// painted plastic". Spaced ~18 px apart so the eye reads them
+	// as a regular substrate texture rather than a counted set.
+	// Drawn 1 px tall to stay subliminal at the 160x128 resolution;
+	// LVGL collapses 1 px rects to a single horizontal line on flush.
+	//
+	// Mechanically the same pattern S111's Stealth Black wallpaper
+	// uses (six 1 px horizontal rasters), tuned for a neon-on-void
+	// theme: CYBER_DIM is a muted maroon that reads as 'cyberpunk
+	// circuit substrate' against the void panel rather than as a
+	// faint metal grain.
+	struct Raster { lv_coord_t y; lv_opa_t opa; };
+	const Raster rasters[] = {
+			{  14, LV_OPA_30 },
+			{  32, LV_OPA_40 },
+			{  50, LV_OPA_30 },
+			{  68, LV_OPA_40 },
+			{  86, LV_OPA_30 },
+			{ 104, LV_OPA_40 },
+	};
+	const uint8_t rasterCount = sizeof(rasters) / sizeof(rasters[0]);
+	for(uint8_t i = 0; i < rasterCount; i++){
+		lv_obj_t* r = lv_obj_create(sky);
+		lv_obj_remove_style_all(r);
+		lv_obj_clear_flag(r, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(r, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(r, BgWidth, 1);
+		lv_obj_set_pos(r, 0, rasters[i].y);
+		lv_obj_set_style_bg_color(r, CYBER_DIM, 0);
+		lv_obj_set_style_bg_opa(r, rasters[i].opa, 0);
+		lv_obj_set_style_radius(r, 0, 0);
+		lv_obj_set_style_border_width(r, 0, 0);
+	}
+
+	// ----- Neon glitch micro-glints -----
+	//
+	// Eight 1-2 px specks (alternating CYBER_NEON / CYBER_HOT)
+	// scattered across the panel suggesting the iconic flickering
+	// neon-tube glow that defined cyberpunk signage cues at every
+	// reading distance. y-positions stay clear of the status bar
+	// (y < 12) and soft-key bar (y > BgHeight - 12) regions so a
+	// glitch pixel never reads as a stuck pixel inside a chrome
+	// strip. Drawn as flat rects (no LV_RADIUS_CIRCLE - at this
+	// size LVGL rounds to a pixel rect anyway). The two-colour
+	// alternation between primary neon-red and hot magenta-pink
+	// suggests the chromatic-aberration fringe that defined every
+	// 'neon tube viewed through humid city air' cue, where the
+	// brightest neon pixels bled toward the magenta side of the
+	// red gamut at the edges of the visible glow.
+	struct Glint { lv_coord_t x; lv_coord_t y; uint8_t s; lv_opa_t opa; uint8_t c; };
+	const Glint glints[] = {
+			{  18,  22, 1, LV_OPA_80, 0 },   // CYBER_NEON
+			{  78,  20, 2, LV_OPA_70, 1 },   // CYBER_HOT
+			{ 132,  38, 1, LV_OPA_80, 0 },
+			{  44,  56, 1, LV_OPA_70, 1 },
+			{ 102,  60, 2, LV_OPA_80, 0 },
+			{  26,  82, 1, LV_OPA_70, 1 },
+			{  88,  92, 1, LV_OPA_80, 0 },
+			{ 138, 104, 2, LV_OPA_70, 1 },
+	};
+	const uint8_t glintCount = sizeof(glints) / sizeof(glints[0]);
+	for(uint8_t i = 0; i < glintCount; i++){
+		lv_obj_t* g = lv_obj_create(sky);
+		lv_obj_remove_style_all(g);
+		lv_obj_clear_flag(g, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(g, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(g, glints[i].s, glints[i].s);
+		lv_obj_set_pos(g, glints[i].x, glints[i].y);
+		lv_color_t fill = (glints[i].c == 0) ? CYBER_NEON : CYBER_HOT;
+		lv_obj_set_style_bg_color(g, fill, 0);
+		lv_obj_set_style_bg_opa(g, glints[i].opa, 0);
+		lv_obj_set_style_radius(g, 0, 0);
+		lv_obj_set_style_border_width(g, 0, 0);
+	}
+
+	// ----- Hazard / "DANGER" chevron motif (bottom-right corner) -----
+	//
+	// Anchored ~14 px clear of the right edge and ~24 px clear of the
+	// bottom edge, in the patch the soft-key bar will cover during
+	// normal use. The chevron is a 5-wide / 4-tall CYBER_NEON warning
+	// triangle silhouette (1 px peak row, 3 px upper-mid row, 5 px
+	// base row, plus a 1 px gap row to mark the bottom-edge of the
+	// triangle) with a single CYBER_HOT highlight pixel at the apex
+	// suggesting reflected neon glow from above (the bright spec every
+	// cyberpunk-genre photo of a real neon sign captures), plus a
+	// single LV_OPA_30 CYBER_DIM halo row two pixels beneath the
+	// triangle suggesting the reflected glow on the void panel
+	// directly below the chevron. The glyph is the trademark-safe
+	// universal "neon hazard" brand cue - it's NOT the Cyberpunk
+	// 2077 logo (specific 'C77' typography), the Akira pill-mark
+	// tattoo (specific spherical glyph), or the Blade Runner LAPD
+	// badge (specific authority iconography); it's the generic
+	// "warning triangle on void" silhouette any cyberpunk reader
+	// recognises as 'corporate warning iconography', the same way
+	// the Y2K raindrop reads as 'translucent Lucite' or the Stealth
+	// LED reads as 'tactical status indicator'.
+	const lv_coord_t chevX = BgWidth  - 14;   // 146
+	const lv_coord_t chevY = BgHeight - 24;   // 104
+
+	struct PixelRect {
+		int8_t   dx;
+		int8_t   dy;
+		uint8_t  w;
+		uint8_t  h;
+		uint8_t  layer;     // 0 = chevron body, 1 = highlight, 2 = halo
+		lv_opa_t opa;
+	};
+
+	// Pixel layout (5 wide x 4 tall warning triangle + 1 highlight + 1 halo):
+	//   ..#..    row 0 - triangle peak
+	//   .###.    row 1 - triangle upper body
+	//   .###.    row 2 - triangle lower body
+	//   #####    row 3 - triangle base
+	//   .....    row 4 - 1 px gap (void panel)
+	//   .....    row 5 - reflected halo (5 wide, opa 30)
+	const PixelRect chevParts[] = {
+			// Triangle peak (row 0, centre pixel)
+			{ 2, 0, 1, 1, 0, LV_OPA_COVER },
+			// Triangle upper body (row 1, 3 px centred)
+			{ 1, 1, 3, 1, 0, LV_OPA_COVER },
+			// Triangle lower body (row 2, 3 px centred)
+			{ 1, 2, 3, 1, 0, LV_OPA_COVER },
+			// Triangle base (row 3, full 5 px)
+			{ 0, 3, 5, 1, 0, LV_OPA_COVER },
+			// Apex highlight pixel (sits over the peak)
+			{ 2, 0, 1, 1, 1, LV_OPA_COVER },
+			// Reflected halo on the void panel two rows below
+			{ 0, 5, 5, 1, 2, LV_OPA_30 },
+	};
+	const uint8_t chevCount = sizeof(chevParts) / sizeof(chevParts[0]);
+	for(uint8_t i = 0; i < chevCount; i++){
+		lv_obj_t* px = lv_obj_create(sky);
+		lv_obj_remove_style_all(px);
+		lv_obj_clear_flag(px, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(px, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(px, chevParts[i].w, chevParts[i].h);
+		lv_obj_set_pos(px, chevX + chevParts[i].dx, chevY + chevParts[i].dy);
+		lv_color_t fill;
+		switch(chevParts[i].layer){
+			case 1:  fill = CYBER_HOT; break;
+			case 2:  fill = CYBER_DIM; break;
+			case 0:
+			default: fill = CYBER_NEON; break;
+		}
+		lv_obj_set_style_bg_color(px, fill, 0);
+		lv_obj_set_style_bg_opa(px, chevParts[i].opa, 0);
 		lv_obj_set_style_radius(px, 0, 0);
 		lv_obj_set_style_border_width(px, 0, 0);
 	}
