@@ -35,6 +35,7 @@
 #include "PhoneLunarLander.h"
 #include "PhoneHelicopter.h"
 #include "Phone2048.h"
+#include "PhoneSolitaire.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -102,6 +103,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "LANDER",   nullptr,                   GameKind::Screen },  // S91
 	{ "COPTER",   nullptr,                   GameKind::Screen },  // S92
 	{ "2048",     nullptr,                   GameKind::Screen },  // S93
+	{ "SOLITAIR", nullptr,                   GameKind::Screen },  // S94
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -878,6 +880,42 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 22,  9, 2, 2, gold);
 			break;
 		}
+		case 22: { // SOLITAIRE - tiny stack of three fanned playing cards
+		           // with a heart pip + spade pip; foreshadows the deck.
+			// S94: a stylised glance of the Klondike screen. Three
+			// cream "cards" fanned slightly so the silhouette reads
+			// as a hand of cards. The top card shows a red heart pip
+			// + the rank glyph "A" (cyan), foreshadowing the Ace
+			// promotion mechanic. A dim purple deck-back peeks out
+			// behind the fan to suggest the stock pile.
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t cream  = lv_color_make(245, 230, 200);
+			const lv_color_t red    = lv_color_make(220,  60,  60);
+
+			// Stock back peeking out top-right.
+			px(g, 19,  3, 8, 8, MP_DIM);
+			px(g, 22,  6, 2, 2, cyan);
+
+			// Bottom card of the fan (left-most), tilted left.
+			px(g,  3,  8, 8, 11, cream);
+			px(g,  4, 13, 1, 1, red);
+
+			// Middle card of the fan, slightly higher.
+			px(g,  9,  6, 8, 11, cream);
+			px(g, 10, 11, 1, 1, red);
+
+			// Top card of the fan, highest. Cream with red heart pip
+			// + cyan "A" stand-in.
+			px(g, 15,  4, 8, 11, cream);
+			// Heart pip (5 pixels in a small heart silhouette).
+			px(g, 16,  6, 1, 1, red);
+			px(g, 18,  6, 1, 1, red);
+			px(g, 16,  7, 3, 1, red);
+			px(g, 17,  8, 1, 1, red);
+			// Cyan ace mark in the bottom-right corner of the top card.
+			px(g, 20, 12, 2, 2, cyan);
+			break;
+		}
 		default:
 			break;
 	}
@@ -1031,6 +1069,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 19: push(new PhoneLunarLander()); break;
 			case 20: push(new PhoneHelicopter()); break;
 			case 21: push(new Phone2048()); break;
+			case 22: push(new PhoneSolitaire()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
