@@ -29,6 +29,7 @@
 #include "PhoneSokoban.h"
 #include "PhonePinball.h"
 #include "PhoneHangman.h"
+#include "PhoneConnectFour.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -90,6 +91,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "SOKOBAN",  nullptr,                   GameKind::Screen },  // S83
 	{ "PINBALL",  nullptr,                   GameKind::Screen },  // S85
 	{ "HANGMAN",  nullptr,                   GameKind::Screen },  // S87
+	{ "CONNECT4", nullptr,                   GameKind::Screen },  // S88
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -659,6 +661,36 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 16, 16, 2, 1, purple);
 			break;
 		}
+		case 16: { // CONNECT4 - 7-column grid silhouette with one cyan disc
+		           // and one orange disc telegraphing "you vs cpu drop".
+			// S88: a stylised glance of the 7x6 board. Three rows of
+			// five faint dim-purple dots sketch the empty grid; one
+			// cyan disc sits low-left for the player and one orange
+			// disc sits one row up to suggest the back-and-forth drop.
+			const lv_color_t purple = lv_color_make(70, 56, 100);
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t orange = lv_color_make(255, 140, 30);
+
+			// 5x3 dot grid (skipping the two cells we'll fill with
+			// real discs below). 4 px pitch, top-left at (4, 6).
+			for(uint8_t r = 0; r < 3; ++r) {
+				for(uint8_t c = 0; c < 5; ++c) {
+					const uint8_t dx = static_cast<uint8_t>(4 + c * 4);
+					const uint8_t dy = static_cast<uint8_t>(6 + r * 4);
+					px(g, dx, dy, 2, 2, purple);
+				}
+			}
+
+			// Player disc: bottom-left of the dot grid (r=2, c=1).
+			px(g,  7, 13, 3, 3, cyan);
+			// CPU disc: above the player (r=1, c=1).
+			px(g,  7,  9, 3, 3, orange);
+
+			// A faint "tray" line under the bottom row, hinting at the
+			// gravity floor that holds dropped discs in place.
+			px(g,  3, 17, 22, 1, purple);
+			break;
+		}
 		default:
 			break;
 	}
@@ -806,6 +838,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 13: push(new PhoneSokoban()); break;
 			case 14: push(new PhonePinball()); break;
 			case 15: push(new PhoneHangman()); break;
+			case 16: push(new PhoneConnectFour()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
