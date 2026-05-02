@@ -189,7 +189,7 @@ Composer is broken into three sessions because it needs (a) keypad note-entry UI
 - [x] **S122** — `PhoneComposer` — RTTTL parser + serializer.
 - [x] **S123** — `PhoneComposer` — save slots + wire to `PhoneRingtoneEngine`.
 - [x] **S124** — `PhoneAlarmClock` — multi-alarm with snooze.
-- [ ] **S125** — `PhoneTimers` — multi-timer countdown list (extends S62).
+- [x] **S125** — `PhoneTimers` — multi-timer countdown list (extends S62).
 - [ ] **S126** — `PhoneCurrencyConverter` — offline rate table, two-column converter.
 - [ ] **S127** — `PhoneUnitConverter` — length / mass / temperature / volume.
 - [ ] **S128** — `PhoneWorldClock` — six-zone clock grid.
