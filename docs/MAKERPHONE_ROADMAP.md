@@ -185,7 +185,7 @@ Two sessions per theme: **part 1 = palette + wallpaper variant**, **part 2 = mat
 ## Phase P — More Apps (S121–S135)
 Composer is broken into three sessions because it needs (a) keypad note-entry UI, (b) RTTTL parser, (c) save-slot wiring to `PhoneRingtoneEngine`. Tamagotchi-style virtual pet adds persistent state via the existing `Storage` layer.
 
-- [ ] **S121** — `PhoneComposer` — keypad note-entry UI.
+- [x] **S121** — `PhoneComposer` — keypad note-entry UI.
 - [ ] **S122** — `PhoneComposer` — RTTTL parser + serializer.
 - [ ] **S123** — `PhoneComposer` — save slots + wire to `PhoneRingtoneEngine`.
 - [ ] **S124** — `PhoneAlarmClock` — multi-alarm with snooze.
