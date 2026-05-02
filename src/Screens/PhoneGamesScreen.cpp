@@ -28,6 +28,7 @@
 #include "PhoneMemoryMatch.h"
 #include "PhoneSokoban.h"
 #include "PhonePinball.h"
+#include "PhoneHangman.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -88,6 +89,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "MEMORY",   nullptr,                   GameKind::Screen },  // S82
 	{ "SOKOBAN",  nullptr,                   GameKind::Screen },  // S83
 	{ "PINBALL",  nullptr,                   GameKind::Screen },  // S85
+	{ "HANGMAN",  nullptr,                   GameKind::Screen },  // S87
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -623,6 +625,40 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 20, 15, 2, 2, cream);
 			break;
 		}
+		case 15: { // HANGMAN - tiny gallows + stick figure + word slot
+			// S87: a stylised glance of the word-guess game. A short
+			// gallows post + crossbeam on the left, a hung stick figure
+			// hanging from the rope, and a row of dashes representing
+			// the word slot on the right. Cyan dashes match the cyan
+			// "in-progress reveal" colour the screen uses.
+			const lv_coord_t centerX = 9;
+			const lv_color_t cream  = lv_color_make(255, 220, 180);
+			const lv_color_t purple = lv_color_make(170, 140, 200);
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+
+			// Gallows base + post + crossbeam + rope.
+			px(g,  3, 18, 10, 1, purple);
+			px(g,  6,  4,  1, 14, purple);
+			px(g,  6,  4,  6,  1, purple);
+			px(g, 11,  5,  1,  2, purple);
+
+			// Stick figure -- head, body, two arms, two legs.
+			px(g, centerX + 1,  7, 3, 3, cream);
+			px(g, centerX + 2, 10, 1, 5, cream);
+			px(g, centerX,     11, 2, 1, cream);
+			px(g, centerX + 3, 11, 2, 1, cream);
+			px(g, centerX,     16, 2, 1, cream);
+			px(g, centerX + 3, 16, 2, 1, cream);
+
+			// Word slot dashes on the right -- five short bars to
+			// telegraph "5-letter word, two letters revealed in cyan".
+			px(g, 16, 12, 2, 1, cyan);
+			px(g, 19, 12, 2, 1, purple);
+			px(g, 22, 12, 2, 1, cyan);
+			px(g, 25, 12, 2, 1, purple);
+			px(g, 16, 16, 2, 1, purple);
+			break;
+		}
 		default:
 			break;
 	}
@@ -769,6 +805,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 12: push(new PhoneMemoryMatch()); break;
 			case 13: push(new PhoneSokoban()); break;
 			case 14: push(new PhonePinball()); break;
+			case 15: push(new PhoneHangman()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud

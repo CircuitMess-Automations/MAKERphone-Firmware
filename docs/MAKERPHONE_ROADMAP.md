@@ -143,7 +143,7 @@ A proper retro-arcade carousel for `PhoneGames`. Each entry is one self-containe
 - [x] **S84** — `PhoneSokoban+` (split) — 10 more levels + level-select grid.
 - [x] **S85** — `PhonePinball` — single-table flippers + bumpers.
 - [x] **S86** — `PhonePinball+` (split) — second table + leaderboard.
-- [ ] **S87** — `PhoneHangman` — uses existing T9 input + inline word list.
+- [x] **S87** — `PhoneHangman` — uses existing T9 input + inline word list.
 - [ ] **S88** — `PhoneConnectFour` — vs CPU.
 - [ ] **S89** — `PhoneReversi` — Othello vs CPU.
 - [ ] **S90** — `PhoneWhackAMole` — dialer-key reaction game.
