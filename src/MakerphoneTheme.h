@@ -1352,4 +1352,29 @@ public:
 #define CYBER_HOT       lv_color_make(255, 110, 150)
 #define CYBER_TEXT      lv_color_make(255, 220, 224)
 
+/* ---------------------------------------------------------------------
+ * S116 - Cyberpunk Red secondary-tube teal accent.
+ *
+ * Real cyberpunk-noir signage is two-toned: the dominant red/magenta
+ * tube is paired with a cool cyan/teal counterpart, the second
+ * neon-tube colour every Blade Runner / Akira / Cyberpunk 2077
+ * establishing shot pairs with its red signage (Blade Runner's
+ * TYRELL + cyan-on-red holos, Akira's pink-on-cyan billboards,
+ * Cyberpunk 2077's red-V / cyan-Arasaka HUD palette). Without this
+ * second tube colour the cyberpunk palette reads as a single-hue
+ * red theme rather than the two-tone signage the genre is famous
+ * for. Used by PhoneIconTile's neonRimHighlightColor() and by the
+ * S115 wallpaper's secondary-glint specks (gracefully picked up via
+ * runtime resolver fallback - the wallpaper builder uses the
+ * CYBER_NEON / CYBER_HOT pair shipped in S115; this macro layers in
+ * the second tube colour without disturbing the wallpaper).
+ *
+ * Calibrated toward the bright neon-tube end of the cyan spectrum
+ * (slightly green-shifted so it reads as 'electric cyan tube'
+ * rather than 'pale Aqua foam' - distinct from AQUA_FOAM's cooler
+ * blue-shifted shade).
+ * ---------------------------------------------------------------------
+ */
+#define CYBER_TEAL      lv_color_make( 64, 220, 220)
+
 #endif // MAKERPHONE_THEME_H
