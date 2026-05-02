@@ -23,6 +23,8 @@ MakerphoneTheme::Theme MakerphoneTheme::themeFromByte(uint8_t raw){
 		                                              return Theme::CyberpunkRed;
 		case static_cast<uint8_t>(Theme::Christmas):
 		                                              return Theme::Christmas;
+		case static_cast<uint8_t>(Theme::SurpriseDailyCycle):
+		                                              return Theme::SurpriseDailyCycle;
 		case static_cast<uint8_t>(Theme::Default):
 		default:                                      return Theme::Default;
 	}
@@ -44,7 +46,54 @@ const char* MakerphoneTheme::getName(Theme t){
 		case Theme::Y2KSilver:  return "Y2K SILVER";
 		case Theme::CyberpunkRed: return "CYBER RED";
 		case Theme::Christmas:  return "CHRISTMAS";
+		case Theme::SurpriseDailyCycle: return "SURPRISE";
 		default:                return "DEFAULT";
+	}
+}
+
+// ---------------------------------------------------------------------
+// S119 - Surprise / Daily-Cycle engine.
+//
+// Day-of-cycle counter derived from Arduino millis(). 86 400 000 ms in
+// a 24-hour period; modulo SurpriseDayCount keeps the index in 0..6
+// regardless of how long the device has been awake. Deterministic for
+// the lifetime of one boot (so a screen built mid-day always reads
+// against the same mood) and rolls automatically every 24 hours of
+// uptime, which is the right cadence for a 'picks up something new
+// each day' device feel without requiring the user to keep the phone
+// awake to see the cycle.
+//
+// When a future session wires a real RTC in, replacing this body with
+// a localtime tm_yday lookup keeps the rest of the dispatch
+// mechanical - the role helpers below already index into the
+// surpriseDayIndex() return value rather than reaching into millis()
+// themselves, so the swap is one function-body change.
+// ---------------------------------------------------------------------
+
+uint8_t MakerphoneTheme::surpriseDayIndex(){
+	// 86 400 000 ms = 24 h. Use uint32_t arithmetic so the divisor is
+	// computed without a 64-bit promotion on the AVR / ESP32 hot path
+	// (millis() rolls over at ~49 d but the modulo keeps the index
+	// stable across the rollover - the day after the rollover starts
+	// fresh on idx 0 either way).
+	return static_cast<uint8_t>((millis() / 86400000UL) % SurpriseDayCount);
+}
+
+const char* MakerphoneTheme::surpriseDayName(uint8_t idx){
+	// All-caps mood names matching the Sony-Ericsson option-list style
+	// used by PhoneSoundScreen / PhoneWallpaperScreen / the upcoming
+	// theme picker. Defensive clamp: any out-of-range index falls back
+	// to SOLAR (idx 0) so a corrupted call site can never render a
+	// blank label - same defensive pattern themeFromByte uses.
+	switch(idx){
+		case 0:  return "SOLAR";
+		case 1:  return "CITRUS";
+		case 2:  return "TWILIGHT";
+		case 3:  return "FOREST";
+		case 4:  return "REEF";
+		case 5:  return "CARNIVAL";
+		case 6:  return "FROST";
+		default: return "SOLAR";
 	}
 }
 
@@ -73,6 +122,87 @@ const char* MakerphoneTheme::getName(Theme t){
 // is exactly what we want.
 // ---------------------------------------------------------------------
 
+// ---------------------------------------------------------------------
+// S119 - Surprise / Daily-Cycle role-resolver.
+//
+// Seven-palette table indexed by surpriseDayIndex(). Each row carries
+// the same six MP_*-equivalent role colours so the role helpers
+// (bgDark / accent / highlight / dim / text / labelDim) can dispatch
+// on the day index with a flat lookup rather than per-day branching.
+// The helper is the only place the SURPRISE_*_* macros are read; the
+// role helpers below stay mechanical, mirroring the per-theme
+// switch-on-Theme pattern the prior themes use - the only difference
+// is that the Surprise branch runs an extra millis-derived index
+// lookup before returning the colour.
+//
+// Role indices (matching the order Phone* widgets consume the palette):
+//   0  bgDark    1  accent    2  highlight
+//   3  dim       4  text      5  labelDim
+//
+// kept as a simple 2D array of lv_color_t literals; the static
+// initialiser cost is paid once at firmware boot so the hot path is
+// just two array indexes.
+// ---------------------------------------------------------------------
+
+namespace {
+
+enum SurpriseRole : uint8_t {
+	SR_BG_DARK   = 0,
+	SR_ACCENT    = 1,
+	SR_HIGHLIGHT = 2,
+	SR_DIM       = 3,
+	SR_TEXT      = 4,
+	SR_LABEL_DIM = 5,
+	SR_ROLE_COUNT
+};
+
+inline lv_color_t surpriseColor(uint8_t day, uint8_t role){
+	// Defensive clamps - any out-of-range argument falls back to the
+	// SOLAR / BG_DARK pair so a corrupted call site can never render
+	// against an unlit colour. Same defensive pattern themeFromByte
+	// uses for Theme bytes.
+	if(day  >= MakerphoneTheme::SurpriseDayCount) day  = 0;
+	if(role >= SR_ROLE_COUNT)                     role = SR_BG_DARK;
+
+	static const lv_color_t table[MakerphoneTheme::SurpriseDayCount][SR_ROLE_COUNT] = {
+		// SOLAR (idx 0)
+		{ SURPRISE_SOLAR_BG_DARK,    SURPRISE_SOLAR_ACCENT,
+		  SURPRISE_SOLAR_HIGHLIGHT,  SURPRISE_SOLAR_DIM,
+		  SURPRISE_SOLAR_TEXT,       SURPRISE_SOLAR_LABEL_DIM },
+		// CITRUS (idx 1)
+		{ SURPRISE_CITRUS_BG_DARK,   SURPRISE_CITRUS_ACCENT,
+		  SURPRISE_CITRUS_HIGHLIGHT, SURPRISE_CITRUS_DIM,
+		  SURPRISE_CITRUS_TEXT,      SURPRISE_CITRUS_LABEL_DIM },
+		// TWILIGHT (idx 2)
+		{ SURPRISE_TWILIGHT_BG_DARK, SURPRISE_TWILIGHT_ACCENT,
+		  SURPRISE_TWILIGHT_HIGHLIGHT, SURPRISE_TWILIGHT_DIM,
+		  SURPRISE_TWILIGHT_TEXT,    SURPRISE_TWILIGHT_LABEL_DIM },
+		// FOREST (idx 3)
+		{ SURPRISE_FOREST_BG_DARK,   SURPRISE_FOREST_ACCENT,
+		  SURPRISE_FOREST_HIGHLIGHT, SURPRISE_FOREST_DIM,
+		  SURPRISE_FOREST_TEXT,      SURPRISE_FOREST_LABEL_DIM },
+		// REEF (idx 4)
+		{ SURPRISE_REEF_BG_DARK,     SURPRISE_REEF_ACCENT,
+		  SURPRISE_REEF_HIGHLIGHT,   SURPRISE_REEF_DIM,
+		  SURPRISE_REEF_TEXT,        SURPRISE_REEF_LABEL_DIM },
+		// CARNIVAL (idx 5)
+		{ SURPRISE_CARNIVAL_BG_DARK, SURPRISE_CARNIVAL_ACCENT,
+		  SURPRISE_CARNIVAL_HIGHLIGHT, SURPRISE_CARNIVAL_DIM,
+		  SURPRISE_CARNIVAL_TEXT,    SURPRISE_CARNIVAL_LABEL_DIM },
+		// FROST (idx 6)
+		{ SURPRISE_FROST_BG_DARK,    SURPRISE_FROST_ACCENT,
+		  SURPRISE_FROST_HIGHLIGHT,  SURPRISE_FROST_DIM,
+		  SURPRISE_FROST_TEXT,       SURPRISE_FROST_LABEL_DIM },
+	};
+	return table[day][role];
+}
+
+inline lv_color_t surpriseToday(uint8_t role){
+	return surpriseColor(MakerphoneTheme::surpriseDayIndex(), role);
+}
+
+} // namespace
+
 lv_color_t MakerphoneTheme::bgDark(){
 	switch(getCurrent()){
 		case Theme::Nokia3310:  return N3310_BG_LIGHT;
@@ -84,6 +214,8 @@ lv_color_t MakerphoneTheme::bgDark(){
 		case Theme::Y2KSilver:  return Y2K_BG_PEARL;
 		case Theme::CyberpunkRed:  return CYBER_BG_VOID;
 		case Theme::Christmas:    return XMAS_BG_PINE;
+		case Theme::SurpriseDailyCycle:
+		                          return surpriseToday(SR_BG_DARK);
 		case Theme::Default:
 		default:                return MP_BG_DARK;
 	}
@@ -100,6 +232,8 @@ lv_color_t MakerphoneTheme::accent(){
 		case Theme::Y2KSilver:  return Y2K_BONDI;
 		case Theme::CyberpunkRed:  return CYBER_NEON;
 		case Theme::Christmas:    return XMAS_HOLLY;
+		case Theme::SurpriseDailyCycle:
+		                          return surpriseToday(SR_ACCENT);
 		case Theme::Default:
 		default:                return MP_ACCENT;
 	}
@@ -116,6 +250,8 @@ lv_color_t MakerphoneTheme::highlight(){
 		case Theme::Y2KSilver:  return Y2K_INK;
 		case Theme::CyberpunkRed:  return CYBER_TEXT;
 		case Theme::Christmas:    return XMAS_GOLD;
+		case Theme::SurpriseDailyCycle:
+		                          return surpriseToday(SR_HIGHLIGHT);
 		case Theme::Default:
 		default:                return MP_HIGHLIGHT;
 	}
@@ -132,6 +268,8 @@ lv_color_t MakerphoneTheme::dim(){
 		case Theme::Y2KSilver:  return Y2K_FROST;
 		case Theme::CyberpunkRed:  return CYBER_DIM;
 		case Theme::Christmas:    return XMAS_DIM;
+		case Theme::SurpriseDailyCycle:
+		                          return surpriseToday(SR_DIM);
 		case Theme::Default:
 		default:                return MP_DIM;
 	}
@@ -148,6 +286,8 @@ lv_color_t MakerphoneTheme::text(){
 		case Theme::Y2KSilver:  return Y2K_INK;
 		case Theme::CyberpunkRed:  return CYBER_TEXT;
 		case Theme::Christmas:    return XMAS_GOLD;
+		case Theme::SurpriseDailyCycle:
+		                          return surpriseToday(SR_TEXT);
 		case Theme::Default:
 		default:                return MP_TEXT;
 	}
@@ -164,6 +304,8 @@ lv_color_t MakerphoneTheme::labelDim(){
 		case Theme::Y2KSilver:  return Y2K_FROST;
 		case Theme::CyberpunkRed:  return CYBER_DIM;
 		case Theme::Christmas:    return XMAS_DIM;
+		case Theme::SurpriseDailyCycle:
+		                          return surpriseToday(SR_LABEL_DIM);
 		case Theme::Default:
 		default:                return MP_LABEL_DIM;
 	}
@@ -195,6 +337,8 @@ lv_color_t MakerphoneTheme::iconStroke(){
 		case Theme::Y2KSilver:  return Y2K_INK;
 		case Theme::CyberpunkRed:  return CYBER_TEXT;
 		case Theme::Christmas:    return XMAS_GOLD;
+		case Theme::SurpriseDailyCycle:
+		                          return surpriseToday(SR_HIGHLIGHT);
 		case Theme::Default:
 		default:                return MP_HIGHLIGHT;
 	}
@@ -211,6 +355,8 @@ lv_color_t MakerphoneTheme::iconDetail(){
 		case Theme::Y2KSilver:  return Y2K_BONDI;
 		case Theme::CyberpunkRed:  return CYBER_NEON;
 		case Theme::Christmas:    return XMAS_HOLLY;
+		case Theme::SurpriseDailyCycle:
+		                          return surpriseToday(SR_ACCENT);
 		case Theme::Default:
 		default:                return MP_ACCENT;
 	}

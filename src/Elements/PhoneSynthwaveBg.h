@@ -220,6 +220,32 @@ public:
 		// so the wallpaper reads as a festive idle scene rather than
 		// a tinted Synthwave.
 		Christmas = 12,
+
+		// S119 - Surprise / Daily-Cycle theme override. Same dispatch
+		// pattern as the prior theme overrides: not part of the 4-style
+		// PhoneWallpaperScreen pager (StyleCount stays at 4 there);
+		// this value is only ever returned by
+		// resolveStyleFromSettings() when Settings.themeId picks the
+		// Surprise / Daily-Cycle theme. Renders a flat single-mood
+		// gradient panel using today's SURPRISE_*_BG_DARK bg as the
+		// gradient top + the matching SURPRISE_*_BG_DEEP shade as the
+		// gradient bottom, six faint horizontal "mood ring" bands at
+		// today's accent / highlight tint suggesting the colour
+		// rotation underneath, six 1-2 px today's-highlight specks
+		// scattered across the panel suggesting candle / firefly /
+		// bubble / snowflake glints depending on mood, and a small
+		// pixel-art four-pointed sparkle motif in today's accent
+		// colour anchored bottom-right (the universal "today is
+		// different" brand cue, copyright-safe vs any specific
+		// daily-greeting commercial pack), bypassing every Synthwave
+		// builder so the wallpaper reads as the active mood's idle
+		// screen rather than a tinted Synthwave. The wallpaper
+		// resolves the active mood from MakerphoneTheme::surpriseDayIndex()
+		// at construction time, so a screen built mid-day always
+		// reads against the same mood and a screen built after
+		// midnight rolls to the next mood automatically (the same
+		// 24-hour cadence the role helpers use).
+		SurpriseDailyCycle = 13,
 	};
 
 	/** Default ctor — picks the style from `Settings.get().wallpaperStyle`. */
@@ -443,6 +469,28 @@ private:
 	// festive UI prints in (no specific commercial Christmas-brand
 	// silhouette).
 	void buildChristmasWallpaper();
+
+	// S119 - Surprise / Daily-Cycle wallpaper builder. Same dispatch
+	// pattern as the prior theme builders (buildNokia3310Wallpaper /
+	// buildGameBoyDMGWallpaper / buildAmberCRTWallpaper /
+	// buildSonyEricssonAquaWallpaper / buildRazrHotPinkWallpaper /
+	// buildStealthBlackWallpaper / buildY2KSilverWallpaper /
+	// buildCyberpunkRedWallpaper / buildChristmasWallpaper): paints a
+	// flat single-mood gradient panel covering the full 160x128 area
+	// using today's SURPRISE_*_BG_DARK as the gradient top + the
+	// matching SURPRISE_*_BG_DEEP shade as the gradient bottom, six faint
+	// "mood ring" horizontal accent bands suggesting the rotating
+	// palette underneath, six 1-2 px today's-highlight specks
+	// scattered across the panel suggesting mood-specific micro-
+	// glints (candles / fireflies / bubbles / snowflakes depending on
+	// the active mood), and a small four-pointed sparkle motif in
+	// today's accent colour anchored bottom-right (the universal
+	// "today is different" brand cue, copyright-safe vs any specific
+	// daily-greeting commercial pack). Reads the active mood from
+	// MakerphoneTheme::surpriseDayIndex() at construction time.
+	// ~24 LVGL primitives total, no animations - matches the prior
+	// theme builders' still-image philosophy.
+	void buildSurpriseDailyCycleWallpaper();
 
 	// Drives the per-star opacity animation. Free function semantics
 	// (matches LVGL's lv_anim_exec_xcb_t signature). Defined in the .cpp

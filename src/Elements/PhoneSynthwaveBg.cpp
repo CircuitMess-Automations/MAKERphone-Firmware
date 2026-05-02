@@ -102,6 +102,18 @@ PhoneSynthwaveBg::Style PhoneSynthwaveBg::resolveStyleFromSettings(){
 	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::Christmas){
 		return Style::Christmas;
 	}
+	// S119 - dispatch the Surprise / Daily-Cycle style override the
+	// same way. The wallpaperStyle byte stays persisted underneath so
+	// flipping the theme back to any prior theme restores the
+	// previously chosen Synthwave variant unchanged, exactly like
+	// the prior branches above. The Surprise wallpaper resolves
+	// today's mood from MakerphoneTheme::surpriseDayIndex() inside
+	// the builder, so this dispatch only has to flag "we're in
+	// Surprise mode" - the per-mood palette pick happens in
+	// buildSurpriseDailyCycleWallpaper().
+	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::SurpriseDailyCycle){
+		return Style::SurpriseDailyCycle;
+	}
 	return styleFromByte(Settings.get().wallpaperStyle);
 }
 
@@ -236,6 +248,20 @@ PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent, Style style) : LVObject(par
 	// Synthwave hot-path.
 	if(style == Style::Christmas){
 		buildChristmasWallpaper();
+		return;
+	}
+
+	// S119 - the Surprise / Daily-Cycle theme owns its wallpaper end
+	// to end the same way: it bypasses every Synthwave builder and
+	// paints a flat single-mood gradient panel using today's
+	// SURPRISE_*_BG_DARK + accent / highlight bands + a four-pointed
+	// sparkle motif instead. The active mood is resolved from
+	// MakerphoneTheme::surpriseDayIndex() inside the builder, so the
+	// dispatch is uniform across all seven daily moods. Returning
+	// early keeps the SURPRISE_* palettes out of every Synthwave
+	// hot-path.
+	if(style == Style::SurpriseDailyCycle){
+		buildSurpriseDailyCycleWallpaper();
 		return;
 	}
 
@@ -2099,6 +2125,228 @@ void PhoneSynthwaveBg::buildChristmasWallpaper(){
 		}
 		lv_obj_set_style_bg_color(px, fill, 0);
 		lv_obj_set_style_bg_opa(px, treeParts[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+
+void PhoneSynthwaveBg::buildSurpriseDailyCycleWallpaper(){
+	// ----- Mood resolver --------------------------------------------------
+	//
+	// The Surprise wallpaper picks today's bg / accent / highlight from a
+	// 7-row table indexed by MakerphoneTheme::surpriseDayIndex(). Same
+	// pattern the role helpers use - the palette stays in MakerphoneTheme.h
+	// and here we just gather the four colours the wallpaper paints with.
+	// Resolved at construction time so a screen built mid-day always
+	// reads against the same mood, and a screen built after midnight
+	// rolls to the next mood automatically.
+	const uint8_t day = MakerphoneTheme::surpriseDayIndex();
+
+	struct DayColours {
+		lv_color_t bg;
+		lv_color_t bgDeep;
+		lv_color_t accent;
+		lv_color_t highlight;
+		lv_color_t labelDim;
+	};
+
+	// Local copy of the seven-mood role colours rather than reaching
+	// into the shared SurpriseRole table - the wallpaper needs five
+	// of the role+gradient colours, and pulling them locally keeps
+	// this translation unit independent of MakerphoneTheme.cpp's
+	// internal surpriseColor() helper (which lives in an anonymous
+	// namespace there for hot-path inlining).
+	static const DayColours moods[7] = {
+		// SOLAR (0)
+		{ SURPRISE_SOLAR_BG_DARK,    SURPRISE_SOLAR_BG_DEEP,
+		  SURPRISE_SOLAR_ACCENT,     SURPRISE_SOLAR_HIGHLIGHT,
+		  SURPRISE_SOLAR_LABEL_DIM },
+		// CITRUS (1)
+		{ SURPRISE_CITRUS_BG_DARK,   SURPRISE_CITRUS_BG_DEEP,
+		  SURPRISE_CITRUS_ACCENT,    SURPRISE_CITRUS_HIGHLIGHT,
+		  SURPRISE_CITRUS_LABEL_DIM },
+		// TWILIGHT (2)
+		{ SURPRISE_TWILIGHT_BG_DARK, SURPRISE_TWILIGHT_BG_DEEP,
+		  SURPRISE_TWILIGHT_ACCENT,  SURPRISE_TWILIGHT_HIGHLIGHT,
+		  SURPRISE_TWILIGHT_LABEL_DIM },
+		// FOREST (3)
+		{ SURPRISE_FOREST_BG_DARK,   SURPRISE_FOREST_BG_DEEP,
+		  SURPRISE_FOREST_ACCENT,    SURPRISE_FOREST_HIGHLIGHT,
+		  SURPRISE_FOREST_LABEL_DIM },
+		// REEF (4)
+		{ SURPRISE_REEF_BG_DARK,     SURPRISE_REEF_BG_DEEP,
+		  SURPRISE_REEF_ACCENT,      SURPRISE_REEF_HIGHLIGHT,
+		  SURPRISE_REEF_LABEL_DIM },
+		// CARNIVAL (5)
+		{ SURPRISE_CARNIVAL_BG_DARK, SURPRISE_CARNIVAL_BG_DEEP,
+		  SURPRISE_CARNIVAL_ACCENT,  SURPRISE_CARNIVAL_HIGHLIGHT,
+		  SURPRISE_CARNIVAL_LABEL_DIM },
+		// FROST (6)
+		{ SURPRISE_FROST_BG_DARK,    SURPRISE_FROST_BG_DEEP,
+		  SURPRISE_FROST_ACCENT,     SURPRISE_FROST_HIGHLIGHT,
+		  SURPRISE_FROST_LABEL_DIM },
+	};
+	const uint8_t safeDay = (day < 7) ? day : 0;
+	const DayColours& m = moods[safeDay];
+
+	// Gradient bottom = today's BG_DEEP, the second mood-shade in the
+	// palette table. Each mood ships with its own deep shade rather
+	// than computing a darken at runtime - keeps the palette
+	// declarative (every per-mood macro lives in MakerphoneTheme.h)
+	// and matches the prior theme builders' pattern (Christmas:
+	// pine -> midnight, RAZR: night-magenta -> warmer dark magenta,
+	// Stealth: obsidian -> warm charcoal, etc.).
+	const lv_color_t bgBottom = m.bgDeep;
+
+	// ----- Mood panel: today's-bg -> darkened today's-bg gradient --------
+	//
+	// Painted on the same `sky` member pointer the Synthwave variant
+	// uses, mirroring the prior theme builders so a future caller
+	// iterating wallpaper children can rely on a single named root
+	// regardless of theme. The container covers the entire 160x128
+	// area - the Surprise idle screen, like the prior light-on-dark
+	// theme builders, is a single flat surface with no horizon.
+	sky = lv_obj_create(obj);
+	lv_obj_remove_style_all(sky);
+	lv_obj_clear_flag(sky, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(sky, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(sky, BgWidth, BgHeight);
+	lv_obj_set_pos(sky, 0, 0);
+	lv_obj_set_style_bg_color(sky, m.bg, 0);
+	lv_obj_set_style_bg_grad_color(sky, bgBottom, 0);
+	lv_obj_set_style_bg_grad_dir(sky, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(sky, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(sky, 0, 0);
+	lv_obj_set_style_pad_all(sky, 0, 0);
+	lv_obj_set_style_border_width(sky, 0, 0);
+
+	// ----- Mood-ring bands ------------------------------------------------
+	//
+	// Six faint full-width horizontal lines alternating today's accent
+	// and today's highlight tints at low opacity. Approximate the
+	// "rotating mood ring" cue the theme is named after - the bands
+	// suggest a colour palette spinning underneath the panel without
+	// committing to any one of the seven moods on a wider strip. Drawn
+	// 1 px tall to stay subliminal at the 160x128 resolution; LVGL
+	// collapses 1 px rects to a single horizontal line on flush.
+	//
+	// Mechanically the same pattern Christmas / Stealth Black / Y2K
+	// Silver wallpapers use (low-opacity 1 px horizontal rasters),
+	// tuned for an inflated colour count: alternating accent / highlight
+	// stripes per-mood read as "this panel rotates through colours"
+	// against the today's-bg fill.
+	struct Stripe { lv_coord_t y; uint8_t kind; lv_opa_t opa; };
+	const Stripe stripes[] = {
+			{  16, 0, LV_OPA_30 },   // 0 = accent
+			{  36, 1, LV_OPA_20 },   // 1 = highlight
+			{  56, 0, LV_OPA_30 },
+			{  76, 1, LV_OPA_20 },
+			{  96, 0, LV_OPA_30 },
+			{ 116, 1, LV_OPA_20 },
+	};
+	const uint8_t stripeCount = sizeof(stripes) / sizeof(stripes[0]);
+	for(uint8_t i = 0; i < stripeCount; i++){
+		lv_obj_t* s = lv_obj_create(sky);
+		lv_obj_remove_style_all(s);
+		lv_obj_clear_flag(s, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(s, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(s, BgWidth, 1);
+		lv_obj_set_pos(s, 0, stripes[i].y);
+		lv_color_t fill = (stripes[i].kind == 0) ? m.accent : m.highlight;
+		lv_obj_set_style_bg_color(s, fill, 0);
+		lv_obj_set_style_bg_opa(s, stripes[i].opa, 0);
+		lv_obj_set_style_radius(s, 0, 0);
+		lv_obj_set_style_border_width(s, 0, 0);
+	}
+
+	// ----- Mood specks ----------------------------------------------------
+	//
+	// Six 1-2 px highlight specks scattered across the panel suggesting
+	// mood-specific micro-glints (candle reflections under SOLAR /
+	// CARNIVAL, bubble specks under REEF, snowflake glints under
+	// FROST, firefly flickers under FOREST, twilight stars under
+	// TWILIGHT, lemon zest specks under CITRUS - the per-mood reading
+	// of the same pixel arrangement is the point of the
+	// daily-cycle theme). y-positions stay clear of the status bar
+	// (y < 12) and soft-key bar (y > BgHeight - 12) regions so a
+	// speck never reads as a stuck pixel inside a chrome strip.
+	// Opacity varies between 60 and 80% so the constellation reads
+	// as 'micro-glints at varying depths' rather than 'pixel-perfect
+	// dots painted on glass'.
+	struct Speck { lv_coord_t x; lv_coord_t y; uint8_t s; lv_opa_t opa; };
+	const Speck specks[] = {
+			{  28,  20, 1, LV_OPA_70 },
+			{  82,  28, 2, LV_OPA_80 },
+			{ 134,  46, 1, LV_OPA_70 },
+			{  44,  68, 1, LV_OPA_60 },
+			{ 110,  82, 2, LV_OPA_80 },
+			{  20, 100, 1, LV_OPA_70 },
+	};
+	const uint8_t speckCount = sizeof(specks) / sizeof(specks[0]);
+	for(uint8_t i = 0; i < speckCount; i++){
+		lv_obj_t* sp = lv_obj_create(sky);
+		lv_obj_remove_style_all(sp);
+		lv_obj_clear_flag(sp, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(sp, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(sp, specks[i].s, specks[i].s);
+		lv_obj_set_pos(sp, specks[i].x, specks[i].y);
+		lv_obj_set_style_bg_color(sp, m.highlight, 0);
+		lv_obj_set_style_bg_opa(sp, specks[i].opa, 0);
+		lv_obj_set_style_radius(sp, 0, 0);
+		lv_obj_set_style_border_width(sp, 0, 0);
+	}
+
+	// ----- Four-pointed sparkle motif (bottom-right corner) --------------
+	//
+	// Anchored ~12 px clear of the right edge and ~22 px clear of the
+	// bottom edge, in the patch the soft-key bar will cover during
+	// normal use. The sparkle is a 5x5 four-pointed star (centre +
+	// four 2 px arms in each cardinal direction), drawn in today's
+	// accent colour, with a single highlight pixel at the centre
+	// suggesting the brightest point of the glint. The glyph is the
+	// trademark-safe universal "today is different" cue (Mac OS 8
+	// "Picture of the Day" sparkle, Sanrio Hello-Kitty daily-greeting
+	// twinkle, every "new today" UI motif since the early-2000s).
+	// Plus a faint highlight halo row two pixels beneath the sparkle
+	// suggesting the reflected glow on the panel directly below.
+	const lv_coord_t glyphX = BgWidth  - 16;   // 144 - leaves 12 px right-margin
+	const lv_coord_t glyphY = BgHeight - 22;   // 106 - leaves 22 px bottom-margin
+
+	struct PixelRect { int8_t dx, dy; uint8_t w, h; uint8_t layer; lv_opa_t opa; };
+	const PixelRect sparkle[] = {
+			// Vertical arm (5 px tall, 1 px wide, dx=2, dy=0..4)
+			{ 2, 0, 1, 5, 0, LV_OPA_COVER },
+			// Horizontal arm (5 px wide, 1 px tall, dx=0..4, dy=2)
+			{ 0, 2, 5, 1, 0, LV_OPA_COVER },
+			// Centre highlight pixel (1x1, dx=2, dy=2)
+			{ 2, 2, 1, 1, 1, LV_OPA_COVER },
+			// Diagonal accent flecks (4 corners of the cross, 1 px each,
+			// dimmer so the sparkle reads as 4-pointed not 8-pointed)
+			{ 1, 1, 1, 1, 0, LV_OPA_50 },
+			{ 3, 1, 1, 1, 0, LV_OPA_50 },
+			{ 1, 3, 1, 1, 0, LV_OPA_50 },
+			{ 3, 3, 1, 1, 0, LV_OPA_50 },
+			// Reflected halo two rows below the sparkle (5 px wide, 1 px
+			// tall, layer 2 = labelDim mood colour at low opacity)
+			{ 0, 7, 5, 1, 2, LV_OPA_30 },
+	};
+	const uint8_t partCount = sizeof(sparkle) / sizeof(sparkle[0]);
+	for(uint8_t i = 0; i < partCount; i++){
+		lv_obj_t* px = lv_obj_create(sky);
+		lv_obj_remove_style_all(px);
+		lv_obj_clear_flag(px, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(px, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(px, sparkle[i].w, sparkle[i].h);
+		lv_obj_set_pos(px, glyphX + sparkle[i].dx, glyphY + sparkle[i].dy);
+		lv_color_t fill;
+		switch(sparkle[i].layer){
+			case 1:  fill = m.highlight; break;   // centre brightest
+			case 2:  fill = m.labelDim;  break;   // reflected halo
+			case 0:
+			default: fill = m.accent;    break;   // sparkle body
+		}
+		lv_obj_set_style_bg_color(px, fill, 0);
+		lv_obj_set_style_bg_opa(px, sparkle[i].opa, 0);
 		lv_obj_set_style_radius(px, 0, 0);
 		lv_obj_set_style_border_width(px, 0, 0);
 	}

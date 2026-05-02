@@ -199,6 +199,7 @@ void PhoneThemeScreen::rebuildSwatch() {
 		case Theme::Y2KSilver:  drawY2KSilverSwatch();  break;
 		case Theme::CyberpunkRed: drawCyberpunkRedSwatch(); break;
 		case Theme::Christmas:  drawChristmasSwatch();  break;
+		case Theme::SurpriseDailyCycle: drawSurpriseDailyCycleSwatch(); break;
 		default:                drawDefaultSwatch();    break;  // defensive
 	}
 }
@@ -1146,5 +1147,150 @@ void PhoneThemeScreen::buttonPressed(uint i) {
 
 		default:
 			break;
+	}
+}
+
+void PhoneThemeScreen::drawSurpriseDailyCycleSwatch() {
+	// ----- Mood resolver -------------------------------------------------
+	//
+	// The Surprise swatch picks today's bg / accent / highlight from a
+	// 7-row table indexed by MakerphoneTheme::surpriseDayIndex(), the
+	// same engine the role helpers + wallpaper builder use. Resolved
+	// at swatch-build time so a swatch built mid-day always reads
+	// against the same mood as the wallpaper preview the user sees
+	// when they commit the theme.
+	const uint8_t day = MakerphoneTheme::surpriseDayIndex();
+
+	struct DayColours {
+		lv_color_t bg;
+		lv_color_t bgDeep;
+		lv_color_t accent;
+		lv_color_t highlight;
+		lv_color_t labelDim;
+	};
+	static const DayColours moods[7] = {
+		{ SURPRISE_SOLAR_BG_DARK,    SURPRISE_SOLAR_BG_DEEP,
+		  SURPRISE_SOLAR_ACCENT,     SURPRISE_SOLAR_HIGHLIGHT,
+		  SURPRISE_SOLAR_LABEL_DIM },
+		{ SURPRISE_CITRUS_BG_DARK,   SURPRISE_CITRUS_BG_DEEP,
+		  SURPRISE_CITRUS_ACCENT,    SURPRISE_CITRUS_HIGHLIGHT,
+		  SURPRISE_CITRUS_LABEL_DIM },
+		{ SURPRISE_TWILIGHT_BG_DARK, SURPRISE_TWILIGHT_BG_DEEP,
+		  SURPRISE_TWILIGHT_ACCENT,  SURPRISE_TWILIGHT_HIGHLIGHT,
+		  SURPRISE_TWILIGHT_LABEL_DIM },
+		{ SURPRISE_FOREST_BG_DARK,   SURPRISE_FOREST_BG_DEEP,
+		  SURPRISE_FOREST_ACCENT,    SURPRISE_FOREST_HIGHLIGHT,
+		  SURPRISE_FOREST_LABEL_DIM },
+		{ SURPRISE_REEF_BG_DARK,     SURPRISE_REEF_BG_DEEP,
+		  SURPRISE_REEF_ACCENT,      SURPRISE_REEF_HIGHLIGHT,
+		  SURPRISE_REEF_LABEL_DIM },
+		{ SURPRISE_CARNIVAL_BG_DARK, SURPRISE_CARNIVAL_BG_DEEP,
+		  SURPRISE_CARNIVAL_ACCENT,  SURPRISE_CARNIVAL_HIGHLIGHT,
+		  SURPRISE_CARNIVAL_LABEL_DIM },
+		{ SURPRISE_FROST_BG_DARK,    SURPRISE_FROST_BG_DEEP,
+		  SURPRISE_FROST_ACCENT,     SURPRISE_FROST_HIGHLIGHT,
+		  SURPRISE_FROST_LABEL_DIM },
+	};
+	const uint8_t safeDay = (day < 7) ? day : 0;
+	const DayColours& m = moods[safeDay];
+	const lv_color_t bgBottom = m.bgDeep;
+
+	// Mood panel: today's-bg -> darkened today's-bg gradient covering
+	// the full swatch (the Surprise idle screen, like the prior
+	// light-on-dark Stealth Black / Cyberpunk Red / Christmas panels,
+	// is a single flat surface - no horizon).
+	lv_obj_t* panel = lv_obj_create(swatchInner);
+	lv_obj_remove_style_all(panel);
+	lv_obj_set_size(panel, SwatchW, SwatchH);
+	lv_obj_set_pos(panel, 0, 0);
+	lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_set_style_bg_color(panel, m.bg, 0);
+	lv_obj_set_style_bg_grad_color(panel, bgBottom, 0);
+	lv_obj_set_style_bg_grad_dir(panel, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(panel, 0, 0);
+	lv_obj_set_style_border_width(panel, 0, 0);
+
+	// Mood-ring bands: three faint full-width horizontal lines
+	// alternating today's accent / highlight at low opacity, mirroring
+	// the wallpaper's mood-ring trim.
+	struct Stripe { lv_coord_t y; uint8_t kind; lv_opa_t opa; };
+	const Stripe stripes[] = {
+			{  8, 0, LV_OPA_30 },   // 0 = accent
+			{ 22, 1, LV_OPA_20 },   // 1 = highlight
+			{ 36, 0, LV_OPA_30 },
+	};
+	for(uint8_t i = 0; i < sizeof(stripes) / sizeof(stripes[0]); i++) {
+		lv_obj_t* s = lv_obj_create(panel);
+		lv_obj_remove_style_all(s);
+		lv_obj_set_size(s, SwatchW, 1);
+		lv_obj_set_pos(s, 0, stripes[i].y);
+		lv_color_t fill = (stripes[i].kind == 0) ? m.accent : m.highlight;
+		lv_obj_set_style_bg_color(s, fill, 0);
+		lv_obj_set_style_bg_opa(s, stripes[i].opa, 0);
+		lv_obj_set_style_radius(s, 0, 0);
+		lv_obj_set_style_border_width(s, 0, 0);
+	}
+
+	// Mood specks: four 1-2 px highlight specks scattered across
+	// the swatch.
+	struct Speck { lv_coord_t x; lv_coord_t y; uint8_t s; lv_opa_t opa; };
+	const Speck specks[] = {
+			{ 12,  5, 1, LV_OPA_70 },
+			{ 30, 16, 2, LV_OPA_80 },
+			{ 58, 12, 1, LV_OPA_70 },
+			{ 70, 32, 1, LV_OPA_60 },
+	};
+	for(uint8_t i = 0; i < sizeof(specks) / sizeof(specks[0]); i++) {
+		lv_obj_t* sp = lv_obj_create(panel);
+		lv_obj_remove_style_all(sp);
+		lv_obj_set_size(sp, specks[i].s, specks[i].s);
+		lv_obj_set_pos(sp, specks[i].x, specks[i].y);
+		lv_obj_set_style_bg_color(sp, m.highlight, 0);
+		lv_obj_set_style_bg_opa(sp, specks[i].opa, 0);
+		lv_obj_set_style_radius(sp, 0, 0);
+		lv_obj_set_style_border_width(sp, 0, 0);
+	}
+
+	// Sparkle motif centred in the swatch. Mirrors the wallpaper's
+	// bottom-right glyph but pulled to the centre so it reads as the
+	// theme's signature glyph - exactly how the prior per-theme
+	// swatch builders position their glyphs.
+	const lv_coord_t cx = SwatchW / 2 - 2;
+	const lv_coord_t cy = SwatchH / 2 - 4;
+
+	struct PixelRect { int8_t dx, dy; uint8_t w, h; uint8_t layer; lv_opa_t opa; };
+	const PixelRect sparkle[] = {
+			// Vertical arm
+			{ 2, 0, 1, 5, 0, LV_OPA_COVER },
+			// Horizontal arm
+			{ 0, 2, 5, 1, 0, LV_OPA_COVER },
+			// Centre highlight pixel
+			{ 2, 2, 1, 1, 1, LV_OPA_COVER },
+			// Diagonal accent flecks
+			{ 1, 1, 1, 1, 0, LV_OPA_50 },
+			{ 3, 1, 1, 1, 0, LV_OPA_50 },
+			{ 1, 3, 1, 1, 0, LV_OPA_50 },
+			{ 3, 3, 1, 1, 0, LV_OPA_50 },
+			// Reflected halo
+			{ 0, 7, 5, 1, 2, LV_OPA_30 },
+	};
+	const uint8_t partCount = sizeof(sparkle) / sizeof(sparkle[0]);
+	for(uint8_t i = 0; i < partCount; i++){
+		lv_obj_t* px = lv_obj_create(panel);
+		lv_obj_remove_style_all(px);
+		lv_obj_set_size(px, sparkle[i].w, sparkle[i].h);
+		lv_obj_set_pos(px, cx + sparkle[i].dx, cy + sparkle[i].dy);
+		lv_color_t fill;
+		switch(sparkle[i].layer){
+			case 1:  fill = m.highlight; break;
+			case 2:  fill = m.labelDim;  break;
+			case 0:
+			default: fill = m.accent;    break;
+		}
+		lv_obj_set_style_bg_color(px, fill, 0);
+		lv_obj_set_style_bg_opa(px, sparkle[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
 	}
 }

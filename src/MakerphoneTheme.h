@@ -239,12 +239,77 @@ public:
 		// Christmas-tree silhouette).
 		Christmas = 9,
 
-		// Reserved 10..15 for the upcoming Phase O themes:
-		//  10  Surprise/Daily-Cycle (S119)
+		// Surprise / Daily-Cycle - rotating-palette homage to every
+		// 'mood ring of the day' aesthetic the early-2000s carrier
+		// theme packs flirted with (the Sony-Ericsson 'Day' theme,
+		// the Nokia 6630 'Mood' pack, every Sanrio Hello-Kitty
+		// daily-greeting flip cover) and to the broader retro-
+		// computing convention of having the desktop change colour
+		// scheme with the date (the Mac OS 8 'Picture of the Day'
+		// CDEF, the Windows 95 'Hot Dog Stand' family of plus!-pack
+		// rotators, the Amiga Workbench 3.x preference saver). The
+		// skin that doesn't pin itself to a single iconic device but
+		// instead cycles through seven distinct mood palettes - one
+		// per day-of-cycle - so the phone reads as a different
+		// retro-ish aesthetic each time the user picks it up the
+		// next day. Seven palettes - SOLAR (warm peach sunset),
+		// CITRUS (lemon-on-teal energy), TWILIGHT (electric-violet
+		// indigo), FOREST (sage-on-pine calm), REEF (coral-on-ocean
+		// tropical), CARNIVAL (hot magenta with gold trim), FROST
+		// (mint-cyan-on-slate cool). Each palette carries the same
+		// six MP_*-equivalent role colours so every Phone* widget
+		// renders against today's mood without per-day branching.
+		// The palette resolver reads MakerphoneTheme::surpriseDayIndex()
+		// (a millis-derived 0..6 day-of-cycle counter, deterministic
+		// for the lifetime of one boot) so a screen built mid-day
+		// always reads against the same mood and a screen built
+		// after midnight rolls to the next palette. Reads
+		// light-on-dark on six of the seven days (SOLAR / CITRUS /
+		// TWILIGHT / FOREST / REEF / CARNIVAL) and cool-on-dark on
+		// the seventh (FROST) - all seven palettes share the
+		// 'bright accent over a saturated panel' reading direction
+		// the prior light-on-dark themes (Default Synthwave, Amber
+		// CRT, Aqua, RAZR, Stealth Black, Cyberpunk Red, Christmas)
+		// established. S119 ships the engine + the seven-palette
+		// table; S120 then adds the rotation logic + per-day icon
+		// variants on top.
+		SurpriseDailyCycle = 10,
+
+		// Reserved 11..15 for the upcoming Phase O themes (none
+		// scheduled yet - S120 finishes Phase O by completing
+		// SurpriseDailyCycle's icon variants).
 	};
 
 	/** Total number of themes the picker should expose today. */
-	static constexpr uint8_t ThemeCount = 10;
+	static constexpr uint8_t ThemeCount = 11;
+
+	/*
+	 * S119 - Surprise / Daily-Cycle engine.
+	 *
+	 * SurpriseDayCount sub-palettes index 0..6 from a millis-derived
+	 * day-of-cycle counter. surpriseDayIndex() returns 0..6 based on
+	 * the integer number of 24-hour periods elapsed since boot, modulo
+	 * SurpriseDayCount; deterministic for the lifetime of one boot
+	 * (so a screen built mid-day always reads against the same mood)
+	 * and rolls to the next sub-palette automatically every 24 hours
+	 * of uptime. surpriseDayName() returns the all-caps mood name for
+	 * a given index, used by the upcoming theme-picker swatch label
+	 * row and by debug logs.
+	 *
+	 * The engine intentionally derives the day-of-cycle from
+	 * Arduino's millis() rather than a real RTC because the Chatter
+	 * hardware does not currently ship a real-time-clock source -
+	 * PhoneClockFace and PhoneStatusBar both fake a date from
+	 * boot uptime today (see PhoneClockFace::updateDate). When a
+	 * future session wires a real RTC in, replacing this body with
+	 * a localtime tm_yday lookup keeps the rest of the dispatch
+	 * mechanical. The 24-hour rollover cadence is the right one
+	 * for a 'picks up something new each day' device feel without
+	 * requiring the user to keep the phone awake to see the cycle.
+	 */
+	static constexpr uint8_t SurpriseDayCount = 7;
+	static uint8_t           surpriseDayIndex();
+	static const char*       surpriseDayName(uint8_t idx);
 
 	/**
 	 * Resolve a raw `Settings.themeId` byte to a clamped Theme. Bytes
@@ -1620,5 +1685,140 @@ public:
 #define XMAS_CRIMSON   lv_color_make(220,  40,  44)
 #define XMAS_GOLD      lv_color_make(248, 212, 110)
 #define XMAS_SNOW      lv_color_make(248, 252, 255)
+
+/*
+ * ---------------------------------------------------------------------
+ * Surprise / Daily-Cycle palette (S119).
+ *
+ * Seven distinct mood-palettes, one per day-of-cycle index returned by
+ * MakerphoneTheme::surpriseDayIndex(). Each palette carries the same
+ * six MP_*-equivalent role colours (BG_DARK, ACCENT, HIGHLIGHT, DIM,
+ * TEXT, LABEL_DIM) so the role helpers - bgDark() / accent() /
+ * highlight() / dim() / text() / labelDim() - can dispatch on the
+ * day index with a flat lookup rather than per-day branching.
+ *
+ * The seven moods:
+ *
+ *   SOLAR    (idx 0) - warm peach sunset over deep wine. Reads as
+ *                      'late-afternoon golden hour through a tinted
+ *                      window' - the warm-on-dark pairing the early-
+ *                      2000s Sony Ericsson 'Sunset' theme leaned on.
+ *   CITRUS   (idx 1) - lemon-yellow + lime over deep teal. Reads as
+ *                      'energetic morning kitchen' - the bright-cool
+ *                      pairing every Y2K-era 'Lemon Fresh' carrier
+ *                      pack used to wake the user up.
+ *   TWILIGHT (idx 2) - electric violet + sky cyan over indigo. Reads
+ *                      as 'pre-dawn sky with the first lights coming
+ *                      on' - the saturated-cool pairing the late-90s
+ *                      Mac OS 8 'Picture of the Day' CDEF rotators
+ *                      anchored to a 'wee-hours mood' day.
+ *   FOREST   (idx 3) - sage green + meadow yellow over pine. Reads
+ *                      as 'walk through dappled morning forest' - the
+ *                      warm-cool green pairing the Amiga Workbench
+ *                      'Earth Day' palette saver shipped on May 1.
+ *   REEF     (idx 4) - coral pink + sea cyan over deep ocean. Reads
+ *                      as 'shallow tropical water with bright fish' -
+ *                      the warm-cool tropical pairing the early-2000s
+ *                      Nokia 6630 'Coral' mood pack used to mark a
+ *                      'beach mood' day.
+ *   CARNIVAL (idx 5) - hot magenta + gold trim over deep maroon.
+ *                      Reads as 'late-night festival with neon
+ *                      signage' - the saturated-warm party pairing
+ *                      every Sanrio 'Friday Night' daily-greeting
+ *                      flip cover used to mark the end of the work
+ *                      week.
+ *   FROST    (idx 6) - mint cyan + ice blue over deep slate. Reads
+ *                      as 'crisp winter morning with frost on the
+ *                      window' - the cool-on-cool pairing every Y2K
+ *                      'Ice' or 'Glacier' carrier pack used to mark
+ *                      a 'calm restorative' day.
+ *
+ * The seven palettes deliberately rotate hue around the colour wheel
+ * (warm-orange -> yellow-green -> blue-violet -> green -> blue-cyan
+ * -> red-magenta -> cyan-teal) so consecutive days never share a
+ * dominant hue family - the user picks up the phone Tuesday and sees
+ * a violet panel where Monday was lemon-yellow, reinforcing the
+ * 'today's mood is different from yesterday's' cue that defines the
+ * theme.
+ *
+ * Naming follows the MP_* convention: a Phone* widget that swaps to
+ * the Surprise palette in S120 only changes which header it includes,
+ * not how it spells colours. The actual #define values live in the
+ * header for symmetry with the other Phase O palettes (Nokia / DMG /
+ * Amber / Aqua / RAZR / Stealth / Y2K / Cyberpunk / Christmas) so
+ * a host-side LVGL build of the test harness can reference them
+ * directly.
+ *
+ * Trademark / copyright notes: every shade is calibrated against the
+ * generic mood-colour vocabulary that is universal across every
+ * 'theme of the day' system - no specific commercial brand palette
+ * is reproduced. The result is a copyright-safe daily-cycle theme
+ * that any Chatter owner can flip on without invoking a specific
+ * brand identity.
+ * ---------------------------------------------------------------------
+ */
+
+// SOLAR (idx 0) - warm peach sunset over deep wine
+#define SURPRISE_SOLAR_BG_DARK    lv_color_make( 40,  16,  32)
+#define SURPRISE_SOLAR_BG_DEEP    lv_color_make( 22,   8,  18)
+#define SURPRISE_SOLAR_ACCENT     lv_color_make(255, 132,  84)
+#define SURPRISE_SOLAR_HIGHLIGHT  lv_color_make(255, 200, 140)
+#define SURPRISE_SOLAR_DIM        lv_color_make( 96,  60,  78)
+#define SURPRISE_SOLAR_TEXT       lv_color_make(255, 230, 210)
+#define SURPRISE_SOLAR_LABEL_DIM  lv_color_make(180, 130, 140)
+
+// CITRUS (idx 1) - lemon-yellow + lime over deep teal
+#define SURPRISE_CITRUS_BG_DARK    lv_color_make(  8,  36,  30)
+#define SURPRISE_CITRUS_BG_DEEP    lv_color_make(  4,  20,  16)
+#define SURPRISE_CITRUS_ACCENT     lv_color_make(240, 220,  60)
+#define SURPRISE_CITRUS_HIGHLIGHT  lv_color_make(176, 240, 100)
+#define SURPRISE_CITRUS_DIM        lv_color_make( 48,  80,  70)
+#define SURPRISE_CITRUS_TEXT       lv_color_make(248, 252, 220)
+#define SURPRISE_CITRUS_LABEL_DIM  lv_color_make(160, 180, 130)
+
+// TWILIGHT (idx 2) - electric violet + sky cyan over indigo
+#define SURPRISE_TWILIGHT_BG_DARK    lv_color_make( 12,  14,  44)
+#define SURPRISE_TWILIGHT_BG_DEEP    lv_color_make(  6,   8,  24)
+#define SURPRISE_TWILIGHT_ACCENT     lv_color_make(160, 100, 255)
+#define SURPRISE_TWILIGHT_HIGHLIGHT  lv_color_make(120, 200, 255)
+#define SURPRISE_TWILIGHT_DIM        lv_color_make( 60,  60, 100)
+#define SURPRISE_TWILIGHT_TEXT       lv_color_make(232, 220, 255)
+#define SURPRISE_TWILIGHT_LABEL_DIM  lv_color_make(150, 150, 200)
+
+// FOREST (idx 3) - sage green + meadow yellow over pine
+#define SURPRISE_FOREST_BG_DARK    lv_color_make( 14,  32,  18)
+#define SURPRISE_FOREST_BG_DEEP    lv_color_make(  6,  18,   8)
+#define SURPRISE_FOREST_ACCENT     lv_color_make(120, 200, 100)
+#define SURPRISE_FOREST_HIGHLIGHT  lv_color_make(220, 240, 120)
+#define SURPRISE_FOREST_DIM        lv_color_make( 56,  88,  60)
+#define SURPRISE_FOREST_TEXT       lv_color_make(220, 240, 200)
+#define SURPRISE_FOREST_LABEL_DIM  lv_color_make(140, 170, 130)
+
+// REEF (idx 4) - coral pink + sea cyan over deep ocean
+#define SURPRISE_REEF_BG_DARK    lv_color_make(  8,  36,  56)
+#define SURPRISE_REEF_BG_DEEP    lv_color_make(  4,  18,  30)
+#define SURPRISE_REEF_ACCENT     lv_color_make(255, 100, 110)
+#define SURPRISE_REEF_HIGHLIGHT  lv_color_make( 80, 220, 220)
+#define SURPRISE_REEF_DIM        lv_color_make( 40,  76,  96)
+#define SURPRISE_REEF_TEXT       lv_color_make(220, 248, 240)
+#define SURPRISE_REEF_LABEL_DIM  lv_color_make(180, 130, 130)
+
+// CARNIVAL (idx 5) - hot magenta + gold trim over deep maroon
+#define SURPRISE_CARNIVAL_BG_DARK    lv_color_make( 36,  12,  28)
+#define SURPRISE_CARNIVAL_BG_DEEP    lv_color_make( 18,   6,  14)
+#define SURPRISE_CARNIVAL_ACCENT     lv_color_make(240,  80, 180)
+#define SURPRISE_CARNIVAL_HIGHLIGHT  lv_color_make(255, 200,  80)
+#define SURPRISE_CARNIVAL_DIM        lv_color_make( 80,  40,  70)
+#define SURPRISE_CARNIVAL_TEXT       lv_color_make(255, 232, 220)
+#define SURPRISE_CARNIVAL_LABEL_DIM  lv_color_make(190, 150, 170)
+
+// FROST (idx 6) - mint cyan + ice blue over deep slate
+#define SURPRISE_FROST_BG_DARK    lv_color_make( 16,  28,  36)
+#define SURPRISE_FROST_BG_DEEP    lv_color_make(  8,  14,  20)
+#define SURPRISE_FROST_ACCENT     lv_color_make(100, 220, 200)
+#define SURPRISE_FROST_HIGHLIGHT  lv_color_make(180, 240, 255)
+#define SURPRISE_FROST_DIM        lv_color_make( 56,  80,  90)
+#define SURPRISE_FROST_TEXT       lv_color_make(220, 250, 250)
+#define SURPRISE_FROST_LABEL_DIM  lv_color_make(140, 180, 180)
 
 #endif // MAKERPHONE_THEME_H
