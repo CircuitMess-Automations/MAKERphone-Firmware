@@ -153,15 +153,45 @@ public:
 		// red status indicator).
 		StealthBlack = 6,
 
-		// Reserved 7..15 for the upcoming Phase O themes:
-		//   7  Y2K Silver   (S113)
+		// Y2K Silver - turn-of-the-millennium "translucent chrome"
+		// homage (iMac G3 Snow, iPod 1G click-wheel, Sony Discman
+		// MZ-E700, Sony VAIO PCG-505, Nokia 8210, Sharp J-SH04
+		// "Frost Silver" - the brushed-silver-and-translucent-blue
+		// industrial-design vocabulary that defined the late-1990s
+		// to early-2000s "Y2K" consumer-electronics aesthetic). The
+		// skin that came right after the late-2000s tactical
+		// blacked-out era visually but actually predated it
+		// historically - the polished-aluminium / frosted-Lucite
+		// gadget every kid in 2001 wanted before the 2005 RAZR flip
+		// phone reset the design conversation. Six shades - pearl-
+		// silver panel off, brushed-aluminium gradient bottom,
+		// frosted-grey idle borders, electric-blue accent (the iMac
+		// G3 Bondi-blue / iPod scroll-wheel ring colour), charcoal-
+		// blue body text (the cool slate every Y2K UI printed
+		// against pearl), icy-white shine highlights / etched-
+		// aluminium ripples. Reads dark-on-light like the Nokia 3310
+		// + Game Boy DMG themes - the authentic Y2K reading
+		// direction (cool dark text on a polished silver panel) -
+		// giving the theme picker a physical-world feel that
+		// contrasts with the light-on-dark Synthwave / Amber CRT /
+		// Aqua / RAZR / Stealth Black themes. Wallpaper bypasses
+		// every Synthwave builder and paints a flat pearl-silver
+		// gradient panel with a few horizontal brushed-aluminium
+		// grain striations + scattered Lucite frost specks + a
+		// stylised translucent-Lucite "raindrop" motif anchored
+		// bottom-right (the universal "Y2K frost" brand cue,
+		// copyright-safe vs the iMac G3 Bondi droplet or the iPod
+		// scroll-wheel ring).
+		Y2KSilver = 7,
+
+		// Reserved 8..15 for the upcoming Phase O themes:
 		//   8  Cyberpunk Red (S115)
 		//   9  Christmas    (S117)
 		//  10  Surprise/Daily-Cycle (S119)
 	};
 
 	/** Total number of themes the picker should expose today. */
-	static constexpr uint8_t ThemeCount = 7;
+	static constexpr uint8_t ThemeCount = 8;
 
 	/**
 	 * Resolve a raw `Settings.themeId` byte to a clamped Theme. Bytes
@@ -905,5 +935,79 @@ public:
 #define STEALTH_LED          lv_color_make(220,  40,  30)
 #define STEALTH_BONE         lv_color_make(228, 226, 220)
 #define STEALTH_STEEL        lv_color_make(160, 168, 180)
+
+
+/*
+ * ---------------------------------------------------------------------
+ * Y2K Silver palette (S113).
+ *
+ * Approximates the iconic turn-of-the-millennium "translucent chrome"
+ * industrial-design vocabulary - the iMac G3 Snow, iPod 1G click-wheel,
+ * Sony Discman MZ-E700, Sony VAIO PCG-505, Nokia 8210 "Frost Silver",
+ * Sharp J-SH04, the brushed-aluminium-and-translucent-blue gadgets that
+ * defined the late-1990s to early-2000s "Y2K" consumer-electronics era
+ * before the mid-2000s RAZR flip phone and the late-2000s blacked-out
+ * tactical handset reset the design conversation. Like the Nokia 3310
+ * and Game Boy DMG palettes, Y2K Silver reads dark-on-light: cool
+ * charcoal-blue menu items + electric-blue accents on a pearl-silver
+ * panel, the authentic Y2K-era menu reading direction (and the visual
+ * pole opposite the Synthwave / Amber CRT / Aqua / RAZR / Stealth
+ * Black light-on-dark themes).
+ *
+ * Six shades, all in the cool silver / electric-blue gamut:
+ *
+ *   Y2K_BG_PEARL  - pearl-silver, the panel-off colour. Top of the
+ *                   vertical gradient. A bright cool grey with a faint
+ *                   blue bias - matches the polished-aluminium /
+ *                   frosted-Lucite back panel of every Y2K-era gadget
+ *                   when the screen is off and ambient light catches
+ *                   the brushed surface.
+ *   Y2K_BG_CHROME - brushed-aluminium chrome, the panel gradient
+ *                   bottom. Slightly darker / more saturated cool grey
+ *                   - the cue every iMac G3 Snow / iPod 1G owner saw
+ *                   when the panel curved away from the light source
+ *                   and the brushed grain caught a deeper shade.
+ *   Y2K_FROST     - frosted-grey idle border / inactive chevron
+ *                   colour. ~40 % darker than BG_PEARL so it reads as
+ *                   legible-but-not-shouting next to the brighter
+ *                   panel - the etched-aluminium trim every Y2K UI
+ *                   used for inactive affordances.
+ *   Y2K_BONDI     - electric Bondi-blue, the focus / accent colour.
+ *                   The signature "iMac G3 Bondi" / iPod scroll-wheel
+ *                   ring colour - the single splash of saturated blue
+ *                   against the cool pearl panel. Calibrated toward
+ *                   the iMac G3 Snow's translucent-blue ring rather
+ *                   than the deeper Bondi original so it stays
+ *                   readable on a 16 bpp panel.
+ *   Y2K_INK       - charcoal-blue body text + icon-stroke colour.
+ *                   The cool dark slate every Y2K UI printed against
+ *                   pearl - bluer than the Nokia 3310 olive-ink, more
+ *                   saturated than the DMG forest-green, but still in
+ *                   the dark-on-light hierarchy. Matches the iPod
+ *                   1G's menu-item ink and the Sony VAIO PCG-505's
+ *                   etched-keyboard label colour.
+ *   Y2K_SHINE     - icy-white shine highlight + ripple accent. Used
+ *                   for top-edge gloss strips, etched-aluminium
+ *                   ripples, dim labels (timestamps, placeholders),
+ *                   and the Lucite-frost specks on the wallpaper.
+ *                   Almost pure white with a hint of cool-blue bias
+ *                   so a SHINE pixel reads as 'reflected ambient
+ *                   light' rather than a focus accent.
+ *
+ * Stored as lv_color_make(R, G, B) so the values render identically on
+ * every LV_COLOR_DEPTH the firmware might be built against - same
+ * portability rationale as the prior palettes.
+ *
+ * Naming follows the MP_* / N3310_* / GBDMG_* / AMBER_CRT_* / AQUA_* /
+ * RAZR_* / STEALTH_* convention so the part-2 icon-glyph swap in S114
+ * only changes which header it includes, not how it spells colours.
+ * ---------------------------------------------------------------------
+ */
+#define Y2K_BG_PEARL  lv_color_make(216, 222, 230)
+#define Y2K_BG_CHROME lv_color_make(176, 184, 196)
+#define Y2K_FROST     lv_color_make(140, 152, 168)
+#define Y2K_BONDI     lv_color_make( 30, 130, 220)
+#define Y2K_INK       lv_color_make( 32,  44,  68)
+#define Y2K_SHINE     lv_color_make(248, 252, 255)
 
 #endif // MAKERPHONE_THEME_H

@@ -196,6 +196,7 @@ void PhoneThemeScreen::rebuildSwatch() {
 		case Theme::SonyEricssonAqua: drawSonyEricssonAquaSwatch(); break;
 		case Theme::RazrHotPink: drawRazrHotPinkSwatch(); break;
 		case Theme::StealthBlack: drawStealthBlackSwatch(); break;
+		case Theme::Y2KSilver:  drawY2KSilverSwatch();  break;
 		default:                drawDefaultSwatch();    break;  // defensive
 	}
 }
@@ -770,6 +771,105 @@ void PhoneThemeScreen::drawStealthBlackSwatch() {
 		}
 		lv_obj_set_style_bg_color(px, fill, 0);
 		lv_obj_set_style_bg_opa(px, led[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+
+
+void PhoneThemeScreen::drawY2KSilverSwatch() {
+	// Pearl-silver panel: pearl-silver -> brushed-aluminium vertical
+	// gradient covering the full swatch (the Y2K-era translucent-
+	// chrome menu screen, like the prior dark-on-light Nokia / DMG
+	// panels and the light-on-dark Aqua / RAZR / Stealth Black
+	// panels, is a single flat surface — no horizon).
+	lv_obj_t* panel = lv_obj_create(swatchInner);
+	lv_obj_remove_style_all(panel);
+	lv_obj_set_size(panel, SwatchW, SwatchH);
+	lv_obj_set_pos(panel, 0, 0);
+	lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_set_style_bg_color(panel, Y2K_BG_PEARL, 0);
+	lv_obj_set_style_bg_grad_color(panel, Y2K_BG_CHROME, 0);
+	lv_obj_set_style_bg_grad_dir(panel, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(panel, 0, 0);
+	lv_obj_set_style_border_width(panel, 0, 0);
+
+	// Brushed-aluminium grain rasters: three faint full-width
+	// horizontal lines in Y2K_FROST at low opacity, mirroring the
+	// wallpaper.
+	struct Raster { lv_coord_t y; lv_opa_t opa; };
+	const Raster rasters[] = {
+			{  9, LV_OPA_30 },
+			{ 22, LV_OPA_40 },
+			{ 35, LV_OPA_30 },
+	};
+	for(uint8_t i = 0; i < sizeof(rasters) / sizeof(rasters[0]); i++) {
+		lv_obj_t* r = lv_obj_create(panel);
+		lv_obj_remove_style_all(r);
+		lv_obj_set_size(r, SwatchW, 1);
+		lv_obj_set_pos(r, 0, rasters[i].y);
+		lv_obj_set_style_bg_color(r, Y2K_FROST, 0);
+		lv_obj_set_style_bg_opa(r, rasters[i].opa, 0);
+		lv_obj_set_style_radius(r, 0, 0);
+		lv_obj_set_style_border_width(r, 0, 0);
+	}
+
+	// Lucite-frost micro-glints: four 1-2 px Y2K_SHINE specks
+	// scattered across the swatch.
+	struct Glint { lv_coord_t x; lv_coord_t y; uint8_t s; lv_opa_t opa; };
+	const Glint glints[] = {
+			{ 12,  6, 1, LV_OPA_70 },
+			{ 30, 16, 2, LV_OPA_60 },
+			{ 58,  8, 1, LV_OPA_70 },
+			{ 70, 30, 2, LV_OPA_60 },
+	};
+	for(uint8_t i = 0; i < sizeof(glints) / sizeof(glints[0]); i++) {
+		lv_obj_t* g = lv_obj_create(panel);
+		lv_obj_remove_style_all(g);
+		lv_obj_set_size(g, glints[i].s, glints[i].s);
+		lv_obj_set_pos(g, glints[i].x, glints[i].y);
+		lv_obj_set_style_bg_color(g, Y2K_SHINE, 0);
+		lv_obj_set_style_bg_opa(g, glints[i].opa, 0);
+		lv_obj_set_style_radius(g, 0, 0);
+		lv_obj_set_style_border_width(g, 0, 0);
+	}
+
+	// Translucent-Lucite raindrop motif centred in the swatch.
+	// Mirrors the wallpaper's bottom-right glyph but pulled to the
+	// centre so it reads as the theme's signature glyph — exactly
+	// how the prior per-theme swatch builders position their glyphs.
+	const lv_coord_t lx = SwatchW / 2 - 1;
+	const lv_coord_t ly = SwatchH / 2 - 2;
+
+	struct PixelRect { int8_t dx, dy; uint8_t w, h; uint8_t layer; lv_opa_t opa; };
+	const PixelRect drop[] = {
+			// Peak (row 0, centre)
+			{ 1, 0, 1, 1, 0, LV_OPA_COVER },
+			// Body rows 1-3
+			{ 0, 1, 3, 1, 0, LV_OPA_COVER },
+			{ 0, 2, 3, 1, 0, LV_OPA_COVER },
+			{ 0, 3, 3, 1, 0, LV_OPA_COVER },
+			// Shine highlight (upper-right of body)
+			{ 2, 1, 1, 1, 1, LV_OPA_COVER },
+			// Reflected halo two rows below
+			{ 0, 5, 3, 1, 2, LV_OPA_30 },
+	};
+	const uint8_t partCount = sizeof(drop) / sizeof(drop[0]);
+	for(uint8_t i = 0; i < partCount; i++){
+		lv_obj_t* px = lv_obj_create(panel);
+		lv_obj_remove_style_all(px);
+		lv_obj_set_size(px, drop[i].w, drop[i].h);
+		lv_obj_set_pos(px, lx + drop[i].dx, ly + drop[i].dy);
+		lv_color_t fill;
+		switch(drop[i].layer){
+			case 1:  fill = Y2K_SHINE; break;
+			case 2:  fill = Y2K_FROST; break;
+			case 0:
+			default: fill = Y2K_BONDI; break;
+		}
+		lv_obj_set_style_bg_color(px, fill, 0);
+		lv_obj_set_style_bg_opa(px, drop[i].opa, 0);
 		lv_obj_set_style_radius(px, 0, 0);
 		lv_obj_set_style_border_width(px, 0, 0);
 	}

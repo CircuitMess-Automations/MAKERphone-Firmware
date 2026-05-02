@@ -140,6 +140,7 @@ private:
 	void drawSonyEricssonAquaSwatch();
 	void drawRazrHotPinkSwatch();
 	void drawStealthBlackSwatch();
+	void drawY2KSilverSwatch();
 };
 
 #endif // MAKERPHONE_PHONETHEMESCREEN_H

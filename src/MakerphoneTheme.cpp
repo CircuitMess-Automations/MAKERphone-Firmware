@@ -17,6 +17,8 @@ MakerphoneTheme::Theme MakerphoneTheme::themeFromByte(uint8_t raw){
 		                                              return Theme::RazrHotPink;
 		case static_cast<uint8_t>(Theme::StealthBlack):
 		                                              return Theme::StealthBlack;
+		case static_cast<uint8_t>(Theme::Y2KSilver):
+		                                              return Theme::Y2KSilver;
 		case static_cast<uint8_t>(Theme::Default):
 		default:                                      return Theme::Default;
 	}
@@ -35,6 +37,7 @@ const char* MakerphoneTheme::getName(Theme t){
 		case Theme::SonyEricssonAqua: return "SE AQUA";
 		case Theme::RazrHotPink: return "RAZR PINK";
 		case Theme::StealthBlack: return "STEALTH";
+		case Theme::Y2KSilver:  return "Y2K SILVER";
 		default:                return "DEFAULT";
 	}
 }
@@ -72,6 +75,7 @@ lv_color_t MakerphoneTheme::bgDark(){
 		case Theme::SonyEricssonAqua: return AQUA_BG_DEEP;
 		case Theme::RazrHotPink: return RAZR_BG_DARK;
 		case Theme::StealthBlack: return STEALTH_BG_OBSIDIAN;
+		case Theme::Y2KSilver:  return Y2K_BG_PEARL;
 		case Theme::Default:
 		default:                return MP_BG_DARK;
 	}
@@ -85,6 +89,7 @@ lv_color_t MakerphoneTheme::accent(){
 		case Theme::SonyEricssonAqua: return AQUA_GLOW;
 		case Theme::RazrHotPink: return RAZR_GLOW;
 		case Theme::StealthBlack: return STEALTH_LED;
+		case Theme::Y2KSilver:  return Y2K_BONDI;
 		case Theme::Default:
 		default:                return MP_ACCENT;
 	}
@@ -98,6 +103,7 @@ lv_color_t MakerphoneTheme::highlight(){
 		case Theme::SonyEricssonAqua: return AQUA_CHROME;
 		case Theme::RazrHotPink: return RAZR_CHROME;
 		case Theme::StealthBlack: return STEALTH_BONE;
+		case Theme::Y2KSilver:  return Y2K_INK;
 		case Theme::Default:
 		default:                return MP_HIGHLIGHT;
 	}
@@ -111,6 +117,7 @@ lv_color_t MakerphoneTheme::dim(){
 		case Theme::SonyEricssonAqua: return AQUA_DIM;
 		case Theme::RazrHotPink: return RAZR_DIM;
 		case Theme::StealthBlack: return STEALTH_GUNMETAL;
+		case Theme::Y2KSilver:  return Y2K_FROST;
 		case Theme::Default:
 		default:                return MP_DIM;
 	}
@@ -124,6 +131,7 @@ lv_color_t MakerphoneTheme::text(){
 		case Theme::SonyEricssonAqua: return AQUA_CHROME;
 		case Theme::RazrHotPink: return RAZR_CHROME;
 		case Theme::StealthBlack: return STEALTH_BONE;
+		case Theme::Y2KSilver:  return Y2K_INK;
 		case Theme::Default:
 		default:                return MP_TEXT;
 	}
@@ -137,6 +145,7 @@ lv_color_t MakerphoneTheme::labelDim(){
 		case Theme::SonyEricssonAqua: return AQUA_FOAM;
 		case Theme::RazrHotPink: return RAZR_SHINE;
 		case Theme::StealthBlack: return STEALTH_STEEL;
+		case Theme::Y2KSilver:  return Y2K_FROST;
 		case Theme::Default:
 		default:                return MP_LABEL_DIM;
 	}
@@ -165,6 +174,7 @@ lv_color_t MakerphoneTheme::iconStroke(){
 		case Theme::SonyEricssonAqua: return AQUA_CHROME;
 		case Theme::RazrHotPink: return RAZR_CHROME;
 		case Theme::StealthBlack: return STEALTH_BONE;
+		case Theme::Y2KSilver:  return Y2K_INK;
 		case Theme::Default:
 		default:                return MP_HIGHLIGHT;
 	}
@@ -178,6 +188,7 @@ lv_color_t MakerphoneTheme::iconDetail(){
 		case Theme::SonyEricssonAqua: return AQUA_GLOW;
 		case Theme::RazrHotPink: return RAZR_GLOW;
 		case Theme::StealthBlack: return STEALTH_LED;
+		case Theme::Y2KSilver:  return Y2K_BONDI;
 		case Theme::Default:
 		default:                return MP_ACCENT;
 	}
@@ -218,6 +229,7 @@ lv_color_t MakerphoneTheme::phosphorGlow(){
 		case Theme::SonyEricssonAqua: return AQUA_DIM;
 		case Theme::RazrHotPink: return RAZR_DIM;
 		case Theme::StealthBlack: return STEALTH_GUNMETAL;
+		case Theme::Y2KSilver:  return Y2K_FROST;
 		case Theme::Default:
 		default:                return MP_DIM;
 	}
@@ -287,6 +299,7 @@ lv_color_t MakerphoneTheme::chromeShineColor(){
 		case Theme::AmberCRT:   return AMBER_CRT_HOT;
 		case Theme::RazrHotPink: return RAZR_SHINE;
 		case Theme::StealthBlack: return STEALTH_STEEL;
+		case Theme::Y2KSilver:        return Y2K_SHINE;
 		case Theme::Default:
 		default:                return MP_HIGHLIGHT;
 	}
@@ -373,6 +386,7 @@ lv_color_t MakerphoneTheme::edgeGlowColor(){
 		case Theme::AmberCRT:         return AMBER_CRT_HOT;
 		case Theme::SonyEricssonAqua: return AQUA_GLOW;
 		case Theme::StealthBlack:     return STEALTH_LED;
+		case Theme::Y2KSilver:        return Y2K_BONDI;
 		case Theme::Default:
 		default:                      return MP_ACCENT;
 	}
@@ -473,6 +487,7 @@ lv_color_t MakerphoneTheme::statusLedColor(){
 		case Theme::AmberCRT:         return AMBER_CRT_HOT;
 		case Theme::SonyEricssonAqua: return AQUA_GLOW;
 		case Theme::RazrHotPink:      return RAZR_GLOW;
+		case Theme::Y2KSilver:        return Y2K_BONDI;
 		case Theme::Default:
 		default:                      return MP_ACCENT;
 	}
@@ -492,6 +507,7 @@ lv_color_t MakerphoneTheme::statusLedHighlightColor(){
 		case Theme::AmberCRT:         return AMBER_CRT_HOT;
 		case Theme::SonyEricssonAqua: return AQUA_CHROME;
 		case Theme::RazrHotPink:      return RAZR_CHROME;
+		case Theme::Y2KSilver:        return Y2K_SHINE;
 		case Theme::Default:
 		default:                      return MP_TEXT;
 	}

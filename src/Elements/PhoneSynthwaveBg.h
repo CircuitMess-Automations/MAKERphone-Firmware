@@ -163,6 +163,27 @@ public:
 		// early-2010s blacked-out tactical-handset idle screen
 		// rather than a tinted Synthwave.
 		StealthBlack = 9,
+
+		// S113 - Y2K Silver "translucent chrome" theme override.
+		// Same dispatch pattern as the prior theme overrides: not
+		// part of the 4-style PhoneWallpaperScreen pager (StyleCount
+		// stays at 4 there); this value is only ever returned by
+		// resolveStyleFromSettings() when Settings.themeId picks the
+		// Y2K Silver theme. Renders a flat pearl-silver gradient
+		// panel (pearl-silver at top -> brushed-aluminium at bottom)
+		// covering the full 160x128 area, four to six low-opacity
+		// horizontal "brushed aluminium grain" striation lines for
+		// the polished-metal cue, half a dozen Y2K_SHINE Lucite-
+		// frost specks suggesting the iconic translucent micro-
+		// glints of the era's clear-plastic gadgets, and a small
+		// pixel-art translucent-Lucite "raindrop" motif anchored
+		// bottom-right (the universal "Y2K frost" brand cue,
+		// copyright-safe vs the iMac G3 Bondi droplet or the iPod
+		// scroll-wheel ring), bypassing every Synthwave builder so
+		// the wallpaper reads as the late-1990s / early-2000s
+		// translucent-chrome industrial-design idle screen rather
+		// than a tinted Synthwave.
+		Y2KSilver = 10,
 	};
 
 	/** Default ctor — picks the style from `Settings.get().wallpaperStyle`. */
@@ -318,6 +339,29 @@ private:
 	// "red dot" status indicator that defined the blacked-out
 	// tactical-handset look.
 	void buildStealthBlackWallpaper();
+
+	// S113 - Y2K Silver "translucent chrome" wallpaper builder. Same
+	// dispatch pattern as the prior theme builders: paints a flat
+	// pearl-silver gradient panel (Y2K_BG_PEARL at top -> Y2K_BG_CHROME
+	// at bottom) covering the full 160x128 area, six faint "brushed
+	// aluminium grain" horizontal raster lines (low-opacity Y2K_FROST)
+	// for the polished-metal cue, four 1-2 px Y2K_SHINE Lucite-frost
+	// specks scattered across the panel suggesting the iconic
+	// translucent micro-glints of the era's clear-plastic gadgets,
+	// and a small pixel-art translucent-Lucite "raindrop" motif
+	// anchored bottom-right (a 3x4 Y2K_BONDI droplet body with a
+	// Y2K_SHINE 1 px highlight pixel at the upper-right suggesting
+	// reflected light, plus a faint Y2K_FROST halo row beneath
+	// suggesting the reflected glow on the polished pearl panel
+	// directly below the droplet). Uses the Y2K_* palette from
+	// MakerphoneTheme.h. ~24 LVGL primitives total, no animations -
+	// matches the Nokia / DMG / Amber CRT / Aqua / RAZR / Stealth
+	// Black variants' still-image philosophy. The droplet is the
+	// theme's signature glyph - the trademark-safe equivalent of the
+	// turn-of-the-millennium translucent-Lucite-and-chrome consumer-
+	// electronics aesthetic that defined the iMac G3, iPod 1G,
+	// VAIO PCG-505, and Sharp J-SH04 Frost Silver era.
+	void buildY2KSilverWallpaper();
 
 	// Drives the per-star opacity animation. Free function semantics
 	// (matches LVGL's lv_anim_exec_xcb_t signature). Defined in the .cpp

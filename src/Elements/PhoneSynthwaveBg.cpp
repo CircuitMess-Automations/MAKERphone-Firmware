@@ -78,6 +78,14 @@ PhoneSynthwaveBg::Style PhoneSynthwaveBg::resolveStyleFromSettings(){
 	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::StealthBlack){
 		return Style::StealthBlack;
 	}
+	// S113 - dispatch the Y2K Silver style override the same way.
+	// The wallpaperStyle byte stays persisted underneath so flipping
+	// the theme back to any prior theme restores the previously
+	// chosen Synthwave variant unchanged, exactly like the prior
+	// branches above.
+	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::Y2KSilver){
+		return Style::Y2KSilver;
+	}
 	return styleFromByte(Settings.get().wallpaperStyle);
 }
 
@@ -179,6 +187,17 @@ PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent, Style style) : LVObject(par
 	// of every Synthwave hot-path.
 	if(style == Style::StealthBlack){
 		buildStealthBlackWallpaper();
+		return;
+	}
+
+	// S113 - the Y2K Silver theme owns its wallpaper end to end
+	// the same way: it bypasses every Synthwave builder and paints a
+	// flat pearl-silver gradient panel with brushed-aluminium grain
+	// striations + Lucite-frost specks + a translucent-Lucite
+	// raindrop motif instead. Returning early keeps the Y2K_*
+	// palette out of every Synthwave hot-path.
+	if(style == Style::Y2KSilver){
+		buildY2KSilverWallpaper();
 		return;
 	}
 
@@ -1485,3 +1504,177 @@ void PhoneSynthwaveBg::buildStealthBlackWallpaper(){
 	}
 }
 
+
+void PhoneSynthwaveBg::buildY2KSilverWallpaper(){
+	// ----- Pearl-silver panel: pearl-silver -> brushed-aluminium vertical gradient -----
+	//
+	// Painted on the same `sky` member pointer the Synthwave variant
+	// uses, mirroring the prior theme builders so a future caller
+	// iterating wallpaper children can rely on a single named root
+	// regardless of theme. The container covers the entire 160x128
+	// area - the late-1990s / early-2000s "translucent chrome" idle
+	// screen, like the LCD / CRT / Aqua / RAZR / Stealth Black panels,
+	// is a single flat surface with no horizon. The vertical gradient
+	// (Y2K_BG_PEARL at top -> Y2K_BG_CHROME at bottom) reads as a
+	// polished pearl-silver back panel with a faint brushed-aluminium
+	// shading bias toward the lower edge - the cue every iMac G3 Snow
+	// / iPod 1G / Sony VAIO PCG-505 owner remembers from catching the
+	// device under indirect light and watching the brushed grain
+	// catch a deeper shade where the panel curved away from the
+	// source.
+	sky = lv_obj_create(obj);
+	lv_obj_remove_style_all(sky);
+	lv_obj_clear_flag(sky, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(sky, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(sky, BgWidth, BgHeight);
+	lv_obj_set_pos(sky, 0, 0);
+	lv_obj_set_style_bg_color(sky, Y2K_BG_PEARL, 0);
+	lv_obj_set_style_bg_grad_color(sky, Y2K_BG_CHROME, 0);
+	lv_obj_set_style_bg_grad_dir(sky, LV_GRAD_DIR_VER, 0);
+	lv_obj_set_style_bg_opa(sky, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(sky, 0, 0);
+	lv_obj_set_style_pad_all(sky, 0, 0);
+	lv_obj_set_style_border_width(sky, 0, 0);
+
+	// ----- Brushed-aluminium grain rasters -----
+	//
+	// Six faint full-width horizontal lines in Y2K_FROST at very low
+	// opacity. Approximate the unidirectional brushed-aluminium grain
+	// every Y2K-era polished-metal panel exhibited under direct light
+	// - barely visible, but the eye registers "this is brushed metal,
+	// not painted plastic". Spaced ~18 px apart so the eye reads them
+	// as a regular texture rather than a counted set. Drawn 1 px tall
+	// to stay subliminal at the 160x128 resolution; LVGL collapses
+	// 1 px rects to a single horizontal line on flush.
+	//
+	// Mechanically the same pattern S111's Stealth Black wallpaper
+	// uses (six 1 px horizontal rasters), but tuned for a dark-on-
+	// light theme: Y2K_FROST is a mid-grey that reads as etched-metal
+	// striation against the pearl panel rather than as a faint glow,
+	// the way STEALTH_GUNMETAL reads against the obsidian panel.
+	struct Raster { lv_coord_t y; lv_opa_t opa; };
+	const Raster rasters[] = {
+			{  14, LV_OPA_20 },
+			{  32, LV_OPA_30 },
+			{  50, LV_OPA_20 },
+			{  68, LV_OPA_30 },
+			{  86, LV_OPA_20 },
+			{ 104, LV_OPA_30 },
+	};
+	const uint8_t rasterCount = sizeof(rasters) / sizeof(rasters[0]);
+	for(uint8_t i = 0; i < rasterCount; i++){
+		lv_obj_t* r = lv_obj_create(sky);
+		lv_obj_remove_style_all(r);
+		lv_obj_clear_flag(r, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(r, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(r, BgWidth, 1);
+		lv_obj_set_pos(r, 0, rasters[i].y);
+		lv_obj_set_style_bg_color(r, Y2K_FROST, 0);
+		lv_obj_set_style_bg_opa(r, rasters[i].opa, 0);
+		lv_obj_set_style_radius(r, 0, 0);
+		lv_obj_set_style_border_width(r, 0, 0);
+	}
+
+	// ----- Lucite-frost micro-glints -----
+	//
+	// Four 1-2 px Y2K_SHINE specks scattered across the panel
+	// suggesting the iconic translucent-Lucite micro-glints that
+	// defined the era's clear-plastic gadgets (the iMac G3 Snow's
+	// matte-frost cover, the Sony Discman MZ-E700's clear-plastic
+	// shell, the Sharp J-SH04 Frost Silver back panel). y-positions
+	// stay clear of the status bar (y < 12) and soft-key bar
+	// (y > BgHeight - 12) regions so a glint never reads as a stuck
+	// pixel inside a chrome strip. Drawn as flat rects (no
+	// LV_RADIUS_CIRCLE - at this size LVGL rounds to a pixel rect
+	// anyway).
+	struct Glint { lv_coord_t x; lv_coord_t y; uint8_t s; lv_opa_t opa; };
+	const Glint glints[] = {
+			{  22,  24, 1, LV_OPA_70 },
+			{  92,  44, 2, LV_OPA_60 },
+			{  56,  78, 1, LV_OPA_70 },
+			{ 128,  96, 2, LV_OPA_60 },
+	};
+	const uint8_t glintCount = sizeof(glints) / sizeof(glints[0]);
+	for(uint8_t i = 0; i < glintCount; i++){
+		lv_obj_t* g = lv_obj_create(sky);
+		lv_obj_remove_style_all(g);
+		lv_obj_clear_flag(g, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(g, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(g, glints[i].s, glints[i].s);
+		lv_obj_set_pos(g, glints[i].x, glints[i].y);
+		lv_obj_set_style_bg_color(g, Y2K_SHINE, 0);
+		lv_obj_set_style_bg_opa(g, glints[i].opa, 0);
+		lv_obj_set_style_radius(g, 0, 0);
+		lv_obj_set_style_border_width(g, 0, 0);
+	}
+
+	// ----- Translucent-Lucite raindrop motif (bottom-right corner) -----
+	//
+	// Anchored ~12 px clear of the right edge and ~22 px clear of the
+	// bottom edge, in the patch the soft-key bar will cover during
+	// normal use. The raindrop is a 3 x 4 Y2K_BONDI body (a tiny
+	// teardrop silhouette: 1 px peak row, two 3 px middle rows, one
+	// 3 px base row) with a single Y2K_SHINE highlight pixel at the
+	// upper-right of the body suggesting reflected light from above
+	// (the bright spec every photo of a real water droplet captures)
+	// plus a single LV_OPA_30 Y2K_FROST halo row two pixels beneath
+	// the droplet suggesting the reflected glow on the polished
+	// pearl panel directly below the droplet. The glyph is the
+	// trademark-safe universal "Y2K frost" brand cue - it's NOT the
+	// iMac G3 Bondi droplet (specific colour palette + shape) or the
+	// iPod 1G scroll-wheel ring (specific concentric circle
+	// geometry); it's the generic "translucent water-droplet on
+	// polished chrome" silhouette any 2001 owner reads as 'frosted
+	// Lucite over brushed aluminium'.
+	const lv_coord_t dropX = BgWidth  - 12;   // 148
+	const lv_coord_t dropY = BgHeight - 22;   // 106
+
+	struct PixelRect {
+		int8_t   dx;
+		int8_t   dy;
+		uint8_t  w;
+		uint8_t  h;
+		uint8_t  layer;     // 0 = droplet body, 1 = shine highlight, 2 = halo
+		lv_opa_t opa;
+	};
+
+	// Pixel layout (3 wide x 4 tall droplet body + 1 highlight + 1 halo):
+	//   .#.     row 0 - droplet peak
+	//   ###     row 1 - droplet upper body
+	//   ###     row 2 - droplet lower body
+	//   ###     row 3 - droplet base
+	//   ...     row 4 - 1 px gap (polished pearl)
+	//   ...     row 5 - reflected halo (3 wide, opa 30)
+	const PixelRect dropParts[] = {
+			// Droplet peak (row 0, centre pixel)
+			{ 1, 0, 1, 1, 0, LV_OPA_COVER },
+			// Droplet body (rows 1-3)
+			{ 0, 1, 3, 1, 0, LV_OPA_COVER },
+			{ 0, 2, 3, 1, 0, LV_OPA_COVER },
+			{ 0, 3, 3, 1, 0, LV_OPA_COVER },
+			// Shine highlight pixel (upper-right of the body)
+			{ 2, 1, 1, 1, 1, LV_OPA_COVER },
+			// Reflected halo on the polished pearl two rows below
+			{ 0, 5, 3, 1, 2, LV_OPA_30 },
+	};
+	const uint8_t dropCount = sizeof(dropParts) / sizeof(dropParts[0]);
+	for(uint8_t i = 0; i < dropCount; i++){
+		lv_obj_t* px = lv_obj_create(sky);
+		lv_obj_remove_style_all(px);
+		lv_obj_clear_flag(px, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(px, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(px, dropParts[i].w, dropParts[i].h);
+		lv_obj_set_pos(px, dropX + dropParts[i].dx, dropY + dropParts[i].dy);
+		lv_color_t fill;
+		switch(dropParts[i].layer){
+			case 1:  fill = Y2K_SHINE; break;
+			case 2:  fill = Y2K_FROST; break;
+			case 0:
+			default: fill = Y2K_BONDI; break;
+		}
+		lv_obj_set_style_bg_color(px, fill, 0);
+		lv_obj_set_style_bg_opa(px, dropParts[i].opa, 0);
+		lv_obj_set_style_radius(px, 0, 0);
+		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
