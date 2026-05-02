@@ -560,3 +560,158 @@ uint8_t MakerphoneTheme::statusLedSelectedOpa(){
 	// indicator.
 	return statusLedEnabled() ? LV_OPA_COVER : LV_OPA_TRANSP;
 }
+
+
+// ---------------------------------------------------------------------
+// S114 - Y2K Silver translucent-Lucite jewel helpers.
+//
+// The turn-of-the-millennium Y2K consumer-electronics aesthetic (iMac
+// G3 Snow / Bondi / Tangerine, iPod 1G click-wheel, Sony Discman
+// MZ-E700, Sony VAIO PCG-505, Nokia 8210 'Frost Silver', Sharp J-SH04 -
+// the brushed-aluminium-and-translucent-blue gadgets that defined the
+// late-1990s to early-2000s era of consumer electronics) shipped a
+// single defining accent: a small translucent-Lucite jewel - usually a
+// Bondi-blue polycarb insert - tucked into one corner of the gadget's
+// polished pearl-silver shell. The iMac G3's translucent handle, the
+// iPod 1G's scroll-wheel ring, the Sony Discman's circular Lucite
+// power LED, the VAIO PCG-505's translucent-blue badge: every Y2K-era
+// device paired its brushed-aluminium body with one carefully-placed
+// Lucite accent, and that pairing was the era's single defining
+// visual cue. Without that translucent jewel, a pearl-silver tile
+// with charcoal-blue icon strokes just reads as 'a flat icon on a
+// silver panel' rather than 'a Y2K-era polished-aluminium gadget
+// with a Bondi-blue Lucite accent', missing the entire point of the
+// era's industrial-design vocabulary.
+//
+// PhoneIconTile consumes these helpers at idle (gated on
+// luciteJewelEnabled()) so every tile under Y2KSilver rests with a
+// faint Y2K_BONDI 3 x 3 jewel in its bottom-left corner - the always-
+// translucent 'frosted Bondi insert' cue every Y2K-era gadget showed
+// when ambient light caught its Lucite accent. Selecting the tile
+// then snaps the jewel to LV_OPA_COVER so the focused tile reads as
+// 'this row is the active selection, Lucite jewel catching a direct
+// light beam' against its softly-frosted neighbours - the same
+// focus-feedback cue every iMac G3 / iPod 1G UI used to mark its
+// current row, where the translucent accent suddenly saturated to
+// its full Bondi-blue intensity rather than its usual frosted-pearl
+// idle shade.
+//
+// Default / Nokia 3310 / Game Boy DMG / Amber CRT / Sony Ericsson
+// Aqua / RAZR Hot Pink / Stealth Black return values that produce
+// the previous byte-identical behaviour: luciteJewelEnabled() ==
+// false, both opacity helpers return LV_OPA_TRANSP (so
+// luciteJewelColor() and luciteJewelHighlightColor() values are
+// never observed), keeping the existing tile silhouette unchanged
+// on every non-Y2K-Silver theme.
+//
+// Mechanically a corner-anchored 3x3 jewel (with a 1x1 highlight
+// pixel), like S112's status LED but anchored to the bottom-LEFT
+// rather than the top-right. The four Phase O icon-glyph overlays
+// (S108 Aqua top-edge, S110 RAZR bottom-edge, S112 Stealth top-right
+// corner, S114 Y2K bottom-left corner) deliberately occupy four
+// disjoint geometric axes so a future theme can combine any subset
+// of them without overpainting, and so a user flipping between the
+// four themes sees the highlight move around the tile perimeter
+// rather than re-colouring the same anchor. The bottom-left anchor
+// is also physically faithful: the iMac G3's translucent handle,
+// the iPod 1G's Apple-logo badge, and the Sony Discman's Lucite
+// power LED all sat in the bottom-left of their respective
+// products, so anchoring the jewel to the bottom-left of the tile
+// captures Y2K-era placement convention directly.
+// ---------------------------------------------------------------------
+
+bool MakerphoneTheme::luciteJewelEnabled(){
+	return getCurrent() == Theme::Y2KSilver;
+}
+
+lv_color_t MakerphoneTheme::luciteJewelColor(){
+	switch(getCurrent()){
+		case Theme::Y2KSilver: return Y2K_BONDI;
+		// The fallbacks below are never observed - luciteJewelIdleOpa()
+		// and luciteJewelSelectedOpa() both return LV_OPA_TRANSP on
+		// every non-Y2K-Silver theme, so the jewel's colour can't reach
+		// the framebuffer. The values still resolve to a sensible per-
+		// theme 'brightest accent' so a future caller that probes the
+		// colour outside the opacity gate (e.g. a debug overlay) reads
+		// something coherent rather than an undefined value.
+		case Theme::Nokia3310:        return N3310_FRAME;
+		case Theme::GameBoyDMG:       return GBDMG_INK;
+		case Theme::AmberCRT:         return AMBER_CRT_HOT;
+		case Theme::SonyEricssonAqua: return AQUA_GLOW;
+		case Theme::RazrHotPink:      return RAZR_GLOW;
+		case Theme::StealthBlack:     return STEALTH_LED;
+		case Theme::Default:
+		default:                      return MP_ACCENT;
+	}
+}
+
+lv_color_t MakerphoneTheme::luciteJewelHighlightColor(){
+	switch(getCurrent()){
+		case Theme::Y2KSilver: return Y2K_SHINE;
+		// The fallbacks below are never observed - the highlight pixel
+		// rides the same opacity as the jewel, and that opacity returns
+		// LV_OPA_TRANSP on every non-Y2K-Silver theme. The values still
+		// resolve to a sensible per-theme 'brightest chrome / body-text
+		// white' so a future caller that probes the colour outside the
+		// opacity gate reads something coherent.
+		case Theme::Nokia3310:        return N3310_HIGHLIGHT;
+		case Theme::GameBoyDMG:       return GBDMG_LCD_LIGHT;
+		case Theme::AmberCRT:         return AMBER_CRT_HOT;
+		case Theme::SonyEricssonAqua: return AQUA_FOAM;
+		case Theme::RazrHotPink:      return RAZR_SHINE;
+		case Theme::StealthBlack:     return STEALTH_BONE;
+		case Theme::Default:
+		default:                      return MP_TEXT;
+	}
+}
+
+uint8_t MakerphoneTheme::luciteJewelIdleOpa(){
+	// LV_OPA_30 is the calibrated 'always-translucent Lucite' opacity:
+	// bright enough that the jewel reads as a deliberate accent (the
+	// eye picks it out as 'frosted Bondi-blue jewel, slightly cloudy')
+	// rather than a stray pixel, dim enough that it doesn't compete
+	// with the icon strokes themselves. On a real iMac G3 / iPod 1G /
+	// Sony Discman the idle Lucite jewel sat at roughly 25-35% of
+	// its full saturation when the gadget wasn't catching a direct
+	// light beam (the polycarb's natural cloudiness diffused the
+	// colour) and LV_OPA_30 is the closest 3x3-jewel approximation
+	// of that translucent idle shade on a 16 bpp panel.
+	//
+	// Lower than S108's LV_OPA_50 chrome-shine idle, S110's LV_OPA_40
+	// EL-bleed idle, and S112's LV_OPA_70 status-LED idle because a
+	// real Y2K-era Lucite jewel was never 'lit' at idle - it was
+	// always frosted-cloudy, with the colour barely tinting the
+	// pearl-silver shell underneath. The four idle opacities therefore
+	// rank physically: 30 (Lucite cloudy) < 40 (EL bleed) < 50
+	// (reflected glass shine) < 70 (emitting status LED). A user
+	// flipping between the four themes sees the highlight intensity
+	// step up monotonically, reinforcing that they're four genuinely
+	// different lighting models rather than four recoloured versions
+	// of the same overlay.
+	return luciteJewelEnabled() ? LV_OPA_30 : LV_OPA_TRANSP;
+}
+
+uint8_t MakerphoneTheme::luciteJewelSelectedOpa(){
+	// LV_OPA_COVER (full intensity) on selection - the focused Y2K
+	// Silver tile snaps to a 'fully-saturated Bondi-blue Lucite jewel'
+	// that the eye reads as 'this row is the active selection, Lucite
+	// jewel catching a direct light beam'. This is a non-pulsing,
+	// on/off overlay because the existing halo already pulses on
+	// selection; layering a second pulsing element on top would make
+	// the focused tile read as jittery rather than 'lit', which
+	// contradicts the still-photograph polish of the Y2K aesthetic
+	// (where the gadget always read as a carefully-lit product shot,
+	// never an animated UI element).
+	//
+	// The 30% -> 100% gap is intentionally the widest of the four
+	// Phase O icon-glyph overlays (vs S108's 50%->100%, S110's
+	// 40%->100%, S112's 70%->100%) because a real Y2K-era Lucite
+	// jewel exhibited the widest dynamic range of any of the four
+	// era-defining lighting cues: idle Lucite was almost
+	// imperceptibly tinted, but a direct light beam would saturate
+	// the jewel to its full Bondi intensity in a single perceptual
+	// step. The 70-percentage-point gap captures that 'frosted to
+	// fully-saturated' transition without needing an in-between
+	// animated state.
+	return luciteJewelEnabled() ? LV_OPA_COVER : LV_OPA_TRANSP;
+}

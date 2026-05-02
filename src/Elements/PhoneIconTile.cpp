@@ -34,7 +34,7 @@
 #define MP_ICON_DETAIL (MakerphoneTheme::iconDetail())
 
 PhoneIconTile::PhoneIconTile(lv_obj_t* parent, Icon icon, const char* label)
-		: LVObject(parent), icon(icon), halo(nullptr), shine(nullptr), edgeGlow(nullptr), statusLed(nullptr), statusLedHi(nullptr), iconLayer(nullptr), labelEl(nullptr){
+		: LVObject(parent), icon(icon), halo(nullptr), shine(nullptr), edgeGlow(nullptr), statusLed(nullptr), statusLedHi(nullptr), luciteJewel(nullptr), luciteJewelHi(nullptr), iconLayer(nullptr), labelEl(nullptr){
 
 	// The tile is a fixed-size widget that flows naturally inside a flex
 	// or grid parent (no IGNORE_LAYOUT flag, see header notes).
@@ -45,6 +45,7 @@ PhoneIconTile::PhoneIconTile(lv_obj_t* parent, Icon icon, const char* label)
 	buildShine();
 	buildEdgeGlow();
 	buildStatusLed();
+	buildLuciteJewel();
 	buildIconLayer();
 	buildLabel(label);
 
@@ -243,6 +244,98 @@ void PhoneIconTile::buildStatusLed(){
 	lv_obj_set_style_bg_opa(statusLedHi, LV_OPA_TRANSP, 0);
 }
 
+// S114 - Y2K Silver translucent-Lucite Bondi jewel.
+// A 3x3 Y2K_BONDI jewel anchored to the bottom-LEFT corner of the
+// tile body, with a 1x1 Y2K_SHINE highlight pixel in the upper-left
+// of the jewel (the Lucite 'spec' - the way every photographed
+// translucent-Lucite gadget always exhibited a near-white reflection
+// peak in the upper-left of the jewel, the cue your eye uses to
+// resolve 'is this a flat painted dot or a translucent volumetric
+// jewel'). Lives as two children of the tile alongside `shine`,
+// `edgeGlow`, and `statusLed`, drawn just below the icon layer so
+// the jewel never occludes any of the per-icon rectangles. Colour +
+// opacity resolve through MakerphoneTheme::luciteJewel*() so the
+// jewel is fully transparent under Default / Nokia 3310 / Game Boy
+// DMG / Amber CRT / Sony Ericsson Aqua / RAZR Hot Pink / Stealth
+// Black (byte-identical to the previous behaviour) and only becomes
+// visible under Y2KSilver.
+//
+// Distinct from PhoneIconTile::buildShine() (top edge),
+// PhoneIconTile::buildEdgeGlow() (bottom edge), and
+// PhoneIconTile::buildStatusLed() (top-right corner) along the
+// bottom-left-corner-anchor axis - the jewel occupies a 3x3 box in
+// the tile's bottom-left corner, which is disjoint from all three
+// existing overlays, so the four cue geometries (top edge / bottom
+// edge / top-right corner / bottom-left corner) stay non-
+// overlapping and a future theme can combine any subset of them
+// without overpainting. The bottom-left anchor is also physically
+// faithful: the iMac G3's translucent handle, the iPod 1G's
+// Apple-logo badge, and the Sony Discman's Lucite power LED all sat
+// in the bottom-left corner of their respective Y2K-era products,
+// so anchoring the jewel to the bottom-left of the tile captures
+// that placement convention directly.
+//
+// Sized 3x3 (one pixel larger than S112's 2x2 status-LED dot) so
+// the jewel reads as a translucent volumetric mass rather than a
+// pinprick LED - the Lucite jewels of the era were always larger
+// than their tactical-LED contemporaries (the iMac G3 handle was
+// roughly 3 cm thick, while a tactical status LED was 1-2 mm), and
+// the size differential between the two overlays helps a viewer
+// flipping between the Stealth Black and Y2K Silver themes
+// distinguish the two cues by silhouette as well as colour.
+void PhoneIconTile::buildLuciteJewel(){
+	// Outer 3x3 Lucite jewel.
+	luciteJewel = lv_obj_create(obj);
+	lv_obj_remove_style_all(luciteJewel);
+	lv_obj_clear_flag(luciteJewel, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(luciteJewel, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(luciteJewel, 3, 3);
+	lv_obj_set_align(luciteJewel, LV_ALIGN_BOTTOM_LEFT);
+	// Inset 2 px from the left edge and 2 px from the bottom edge so
+	// the jewel sits cleanly inside the 1 px tile border without
+	// overpainting it (the border carries the selection cue, so the
+	// jewel must never touch it). The 2 px bottom inset also keeps
+	// the jewel one row clear of the S110 RAZR edge-glow strip
+	// (which sits at row TileHeight - 2 when active), so the two
+	// overlays could in principle coexist without overpainting.
+	lv_obj_set_pos(luciteJewel, 2, -2);
+	lv_obj_set_style_radius(luciteJewel, 0, 0);
+	lv_obj_set_style_border_width(luciteJewel, 0, 0);
+	lv_obj_set_style_pad_all(luciteJewel, 0, 0);
+	lv_obj_set_style_bg_color(luciteJewel, MakerphoneTheme::luciteJewelColor(), 0);
+	// Idle opacity is wired in refreshSelection() (which runs once at
+	// the end of the constructor), so this initial set just keeps the
+	// jewel invisible until refreshSelection() decides per-theme.
+	lv_obj_set_style_bg_opa(luciteJewel, LV_OPA_TRANSP, 0);
+
+	// Inner 1x1 highlight pixel - the Lucite reflection peak.
+	luciteJewelHi = lv_obj_create(obj);
+	lv_obj_remove_style_all(luciteJewelHi);
+	lv_obj_clear_flag(luciteJewelHi, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_add_flag(luciteJewelHi, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(luciteJewelHi, 1, 1);
+	lv_obj_set_align(luciteJewelHi, LV_ALIGN_BOTTOM_LEFT);
+	// One pixel inset deeper than the jewel so the highlight pixel
+	// occupies the upper-left of the 3x3 jewel (origin x = 2 = the
+	// jewel's left column; origin y = -4 = two rows above the
+	// jewel's bottom edge, i.e. the jewel's top row). The result
+	// reads as 'reflection peak on a translucent Lucite mass', the
+	// way a real photographed Lucite jewel looks under product-shot
+	// lighting: the jewel itself reads as Bondi blue, but the
+	// upper-left of the jewel exhibits a sharp near-white reflection
+	// where the studio key light catches the curved surface, the
+	// cue your eye uses to resolve 'is this a flat painted dot or
+	// a translucent volumetric jewel' (without the spec, the jewel
+	// would read as a flat coloured square - the spec is what
+	// makes Lucite read as Lucite).
+	lv_obj_set_pos(luciteJewelHi, 2, -4);
+	lv_obj_set_style_radius(luciteJewelHi, 0, 0);
+	lv_obj_set_style_border_width(luciteJewelHi, 0, 0);
+	lv_obj_set_style_pad_all(luciteJewelHi, 0, 0);
+	lv_obj_set_style_bg_color(luciteJewelHi, MakerphoneTheme::luciteJewelHighlightColor(), 0);
+	lv_obj_set_style_bg_opa(luciteJewelHi, LV_OPA_TRANSP, 0);
+}
+
 void PhoneIconTile::buildIconLayer(){
 	// 16x16 transparent container that holds the per-icon pixel rectangles.
 	// Centered horizontally; sits 3 px from the top of the tile so the
@@ -339,6 +432,22 @@ void PhoneIconTile::refreshSelection(){
 		lv_obj_set_style_bg_opa(statusLed, (lv_opa_t) MakerphoneTheme::statusLedSelectedOpa(), 0);
 		lv_obj_set_style_bg_color(statusLedHi, MakerphoneTheme::statusLedHighlightColor(), 0);
 		lv_obj_set_style_bg_opa(statusLedHi, (lv_opa_t) MakerphoneTheme::statusLedSelectedOpa(), 0);
+		// S114 - Y2K Silver: focused tile burns the translucent Lucite
+		// jewel to full Bondi-blue saturation (LV_OPA_COVER under
+		// Y2KSilver, LV_OPA_TRANSP everywhere else - same byte as the
+		// idle non-Y2K state, so non-Y2K themes never see a jewel
+		// flash). The cue reads as 'this row is the active selection,
+		// Lucite jewel catching a direct light beam' - the focus-
+		// feedback signature of every Y2K-era polished-aluminium
+		// gadget, where the translucent accent suddenly read as
+		// fully-saturated Bondi rather than its usual frosted-pearl
+		// idle shade. The highlight pixel rides the same opacity, so
+		// the jewel's reflection peak stays visible (and bright) on
+		// focus.
+		lv_obj_set_style_bg_color(luciteJewel, MakerphoneTheme::luciteJewelColor(), 0);
+		lv_obj_set_style_bg_opa(luciteJewel, (lv_opa_t) MakerphoneTheme::luciteJewelSelectedOpa(), 0);
+		lv_obj_set_style_bg_color(luciteJewelHi, MakerphoneTheme::luciteJewelHighlightColor(), 0);
+		lv_obj_set_style_bg_opa(luciteJewelHi, (lv_opa_t) MakerphoneTheme::luciteJewelSelectedOpa(), 0);
 
 		lv_anim_t a;
 		lv_anim_init(&a);
@@ -394,6 +503,24 @@ void PhoneIconTile::refreshSelection(){
 		lv_obj_set_style_bg_opa(statusLed, (lv_opa_t) MakerphoneTheme::statusLedIdleOpa(), 0);
 		lv_obj_set_style_bg_color(statusLedHi, MakerphoneTheme::statusLedHighlightColor(), 0);
 		lv_obj_set_style_bg_opa(statusLedHi, (lv_opa_t) MakerphoneTheme::statusLedIdleOpa(), 0);
+		// S114 - Y2K Silver: idle tile rests with a faint Y2K_BONDI
+		// translucent-Lucite jewel in its bottom-left corner
+		// (LV_OPA_30 under Y2KSilver, LV_OPA_TRANSP everywhere else -
+		// so non-Y2K themes still render a perfectly flat tile body,
+		// byte-identical to the pre-S114 behaviour). The cue reads as
+		// 'frosted Bondi-blue Lucite accent, polycarb cloudiness
+		// diffusing the colour' - the soft translucent jewel every
+		// Y2K-era gadget kept tucked into the bottom-left corner of
+		// its polished pearl-silver shell. The highlight pixel rides
+		// the same idle opacity so the Lucite reflection peak shows
+		// through even at the soft idle brightness, the way a real
+		// photographed translucent-Lucite jewel always exhibits a
+		// near-white reflection in its upper-left even when the rest
+		// of the jewel reads as a frosted soft-Bondi.
+		lv_obj_set_style_bg_color(luciteJewel, MakerphoneTheme::luciteJewelColor(), 0);
+		lv_obj_set_style_bg_opa(luciteJewel, (lv_opa_t) MakerphoneTheme::luciteJewelIdleOpa(), 0);
+		lv_obj_set_style_bg_color(luciteJewelHi, MakerphoneTheme::luciteJewelHighlightColor(), 0);
+		lv_obj_set_style_bg_opa(luciteJewelHi, (lv_opa_t) MakerphoneTheme::luciteJewelIdleOpa(), 0);
 	}
 }
 

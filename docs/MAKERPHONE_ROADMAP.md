@@ -174,7 +174,7 @@ Two sessions per theme: **part 1 = palette + wallpaper variant**, **part 2 = mat
 - [x] **S111** — Theme: Stealth Black — palette + wallpaper.
 - [x] **S112** — Theme: Stealth Black — icon glyphs + accents.
 - [x] **S113** — Theme: Y2K Silver — palette + wallpaper.
-- [ ] **S114** — Theme: Y2K Silver — icon glyphs + accents.
+- [x] **S114** — Theme: Y2K Silver — icon glyphs + accents.
 - [ ] **S115** — Theme: Cyberpunk Red — palette + wallpaper.
 - [ ] **S116** — Theme: Cyberpunk Red — icon glyphs + accents.
 - [ ] **S117** — Theme: Christmas / Festive — palette + wallpaper.

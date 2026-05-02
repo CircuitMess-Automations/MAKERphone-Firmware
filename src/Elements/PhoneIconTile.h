@@ -100,6 +100,23 @@ private:
 	                        //          status LED always exhibits a near-white emission peak in
 	                        //          its centre, even though the LED itself is red). Fully
 	                        //          transparent under every non-Stealth-Black theme.
+	lv_obj_t* luciteJewel;   // S114 - Y2K Silver translucent-Lucite Bondi jewel anchored to the
+	                          //          tile's bottom-LEFT corner - a 3x3 Y2K_BONDI translucent
+	                          //          accent that mirrors `statusLed` (top-right corner, 2x2)
+	                          //          on the opposite tile diagonal. The four icon-glyph
+	                          //          overlay axes (top edge / bottom edge / top-right corner
+	                          //          / bottom-left corner) stay disjoint so a future theme
+	                          //          can combine any subset of them without overpainting.
+	                          //          Fully transparent under every non-Y2K-Silver theme.
+	lv_obj_t* luciteJewelHi; // S114 - Y2K Silver Lucite-jewel reflection peak: a 1x1 Y2K_SHINE
+	                          //          highlight pixel anchored to the upper-left of the jewel
+	                          //          (the iconic Lucite 'spec' - the way every photographed
+	                          //          translucent-Lucite gadget always exhibited a near-white
+	                          //          reflection peak in the upper-left of the jewel, the cue
+	                          //          your eye uses to resolve 'is this a flat painted dot or
+	                          //          a translucent volumetric jewel'). Rides the same
+	                          //          opacity as the jewel itself. Fully transparent under
+	                          //          every non-Y2K-Silver theme.
 	lv_obj_t* iconLayer;   // 16x16 transparent container that holds the pixel rectangles
 	lv_obj_t* labelEl;     // optional pixelbasic7 label below the icon (nullable)
 
@@ -108,6 +125,7 @@ private:
 	void buildShine();
 	void buildEdgeGlow();
 	void buildStatusLed();
+	void buildLuciteJewel();
 	void buildIconLayer();
 	void buildLabel(const char* label);
 	void refreshSelection();

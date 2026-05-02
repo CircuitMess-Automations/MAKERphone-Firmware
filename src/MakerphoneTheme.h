@@ -612,6 +612,120 @@ public:
 	static lv_color_t statusLedHighlightColor();
 	static uint8_t    statusLedIdleOpa();
 	static uint8_t    statusLedSelectedOpa();
+
+	/*
+	 * S114 - Y2K Silver translucent-Lucite jewel helpers (icon-glyph pass).
+	 *
+	 * The defining visual cue of the turn-of-the-millennium Y2K
+	 * consumer-electronics aesthetic (iMac G3 Snow / Bondi / Tangerine,
+	 * iPod 1G click-wheel, Sony Discman MZ-E700, Sony VAIO PCG-505,
+	 * Nokia 8210 'Frost Silver', Sharp J-SH04 - the brushed-aluminium-
+	 * and-translucent-blue gadgets that defined the late-1990s to early-
+	 * 2000s era of consumer electronics) was a small translucent-Lucite
+	 * accent - usually a coloured Bondi-blue jewel or a frosted polycarb
+	 * insert - tucked into one corner of the gadget's polished pearl-
+	 * silver shell. The iMac G3's translucent handle, the iPod 1G's
+	 * scroll-wheel ring, the Sony Discman's circular Lucite power LED,
+	 * the VAIO PCG-505's translucent-blue badge: every Y2K-era device
+	 * paired its brushed-aluminium body with one carefully-placed
+	 * Lucite accent, and that pairing was the era's single defining
+	 * visual cue. Without that translucent-Lucite jewel, a pearl-silver
+	 * tile with charcoal-blue icon strokes just reads as 'a flat icon
+	 * on a silver panel' rather than 'a Y2K-era polished-aluminium
+	 * gadget with a Bondi-blue Lucite accent', missing the entire point
+	 * of the era's industrial-design vocabulary.
+	 *
+	 * Phase O folds that effect into PhoneIconTile via a per-theme
+	 * 'Lucite-jewel' overlay - a 3 x 3 Y2K_BONDI translucent jewel
+	 * rendered in the bottom-left corner of every tile body, capped
+	 * with a 1 x 1 Y2K_SHINE highlight pixel in the upper-left of the
+	 * jewel (the iconic Lucite 'spec' - the way every photographed
+	 * translucent-Lucite gadget always exhibited a near-white reflection
+	 * peak in the upper-left of the jewel, the cue your eye uses to
+	 * resolve 'is this a flat painted dot or a translucent volumetric
+	 * jewel'). On themes that don't have a Lucite-jewel convention
+	 * (Default Synthwave purple, Nokia 3310 LCD, Game Boy DMG LCD,
+	 * Amber CRT phosphor, Sony Ericsson Aqua glass, RAZR Hot Pink EL
+	 * backlight, Stealth Black tactical handset) the jewel stays fully
+	 * transparent, byte-identical to the previous behaviour. On Y2K
+	 * Silver, the jewel rests at a moderate translucent-Lucite idle
+	 * opacity - the always-cloudy 'frosted Bondi-blue accent' cue every
+	 * Y2K-era gadget displayed when ambient light caught its Lucite
+	 * insert - and the selected tile burns the jewel to full saturation
+	 * (the 'this row is the active selection, Lucite jewel catching a
+	 * direct light beam' cue every iMac G3 / iPod 1G UI used to mark
+	 * its focused row, where the translucent accent suddenly read as
+	 * fully-saturated Bondi blue rather than its usual frosted idle
+	 * shade).
+	 *
+	 *   luciteJewelEnabled()         - true only for Y2KSilver
+	 *   luciteJewelColor()           - Y2K_BONDI under Y2KSilver, falls
+	 *                                  back to MP_ACCENT otherwise (the
+	 *                                  fallback is never observed
+	 *                                  because callers gate on
+	 *                                  luciteJewelEnabled() first via
+	 *                                  the opacity helpers below)
+	 *   luciteJewelHighlightColor()  - Y2K_SHINE under Y2KSilver, falls
+	 *                                  back to MP_TEXT otherwise (same
+	 *                                  fallback semantics; never
+	 *                                  observed outside Y2K Silver
+	 *                                  because the highlight pixel
+	 *                                  rides the same opacity as the
+	 *                                  jewel)
+	 *   luciteJewelIdleOpa()         - LV_OPA_30 under Y2KSilver,
+	 *                                  LV_OPA_TRANSP otherwise (so the
+	 *                                  existing tiles render byte-
+	 *                                  identically on every other
+	 *                                  theme)
+	 *   luciteJewelSelectedOpa()     - LV_OPA_COVER under Y2KSilver,
+	 *                                  LV_OPA_TRANSP otherwise
+	 *
+	 * The selected-vs-idle opacity gap (30% -> 100%) is intentionally
+	 * the widest of the four Phase O icon-glyph overlays - wider than
+	 * S108's 50% -> 100% (Aqua chrome shine), S110's 40% -> 100% (RAZR
+	 * EL bleed), and S112's 70% -> 100% (Stealth Black status LED) -
+	 * because a real Y2K-era translucent-Lucite jewel exhibited the
+	 * widest dynamic range of any of the four era-defining lighting
+	 * cues: idle Lucite was almost imperceptibly tinted (the polycarb
+	 * cloudiness diffused the colour to a near-pearl shade), but a
+	 * direct light beam would saturate the jewel to its full Bondi
+	 * intensity in a single perceptual step - the ' Lucite glows when
+	 * the light hits it just right' phenomenon every iMac G3 owner
+	 * remembered. The 30%->100% gap captures that 'frosted to
+	 * fully-saturated' transition without animating the jewel through
+	 * an in-between state. PhoneIconTile applies this static (non-
+	 * pulsing) overlay rather than animating it because the existing
+	 * halo already pulses on selection; layering a second pulsing
+	 * element on top would make the focused tile read as jittery
+	 * rather than 'lit', which contradicts the still-photograph
+	 * polish of the Y2K aesthetic (where the gadget always read as a
+	 * carefully-lit product shot, never an animated UI element).
+	 *
+	 * Why bottom-left corner (vs S108's top edge / S110's bottom edge /
+	 * S112's top-right corner): the four Phase O icon-glyph overlays
+	 * are deliberately anchored to four disjoint geometric axes - top
+	 * edge, bottom edge, top-right corner, bottom-left corner - so a
+	 * future theme can layer any subset of the four cues without
+	 * overpainting, and so a user flipping between Aqua, RAZR, Stealth
+	 * Black, and Y2K Silver sees the highlight move from top edge to
+	 * bottom edge to top-right corner to bottom-left corner,
+	 * reinforcing that they're four genuinely different lighting
+	 * models rather than four recoloured versions of the same
+	 * overlay. The bottom-left anchor is also faithful to the era's
+	 * industrial-design vocabulary: the iMac G3's translucent handle
+	 * sat at the bottom-left of the cabinet, the iPod 1G's Apple logo
+	 * sat at the bottom-left of the polished face, and the Sony
+	 * Discman's Lucite power LED sat in the bottom-left corner of the
+	 * lid - the bottom-left was where Y2K-era industrial designers
+	 * placed their signature-Lucite accents, so anchoring the jewel
+	 * to the bottom-left of the tile captures that placement
+	 * directly.
+	 */
+	static bool       luciteJewelEnabled();
+	static lv_color_t luciteJewelColor();
+	static lv_color_t luciteJewelHighlightColor();
+	static uint8_t    luciteJewelIdleOpa();
+	static uint8_t    luciteJewelSelectedOpa();
 };
 
 /*
