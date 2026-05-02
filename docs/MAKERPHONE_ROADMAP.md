@@ -155,7 +155,7 @@ A proper retro-arcade carousel for `PhoneGames`. Each entry is one self-containe
 - [x] **S96** — `PhoneWordle` — daily 5-letter guess.
 - [x] **S97** — `PhoneSimon` — memory + buzzer-tone Simon Says.
 - [x] **S98** — `PhoneSnakesLadders` — vs CPU.
-- [ ] **S99** — `PhoneAirHockey` — vs CPU, single-screen.
+- [x] **S99** — `PhoneAirHockey` — vs CPU, single-screen.
 - [ ] **S100** — `PhoneTowerDefence` — single lane, 8 waves.
 
 ## Phase O — Themes & Icon Sets (S101–S120)

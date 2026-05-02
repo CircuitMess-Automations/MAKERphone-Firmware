@@ -40,6 +40,7 @@
 #include "PhoneWordle.h"
 #include "PhoneSimon.h"
 #include "PhoneSnakesLadders.h"
+#include "PhoneAirHockey.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the cards visually slot into the rest of the device. Inlined here
@@ -112,6 +113,7 @@ const PhoneGamesScreen::GameInfo PhoneGamesScreen::Games[PhoneGamesScreen::kGame
 	{ "WORDLE",   nullptr,                   GameKind::Screen },  // S96
 	{ "SIMON",    nullptr,                   GameKind::Screen },  // S97
 	{ "S&L",     nullptr,                   GameKind::Screen },  // S98
+	{ "AIRHOCK",  nullptr,                   GameKind::Screen },  // S99
 };
 
 PhoneGamesScreen::PhoneGamesScreen()
@@ -1068,6 +1070,49 @@ void PhoneGamesScreen::paintGlyph(lv_obj_t* g, uint8_t gameIndex) {
 			px(g, 23,  5, 2, 1, cream);
 			break;
 		}
+		case 27: { // AIRHOCK -- vertical rink with two mallets + a puck
+			// S99: a stylised glance of an air-hockey table -- a faint
+			// rink frame, a centre line slicing the field in two, and
+			// the cyan player mallet at the bottom facing the orange
+			// CPU mallet at the top with a cream puck between them.
+			const lv_color_t cream  = lv_color_make(255, 220, 180);
+			const lv_color_t cyan   = lv_color_make(122, 232, 255);
+			const lv_color_t orange = lv_color_make(255, 140,  30);
+
+			// Rink outline: 22x18 hollow rectangle slightly inset from
+			// the glyph's 30x22 canvas.
+			px(g,  4,  3, 22, 1, MP_DIM);    // top wall (with goal hint)
+			px(g,  4, 20, 22, 1, MP_DIM);    // bottom wall
+			px(g,  4,  4,  1, 16, MP_DIM);   // left wall
+			px(g, 25,  4,  1, 16, MP_DIM);   // right wall
+
+			// Goal mouth highlights -- erase the centre of the top +
+			// bottom walls so they read as goals rather than a closed
+			// box. Orange (CPU goal) at top, cyan (player goal) at bottom.
+			px(g, 11,  3,  8, 1, orange);
+			px(g, 11, 20,  8, 1, cyan);
+
+			// Centre line + centre dot.
+			px(g,  5, 11,  9, 1, MP_LABEL_DIM);
+			px(g, 16, 11,  9, 1, MP_LABEL_DIM);
+			px(g, 14, 11,  2, 1, cream);
+
+			// CPU mallet (top half) -- a 5x5 orange disc, picked apart
+			// from a hollow circle so it reads as a mallet ring.
+			px(g, 13,  6,  4, 1, orange);
+			px(g, 12,  7,  6, 3, orange);
+			px(g, 13, 10,  4, 1, orange);
+
+			// Player mallet (bottom half) -- 5x5 cyan disc.
+			px(g, 13, 13,  4, 1, cyan);
+			px(g, 12, 14,  6, 3, cyan);
+			px(g, 13, 17,  4, 1, cyan);
+
+			// Puck -- a 2x2 cream square sitting just above the player
+			// mallet so it reads as "in flight toward CPU".
+			px(g, 18, 12,  2, 2, cream);
+			break;
+		}
 		default:
 			break;
 	}
@@ -1226,6 +1271,7 @@ void PhoneGamesScreen::launchSelected() {
 			case 24: push(new PhoneWordle()); break;
 			case 25: push(new PhoneSimon()); break;
 			case 26: push(new PhoneSnakesLadders()); break;
+			case 27: push(new PhoneAirHockey()); break;
 			default:
 				// Should never happen unless somebody added a Screen
 				// entry to Games[] without wiring it here. Be loud
