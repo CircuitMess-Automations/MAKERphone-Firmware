@@ -22,6 +22,17 @@
  * its palette constants (N3310_*) are exposed here for the icon-glyph
  * pass that follows in S102.
  *
+ * S102 wires the icon-glyph + accent layer of the Nokia 3310 theme.
+ * Phone* widgets (PhoneIconTile, PhoneSoftKeyBar, PhoneLockHint, ...)
+ * stop hard-coding the synthwave MP_* values and instead call the
+ * accent helpers below — `MakerphoneTheme::bgDark()`, `accent()`,
+ * `highlight()`, `dim()`, `text()`, `labelDim()` — so swapping the
+ * global theme propagates to every newly-built screen without each
+ * widget having to know which palette to read. The helpers are
+ * defensive: they fall back to the Synthwave defaults whenever the
+ * current theme isn't one they handle, so an unknown future Theme
+ * value can never render an undefined colour.
+ *
  * Persistence:
  *   themeId lives in SettingsData (default 0 = Default). Read on every
  *   screen build through MakerphoneTheme::getCurrent(), so changing the
@@ -86,6 +97,50 @@ public:
 	 * part of the same family.
 	 */
 	static const char* getName(Theme t);
+
+	/*
+	 * S102 — accent palette resolvers.
+	 *
+	 * Each helper returns the colour the named *role* should take
+	 * under the currently active theme. Phone* widgets call these at
+	 * construction (and from the rare animation hot-path that mid-
+	 * frame re-tints, e.g. PhoneSoftKeyBar's flash) so swapping the
+	 * global theme propagates to every newly-built screen without
+	 * each widget having to ifdef on Theme.
+	 *
+	 * Roles (named after the existing MP_* macros so the .cpp swap
+	 * is mechanical):
+	 *
+	 *   bgDark    — page / slab / status-bar background fill.
+	 *   accent    — primary accent (focus border, "Sent" bubble fill,
+	 *               soft-key arrow tint, halo ring).
+	 *   highlight — icon strokes, soft-key label, "edited" cyan.
+	 *   dim       — idle borders, "Received" bubble fill, inactive
+	 *               chevrons.
+	 *   text      — default body text (cream).
+	 *   labelDim  — timestamps, placeholders, idle tile labels.
+	 *
+	 * Theme mappings:
+	 *
+	 *   Default:    MP_BG_DARK / MP_ACCENT / MP_HIGHLIGHT /
+	 *               MP_DIM / MP_TEXT / MP_LABEL_DIM
+	 *   Nokia3310:  N3310_BG_LIGHT (LCD off) / N3310_FRAME (deep
+	 *               olive) / N3310_PIXEL (LCD on) / N3310_PIXEL_DIM /
+	 *               N3310_PIXEL / N3310_PIXEL_DIM
+	 *
+	 * The Nokia mapping inverts the Synthwave dark-on-light
+	 * convention: the "background" role becomes a light olive and
+	 * the "text"/"highlight" roles become the dark LCD ink — that's
+	 * the authentic 3310 reading direction (dark pixels on a pale
+	 * green panel) and what a 1999 user would expect when they hit
+	 * the menu icon on the LCD.
+	 */
+	static lv_color_t bgDark();
+	static lv_color_t accent();
+	static lv_color_t highlight();
+	static lv_color_t dim();
+	static lv_color_t text();
+	static lv_color_t labelDim();
 };
 
 /*

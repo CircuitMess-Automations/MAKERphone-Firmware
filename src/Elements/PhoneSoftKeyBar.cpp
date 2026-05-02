@@ -1,12 +1,20 @@
 #include "PhoneSoftKeyBar.h"
 #include "../Fonts/font.h"
+#include "../MakerphoneTheme.h"
 #include <string.h>
 
 // MAKERphone retro palette (kept consistent with PhoneStatusBar).
-#define MP_BG_DARK     lv_color_make(20, 12, 36)     // deep purple bar background
-#define MP_ACCENT      lv_color_make(255, 140, 30)   // sunset orange (separator + arrows)
-#define MP_HIGHLIGHT   lv_color_make(122, 232, 255)  // cyan (label text)
-#define MP_TEXT        lv_color_make(255, 220, 180)  // warm cream (center hint)
+//
+// S102 — replaced literal lv_color_make() defines with theme-aware
+// helpers from MakerphoneTheme so the soft-key bar follows the active
+// theme. Every screen drops a fresh PhoneSoftKeyBar so swapping the
+// theme via Settings → Theme takes effect on the next screen build,
+// no per-frame work. Default theme is byte-identical to the previous
+// hard-coded palette.
+#define MP_BG_DARK     (MakerphoneTheme::bgDark())
+#define MP_ACCENT      (MakerphoneTheme::accent())
+#define MP_HIGHLIGHT   (MakerphoneTheme::highlight())
+#define MP_TEXT        (MakerphoneTheme::text())
 
 // Per-flash user-data trampoline. We need to know both *which* bar is
 // flashing (so the timer can clear its own pointer + reset the colors)

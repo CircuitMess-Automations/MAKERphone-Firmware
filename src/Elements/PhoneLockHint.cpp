@@ -1,12 +1,21 @@
 #include "PhoneLockHint.h"
 #include "../Fonts/font.h"
+#include "../MakerphoneTheme.h"
 #include <Loop/LoopManager.h>
 
 // MAKERphone retro palette - kept identical across the Phone* family.
-#define MP_TEXT       lv_color_make(255, 220, 180)   // warm cream caption
-#define MP_HIGHLIGHT  lv_color_make(122, 232, 255)   // cyan chevrons
-#define MP_ACCENT     lv_color_make(255, 140, 30)    // sunset orange - chord-armed accent
-#define MP_DIM        lv_color_make(70, 56, 100)     // muted purple - inactive chevrons
+//
+// S102 — these now resolve through MakerphoneTheme so the lock-screen
+// hint picks up the active theme. The caption colour is the live one
+// (MP_TEXT for the cream Synthwave caption / dark olive ink under the
+// Nokia 3310 panel) and the chevron sweep uses the theme's highlight
+// colour, so the slide cue reads correctly against either wallpaper.
+// Boost (chord-armed) state still uses the accent colour, which under
+// Nokia is the deep frame olive — readable on the pale-olive panel.
+#define MP_TEXT       (MakerphoneTheme::text())
+#define MP_HIGHLIGHT  (MakerphoneTheme::highlight())
+#define MP_ACCENT     (MakerphoneTheme::accent())
+#define MP_DIM        (MakerphoneTheme::dim())
 
 PhoneLockHint::PhoneLockHint(lv_obj_t* parent) : LVObject(parent){
 	caption = nullptr;

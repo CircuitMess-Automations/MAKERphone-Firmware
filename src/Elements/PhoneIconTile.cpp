@@ -1,14 +1,25 @@
 #include "PhoneIconTile.h"
 #include "../Fonts/font.h"
+#include "../MakerphoneTheme.h"
 
 // MAKERphone retro palette - kept consistent with the other phone widgets
 // (PhoneStatusBar, PhoneSoftKeyBar, PhoneClockFace, PhoneSynthwaveBg).
-#define MP_BG_DARK     lv_color_make(20, 12, 36)     // deep purple tile background
-#define MP_ACCENT      lv_color_make(255, 140, 30)   // sunset orange (selected border + halo)
-#define MP_HIGHLIGHT   lv_color_make(122, 232, 255)  // cyan (icon strokes)
-#define MP_DIM         lv_color_make(70, 56, 100)    // muted purple (idle border)
-#define MP_TEXT        lv_color_make(255, 220, 180)  // warm cream label
-#define MP_LABEL_DIM   lv_color_make(170, 140, 200)  // dim label when not selected
+//
+// S102 — these were previously hard-coded lv_color_make literals (the
+// Synthwave palette). They now resolve through MakerphoneTheme so the
+// Nokia 3310 (and every future Phase O theme) gets the right tint
+// without rewriting every per-icon builder. The names match the
+// MP_BG_DARK / MP_ACCENT / MP_HIGHLIGHT / MP_DIM / MP_TEXT /
+// MP_LABEL_DIM convention so the rest of this file is unchanged: the
+// macros simply ask MakerphoneTheme for the role colour at the moment
+// the tile is built (or re-tinted by setSelected). Default theme
+// keeps the original Synthwave look pixel-for-pixel.
+#define MP_BG_DARK     (MakerphoneTheme::bgDark())
+#define MP_ACCENT      (MakerphoneTheme::accent())
+#define MP_HIGHLIGHT   (MakerphoneTheme::highlight())
+#define MP_DIM         (MakerphoneTheme::dim())
+#define MP_TEXT        (MakerphoneTheme::text())
+#define MP_LABEL_DIM   (MakerphoneTheme::labelDim())
 
 PhoneIconTile::PhoneIconTile(lv_obj_t* parent, Icon icon, const char* label)
 		: LVObject(parent), icon(icon), halo(nullptr), iconLayer(nullptr), labelEl(nullptr){
