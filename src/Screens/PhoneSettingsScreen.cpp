@@ -68,6 +68,11 @@ const Section kLayout[] = {
 	{ false, "Key clicks",         "KEY CLICKS",  PhoneSettingsScreen::Item::Haptics    },
 	{ true,  "SYSTEM",             nullptr,       PhoneSettingsScreen::Item::DateTime   },
 	{ false, "Date & Time",        "DATE & TIME", PhoneSettingsScreen::Item::DateTime   },
+	// S144 - owner name (lock-screen greeting). Sits between Date & Time
+	// and About so the SYSTEM group reads as a natural "phone identity"
+	// cluster and the existing About row stays at the bottom of the list
+	// where users expect a feature-phone About entry.
+	{ false, "Owner name",         "OWNER",       PhoneSettingsScreen::Item::Owner      },
 	{ false, "About",              "ABOUT",       PhoneSettingsScreen::Item::About      },
 };
 constexpr uint8_t kLayoutLen = sizeof(kLayout) / sizeof(kLayout[0]);

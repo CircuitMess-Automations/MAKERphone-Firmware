@@ -216,7 +216,7 @@ Sony Ericsson "Organiser" classics — practical apps with offline-only state. E
 ## Phase R — Nostalgia Layer (S144–S163)
 Tiny details that make the difference between "phone-shaped toy" and "this is exactly how my Nokia did it".
 
-- [ ] **S144** — Owner name on lock screen (T9 entry in Settings).
+- [x] **S144** — Owner name on lock screen (T9 entry in Settings).
 - [ ] **S145** — Custom welcome greeting on boot ("Hello, $NAME!").
 - [ ] **S146** — Custom power-off message.
 - [ ] **S147** — Operator-logo banner — text + 5×16 user-pixelable logo.

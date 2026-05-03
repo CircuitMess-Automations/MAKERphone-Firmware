@@ -76,6 +76,21 @@ struct SettingsData {
 	// Toggle is exposed via PhoneHapticsScreen, reachable from the SOUND
 	// section of PhoneSettingsScreen as the "Key clicks" row.
 	bool keyTicks = false;
+	// S144 - owner name shown on the lock screen. Set via the
+	// PhoneOwnerNameScreen reached from the SYSTEM section of
+	// PhoneSettingsScreen ("Owner name" row); when non-empty the
+	// LockScreen tucks the string between the status bar and the
+	// clock face as a small retro greeting and shifts the clock
+	// face / preview / unread container down to make room. An
+	// empty string (the factory default) keeps the classic
+	// clock-anchored-to-the-status-bar layout.
+	//
+	// Stored as a fixed-width 24-byte buffer (23 visible chars plus
+	// the trailing nul) so the SettingsData blob stays plain-old-data
+	// and the existing NVS-resize pattern that grew this struct via
+	// soundProfile / wallpaperStyle / themeId / keyTicks reads the
+	// new field as zero-initialised on a first boot after upgrade.
+	char ownerName[24] = "";
 };
 
 class SettingsImpl {

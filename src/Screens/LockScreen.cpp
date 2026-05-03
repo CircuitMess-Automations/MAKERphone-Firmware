@@ -1,6 +1,8 @@
 #include "LockScreen.h"
 #include "../Storage/Storage.h"
 #include "../Fonts/font.h"
+#include <Settings.h>
+#include <string.h>
 #include "../Services/SleepService.h"
 #include "../Elements/BatteryElement.h"
 #include "../Elements/PhoneStatusBar.h"
@@ -39,8 +41,12 @@ LockScreen::LockScreen() : LVScreen(){
 	// MAKERphone retro status bar (signal | clock | battery) anchored to the top.
 	new PhoneStatusBar(obj);
 
-	// Big retro clock face directly under the status bar.
-	new PhoneClockFace(obj);
+	// Big retro clock face directly under the status bar. Cached on
+	// the screen so S144's layoutForOwner() can re-anchor it when the
+	// user sets / clears Settings.ownerName without rebuilding the
+	// whole screen.
+	auto* clockFace = new PhoneClockFace(obj);
+	clockFaceObj = clockFace->getLvObj();
 
 	// S49 lock-screen notifications preview: a compact two-row summary
 	// of unread messages + missed calls. Anchored just under the clock
@@ -114,6 +120,14 @@ LockScreen::LockScreen() : LVScreen(){
 	// Lift the unlock slide just above the softkey bar so the two do not overlap.
 	lv_obj_set_y(slide->getLvObj(), -PhoneSoftKeyBar::BarHeight);
 
+	// S144 - mount the owner-name strip if Settings.ownerName is set;
+	// re-anchor the clock face / preview / unread container Y offsets
+	// to match. Safe to call before the screen is start()'d -- the
+	// helpers only touch widgets that this constructor has already
+	// created.
+	refreshOwnerLabel();
+	layoutForOwner();
+
 	instance = this;
 }
 
@@ -138,6 +152,11 @@ void LockScreen::activate(LVScreen* parent){
 }
 
 void LockScreen::onStarting(){
+	// S144 - re-read Settings.ownerName so an edit made while the user
+	// was inside PhoneOwnerNameScreen propagates here on the next
+	// onStarting() pass without requiring a screen rebuild.
+	refreshOwnerLabel();
+	layoutForOwner();
 	loadUnread();
 	if(preview) preview->refresh();
 	slide->reset();
@@ -290,4 +309,86 @@ void LockScreen::createNoUnreads(){
 	lv_label_set_text(noUnreads, "Nothing new.");
 	lv_obj_set_style_text_font(noUnreads, &pixelbasic7, 0);
 	lv_obj_set_style_text_color(noUnreads, lv_color_make(200, 200, 200), 0);
+}
+
+
+// ----- S144: owner-name strip ----------------------------------------------
+
+void LockScreen::refreshOwnerLabel(){
+	const char* name = Settings.get().ownerName;
+	const bool  set  = (name != nullptr) && (name[0] != '\0');
+
+	if(set){
+		// Lazy-construct the label the first time we need it. Painted
+		// in MP_HIGHLIGHT (cyan) on top of the synthwave wallpaper so
+		// it reads as a small "phone identity" greeting strip.
+		if(ownerLabel == nullptr){
+			ownerLabel = lv_label_create(obj);
+			lv_obj_add_flag(ownerLabel, LV_OBJ_FLAG_IGNORE_LAYOUT);
+			lv_obj_set_style_text_font(ownerLabel, &pixelbasic7, 0);
+			lv_obj_set_style_text_color(ownerLabel,
+				lv_color_make(122, 232, 255), 0);
+			lv_label_set_long_mode(ownerLabel, LV_LABEL_LONG_DOT);
+			// Slightly less than the full screen width so a too-long
+			// name dot-truncates rather than crowding the bezel.
+			lv_obj_set_width(ownerLabel, 156);
+			lv_obj_set_style_text_align(ownerLabel,
+				LV_TEXT_ALIGN_CENTER, 0);
+			lv_obj_set_align(ownerLabel, LV_ALIGN_TOP_MID);
+			// Sits just below the 10 px status bar.
+			lv_obj_set_y(ownerLabel, 11);
+		}
+
+		// Defensive: keep the displayed text capped at the 23-char
+		// editable budget so a corrupt blob with no nul terminator
+		// cannot overrun the buffer when copied through lv_label.
+		char safe[24];
+		const size_t cap = sizeof(safe) - 1;
+		size_t n = 0;
+		while(n < cap && name[n] != '\0') ++n;
+		memcpy(safe, name, n);
+		safe[n] = '\0';
+		lv_label_set_text(ownerLabel, safe);
+		lv_obj_clear_flag(ownerLabel, LV_OBJ_FLAG_HIDDEN);
+
+		ownerStripH = kOwnerStripH;
+	}else{
+		// Name unset (factory default) - hide the label and fall back
+		// to the pre-S144 layout (clock anchored under the status bar).
+		if(ownerLabel != nullptr){
+			lv_label_set_text(ownerLabel, "");
+			lv_obj_add_flag(ownerLabel, LV_OBJ_FLAG_HIDDEN);
+		}
+		ownerStripH = 0;
+	}
+}
+
+void LockScreen::layoutForOwner(){
+	// Re-anchor the clock face: y = 11 (base) when the strip is hidden,
+	// y = 11 + ownerStripH when the strip is visible. Everything below
+	// shifts with it because PhoneNotificationPreview / the unread
+	// container are positioned relative to the clock-face base + the
+	// PreviewHeight constant.
+	if(clockFaceObj != nullptr){
+		lv_obj_set_y(clockFaceObj, kClockBaseY + ownerStripH);
+	}
+
+	if(preview != nullptr){
+		// Original Y = 11 + FaceHeight + 2; the +ownerStripH preserves
+		// the same gap-to-clock relationship after the shift.
+		lv_obj_set_y(preview->getLvObj(),
+			11 + PhoneClockFace::FaceHeight + 2 + ownerStripH);
+	}
+
+	if(container != nullptr){
+		// Re-derive the container's top padding so the unread-message
+		// rows stay tucked under the (shifted) preview.
+		lv_obj_set_style_pad_top(
+			container,
+			11 + PhoneClockFace::FaceHeight + 2
+				+ PhoneNotificationPreview::PreviewHeight + 2
+				+ ownerStripH,
+			0
+		);
+	}
 }

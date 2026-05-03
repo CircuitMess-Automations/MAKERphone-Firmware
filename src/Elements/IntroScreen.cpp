@@ -25,6 +25,7 @@
 #include "../Screens/PhoneDateTimeScreen.h"
 #include "../Screens/PhoneAboutScreen.h"
 #include "../Screens/PhoneThemeScreen.h"
+#include "../Screens/PhoneOwnerNameScreen.h"
 #include "../Screens/PhoneGamesScreen.h"
 #include "../Interface/LVScreen.h"
 #include "../Interface/PhoneTransitions.h"
@@ -216,6 +217,19 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// uptime, and paired peer count, with the heap + uptime
 						// fields refreshed at 1 Hz so the user sees a live readout.
 						self->push(new PhoneAboutScreen());
+						break;
+					case PhoneSettingsScreen::Item::Owner:
+						// S144: owner-name editor replaces the OWNER
+						// placeholder stub. PhoneOwnerNameScreen is a
+						// single-buffer T9 entry (PhoneT9Input + the
+						// usual PhoneScratchpad-style scaffolding) that
+						// reads / writes Settings.ownerName directly,
+						// so the LockScreen picks the new name up on
+						// the next push without any extra wiring. The
+						// stub fallback in launchDefault() still works
+						// for any future row that lands without a
+						// dedicated screen yet.
+						self->push(new PhoneOwnerNameScreen());
 						break;
 					case PhoneSettingsScreen::Item::Theme:
 						// S101: global theme picker drills into the Default

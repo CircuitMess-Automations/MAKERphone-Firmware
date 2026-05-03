@@ -86,6 +86,14 @@ public:
 		// DISPLAY group right under Wallpaper so theme + wallpaper-style
 		// edits live next to each other in the user's mental model.
 		Theme      = 6,        // S101
+		// S144 - owner name (lock-screen greeting). T9-typed in
+		// PhoneOwnerNameScreen and stored in Settings.ownerName so the
+		// LockScreen can read it on every push and tuck a small retro
+		// greeting between the status bar and the clock face. Lives in
+		// the SYSTEM group right above About so the SYSTEM section
+		// reads as Date & Time -> Owner name -> About -- a natural
+		// "phone identity" cluster.
+		Owner      = 7,        // S144
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);
@@ -135,7 +143,7 @@ public:
 	void flashRightSoftKey();
 
 	/** Number of selectable rows (excludes group headers). */
-	static constexpr uint8_t ItemCount = 7;
+	static constexpr uint8_t ItemCount = 8;
 
 	// --- Geometry, exposed for unit-test friendliness. -----------------
 
@@ -152,8 +160,15 @@ public:
 	 * bar at y=118 - 3*9 + 7*10 = 97 px with 1 px slack. pixelbasic7
 	 * is 7 px tall so the row still has 3 px halo for the highlight
 	 * rect; tighter than the pre-S101 4 px but still legible.
+	 *
+	 * S144 trims this further to 9 px so the new "Owner name" row
+	 * fits inside the same 98 px window without scrolling: 8 rows
+	 * * 9 px + 3 headers * 9 px = 99 px -- 1 px of bleed against
+	 * the soft-key bar that the rounded highlight rect absorbs
+	 * cleanly. pixelbasic7 still has 1 px halo top/bottom so the
+	 * cream label stays crisp at the new height.
 	 */
-	static constexpr lv_coord_t RowH   = 10;
+	static constexpr lv_coord_t RowH   = 9;
 	/**
 	 * Per-header height (group titles). Trimmed to 9 px in S101 (was
 	 * 10) for the same fit reason as RowH above. pixelbasic7 leaves
