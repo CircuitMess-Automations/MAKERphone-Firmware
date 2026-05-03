@@ -26,6 +26,7 @@
 #include "../Screens/PhoneAboutScreen.h"
 #include "../Screens/PhoneThemeScreen.h"
 #include "../Screens/PhoneOwnerNameScreen.h"
+#include "../Screens/PhoneWelcomeScreen.h"
 #include "../Screens/PhoneGamesScreen.h"
 #include "../Interface/LVScreen.h"
 #include "../Interface/PhoneTransitions.h"
@@ -57,6 +58,14 @@
 // Sample / placeholder rows from the S36 fallback list have uid==0 -
 // we no-op the actions on those so the user gets a flash but nothing
 // nonsensical happens.
+// S145: stash for the PhoneWelcomeScreen dismiss callback. The dismiss
+// callback is a plain `void (*)()` (no captures), so the IntroScreen
+// READY handler hands the freshly-built PhoneHomeScreen off through
+// this single-slot static. The slot is cleared by the callback as
+// soon as it consumes the pointer so a later (somehow) reuse of the
+// welcome screen cannot accidentally re-activate a stale home.
+static PhoneHomeScreen* s_pendingHomeForWelcome = nullptr;
+
 static void contactDetailCall(PhoneContactDetail* self){
 	if(self == nullptr) return;
 	const UID_t uid = self->getUid();
@@ -410,7 +419,28 @@ IntroScreen::IntroScreen(void (* callback)()) : callback(callback){
 		// S22: long-press shortcuts on the homescreen.
 		home->setOnQuickDial(launchQuickDialFromHome);
 		home->setOnLockHold(lockFromHome);
-		LockScreen::activate(home);
+
+		// S145: if the user has set Settings.ownerName via the S144
+		// PhoneOwnerNameScreen, flash a "Hello, $NAME!" welcome
+		// greeting between the intro gif and the lock screen. The
+		// PhoneWelcomeScreen auto-dismisses after ~1.5 s (or any-key
+		// skip) and then calls our continuation callback, which
+		// activates the lock screen with the pre-built home as
+		// parent - exactly the same handoff the unconditional path
+		// below performs. On a freshly-flashed device with no name
+		// set we skip the greeting entirely so the boot flow looks
+		// identical to pre-S145 builds.
+		if(PhoneWelcomeScreen::isEnabled()){
+			s_pendingHomeForWelcome = home;
+			auto* welcome = new PhoneWelcomeScreen([](){
+				auto* h = s_pendingHomeForWelcome;
+				s_pendingHomeForWelcome = nullptr;
+				if(h != nullptr) LockScreen::activate(h);
+			});
+			welcome->start();
+		}else{
+			LockScreen::activate(home);
+		}
 #else
 		// Legacy boot path - LockScreen resumes directly into MainMenu,
 		// matching the original Chatter firmware. Kept for fall-back via

@@ -217,7 +217,7 @@ Sony Ericsson "Organiser" classics — practical apps with offline-only state. E
 Tiny details that make the difference between "phone-shaped toy" and "this is exactly how my Nokia did it".
 
 - [x] **S144** — Owner name on lock screen (T9 entry in Settings).
-- [ ] **S145** — Custom welcome greeting on boot ("Hello, $NAME!").
+- [x] **S145** — Custom welcome greeting on boot ("Hello, $NAME!").
 - [ ] **S146** — Custom power-off message.
 - [ ] **S147** — Operator-logo banner — text + 5×16 user-pixelable logo.
 - [ ] **S148** — Boot melody (Sony-Ericsson-style four-note chime).
