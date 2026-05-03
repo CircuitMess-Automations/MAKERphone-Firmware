@@ -209,7 +209,7 @@ Sony Ericsson "Organiser" classics — practical apps with offline-only state. E
 - [x] **S138** — `PhonePomodoro` — work/break cycle timer, configurable durations, cycle counter.
 - [x] **S139** — `PhoneMoodLog` — one-tap-per-day mood journal, 30-day strip view.
 - [x] **S140** — `PhoneScratchpad` — instant quick-jot pad (one buffer, separate from S64 Notepad's saved list).
-- [ ] **S141** — `PhoneExpenses` — running daily/weekly tally with category tags.
+- [x] **S141** — `PhoneExpenses` — running daily/weekly tally with category tags.
 - [ ] **S142** — `PhoneCountdown` — days-until-event widget (multiple events, sortable by closeness).
 - [ ] **S143** — `PhoneSteps` — mock pedometer (uptime-derived) with daily goal + streak.
 
