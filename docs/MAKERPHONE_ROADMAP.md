@@ -198,7 +198,7 @@ Composer is broken into three sessions because it needs (a) keypad note-entry UI
 - [x] **S131** — `PhoneDiceRoller` — 1d4 → 2d20.
 - [x] **S132** — `PhoneCoinFlip` — gravity-style flip animation.
 - [x] **S133** — `PhoneFortuneCookie` — daily wisdom from inline string list.
-- [ ] **S134** — `PhoneFlashlight` — full-white screen + brightness max.
+- [x] **S134** — `PhoneFlashlight` — full-white screen + brightness max.
 - [ ] **S135** — `PhoneBirthdayReminders` — list + per-contact birthday field.
 
 ## Phase Q — Pocket Organiser (S136–S143)
