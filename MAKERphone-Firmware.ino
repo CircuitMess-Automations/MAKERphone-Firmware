@@ -25,6 +25,7 @@
 #include "src/Services/BuzzerService.h"
 #include "src/Services/PhoneRingtoneEngine.h"
 #include "src/Services/PhoneAlarmService.h"
+#include "src/Services/PhoneVirtualPet.h"
 #include "src/JigHWTest/JigHWTest.h"
 #include "src/Games/GameEngine/Game.h"
 
@@ -163,6 +164,7 @@ void boot(){
 			Buzz.begin();
 			Ringtone.begin();
 			Alarms.begin();
+			Pet.begin();
 		});
 		intro->start();
 	});
