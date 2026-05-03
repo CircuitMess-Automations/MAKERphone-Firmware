@@ -194,7 +194,7 @@ Composer is broken into three sessions because it needs (a) keypad note-entry UI
 - [x] **S127** — `PhoneUnitConverter` — length / mass / temperature / volume.
 - [x] **S128** — `PhoneWorldClock` — six-zone clock grid.
 - [x] **S129** — `PhoneVirtualPet` — Tamagotchi-style feed/sleep/play, persists hunger/age across reboots.
-- [ ] **S130** — `PhoneMagic8Ball` — shake + reveal answer.
+- [x] **S130** — `PhoneMagic8Ball` — shake + reveal answer.
 - [ ] **S131** — `PhoneDiceRoller` — 1d4 → 2d20.
 - [ ] **S132** — `PhoneCoinFlip` — gravity-style flip animation.
 - [ ] **S133** — `PhoneFortuneCookie` — daily wisdom from inline string list.
