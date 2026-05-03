@@ -205,7 +205,7 @@ Composer is broken into three sessions because it needs (a) keypad note-entry UI
 Sony Ericsson "Organiser" classics — practical apps with offline-only state. Each persists through the existing `Storage` layer so a paused habit streak still counts on reboot.
 
 - [x] **S136** — `PhoneTodo` — task list with three priority levels + tick-off animation.
-- [ ] **S137** — `PhoneHabits` — five-habit daily tracker, streak counter, weekly heatmap.
+- [x] **S137** — `PhoneHabits` — five-habit daily tracker, streak counter, weekly heatmap.
 - [ ] **S138** — `PhonePomodoro` — work/break cycle timer, configurable durations, cycle counter.
 - [ ] **S139** — `PhoneMoodLog` — one-tap-per-day mood journal, 30-day strip view.
 - [ ] **S140** — `PhoneScratchpad` — instant quick-jot pad (one buffer, separate from S64 Notepad's saved list).
