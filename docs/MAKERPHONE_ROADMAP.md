@@ -211,7 +211,7 @@ Sony Ericsson "Organiser" classics — practical apps with offline-only state. E
 - [x] **S140** — `PhoneScratchpad` — instant quick-jot pad (one buffer, separate from S64 Notepad's saved list).
 - [x] **S141** — `PhoneExpenses` — running daily/weekly tally with category tags.
 - [x] **S142** — `PhoneCountdown` — days-until-event widget (multiple events, sortable by closeness).
-- [ ] **S143** — `PhoneSteps` — mock pedometer (uptime-derived) with daily goal + streak.
+- [x] **S143** — `PhoneSteps` — mock pedometer (uptime-derived) with daily goal + streak.
 
 ## Phase R — Nostalgia Layer (S144–S163)
 Tiny details that make the difference between "phone-shaped toy" and "this is exactly how my Nokia did it".
