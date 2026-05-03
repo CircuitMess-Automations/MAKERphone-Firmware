@@ -204,7 +204,7 @@ Composer is broken into three sessions because it needs (a) keypad note-entry UI
 ## Phase Q — Pocket Organiser (S136–S143)
 Sony Ericsson "Organiser" classics — practical apps with offline-only state. Each persists through the existing `Storage` layer so a paused habit streak still counts on reboot.
 
-- [ ] **S136** — `PhoneTodo` — task list with three priority levels + tick-off animation.
+- [x] **S136** — `PhoneTodo` — task list with three priority levels + tick-off animation.
 - [ ] **S137** — `PhoneHabits` — five-habit daily tracker, streak counter, weekly heatmap.
 - [ ] **S138** — `PhonePomodoro` — work/break cycle timer, configurable durations, cycle counter.
 - [ ] **S139** — `PhoneMoodLog` — one-tap-per-day mood journal, 30-day strip view.
