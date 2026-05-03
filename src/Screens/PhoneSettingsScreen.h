@@ -91,9 +91,20 @@ public:
 		// LockScreen can read it on every push and tuck a small retro
 		// greeting between the status bar and the clock face. Lives in
 		// the SYSTEM group right above About so the SYSTEM section
-		// reads as Date & Time -> Owner name -> About -- a natural
-		// "phone identity" cluster.
+		// reads as Date & Time -> Owner name -> Power-off msg -> About
+		// -- a natural "phone identity" cluster.
 		Owner      = 7,        // S144
+		// S146 - custom power-off message overlaid on the
+		// PhonePowerDown CRT-shrink animation. T9-typed in
+		// PhonePowerOffMessageScreen and stored in
+		// Settings.powerOffMessage so PhonePowerDown can read it
+		// fresh on every push and append a ~700 ms preamble that
+		// holds the phosphor plate at full brightness while the
+		// message is centred on it. Empty string (factory default)
+		// skips the preamble entirely. Lives in SYSTEM directly
+		// below "Owner name" so the two T9-typed identity slots
+		// cluster together inside the existing SYSTEM group.
+		PowerOffMsg= 8,        // S146
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);
@@ -143,7 +154,7 @@ public:
 	void flashRightSoftKey();
 
 	/** Number of selectable rows (excludes group headers). */
-	static constexpr uint8_t ItemCount = 8;
+	static constexpr uint8_t ItemCount = 9;
 
 	// --- Geometry, exposed for unit-test friendliness. -----------------
 
@@ -167,8 +178,17 @@ public:
 	 * the soft-key bar that the rounded highlight rect absorbs
 	 * cleanly. pixelbasic7 still has 1 px halo top/bottom so the
 	 * cream label stays crisp at the new height.
+	 *
+	 * S146 trims rows by another pixel (RowH 9 -> 8) so the new
+	 * "Power-off msg" row fits inside the same 98 px window: 9
+	 * rows * 8 px + 3 headers * 9 px = 99 px -- the exact same
+	 * 1 px bleed S144 already absorbs. The label position in
+	 * buildList() drops to y+1 to match the tighter row, leaving
+	 * pixelbasic7 with 0 px top halo + 0 px bottom halo, which
+	 * still reads crisply because the highlight rect's 70 % muted
+	 * purple keeps the cream label well-contrasted.
 	 */
-	static constexpr lv_coord_t RowH   = 9;
+	static constexpr lv_coord_t RowH   = 8;
 	/**
 	 * Per-header height (group titles). Trimmed to 9 px in S101 (was
 	 * 10) for the same fit reason as RowH above. pixelbasic7 leaves

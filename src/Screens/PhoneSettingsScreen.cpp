@@ -72,8 +72,14 @@ const Section kLayout[] = {
 	// and About so the SYSTEM group reads as a natural "phone identity"
 	// cluster and the existing About row stays at the bottom of the list
 	// where users expect a feature-phone About entry.
-	{ false, "Owner name",         "OWNER",       PhoneSettingsScreen::Item::Owner      },
-	{ false, "About",              "ABOUT",       PhoneSettingsScreen::Item::About      },
+	{ false, "Owner name",         "OWNER",       PhoneSettingsScreen::Item::Owner       },
+	// S146 - custom power-off message painted over the PhonePowerDown
+	// CRT-shrink animation. Sits directly below "Owner name" so the
+	// two T9-typed personalisation slots cluster together inside the
+	// existing SYSTEM group; About stays anchored at the bottom of
+	// the list where feature-phone users expect to find it.
+	{ false, "Power-off msg",      "POWER-OFF MSG", PhoneSettingsScreen::Item::PowerOffMsg },
+	{ false, "About",              "ABOUT",       PhoneSettingsScreen::Item::About       },
 };
 constexpr uint8_t kLayoutLen = sizeof(kLayout) / sizeof(kLayout[0]);
 } // namespace
@@ -232,13 +238,18 @@ void PhoneSettingsScreen::buildList() {
 		lv_label_set_long_mode(r.labelObj, LV_LABEL_LONG_DOT);
 		lv_obj_set_width(r.labelObj, ListW - 24); // leave 24 px for chevron column
 		lv_label_set_text(r.labelObj, s.text);
-		lv_obj_set_pos(r.labelObj, kColLabelX, y + 2);
+		// S146 - row label drops to y+1 to match the trimmed 8 px RowH.
+		// pixelbasic7 is 7 px tall so the label fits cleanly inside the
+		// row without bleeding into the next one. Header captions still
+		// use y+1 below (they remain on a 9 px HdrH so they keep their
+		// 2 px top halo unchanged from S144).
+		lv_obj_set_pos(r.labelObj, kColLabelX, y + 1);
 
 		r.chevronObj = lv_label_create(listContainer);
 		lv_obj_set_style_text_font(r.chevronObj, &pixelbasic7, 0);
 		lv_obj_set_style_text_color(r.chevronObj, MP_LABEL_DIM, 0);
 		lv_label_set_text(r.chevronObj, ">");
-		lv_obj_set_pos(r.chevronObj, kColChevX, y + 2);
+		lv_obj_set_pos(r.chevronObj, kColChevX, y + 1);
 
 		y += RowH;
 		++rowIdx;

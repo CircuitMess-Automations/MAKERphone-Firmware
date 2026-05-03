@@ -5,7 +5,7 @@
 #include "../Interface/LVScreen.h"
 
 /**
- * PhonePowerDown (S57)
+ * PhonePowerDown (S57 / S146)
  *
  * The "powering off" overlay that ships the MAKERphone's signature CRT
  * shrink animation + descending piezo tone. Modeled on the way an old
@@ -13,6 +13,17 @@
  * dim afterglow pixel when you yank the mains. Code-only - no SPIFFS
  * assets, no canvas blits, just a couple of lv_obj rectangles whose
  * geometry we walk every animation tick.
+ *
+ * S146 layers a "custom power-off message" preamble on top of the
+ * S57 baseline. When Settings.powerOffMessage is non-empty (set via
+ * PhonePowerOffMessageScreen, reachable from the SYSTEM section of
+ * PhoneSettingsScreen) the screen prepends a ~700 ms hold-frame in
+ * which the phosphor plate stays at full brightness while the
+ * persisted message is centred on it in deep-purple pixelbasic16
+ * -- the classic Sony-Ericsson "Bye!" flourish. Once the preamble
+ * elapses the existing CRT shrink fires unchanged. An empty
+ * powerOffMessage slot (factory default) skips the preamble
+ * entirely so the original S57 timeline is preserved exactly.
  *
  *   t=0.00 s : full screen filled with a warm-cream "phosphor" plate
  *   t=0.50 s : plate has collapsed to a 2 px tall band across the centre
@@ -76,11 +87,27 @@ class PhonePowerDown : public LVScreen {
 public:
 	using DismissHandler = void (*)();
 
-	/** Total animation run length, in milliseconds. */
+	/** Total animation run length for the post-preamble CRT shrink,
+	 *  in milliseconds. The S146 message preamble (when active) is
+	 *  ADDED on top of this duration so that the CRT shrink keeps
+	 *  the same on-screen timing every host has been measuring
+	 *  against since S57. */
 	static constexpr uint32_t DefaultDurationMs = 1300;
 
 	/** Animation tick cadence, in milliseconds (~33 Hz). */
 	static constexpr uint32_t AnimTickMs = 30;
+
+	/** S146 - default message-preamble hold time when
+	 *  Settings.powerOffMessage is non-empty. Long enough for the
+	 *  user to read a classic 5-10 character feature-phone goodbye
+	 *  ("Bye!", "See ya!") at glance speed, short enough that the
+	 *  whole power-off ceremony still wraps in ~2 s end-to-end. The
+	 *  preamble ticks through `applyTone(0.0f)` so the descending
+	 *  piezo sweep starts at the top of its envelope and stays
+	 *  audibly steady on the highest note for the duration of the
+	 *  message hold -- "the screen is bright, the device is humming,
+	 *  goodbye". */
+	static constexpr uint32_t DefaultMessagePreambleMs = 700;
 
 	/**
 	 * Build the power-down overlay. The DismissHandler fires exactly
@@ -100,6 +127,26 @@ public:
 	/** Replace the on-completion handler. Has no effect once fired. */
 	void setOnComplete(DismissHandler cb) { dismissCb = cb; }
 
+	/**
+	 * S146 - replace the message painted over the phosphor plate
+	 * during the preamble phase. By default the screen reads the
+	 * value from Settings.powerOffMessage on construction; hosts
+	 * (and tests) can override it after the fact. Passing an
+	 * empty / null string drops the preamble back to zero so the
+	 * shrink fires immediately on onStart() -- the original S57
+	 * behaviour. Has no effect once the timer has fired through
+	 * the preamble window.
+	 */
+	void setMessage(const char* text);
+
+	/** S146 - read the active message buffer. Useful for tests
+	 *  and future hosts. */
+	const char* getMessage() const { return message; }
+
+	/** S146 - duration of the message preamble in milliseconds. Zero
+	 *  when no message is active (factory default or post-CLEAR). */
+	uint32_t getMessagePreambleMs() const { return messagePreambleMs; }
+
 private:
 	DismissHandler dismissCb;
 	uint32_t       durationMs;
@@ -110,6 +157,19 @@ private:
 	lv_obj_t*   dot;         // centre afterglow dot, fades at the end
 	lv_timer_t* tickTimer;
 
+	// S146 - custom message preamble. The label is built unconditionally
+	// (LVGL teardown stays the same in both branches) but only made
+	// visible while `messagePreambleMs > 0` and `elapsedMs` is inside
+	// the preamble window. The buffer caps at 23 chars + nul to match
+	// the Settings.powerOffMessage slot. Pixelbasic16 paints the
+	// message in deep purple over the warm-cream plate so it reads as
+	// a hard-stamped CRT phosphor caption rather than a translucent
+	// overlay.
+	static constexpr uint16_t MessageMaxLen = 23;
+	char       message[MessageMaxLen + 1];
+	uint32_t   messagePreambleMs;
+	lv_obj_t*  messageLabel;
+
 	// Phase boundaries as fractions of total progress. Phase 0 collapses
 	// the plate vertically, phase 1 horizontally, phase 2 fades the dot.
 	static constexpr float PhaseVerticalEnd   = 0.50f;
@@ -117,6 +177,16 @@ private:
 
 	void buildPlate();
 	void buildDot();
+	// S146 - build the centred message label. Always called from
+	// the ctor so a host that flips the message after construction
+	// (via setMessage) does not have to re-create the label.
+	void buildMessageLabel();
+	// S146 - apply the preamble visibility for the current
+	// elapsedMs (called every tick before the existing applyFrame).
+	// Returns true when the preamble is active and the tick should
+	// SKIP the existing CRT-shrink frame so the plate stays at full
+	// size while the message reads.
+	bool applyPreamble();
 
 	void startTicker();
 	void stopTicker();

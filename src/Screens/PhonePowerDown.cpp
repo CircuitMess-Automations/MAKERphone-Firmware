@@ -3,6 +3,9 @@
 #include <Audio/Piezo.h>
 #include <Settings.h>
 #include <math.h>
+#include <string.h>
+
+#include "../Fonts/font.h"
 
 // MAKERphone retro palette - inlined per the established convention in
 // this codebase (see PhoneBootSplash / PhoneCallEnded / PhoneSynthwaveBg).
@@ -49,7 +52,17 @@ PhonePowerDown::PhonePowerDown(DismissHandler onComplete,
 		  firedAlready(false),
 		  plate(nullptr),
 		  dot(nullptr),
-		  tickTimer(nullptr) {
+		  tickTimer(nullptr),
+		  // S146 - default to no message; fall through to the persisted
+		  // Settings.powerOffMessage slot below. messagePreambleMs stays
+		  // zero until setMessage() decides we have something to paint.
+		  messagePreambleMs(0),
+		  messageLabel(nullptr) {
+
+	// Zero-init the message buffer so an empty Settings slot leaves us
+	// in the "no preamble" branch even if the firmware boots before
+	// SettingsImpl::begin() loads from NVS.
+	message[0] = '\0';
 
 	// Full-screen black canvas, no scrollbars, no inner padding. Same
 	// blank-canvas pattern as every other Phone* screen. Children are
@@ -73,6 +86,15 @@ PhonePowerDown::PhonePowerDown(DismissHandler onComplete,
 	// are technically visible at the centre.
 	buildPlate();
 	buildDot();
+	buildMessageLabel();
+
+	// S146 - pull the persisted custom power-off message (if any) into
+	// the screen's local buffer. setMessage() also recomputes
+	// messagePreambleMs and toggles the message label's visibility, so
+	// after this call the screen is fully primed for either branch
+	// (preamble + shrink, or shrink-only) without any further wiring.
+	const char* persisted = Settings.get().powerOffMessage;
+	setMessage(persisted);
 }
 
 PhonePowerDown::~PhonePowerDown() {
@@ -136,6 +158,109 @@ void PhonePowerDown::buildPlate() {
 	lv_obj_set_style_outline_opa(plate, LV_OPA_50, 0);
 }
 
+void PhonePowerDown::buildMessageLabel() {
+	// Build the message label once, anchored at the centre of the
+	// 160 x 128 display. Hidden by default so the original S57 visual
+	// timeline is preserved exactly when the powerOffMessage slot is
+	// empty -- setMessage() unhides + repaints it when there is text
+	// to show. Uses pixelbasic16 (the bigger of the two retro fonts)
+	// so even short three-character messages read clearly across the
+	// phosphor plate.
+	messageLabel = lv_label_create(obj);
+	lv_obj_set_style_text_font(messageLabel, &pixelbasic16, 0);
+	// Deep-purple text reads as a hard CRT phosphor caption against
+	// the warm-cream plate. We deliberately do NOT use cyan/orange
+	// here -- the message must contrast strongly with the cream
+	// gradient under it, and deep purple is the inverse pole of the
+	// MAKERphone palette.
+	lv_obj_set_style_text_color(messageLabel,
+								lv_color_make(20, 12, 36),
+								0);
+	// Centred horizontally on the 160 px display, vertically on the
+	// 128 px height -- exactly the centre of the phosphor plate so
+	// the eye reads "the message lives ON the screen, not floating
+	// above it".
+	lv_obj_set_align(messageLabel, LV_ALIGN_CENTER);
+	// Single-line, dot-truncate when the message is too wide for the
+	// 156 px usable plate. Keeps an accidentally-long entry from
+	// wrapping into the plate's collapse line at phase 1.
+	lv_obj_set_width(messageLabel, 156);
+	lv_label_set_long_mode(messageLabel, LV_LABEL_LONG_DOT);
+	lv_obj_set_style_text_align(messageLabel, LV_TEXT_ALIGN_CENTER, 0);
+	lv_label_set_text(messageLabel, "");
+	// Hidden by default. setMessage() will unhide when there is
+	// content to display.
+	lv_obj_add_flag(messageLabel, LV_OBJ_FLAG_HIDDEN);
+}
+
+void PhonePowerDown::setMessage(const char* text) {
+	// Defensive: a null pointer collapses to "no message" so the
+	// preamble drops out cleanly. The empty-string branch matches.
+	if(text == nullptr || text[0] == '\0') {
+		message[0] = '\0';
+		messagePreambleMs = 0;
+		if(messageLabel != nullptr) {
+			lv_label_set_text(messageLabel, "");
+			lv_obj_add_flag(messageLabel, LV_OBJ_FLAG_HIDDEN);
+		}
+		return;
+	}
+
+	// Copy into the local 24-byte buffer (23 chars + nul). strncpy is
+	// safe here because we always nul-terminate the destination after
+	// the copy, regardless of whether the source ran past the cap.
+	const size_t maxCopy = MessageMaxLen;
+	size_t i = 0;
+	for(; i < maxCopy && text[i] != '\0'; ++i) {
+		message[i] = text[i];
+	}
+	message[i] = '\0';
+
+	messagePreambleMs = DefaultMessagePreambleMs;
+
+	if(messageLabel != nullptr) {
+		lv_label_set_text(messageLabel, message);
+		lv_obj_clear_flag(messageLabel, LV_OBJ_FLAG_HIDDEN);
+	}
+}
+
+bool PhonePowerDown::applyPreamble() {
+	// No message persisted (or explicitly cleared via setMessage("")):
+	// drop straight through to the existing CRT-shrink timeline. This
+	// preserves the original S57 behaviour pixel-for-pixel for every
+	// host that has not opted into the S146 custom message feature.
+	if(messagePreambleMs == 0) {
+		if(messageLabel != nullptr) {
+			lv_obj_add_flag(messageLabel, LV_OBJ_FLAG_HIDDEN);
+		}
+		return false;
+	}
+
+	// Inside the preamble window: hold the plate at full bleed, hide
+	// the afterglow dot, and unhide the message label so the user
+	// reads "BYE!" (or whatever they typed) over a steady warm-cream
+	// background. The piezo descending sweep is suppressed for the
+	// duration of the preamble by applyTone()'s own check on
+	// elapsedMs < messagePreambleMs.
+	if(elapsedMs < messagePreambleMs) {
+		lv_obj_set_size(plate, 160, 128);
+		lv_obj_clear_flag(plate, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(dot, LV_OBJ_FLAG_HIDDEN);
+		if(messageLabel != nullptr) {
+			lv_obj_clear_flag(messageLabel, LV_OBJ_FLAG_HIDDEN);
+		}
+		return true;
+	}
+
+	// First tick past the preamble: hide the message so it does not
+	// fight the collapsing plate. The CRT-shrink path takes over from
+	// here via applyFrame(progress) below.
+	if(messageLabel != nullptr) {
+		lv_obj_add_flag(messageLabel, LV_OBJ_FLAG_HIDDEN);
+	}
+	return false;
+}
+
 void PhonePowerDown::buildDot() {
 	// Centre afterglow dot. Hidden by default (LV_OBJ_FLAG_HIDDEN) so
 	// frames during the vertical / horizontal collapse phases see a
@@ -180,23 +305,45 @@ void PhonePowerDown::onTickStatic(lv_timer_t* timer) {
 
 	// Advance the wall-clock counter by the timer's nominal cadence.
 	// LVGL does not expose the actual delta on a periodic timer, but
-	// the tick rate is fixed so the cumulative drift across the ~1.3 s
-	// run is well under a frame's worth of error. Cap at durationMs so
-	// a slow LVGL loop that drops a frame does not blow the progress
-	// past 1.0f and confuse the phase math.
+	// the tick rate is fixed so the cumulative drift across the
+	// preamble + shrink run is well under a frame's worth of error.
+	// Cap at the total run length (preamble + shrink) so a slow LVGL
+	// loop that drops a frame does not blow the progress past 1.0f
+	// and confuse the phase math.
 	if(self->firedAlready) return;
 
+	const uint32_t totalMs = self->messagePreambleMs + self->durationMs;
 	self->elapsedMs += AnimTickMs;
-	if(self->elapsedMs > self->durationMs) self->elapsedMs = self->durationMs;
+	if(self->elapsedMs > totalMs) self->elapsedMs = totalMs;
 
-	const float progress =
-		self->durationMs == 0 ? 1.0f
-							  : (float) self->elapsedMs / (float) self->durationMs;
+	// S146 - while the preamble is active the message label paints
+	// over a full-bleed plate and the CRT-shrink phase math is
+	// suppressed. applyTone still sees the raw progress so the
+	// piezo sweep stays muted during the hold (handled inside
+	// applyTone via the same elapsedMs < messagePreambleMs check).
+	const bool inPreamble = self->applyPreamble();
 
-	self->applyFrame(progress);
+	// Compute the post-preamble progress (0.0..1.0 across the original
+	// CRT-shrink window) and let the existing applyFrame /
+	// applyTone branch unchanged. Outside the preamble window
+	// elapsedMs ranges over [messagePreambleMs .. totalMs], so we
+	// subtract the preamble offset before normalising.
+	float progress = 0.0f;
+	if(!inPreamble){
+		const uint32_t shrinkElapsed =
+			self->elapsedMs > self->messagePreambleMs
+				? self->elapsedMs - self->messagePreambleMs
+				: 0;
+		progress = self->durationMs == 0
+					   ? 1.0f
+					   : (float) shrinkElapsed / (float) self->durationMs;
+		if(progress > 1.0f) progress = 1.0f;
+		self->applyFrame(progress);
+	}
+
 	self->applyTone(progress);
 
-	if(self->elapsedMs >= self->durationMs){
+	if(self->elapsedMs >= totalMs){
 		self->fireComplete();
 	}
 }
@@ -265,6 +412,16 @@ void PhonePowerDown::applyTone(float progress) {
 		return;
 	}
 
+	// S146 - suppress the descending sweep while the preamble is
+	// holding the plate at full brightness. The user reads the
+	// message in silence; once the preamble window elapses the
+	// existing exponential sweep takes over from the top of the
+	// envelope just like the original S57 timeline.
+	if(messagePreambleMs > 0 && elapsedMs < messagePreambleMs){
+		Piezo.noTone();
+		return;
+	}
+
 	// Final tail: Phase 2 silences the descending sweep and emits a
 	// single brief click at TONE_CLICK_HZ on the very first frame of
 	// the dot fade. The click is short by design - a long buzz here
@@ -277,7 +434,14 @@ void PhonePowerDown::applyTone(float progress) {
 		// Emit the click exactly once at the boundary, then go silent.
 		// We detect "first frame past the boundary" by checking that
 		// elapsedMs is within one tick of the boundary timestamp.
-		const uint32_t boundaryMs = (uint32_t) (PhaseHorizontalEnd * (float) durationMs);
+		// S146 - the boundary lives in the post-preamble timeline, so
+		// add messagePreambleMs to the durationMs-based offset.
+		// messagePreambleMs is zero on the legacy (no-message) path so
+		// the original S57 timing is preserved exactly when no power-off
+		// message is persisted.
+		const uint32_t boundaryMs =
+			messagePreambleMs +
+			(uint32_t) (PhaseHorizontalEnd * (float) durationMs);
 		if(elapsedMs >= boundaryMs && elapsedMs < boundaryMs + AnimTickMs){
 			Piezo.tone(TONE_CLICK_HZ, AnimTickMs);
 		}else{

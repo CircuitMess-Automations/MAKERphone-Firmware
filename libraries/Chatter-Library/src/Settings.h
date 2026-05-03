@@ -91,6 +91,25 @@ struct SettingsData {
 	// soundProfile / wallpaperStyle / themeId / keyTicks reads the
 	// new field as zero-initialised on a first boot after upgrade.
 	char ownerName[24] = "";
+	// S146 - custom power-off message painted over the warm-cream
+	// phosphor plate while the PhonePowerDown CRT-shrink animation
+	// is in its preamble phase. Set via the PhonePowerOffMessageScreen
+	// reached from the SYSTEM section of PhoneSettingsScreen
+	// ("Power-off msg" row, just above About). When non-empty the
+	// PhonePowerDown overlay appends a ~700 ms preamble that holds
+	// the plate at full brightness while the message is centred on
+	// it in deep-purple pixelbasic16 -- the Sony-Ericsson "Bye!"
+	// flourish that the S57 stub baseline never had. An empty
+	// string (the factory default) skips the preamble entirely so
+	// the existing CRT shrink fires immediately, exactly the way
+	// every existing test driver and host expects.
+	//
+	// Stored as a fixed-width 24-byte buffer (23 visible chars plus
+	// the trailing nul) -- same shape as the S144 ownerName slot, so
+	// the SettingsData blob stays plain-old-data and the existing
+	// NVS-resize pattern reads the new field as zero-initialised on
+	// a first boot after the firmware grows.
+	char powerOffMessage[24] = "";
 };
 
 class SettingsImpl {

@@ -26,6 +26,7 @@
 #include "../Screens/PhoneAboutScreen.h"
 #include "../Screens/PhoneThemeScreen.h"
 #include "../Screens/PhoneOwnerNameScreen.h"
+#include "../Screens/PhonePowerOffMessageScreen.h"
 #include "../Screens/PhoneWelcomeScreen.h"
 #include "../Screens/PhoneGamesScreen.h"
 #include "../Interface/LVScreen.h"
@@ -239,6 +240,22 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// for any future row that lands without a
 						// dedicated screen yet.
 						self->push(new PhoneOwnerNameScreen());
+						break;
+					case PhoneSettingsScreen::Item::PowerOffMsg:
+						// S146: custom power-off message editor
+						// replaces the POWER-OFF MSG placeholder stub.
+						// PhonePowerOffMessageScreen is a near-identical
+						// twin of PhoneOwnerNameScreen (single-buffer
+						// T9 entry, persistence into a 24-byte slot)
+						// that reads / writes Settings.powerOffMessage
+						// directly, so PhonePowerDown picks the new
+						// text up on the next push without any extra
+						// wiring. An empty buffer (factory default or
+						// after CLEAR) leaves PhonePowerDown's preamble
+						// dormant and the existing CRT shrink fires
+						// immediately, exactly the way every prior
+						// host expects.
+						self->push(new PhonePowerOffMessageScreen());
 						break;
 					case PhoneSettingsScreen::Item::Theme:
 						// S101: global theme picker drills into the Default
