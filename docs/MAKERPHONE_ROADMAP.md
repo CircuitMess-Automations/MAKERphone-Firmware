@@ -197,7 +197,7 @@ Composer is broken into three sessions because it needs (a) keypad note-entry UI
 - [x] **S130** — `PhoneMagic8Ball` — shake + reveal answer.
 - [x] **S131** — `PhoneDiceRoller` — 1d4 → 2d20.
 - [x] **S132** — `PhoneCoinFlip` — gravity-style flip animation.
-- [ ] **S133** — `PhoneFortuneCookie` — daily wisdom from inline string list.
+- [x] **S133** — `PhoneFortuneCookie` — daily wisdom from inline string list.
 - [ ] **S134** — `PhoneFlashlight` — full-white screen + brightness max.
 - [ ] **S135** — `PhoneBirthdayReminders` — list + per-contact birthday field.
 
