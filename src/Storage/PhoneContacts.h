@@ -82,6 +82,33 @@ bool isMuted(UID_t uid);
 bool markInteraction(UID_t uid);
 bool markInteractionAt(UID_t uid, uint32_t timestamp);
 
+// ------------------------------------------------------------------
+// S135 — birthday reminders
+//
+// Per-contact birthday is stored as (month, day) on the `PhoneContact`
+// record. The year is intentionally ignored so reminders fire every
+// year on the same calendar day, matching the Sony Ericsson Organiser
+// the screen reproduces.
+//
+// Inputs are clamped to plausible civil-time ranges (month 1..12,
+// day 1..31). Out-of-range values are rejected — `setBirthday`
+// returns false and the record is left untouched. To remove a
+// birthday entirely use `clearBirthday(uid)`.
+//
+// `hasBirthday(uid)` returns true only when the stored record carries
+// a non-default birthday and has the `ContactFlag_HasBirthday` bit
+// set (so a zero-initialised record is correctly rejected).
+//
+// `birthdayOf(uid, &m, &d)` writes the stored month/day through the
+// out-pointers (nullptr-tolerant) and returns true on success. When
+// the contact has no birthday set, the out-pointers are left
+// untouched and the function returns false.
+// ------------------------------------------------------------------
+bool setBirthday(UID_t uid, uint8_t month, uint8_t day);
+bool clearBirthday(UID_t uid);
+bool hasBirthday(UID_t uid);
+bool birthdayOf(UID_t uid, uint8_t* outMonth, uint8_t* outDay);
+
 // Deterministic fallback seed derived from a uid - exposed so other
 // widgets (e.g. an inbox row that shows an avatar without ever
 // touching the repo) match the contacts screen.

@@ -199,7 +199,7 @@ Composer is broken into three sessions because it needs (a) keypad note-entry UI
 - [x] **S132** — `PhoneCoinFlip` — gravity-style flip animation.
 - [x] **S133** — `PhoneFortuneCookie` — daily wisdom from inline string list.
 - [x] **S134** — `PhoneFlashlight` — full-white screen + brightness max.
-- [ ] **S135** — `PhoneBirthdayReminders` — list + per-contact birthday field.
+- [x] **S135** — `PhoneBirthdayReminders` — list + per-contact birthday field.
 
 ## Phase Q — Pocket Organiser (S136–S143)
 Sony Ericsson "Organiser" classics — practical apps with offline-only state. Each persists through the existing `Storage` layer so a paused habit streak still counts on reboot.

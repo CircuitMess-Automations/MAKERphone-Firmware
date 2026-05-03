@@ -33,6 +33,19 @@
  * display name / avatar even when the user hasn't yet customised
  * the contact, so calling code (S36 list screen, S37 detail screen,
  * S38 edit screen) doesn't have to special-case the missing entry.
+ *
+ * S135 — birthday reminders
+ *
+ * The `birthdayMonth` (1..12) and `birthdayDay` (1..31) fields claim
+ * two bytes from the original `reserved[8]` tail without changing
+ * the on-disk record size. They are only meaningful when the
+ * `ContactFlag_HasBirthday` bit is set in `flags`; otherwise the
+ * fields are ignored and the contact is excluded from
+ * PhoneBirthdayReminders. Storing a leap-day birthday (Feb 29) is
+ * intentionally allowed — the leap-year-free calendar PhoneClock
+ * already uses (28-day Feb) means the reminder simply never matches
+ * an exact day, which is the same nostalgic quirk the original
+ * Sony Ericsson Organiser had with leap-day entries.
  */
 struct PhoneContact : Entity {
 	// User-edited display name. When `flags & ContactFlag_HasDisplayName`
@@ -68,10 +81,21 @@ struct PhoneContact : Entity {
 	// sort order in S27 / S36 uses this value.
 	uint32_t lastInteraction = 0;
 
+	// S135 — birthday reminder fields. Claim 2 of the original
+	// reserved[8] bytes without changing the on-disk record size.
+	// Only meaningful when ContactFlag_HasBirthday is set in `flags`.
+	// Month is 1..12, day is 1..31. Year is intentionally not stored
+	// — birthday reminders are "this month / this day", not "this
+	// person turns N", to match the Sony Ericsson Organiser
+	// behaviour S135 reproduces.
+	uint8_t birthdayMonth = 0;
+	uint8_t birthdayDay   = 0;
+
 	// Reserved bytes for future struct evolution (mute toggle, pinned
 	// flag, custom palette index, ...). New fields claim from the tail
-	// without changing the on-disk record size.
-	uint8_t reserved[8] = {0};
+	// without changing the on-disk record size. Originally 8; S135
+	// claimed 2 (birthdayMonth + birthdayDay) so 6 remain.
+	uint8_t reserved[6] = {0};
 };
 
 // Bit-flag constants for `PhoneContact::flags`.
@@ -79,6 +103,9 @@ enum PhoneContactFlag : uint8_t {
 	ContactFlag_HasDisplayName = 1 << 0,
 	ContactFlag_HasAvatarSeed  = 1 << 1,
 	ContactFlag_Muted          = 1 << 2,
+	// S135 — set when `birthdayMonth` / `birthdayDay` carry a
+	// user-supplied date. Cleared when the user removes the birthday.
+	ContactFlag_HasBirthday    = 1 << 3,
 };
 
 // Group tag constants for `PhoneContact::group`. Kept tiny so the

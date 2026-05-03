@@ -164,4 +164,61 @@ bool markInteractionAt(UID_t uid, uint32_t timestamp){
 	return upsert(c);
 }
 
+// ----------------------------------------------------------------------
+// S135 — birthday reminders
+//
+// Two-byte (month, day) per-contact field. Year is intentionally not
+// stored — birthday reminders are a recurring "this calendar day"
+// notification, not an age tracker. Flag bit gates the read path so
+// a zero-initialised record (month=0, day=0) is never accidentally
+// treated as "January 0th".
+//
+// `setBirthday` clamps month to 1..12 and day to 1..31. We accept
+// Feb 29 for leap-day birthdays even though PhoneClock uses a
+// leap-year-free 28-day February — the reminder simply never matches
+// in that case, which is the same nostalgic quirk the original
+// Sony Ericsson Organiser had.
+// ----------------------------------------------------------------------
+
+bool setBirthday(UID_t uid, uint8_t month, uint8_t day){
+	if(month < 1 || month > 12) return false;
+	if(day   < 1 || day   > 31) return false;
+
+	PhoneContact c = getOrDefault(uid);
+	c.birthdayMonth = month;
+	c.birthdayDay   = day;
+	c.flags |= ContactFlag_HasBirthday;
+	return upsert(c);
+}
+
+bool clearBirthday(UID_t uid){
+	if(!Storage.PhoneContacts.exists(uid)){
+		// Nothing to clear; treat as a no-op success so callers don't
+		// need to special-case "never set" vs "set then cleared".
+		return true;
+	}
+	PhoneContact c = Storage.PhoneContacts.get(uid);
+	c.birthdayMonth = 0;
+	c.birthdayDay   = 0;
+	c.flags &= ~ContactFlag_HasBirthday;
+	return upsert(c);
+}
+
+bool hasBirthday(UID_t uid){
+	if(!Storage.PhoneContacts.exists(uid)) return false;
+	const PhoneContact c = Storage.PhoneContacts.get(uid);
+	if((c.flags & ContactFlag_HasBirthday) == 0) return false;
+	if(c.birthdayMonth < 1 || c.birthdayMonth > 12) return false;
+	if(c.birthdayDay   < 1 || c.birthdayDay   > 31) return false;
+	return true;
+}
+
+bool birthdayOf(UID_t uid, uint8_t* outMonth, uint8_t* outDay){
+	if(!hasBirthday(uid)) return false;
+	const PhoneContact c = Storage.PhoneContacts.get(uid);
+	if(outMonth != nullptr) *outMonth = c.birthdayMonth;
+	if(outDay   != nullptr) *outDay   = c.birthdayDay;
+	return true;
+}
+
 }
