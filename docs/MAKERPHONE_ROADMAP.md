@@ -250,7 +250,7 @@ The kind of thing customers post about when they discover it.
 - [x] **S171** — `PhoneStressReliever` — tap a thing repeatedly, watch reactions.
 - [x] **S172** — Daily fortune in dialer (first open per day).
 - [x] **S173** — Type "S-N-A-K-E" on dialer → instant Snake launch.
-- [ ] **S174** — Find-Friends radar mini — animated sweep over the friends list.
+- [x] **S174** — Find-Friends radar mini — animated sweep over the friends list.
 - [ ] **S175** — T9 vocab pack expansion (more dictionary words).
 - [ ] **S176** — Drum kit on dialer keypad — each digit a different drum.
 - [ ] **S177** — Boot phrase rotates each day (motivational quotes).
