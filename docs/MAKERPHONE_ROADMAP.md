@@ -226,7 +226,7 @@ Tiny details that make the difference between "phone-shaped toy" and "this is ex
 - [x] **S151** — Speed dial 1–9 — long-press digit on home dials that contact.
 - [x] **S152** — Birthday confetti animation when system date matches a contact (depends on S135).
 - [x] **S153** — Per-contact custom ringtone (depends on S121–S123 composer output).
-- [ ] **S154** — "Press any key" idle hint that fades in after 10 s of stillness.
+- [x] **S154** — "Press any key" idle hint that fades in after 10 s of stillness.
 - [ ] **S155** — Animated battery-charge fill bars on lock + home.
 - [ ] **S156** — Envelope-flying SMS-sent animation.
 - [ ] **S157** — "Delivered" double-tick chime.

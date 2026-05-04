@@ -11,6 +11,7 @@
 #include "../Elements/PhoneOperatorBanner.h"
 #include "../Elements/PhoneConfettiOverlay.h"
 #include "../Elements/PhoneNotificationToast.h"
+#include "../Elements/PhoneIdleHint.h"
 #include "PhoneBirthdayReminders.h"
 
 PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
@@ -69,6 +70,19 @@ PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
 	lv_obj_set_y(chargingOverlay->getLvObj(), -(int16_t)(10 + 4));
 	chargingOverlay->setAutoDetect(true);
 
+	// S154 - "PRESS ANY KEY" idle hint. Boots invisible and only
+	// fades in after PhoneIdleHint::IdleMs (10 s) of stillness, so
+	// at boot the homescreen reads exactly the way the previous
+	// (S17/S18) skeleton did - this is purely additive. The hint
+	// hangs above the charging overlay (y = -30 from BOTTOM_MID,
+	// well clear of the chip's y = 101..114 strip), but we still
+	// gate it off whenever the charging chip is visible so the
+	// two never share screen attention. The host's onStart /
+	// loop run wires the gate; the cheap setActive() call here
+	// is just the safe initial state.
+	idleHint = new PhoneIdleHint(obj);
+	idleHint->setActive(true);
+
 	// S22: enable long-press detection on BTN_0 (homescreen quick-dial)
 	// and BTN_BACK (homescreen lock). 600 ms is the sweet spot used by
 	// classic feature-phones - long enough to be intentional, short
@@ -105,6 +119,17 @@ PhoneHomeScreen::~PhoneHomeScreen() {
 
 void PhoneHomeScreen::onStart() {
 	Input::getInstance()->addListener(this);
+
+	// S154 - sync the "PRESS ANY KEY" hint to the current
+	// charging-overlay visibility so a homescreen surfaced
+	// while the chip is already up does not bring an idle
+	// hint into the same y strip. The PhoneChargingOverlay
+	// flips its own visibility from BatteryService voltage
+	// trends, so on the next idle window we re-enable; for
+	// now an immediate read is enough.
+	if(idleHint != nullptr && chargingOverlay != nullptr){
+		idleHint->setActive(!chargingOverlay->isCharging());
+	}
 
 	// S152 - check whether today is anyone's birthday and, if so,
 	// drop a one-shot confetti volley + a slide-down toast on top of

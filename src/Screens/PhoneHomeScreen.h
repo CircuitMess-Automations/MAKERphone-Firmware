@@ -13,6 +13,7 @@ class PhoneChargingOverlay;
 class PhoneOperatorBanner;
 class PhoneConfettiOverlay;
 class PhoneNotificationToast;
+class PhoneIdleHint;
 
 /**
  * PhoneHomeScreen
@@ -149,6 +150,16 @@ private:
 	// PhoneHomeScreen on the next session day is rebuilt from scratch.
 	PhoneConfettiOverlay*    confettiOverlay  = nullptr;
 	PhoneNotificationToast*  birthdayToast    = nullptr;
+	// S154 - "PRESS ANY KEY" idle hint that fades in after 10 s
+	// of stillness (any button = stillness reset). Mounted at
+	// construction, gated off whenever PhoneChargingOverlay is
+	// visible so the two never share screen space, and torn
+	// down with the screen via the LVGL parent chain. The hint
+	// is purely visual - it does not consume any input - so the
+	// existing softkey / quick-dial / lock-hold gestures are
+	// unaffected. Owned by the LVGL parent; we just keep the
+	// pointer to drive setActive() each loop().
+	PhoneIdleHint*           idleHint         = nullptr;
 
 	SoftKeyHandler leftCb       = nullptr;
 	SoftKeyHandler rightCb      = nullptr;
