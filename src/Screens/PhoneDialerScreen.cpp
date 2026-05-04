@@ -11,6 +11,7 @@
 #include "../Fonts/font.h"
 
 #include "PhoneImeiRevealScreen.h"
+#include "PhoneFirmwareInfoScreen.h"
 
 // MAKERphone retro palette - inlined per the established pattern in this
 // codebase (see PhoneMainMenu.cpp / PhoneHomeScreen.cpp / PhoneAppStubScreen.cpp).
@@ -174,6 +175,25 @@ void PhoneDialerScreen::appendGlyph(char c) {
 		clearBuffer();
 		auto* reveal = new PhoneImeiRevealScreen();
 		this->push(reveal);
+	}
+
+	// S165 - second magic-code Easter egg. The classic Sony-Ericsson
+	// service code `*#0000#` opens a tiny phone-information page (model,
+	// build date, hardware rev). We mirror the gesture here exactly the
+	// same way as `*#06#` above: if the buffer (after this append)
+	// matches the seven-glyph code, clear the buffer so the user lands
+	// on a fresh dialer when they pop, and push the FW-info reveal.
+	// Detection is on exact match for the same reason `*#06#` is
+	// strict -- a buffer that merely contains the code as a suffix
+	// mid-edit (e.g. before a backspace) does not fire, which is
+	// what the original handsets did and what sells the joke.
+	if(bufferLen == 7 && buffer[0] == '*' && buffer[1] == '#'
+			&& buffer[2] == '0' && buffer[3] == '0'
+			&& buffer[4] == '0' && buffer[5] == '0'
+			&& buffer[6] == '#') {
+		clearBuffer();
+		auto* info = new PhoneFirmwareInfoScreen();
+		this->push(info);
 	}
 }
 
