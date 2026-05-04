@@ -9,6 +9,9 @@
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Elements/PhoneChargingOverlay.h"
 #include "../Elements/PhoneOperatorBanner.h"
+#include "../Elements/PhoneConfettiOverlay.h"
+#include "../Elements/PhoneNotificationToast.h"
+#include "PhoneBirthdayReminders.h"
 
 PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
 	// Full-screen container, no scrollbars, no inner padding - the four
@@ -102,6 +105,37 @@ PhoneHomeScreen::~PhoneHomeScreen() {
 
 void PhoneHomeScreen::onStart() {
 	Input::getInstance()->addListener(this);
+
+	// S152 - check whether today is anyone's birthday and, if so,
+	// drop a one-shot confetti volley + a slide-down toast on top of
+	// the homescreen. The check runs every onStart() so a user who
+	// rolls past midnight while the device is awake (or who tweaks
+	// the wall clock from PhoneDateTimeScreen) sees the celebration
+	// the next time the homescreen surfaces. The overlay and the
+	// toast are children of obj, so they are torn down with the
+	// screen automatically.
+	const auto match = PhoneBirthdayReminders::firstBirthdayToday();
+	if(match.hasMatch) {
+		if(confettiOverlay == nullptr) confettiOverlay = new PhoneConfettiOverlay(obj);
+		confettiOverlay->start();
+
+		if(birthdayToast == nullptr) {
+			birthdayToast = new PhoneNotificationToast(obj);
+		}
+		char msg[40] = {0};
+		// Compose "<NAME> turns one year older!" so a user without
+		// stored age sees a friendly greeting either way. The toast
+		// truncates with an ellipsis on overflow, so the line is safe
+		// for every reasonable contact name.
+		snprintf(msg, sizeof(msg), "Wish %s well today", match.name);
+		birthdayToast->show(PhoneNotificationToast::Variant::Generic,
+		                    "Happy birthday!", msg);
+	} else if(confettiOverlay != nullptr) {
+		// Birthday rolled past while we were elsewhere - cancel any
+		// stale animation so the next visit doesn't see a half-faded
+		// volley left over from yesterday.
+		confettiOverlay->stop();
+	}
 }
 
 void PhoneHomeScreen::onStop() {

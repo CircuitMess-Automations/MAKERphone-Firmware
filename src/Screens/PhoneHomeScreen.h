@@ -11,6 +11,8 @@ class PhoneClockFace;
 class PhoneSoftKeyBar;
 class PhoneChargingOverlay;
 class PhoneOperatorBanner;
+class PhoneConfettiOverlay;
+class PhoneNotificationToast;
 
 /**
  * PhoneHomeScreen
@@ -140,6 +142,13 @@ private:
 	// and logo are empty (factory-cleared state) so a wiped banner
 	// does not leave an empty strip on the homescreen.
 	PhoneOperatorBanner*  operatorBanner  = nullptr;
+	// S152 - birthday confetti overlay + matching toast. Mounted only
+	// when PhoneClock::now()'s (month, day) matches a contact birthday;
+	// nullptr on every other day so the homescreen pays no LVGL cost.
+	// The overlay tears itself down with the screen so a freshly built
+	// PhoneHomeScreen on the next session day is rebuilt from scratch.
+	PhoneConfettiOverlay*    confettiOverlay  = nullptr;
+	PhoneNotificationToast*  birthdayToast    = nullptr;
 
 	SoftKeyHandler leftCb       = nullptr;
 	SoftKeyHandler rightCb      = nullptr;

@@ -99,6 +99,40 @@ uint16_t PhoneBirthdayReminders::daysUntil(uint8_t todayMonth, uint8_t todayDay,
 	return (kDaysInYear - today) + birth;
 }
 
+PhoneBirthdayReminders::TodayBirthday
+PhoneBirthdayReminders::firstBirthdayToday() {
+	TodayBirthday result;
+	result.hasMatch = false;
+	result.uid      = 0;
+	result.name[0]  = 0;
+
+	// Pull today's calendar from PhoneClock so the match runs against
+	// the same wall clock the rest of the firmware shows. Out-of-range
+	// fields fall through the same clamps PhoneBirthdayReminders uses
+	// internally.
+	uint16_t y; uint8_t m, d, hh, mm, ss, wd;
+	PhoneClock::now(y, m, d, hh, mm, ss, wd);
+	if(m < 1 || m > 12) m = 1;
+	if(d < 1 || d > 31) d = 1;
+
+	const auto uids = Storage.PhoneContacts.all();
+	for(UID_t uid : uids) {
+		uint8_t bm = 0, bd = 0;
+		if(!PhoneContacts::birthdayOf(uid, &bm, &bd)) continue;
+		if(bm != m || bd != d) continue;
+
+		result.hasMatch = true;
+		result.uid      = uid;
+		const char* nm  = PhoneContacts::displayNameOf(uid);
+		if(nm == nullptr) nm = "";
+		strncpy(result.name, nm, sizeof(result.name) - 1);
+		result.name[sizeof(result.name) - 1] = 0;
+		break;
+	}
+
+	return result;
+}
+
 // ---------- ctor / dtor -----------------------------------------------
 
 PhoneBirthdayReminders::PhoneBirthdayReminders()

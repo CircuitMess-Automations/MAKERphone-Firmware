@@ -128,6 +128,34 @@ public:
 	 */
 	static uint16_t dayOfYear(uint8_t month, uint8_t day);
 
+	/**
+	 * S152 - lightweight "is today anyone's birthday?" answer for the
+	 * confetti overlay on PhoneHomeScreen (and any future caller that
+	 * wants to celebrate without re-walking the contacts repo).
+	 *
+	 * On a hit, `hasMatch` is set to true and `uid` / `name` carry the
+	 * matched contact's identity. `name` is a copy of the value
+	 * `PhoneContacts::displayNameOf()` returns at the time of the call -
+	 * safe to keep around because the helper writes into the struct's
+	 * own buffer rather than into the shared scratch area.
+	 *
+	 * On a miss (no contact has a birthday set, or no birthday matches
+	 * the current PhoneClock::now() date), `hasMatch` is false and the
+	 * other fields are zero-initialised. The helper is total - it
+	 * never throws, never allocates, and is safe to call from onStart().
+	 *
+	 * The match is stable: when several contacts share the same
+	 * birthday the first one returned by `Storage.PhoneContacts.all()`
+	 * wins. That mirrors `rebuildList()`'s ordering, so the home
+	 * screen and the reminders list show the same celebrant.
+	 */
+	struct TodayBirthday {
+		bool   hasMatch;
+		UID_t  uid;
+		char   name[24];   // Mirrors PhoneContact::displayName length.
+	};
+	static TodayBirthday firstBirthdayToday();
+
 private:
 	// One precomputed row in the sorted "upcoming" list. Captured at
 	// onStart() so the LVGL labels can render without re-walking the
