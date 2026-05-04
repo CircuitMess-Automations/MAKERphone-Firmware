@@ -13,6 +13,7 @@
 #include "../Elements/PhoneConfettiOverlay.h"
 #include "../Elements/PhoneNotificationToast.h"
 #include "../Elements/PhoneIdleHint.h"
+#include "../Elements/PhoneYawnOverlay.h"
 #include "PhoneBirthdayReminders.h"
 
 PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
@@ -102,6 +103,24 @@ PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
 	idleHint = new PhoneIdleHint(obj);
 	idleHint->setActive(true);
 
+	// S163 - "phone yawns" idle animation. Boots invisible and
+	// only fades in after PhoneYawnOverlay::IdleMs (5 min) of
+	// stillness, so at boot the homescreen reads exactly the
+	// way the previous (S154-built) skeleton did - this is a
+	// purely additive personality detail. The overlay sits as
+	// a free-floating 160x128 transparent slab on top of every
+	// other widget, anchored y = EyeYOffset (~60) so the eyes
+	// fall in the empty wallpaper band between the clock face
+	// (y = 11..43) and the idle hint (y = 89..98). Hit-testing
+	// is disabled inside the overlay so the host's existing
+	// softkey / quick-dial / lock-hold gestures keep firing
+	// the moment the user touches a button. Gated off in the
+	// same setActive() pass as the idle hint whenever the
+	// charging chip is visible, so the eyes do not blink at
+	// the user while the device is plugged in.
+	yawnOverlay = new PhoneYawnOverlay(obj);
+	yawnOverlay->setActive(true);
+
 	// S22: enable long-press detection on BTN_0 (homescreen quick-dial)
 	// and BTN_BACK (homescreen lock). 600 ms is the sweet spot used by
 	// classic feature-phones - long enough to be intentional, short
@@ -148,6 +167,16 @@ void PhoneHomeScreen::onStart() {
 	// now an immediate read is enough.
 	if(idleHint != nullptr && chargingOverlay != nullptr){
 		idleHint->setActive(!chargingOverlay->isCharging());
+	}
+
+	// S163 - same gate sync for the "phone yawns" overlay so a
+	// homescreen surfaced while the chip is already up does not
+	// race the eye fade-in against a visible charging widget.
+	// Activity counts that fire from the chip's own auto-detect
+	// pass naturally re-arm us on the next idle window, so we
+	// only need a one-shot read here.
+	if(yawnOverlay != nullptr && chargingOverlay != nullptr){
+		yawnOverlay->setActive(!chargingOverlay->isCharging());
 	}
 
 	// S152 - check whether today is anyone's birthday and, if so,

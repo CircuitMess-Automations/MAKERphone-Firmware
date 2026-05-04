@@ -15,6 +15,7 @@ class PhoneOperatorBanner;
 class PhoneConfettiOverlay;
 class PhoneNotificationToast;
 class PhoneIdleHint;
+class PhoneYawnOverlay;
 
 /**
  * PhoneHomeScreen
@@ -168,6 +169,17 @@ private:
 	// unaffected. Owned by the LVGL parent; we just keep the
 	// pointer to drive setActive() each loop().
 	PhoneIdleHint*           idleHint         = nullptr;
+	// S163 - "phone yawns" idle animation. After 5 minutes of
+	// stillness the overlay fades a pair of pixel-art eyes in
+	// over the synthwave wallpaper and lets them blink at a
+	// slow, breathing pace, so a forgotten device reads as a
+	// sleepy companion rather than as a frozen LCD. Any button
+	// resets the idle clock and snaps the eyes invisible. Gated
+	// off while PhoneChargingOverlay is visible so the chip and
+	// the eyes never share screen attention. Owned by the LVGL
+	// parent; we keep the pointer to drive setActive() each
+	// loop, mirroring the PhoneIdleHint wiring two lines above.
+	PhoneYawnOverlay*        yawnOverlay      = nullptr;
 
 	SoftKeyHandler leftCb       = nullptr;
 	SoftKeyHandler rightCb      = nullptr;
