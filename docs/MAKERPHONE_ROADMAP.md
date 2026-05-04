@@ -240,7 +240,7 @@ Tiny details that make the difference between "phone-shaped toy" and "this is ex
 ## Phase S — Quirks & Easter Eggs (S164–S178)
 The kind of thing customers post about when they discover it.
 
-- [ ] **S164** — `*#06#` on dialer → fake IMEI reveal screen.
+- [x] **S164** — `*#06#` on dialer → fake IMEI reveal screen.
 - [ ] **S165** — `*#0000#` → firmware-info screen (Sony-Ericsson code).
 - [ ] **S166** — Konami code on the d-pad → unlocks rainbow theme.
 - [ ] **S167** — Long-press `5` on dialer → flashlight quick-shortcut.

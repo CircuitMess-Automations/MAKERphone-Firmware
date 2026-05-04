@@ -10,6 +10,8 @@
 #include "../Elements/PhoneDialerPad.h"
 #include "../Fonts/font.h"
 
+#include "PhoneImeiRevealScreen.h"
+
 // MAKERphone retro palette - inlined per the established pattern in this
 // codebase (see PhoneMainMenu.cpp / PhoneHomeScreen.cpp / PhoneAppStubScreen.cpp).
 // Keeping the typed digits in cyan and the empty-buffer hint in dim
@@ -155,6 +157,24 @@ void PhoneDialerScreen::appendGlyph(char c) {
 	buffer[bufferLen++] = c;
 	buffer[bufferLen]   = '\0';
 	refreshBufferLabel();
+
+	// S164 - magic-code Easter egg. The classic GSM IMEI check is
+	// `*#06#`; on a real Sony-Ericsson handset typing those five
+	// glyphs immediately reveals the device's serial number rather
+	// than dialling them. We mirror the gesture here: if the buffer
+	// (after this append) exactly matches the code, clear the buffer
+	// so the user lands back on a fresh dialer when they pop, and
+	// push the PhoneImeiRevealScreen overlay. The detection is on
+	// exact match so a buffer that happens to *contain* the code as
+	// a suffix (e.g. mid-edit before a backspace) does not fire -
+	// the Sony-Ericsson behaviour was equally strict and that is
+	// what sells the joke.
+	if(bufferLen == 5 && buffer[0] == '*' && buffer[1] == '#'
+			&& buffer[2] == '0' && buffer[3] == '6' && buffer[4] == '#') {
+		clearBuffer();
+		auto* reveal = new PhoneImeiRevealScreen();
+		this->push(reveal);
+	}
 }
 
 void PhoneDialerScreen::backspace() {
