@@ -9,6 +9,7 @@
 #include "../Elements/PhoneLockHint.h"
 #include "../Elements/PhoneNotificationPreview.h"
 #include "../Elements/PhoneChargingOverlay.h"
+#include "../Elements/PhoneChargeBars.h"
 #include "../Services/MessageService.h"
 #include "../Elements/UserWithMessage.h"
 
@@ -34,6 +35,13 @@ private:
 	PhoneLockHint*             lockHint = nullptr;
 	PhoneNotificationPreview*  preview  = nullptr;
 	PhoneChargingOverlay*      chargingOverlay = nullptr;
+	// S155 - wide animated charge fill-bars that sit between the
+	// charging chip and the slide-to-unlock hint while the device is
+	// plugged in. Subscribes to chargingOverlay->isCharging() each
+	// loop, so visibility tracks the same auto-detect heuristic the
+	// chip already uses; nullptr until the constructor finishes
+	// building chargingOverlay (the bars need it as their source).
+	PhoneChargeBars*           chargeBars      = nullptr;
 	// S144 - small "OWNER" greeting label tucked between the status
 	// bar and the clock face. Mounted lazily by ensureOwnerLabel() the
 	// first time onStarting() sees a non-empty Settings.ownerName, then

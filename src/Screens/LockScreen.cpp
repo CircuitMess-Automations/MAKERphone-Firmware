@@ -12,6 +12,7 @@
 #include "../Elements/PhoneLockHint.h"
 #include "../Elements/PhoneNotificationPreview.h"
 #include "../Elements/PhoneChargingOverlay.h"
+#include "../Elements/PhoneChargeBars.h"
 #include <Input/Input.h>
 #include <Pins.hpp>
 
@@ -79,10 +80,27 @@ LockScreen::LockScreen() : LVScreen(){
 	chargingOverlay = new PhoneChargingOverlay(obj);
 	lv_obj_set_align(chargingOverlay->getLvObj(), LV_ALIGN_BOTTOM_MID);
 	// 10 (soft-key bar) + 18 (unlock slide gap) + 1 (separator) + HintHeight
-	// + 4 (gap) puts the chip directly above the slide-to-unlock hint.
+	// + 4 (gap) was the original S59 anchor. S155 lifts the chip another
+	// PhoneChargeBars::Height + 4 (gap) + 4 (bars-to-chip gap) px so the
+	// new wide fill-bars strip can sit immediately under the chip while
+	// charging without colliding with the slide-to-unlock hint below it.
 	lv_obj_set_y(chargingOverlay->getLvObj(),
-		-(int16_t)(PhoneSoftKeyBar::BarHeight + 18 + 1 + PhoneLockHint::HintHeight + 4));
+		-(int16_t)(PhoneSoftKeyBar::BarHeight + 18 + 1 + PhoneLockHint::HintHeight + 4
+			+ PhoneChargeBars::Height + 4 + 4));
 	chargingOverlay->setAutoDetect(true);
+
+	// S155 - wide animated fill-bars strip mirrors the chip's
+	// isCharging() each loop. Sits 4 px above the slide-to-unlock
+	// hint (so the unlock affordance is unobstructed) and 4 px below
+	// the chip itself, giving the lock screen the classic Sony-
+	// Ericsson "tank fills up" silhouette during charge. Hidden by
+	// default; the LoopListener inside PhoneChargeBars flips it on
+	// once the chip's auto-detect heuristic agrees the device is
+	// charging, so no host wiring beyond construction is required.
+	chargeBars = new PhoneChargeBars(obj, chargingOverlay);
+	lv_obj_set_align(chargeBars->getLvObj(), LV_ALIGN_BOTTOM_MID);
+	lv_obj_set_y(chargeBars->getLvObj(),
+		-(int16_t)(PhoneSoftKeyBar::BarHeight + 18 + 1 + PhoneLockHint::HintHeight + 4));
 
 	lockHint = new PhoneLockHint(obj);
 	lv_obj_set_align(lockHint->getLvObj(), LV_ALIGN_BOTTOM_MID);

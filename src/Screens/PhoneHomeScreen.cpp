@@ -8,6 +8,7 @@
 #include "../Elements/PhoneClockFace.h"
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Elements/PhoneChargingOverlay.h"
+#include "../Elements/PhoneChargeBars.h"
 #include "../Elements/PhoneOperatorBanner.h"
 #include "../Elements/PhoneConfettiOverlay.h"
 #include "../Elements/PhoneNotificationToast.h"
@@ -69,6 +70,24 @@ PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
 	// PhoneSoftKeyBar is 10 px tall; sit the chip 4 px above it.
 	lv_obj_set_y(chargingOverlay->getLvObj(), -(int16_t)(10 + 4));
 	chargingOverlay->setAutoDetect(true);
+
+	// S155 - wide animated fill-bars strip mirrors the chip's
+	// isCharging() each loop. Sits 4 px above the chip on the
+	// homescreen, where the synthwave wallpaper has tons of vertical
+	// real estate between the clock face and the soft-key bar, so
+	// the new strip lands cleanly without disturbing any other
+	// homescreen widget. Hidden by default; the LoopListener inside
+	// PhoneChargeBars flips it on once the chip's auto-detect
+	// heuristic agrees the device is charging.
+	chargeBars = new PhoneChargeBars(obj, chargingOverlay);
+	lv_obj_set_align(chargeBars->getLvObj(), LV_ALIGN_BOTTOM_MID);
+	// Anchor 44 px above the screen bottom (chip 14 + chip-height 13 +
+	// idle-hint 9 + 4 px gap above the hint + 4 px breathing room above
+	// the chip itself). Lands the bars at screen y = 75..83 - clear of
+	// the clock face (y = 11..43), the idle hint (y = 89..98), and the
+	// charging chip (y = 101..114).
+	lv_obj_set_y(chargeBars->getLvObj(),
+		-(int16_t)(10 + 4 + PhoneChargingOverlay::ChipHeight + 9 + 4 + 4));
 
 	// S154 - "PRESS ANY KEY" idle hint. Boots invisible and only
 	// fades in after PhoneIdleHint::IdleMs (10 s) of stillness, so

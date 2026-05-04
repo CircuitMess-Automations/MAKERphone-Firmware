@@ -10,6 +10,7 @@ class PhoneStatusBar;
 class PhoneClockFace;
 class PhoneSoftKeyBar;
 class PhoneChargingOverlay;
+class PhoneChargeBars;
 class PhoneOperatorBanner;
 class PhoneConfettiOverlay;
 class PhoneNotificationToast;
@@ -137,6 +138,13 @@ private:
 	PhoneClockFace*       clockFace;
 	PhoneSoftKeyBar*      softKeys;
 	PhoneChargingOverlay* chargingOverlay = nullptr;
+	// S155 - wide animated charge fill-bars that sit just above the
+	// charging chip while the device is plugged in. Subscribes to
+	// chargingOverlay->isCharging() each loop, so visibility tracks
+	// the same auto-detect heuristic the chip already uses; nullptr
+	// until the constructor finishes building chargingOverlay (the
+	// bars need it as their source).
+	PhoneChargeBars*      chargeBars      = nullptr;
 	// S147 - operator-banner widget (carrier name + 5x16 user-pixelable
 	// logo). Mounted just under the status bar so the homescreen wears
 	// the classic Sony-Ericsson silhouette. Hidden when both the text
