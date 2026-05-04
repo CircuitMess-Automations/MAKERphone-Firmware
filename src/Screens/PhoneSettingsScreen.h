@@ -114,6 +114,15 @@ public:
 		// About stays anchored at the bottom of the SYSTEM list
 		// where feature-phone users expect to find it.
 		Operator   = 9,        // S147
+		// S151 - speed-dial slots editor (per-digit configuration UI
+		// for the nine 1..9 long-press gesture slots that the
+		// PhoneHomeScreen / launchSpeedDialFromHome dispatcher already
+		// reads from Settings.speedDial[1..9]). Sits in the SYSTEM
+		// group directly below "Operator" so the two SYSTEM-cluster
+		// rows that need their own dedicated picker UI sit next to
+		// each other -- About stays anchored at the bottom of the
+		// SYSTEM list where feature-phone users expect to find it.
+		SpeedDial  = 10,       // S151
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);
@@ -163,7 +172,7 @@ public:
 	void flashRightSoftKey();
 
 	/** Number of selectable rows (excludes group headers). */
-	static constexpr uint8_t ItemCount = 10;
+	static constexpr uint8_t ItemCount = 11;
 
 	// --- Geometry, exposed for unit-test friendliness. -----------------
 
@@ -205,6 +214,13 @@ public:
 	 * reads crisply on the muted-purple highlight rect that
 	 * already carries the focused row.
 	 */
+	//
+	// S151 keeps RowH at 7 px (no further trim possible without
+	// clipping pixelbasic7's 7 px glyph) and instead trims HdrH from
+	// 9 to 7 to make room for the new 11th row ("Speed dial"). The
+	// resulting 11 rows * 7 px + 3 headers * 7 px = 98 px fits the
+	// 98 px window exactly with zero slack -- any future row will
+	// require switching the list to a scrolling container.
 	static constexpr lv_coord_t RowH   = 7;
 	/**
 	 * Per-header height (group titles). Trimmed to 9 px in S101 (was
@@ -212,7 +228,13 @@ public:
 	 * 2 px halo, enough that the dim-purple group caption stays
 	 * crisp without the row labels reading as squashed.
 	 */
-	static constexpr lv_coord_t HdrH   = 9;
+	// S151 trims HdrH to 7 (was 9) so 11 rows + 3 headers fit cleanly
+	// in the 98 px window (see RowH above for the arithmetic). At
+	// HdrH = 7 the dim-purple group caption fills the row exactly
+	// with zero halo -- still readable because headers do not carry
+	// a highlight rect, so contrast with the wallpaper is the only
+	// thing that matters and the wallpaper is dark synthwave.
+	static constexpr lv_coord_t HdrH   = 7;
 	/** Width of the list container (full screen minus 4 px margins). */
 	static constexpr lv_coord_t ListW  = 152;
 

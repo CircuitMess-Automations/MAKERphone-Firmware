@@ -85,6 +85,12 @@ const Section kLayout[] = {
 	// and About stays anchored at the bottom of the SYSTEM list where
 	// feature-phone users expect to find it.
 	{ false, "Operator",           "OPERATOR",    PhoneSettingsScreen::Item::Operator    },
+	// S151 - speed-dial slots editor. Sits between Operator and About so
+	// the two SYSTEM-cluster rows that need their own dedicated picker UI
+	// (Operator's text/logo editor and SpeedDial's per-slot contact picker)
+	// cluster together at the bottom of SYSTEM, with About anchored at
+	// the very end where feature-phone users expect to find it.
+	{ false, "Speed dial",         "SPEED DIAL",  PhoneSettingsScreen::Item::SpeedDial   },
 	{ false, "About",              "ABOUT",       PhoneSettingsScreen::Item::About       },
 };
 constexpr uint8_t kLayoutLen = sizeof(kLayout) / sizeof(kLayout[0]);
@@ -224,7 +230,13 @@ void PhoneSettingsScreen::buildList() {
 			lv_obj_set_style_text_font(hdr, &pixelbasic7, 0);
 			lv_obj_set_style_text_color(hdr, MP_LABEL_DIM, 0);
 			lv_label_set_text(hdr, s.text);
-			lv_obj_set_pos(hdr, kColLabelX - 2, y + 1);
+			// S151 trims HdrH from 9 to 7 so the +1 baseline shift the
+			// pre-S151 layout used would push the bottom of pixelbasic7
+			// 1 px into the next row. Anchor the header label flush at
+			// the row top instead -- the dim-purple caption keeps its
+			// readability against the synthwave wallpaper because it
+			// has no highlight rect to contrast against.
+			lv_obj_set_pos(hdr, kColLabelX - 2, y);
 			y += HdrH;
 			continue;
 		}

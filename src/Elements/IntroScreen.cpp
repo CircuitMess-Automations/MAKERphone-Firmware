@@ -28,6 +28,7 @@
 #include "../Screens/PhoneOwnerNameScreen.h"
 #include "../Screens/PhonePowerOffMessageScreen.h"
 #include "../Screens/PhoneOperatorScreen.h"
+#include "../Screens/PhoneSpeedDialScreen.h"
 #include "../Screens/PhoneWelcomeScreen.h"
 #include "../Screens/PhoneGamesScreen.h"
 #include "../Interface/LVScreen.h"
@@ -275,6 +276,20 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// row that lands without a dedicated screen
 						// yet.
 						self->push(new PhoneOperatorScreen());
+						break;
+					case PhoneSettingsScreen::Item::SpeedDial:
+						// S151 (UI half): per-slot speed-dial configuration
+						// editor replaces the SPEED DIAL placeholder stub.
+						// PhoneSpeedDialScreen exposes the nine 1..9 slots
+						// (slot 0 stays reserved for the S22 hold-0 quick-dial
+						// gesture) and lets the user pick a paired contact for
+						// each, persisting each pick into Settings.speedDial[d]
+						// directly. The S151 gesture half on PhoneHomeScreen
+						// (long-press 1..9 -> launchSpeedDialFromHome ->
+						// Phone.placeCall) reads the same array on every press
+						// so the new assignment takes effect from the next
+						// homescreen long-press without any extra wiring.
+						self->push(new PhoneSpeedDialScreen());
 						break;
 					case PhoneSettingsScreen::Item::Theme:
 						// S101: global theme picker drills into the Default
