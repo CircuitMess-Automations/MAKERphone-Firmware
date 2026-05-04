@@ -145,6 +145,26 @@ struct SettingsData {
 	// keyTicks / ownerName / powerOffMessage.
 	char     operatorText[16] = "MAKERphone";
 	uint16_t operatorLogo[5]  = { 0, 0, 0, 0, 0 };
+	// S151 - speed-dial slots mapping numeric keypad digits to LoRa
+	// peer UIDs. A long-press of BTN_1..BTN_9 on the homescreen
+	// (PhoneHomeScreen) looks up the matching slot and fires
+	// PhoneCallService::placeCall(uid) when a non-zero UID is stored;
+	// when the slot is empty (factory default) the gesture falls
+	// through to opening an empty PhoneDialerScreen so the user can
+	// dial a number manually instead. Slot 0 is reserved for the
+	// existing "hold 0 to quick-dial" gesture (S22) which still
+	// opens the dialer empty -- the array is sized 10 so the
+	// indexing matches the digit pressed without an off-by-one,
+	// even though slot 0 is currently unused. UID_t is uint64_t so
+	// the array claims 80 bytes; the SettingsData blob stays plain-
+	// old-data and the existing NVS-resize pattern (that grew this
+	// struct via soundProfile / wallpaperStyle / themeId / keyTicks
+	// / ownerName / powerOffMessage / operatorText / operatorLogo)
+	// reads the new field as zero-initialised on a first boot after
+	// the firmware grows. Edited from PhoneSpeedDialScreen, reachable
+	// from the SYSTEM section of PhoneSettingsScreen ("Speed dial"
+	// row, directly below "Operator").
+	uint64_t speedDial[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 };
 
 class SettingsImpl {

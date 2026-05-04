@@ -90,6 +90,29 @@ public:
 	 */
 	void setOnLockHold(SoftKeyHandler cb);
 
+	/**
+	 * S151 — handler signature for the long-press 1..9 speed-dial
+	 * gesture. The classic Sony-Ericsson "hold a digit on home dials
+	 * the matching speed-dial entry" reflex; the handler receives the
+	 * 1..9 digit so a single host helper can dispatch all nine slots
+	 * without the screen needing to know the routing. Distinct from
+	 * `SoftKeyHandler` because the digit context is essential to the
+	 * caller. Slot 0 stays bound to the existing `setOnQuickDial`
+	 * gesture (S22) so the home screen still opens an empty dialer on
+	 * a long-press of BTN_0 the way feature-phone muscle memory
+	 * expects.
+	 */
+	using SpeedDialHandler = void (*)(PhoneHomeScreen* self, uint8_t digit);
+
+	/**
+	 * S151 — bind a callback to a long-press of BTN_1..BTN_9. The
+	 * host wires a single helper that consults Settings.speedDial[d]
+	 * and either fires PhoneCallService::placeCall() on the assigned
+	 * peer or falls through to opening an empty dialer when the slot
+	 * has not been assigned yet. nullptr clears.
+	 */
+	void setOnSpeedDial(SpeedDialHandler cb);
+
 	/** Replace the visible label of the left softkey (default "CALL"). */
 	void setLeftLabel(const char* label);
 
@@ -121,7 +144,8 @@ private:
 	SoftKeyHandler leftCb       = nullptr;
 	SoftKeyHandler rightCb      = nullptr;
 	SoftKeyHandler quickDialCb  = nullptr;
-	SoftKeyHandler lockHoldCb   = nullptr;
+	SoftKeyHandler   lockHoldCb   = nullptr;
+	SpeedDialHandler speedDialCb  = nullptr;  // S151
 
 	// S22: track when a hold-fired action has already run for the
 	// current press, so the matching short-press handler doesn't ALSO
@@ -129,6 +153,14 @@ private:
 	// the same key after a long-press shortcut triggered.
 	bool zeroLongFired = false;
 	bool backLongFired = false;
+	// S151 — one suppression flag per BTN_1..BTN_9 long-press, same
+	// pattern zeroLongFired / backLongFired use for BTN_0 / BTN_BACK.
+	// Sized [10] so the index matches the digit pressed; slot 0 is
+	// unused (BTN_0 keeps the dedicated zeroLongFired flag the S22
+	// quick-dial gesture wired). Keeps the matching short-press from
+	// double-firing on key release after a long-press has already
+	// triggered the speed-dial callback.
+	bool digitLongFired[10] = { false, false, false, false, false, false, false, false, false, false };
 
 	void buttonPressed(uint i) override;
 	void buttonReleased(uint i) override;

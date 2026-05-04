@@ -223,7 +223,7 @@ Tiny details that make the difference between "phone-shaped toy" and "this is ex
 - [x] **S148** — Boot melody (Sony-Ericsson-style four-note chime).
 - [x] **S149** — Upgraded power-off melody (real descending arpeggio, replaces the S57 placeholder).
 - [x] **S150** — Charge-complete chime (one-shot on charger transition).
-- [ ] **S151** — Speed dial 1–9 — long-press digit on home dials that contact.
+- [~] **S151** — Speed dial 1–9 — long-press digit on home dials that contact. (gesture + persistence + dispatch shipped; per-slot configuration UI in next run)
 - [ ] **S152** — Birthday confetti animation when system date matches a contact (depends on S135).
 - [ ] **S153** — Per-contact custom ringtone (depends on S121–S123 composer output).
 - [ ] **S154** — "Press any key" idle hint that fades in after 10 s of stillness.

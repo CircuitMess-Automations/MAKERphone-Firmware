@@ -73,6 +73,25 @@ PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
 	// itself, so it follows the listener's lifetime.
 	setButtonHoldTime(BTN_0, 600);
 	setButtonHoldTime(BTN_BACK, 600);
+
+	// S151: enable long-press detection on BTN_1..BTN_9 so the classic
+	// Sony-Ericsson "hold a digit on home dials the matching speed-
+	// dial entry" gesture fires. Same 600 ms hold time the BTN_0
+	// quick-dial / BTN_BACK lock gestures use, so the homescreen
+	// long-press feel stays consistent across the entire numeric
+	// keypad. The host wires a single SpeedDialHandler via
+	// setOnSpeedDial(); each digit's suppression flag (digitLongFired
+	// [d]) keeps the matching short-press from double-firing on key
+	// release.
+	setButtonHoldTime(BTN_1, 600);
+	setButtonHoldTime(BTN_2, 600);
+	setButtonHoldTime(BTN_3, 600);
+	setButtonHoldTime(BTN_4, 600);
+	setButtonHoldTime(BTN_5, 600);
+	setButtonHoldTime(BTN_6, 600);
+	setButtonHoldTime(BTN_7, 600);
+	setButtonHoldTime(BTN_8, 600);
+	setButtonHoldTime(BTN_9, 600);
 }
 
 PhoneHomeScreen::~PhoneHomeScreen() {
@@ -103,6 +122,13 @@ void PhoneHomeScreen::setOnQuickDial(SoftKeyHandler cb) {
 
 void PhoneHomeScreen::setOnLockHold(SoftKeyHandler cb) {
 	lockHoldCb = cb;
+}
+
+void PhoneHomeScreen::setOnSpeedDial(SpeedDialHandler cb) {
+	// S151: long-press BTN_1..BTN_9 dispatch hook. Stored as a single
+	// function pointer so a host can route all nine slots through one
+	// helper without per-digit binding boilerplate.
+	speedDialCb = cb;
 }
 
 void PhoneHomeScreen::setLeftLabel(const char* label) {
@@ -156,6 +182,16 @@ void PhoneHomeScreen::buttonPressed(uint i) {
 			backLongFired = false;
 			break;
 
+		case BTN_1: digitLongFired[1] = false; break;
+		case BTN_2: digitLongFired[2] = false; break;
+		case BTN_3: digitLongFired[3] = false; break;
+		case BTN_4: digitLongFired[4] = false; break;
+		case BTN_5: digitLongFired[5] = false; break;
+		case BTN_6: digitLongFired[6] = false; break;
+		case BTN_7: digitLongFired[7] = false; break;
+		case BTN_8: digitLongFired[8] = false; break;
+		case BTN_9: digitLongFired[9] = false; break;
+
 		default:
 			break;
 	}
@@ -182,6 +218,16 @@ void PhoneHomeScreen::buttonReleased(uint i) {
 			zeroLongFired = false;
 			break;
 
+		case BTN_1: digitLongFired[1] = false; break;
+		case BTN_2: digitLongFired[2] = false; break;
+		case BTN_3: digitLongFired[3] = false; break;
+		case BTN_4: digitLongFired[4] = false; break;
+		case BTN_5: digitLongFired[5] = false; break;
+		case BTN_6: digitLongFired[6] = false; break;
+		case BTN_7: digitLongFired[7] = false; break;
+		case BTN_8: digitLongFired[8] = false; break;
+		case BTN_9: digitLongFired[9] = false; break;
+
 		default:
 			break;
 	}
@@ -207,6 +253,39 @@ void PhoneHomeScreen::buttonHeld(uint i) {
 			if(softKeys) softKeys->flashRight();
 			if(lockHoldCb) lockHoldCb(this);
 			break;
+
+		// S151: long-press BTN_1..BTN_9 maps to speed-dial slots
+		// 1..9. We flash the LEFT softkey ("CALL") so the gesture
+		// reads as the same family as the existing hold-0 quick-dial
+		// (which also flashes left), then hand off to the host
+		// callback with the digit. The matching digit's suppression
+		// flag is set so the buttonReleased short-press path on lift-
+		// off does not double-fire (currently a no-op for digits, but
+		// kept consistent with the BTN_0 / BTN_BACK pattern so a
+		// future short-press meaning for digits stays well-behaved).
+		case BTN_1: case BTN_2: case BTN_3:
+		case BTN_4: case BTN_5: case BTN_6:
+		case BTN_7: case BTN_8: case BTN_9: {
+			uint8_t digit = 0;
+			switch(i){
+				case BTN_1: digit = 1; break;
+				case BTN_2: digit = 2; break;
+				case BTN_3: digit = 3; break;
+				case BTN_4: digit = 4; break;
+				case BTN_5: digit = 5; break;
+				case BTN_6: digit = 6; break;
+				case BTN_7: digit = 7; break;
+				case BTN_8: digit = 8; break;
+				case BTN_9: digit = 9; break;
+				default:    break;
+			}
+			if(digit >= 1 && digit <= 9){
+				digitLongFired[digit] = true;
+				if(softKeys) softKeys->flashLeft();
+				if(speedDialCb) speedDialCb(this, digit);
+			}
+			break;
+		}
 
 		default:
 			break;

@@ -33,6 +33,8 @@
 #include "../Interface/LVScreen.h"
 #include "../Interface/PhoneTransitions.h"
 #include "../Services/PhoneCallService.h"
+#include "../Storage/Storage.h"
+#include <Settings.h>
 
 // S20: Per-icon dispatch from the new phone-style PhoneMainMenu.
 //
@@ -413,6 +415,40 @@ static void launchQuickDialFromMenu(PhoneMainMenu* self){
 	self->push(dialer);
 }
 
+// S151: long-press 1..9 on the homescreen looks up the matching speed-
+// dial slot in Settings and either fires PhoneCallService::placeCall()
+// on the assigned peer or falls through to opening an empty dialer
+// when the slot has not been assigned yet. Keeping the fall-through
+// to the dialer means the gesture is *always* meaningful — even on
+// a fresh boot with no slots assigned the user lands somewhere they
+// can actually dial from, instead of the long-press silently no-
+// op'ing. Mirrors the S37 PhoneContactDetail "CALL" softkey wiring
+// (Phone.placeCall on a paired peer) so the call-flow design is the
+// same regardless of how the user reached it.
+static void launchSpeedDialFromHome(PhoneHomeScreen* self, uint8_t digit){
+	if(self == nullptr) return;
+	if(digit < 1 || digit > 9) return;
+
+	const UID_t uid = Settings.get().speedDial[digit];
+
+	if(uid != 0 && Storage.Friends.exists(uid)){
+		// Slot is set and the peer is still in the local Friends repo
+		// (a wiped Storage between assignment and call would leave a
+		// stale UID; we treat that the same as "unassigned" and fall
+		// through). Fire the LoRa CALL_REQUEST through the same path
+		// PhoneContactDetail's CALL softkey uses.
+		Phone.placeCall(uid);
+		return;
+	}
+
+	// Empty / stale slot: open the real dialer so the gesture still
+	// reads as "start a call" instead of silently no-op'ing. Same
+	// fall-through the S22 hold-0 quick-dial uses today, so the muscle
+	// memory carries over to the unassigned digits.
+	auto* dialer = new PhoneDialerScreen();
+	self->push(dialer);
+}
+
 // "Hold Back to lock" - drop into the LockScreen. LockScreen::activate
 // stops the current screen and resumes it on unlock, so the user lands
 // back exactly where they were holding from. Same call-pattern that
@@ -453,6 +489,11 @@ IntroScreen::IntroScreen(void (* callback)()) : callback(callback){
 		// S22: long-press shortcuts on the homescreen.
 		home->setOnQuickDial(launchQuickDialFromHome);
 		home->setOnLockHold(lockFromHome);
+		// S151: long-press 1..9 on the homescreen runs the speed-dial
+		// dispatcher (look up Settings.speedDial[d] and fire
+		// Phone.placeCall(uid) when set, otherwise open an empty
+		// dialer so the gesture is always meaningful).
+		home->setOnSpeedDial(launchSpeedDialFromHome);
 
 		// S145: if the user has set Settings.ownerName via the S144
 		// PhoneOwnerNameScreen, flash a "Hello, $NAME!" welcome
