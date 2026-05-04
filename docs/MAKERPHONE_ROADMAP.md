@@ -246,7 +246,7 @@ The kind of thing customers post about when they discover it.
 - [x] **S167** — Long-press `5` on dialer → flashlight quick-shortcut.
 - [x] **S168** — Tilt simulator (hold L+R together) → shake-to-randomize current screen.
 - [x] **S169** — Random tip-of-the-day banner on home idle.
-- [ ] **S170** — ASCII art slideshow viewer — eight hand-pixeled drawings.
+- [x] **S170** — ASCII art slideshow viewer — eight hand-pixeled drawings.
 - [ ] **S171** — `PhoneStressReliever` — tap a thing repeatedly, watch reactions.
 - [ ] **S172** — Daily fortune in dialer (first open per day).
 - [ ] **S173** — Type "S-N-A-K-E" on dialer → instant Snake launch.
