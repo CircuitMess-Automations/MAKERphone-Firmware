@@ -182,11 +182,77 @@ private:
 	 *  unit that touches PhoneDialerScreen. */
 	void launchFlashlight();
 
+	// S172 - "Daily fortune in dialer (first open per day)".
+	//
+	// The classic Sony-Ericsson handsets used to drop a tiny
+	// inspirational greeting on the dialer the first time you
+	// opened it after midnight - "Have a beautiful day", that
+	// kind of thing. We replicate the gesture here by overlaying
+	// a code-only "FORTUNE OF THE DAY" strip on top of the
+	// keypad whenever PhoneDialerScreen::onStart() detects the
+	// wall-clock day index has rolled forward since the last
+	// open. The fortune string itself is pulled from the same
+	// 32-entry rotation the PhoneFortuneCookie utility (S133)
+	// uses, so the toy and the morning greeting stay in lockstep.
+	//
+	// Lifecycle:
+	//   - s_fortuneLastDayIdx is a class-static that survives
+	//     across screen pushes, so re-entering the dialer on
+	//     the same day does NOT re-trigger the strip. It is
+	//     initialised to UINT32_MAX so the first ever open
+	//     after a fresh boot always shows the fortune.
+	//   - The overlay is built once in the ctor (hidden) and
+	//     toggled visible inside showDailyFortune(). It carries
+	//     its own auto-dismiss lv_timer which fires after
+	//     FortuneAutoDismissMs and falls back into the keypad
+	//     view. Any button press also dismisses the strip
+	//     immediately (the press itself still propagates so
+	//     a user typing the moment the dialer opens does not
+	//     lose the digit).
+	//   - hideDailyFortune() is idempotent and safe to call
+	//     from onStop() / dtor / button handlers.
+	//
+	// Geometry: a 144 x 64 strip centred on the screen, sitting
+	// over the top half of the keypad so the whole fortune
+	// reads in one glance. Background is a high-opacity dark
+	// purple so the keypad shows through faintly underneath -
+	// the user gets a hint of "the dialer is still here, this
+	// is just a greeting" rather than a hard takeover.
+	void showDailyFortune();
+	void hideDailyFortune();
+	static void onFortuneAutoDismissStatic(lv_timer_t* timer);
+	void buildFortuneOverlay();
+
+	/** Auto-dismiss the fortune-of-the-day strip after this many ms.
+	 *  4 s is long enough to read the longest entry in the kFortunes
+	 *  table (~50 chars wraps to two lines at pixelbasic7) without
+	 *  feeling like the dialer is unresponsive when the user wants
+	 *  to start typing immediately. */
+	static constexpr uint32_t FortuneAutoDismissMs = 4000;
+
+	/** Day-index of the last time the dialer showed the fortune-of-
+	 *  the-day strip. Persists across screen pushes via the static
+	 *  storage class so re-entering the dialer on the same wall-
+	 *  clock day stays quiet. UINT32_MAX = "never shown yet" so
+	 *  the very first open after boot always greets the user. */
+	static uint32_t s_fortuneLastDayIdx;
+
 	void buildBufferLabel();
 	void buildPad();
 	void appendGlyph(char c);
 	void backspace();
 	void refreshBufferLabel();
+
+	// S172 - fortune-of-the-day overlay objects + transient state.
+	// Built once in the ctor and toggled visible/hidden via
+	// showDailyFortune() / hideDailyFortune(). The objects are
+	// parented to `obj` so LVGL frees them with the screen.
+	lv_obj_t*   fortuneOverlay  = nullptr;  // dark backdrop strip
+	lv_obj_t*   fortuneCaption  = nullptr;  // "FORTUNE OF THE DAY"
+	lv_obj_t*   fortuneText     = nullptr;  // wrapped wisdom text
+	lv_obj_t*   fortuneFooter   = nullptr;  // "ANY KEY TO DISMISS"
+	lv_timer_t* fortuneTimer    = nullptr;  // auto-dismiss timer
+	bool        fortuneVisible  = false;
 
 	void buttonPressed(uint i) override;
 	void buttonReleased(uint i) override;

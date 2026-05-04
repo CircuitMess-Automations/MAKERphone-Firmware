@@ -2,6 +2,7 @@
 
 #include <Input/Input.h>
 #include <Pins.hpp>
+#include <stdint.h>
 #include <string.h>
 
 #include "../Elements/PhoneSynthwaveBg.h"
@@ -9,18 +10,32 @@
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Elements/PhoneDialerPad.h"
 #include "../Fonts/font.h"
+#include "../Services/PhoneClock.h"
 
 #include "PhoneImeiRevealScreen.h"
 #include "PhoneFirmwareInfoScreen.h"
 #include "PhoneFlashlight.h"
+#include "PhoneFortuneCookie.h"
 
 // MAKERphone retro palette - inlined per the established pattern in this
 // codebase (see PhoneMainMenu.cpp / PhoneHomeScreen.cpp / PhoneAppStubScreen.cpp).
 // Keeping the typed digits in cyan and the empty-buffer hint in dim
 // purple matches the rest of the phone-style screens, so a stray newcomer
 // dialer feels visually at home next to home / menu.
+#define MP_BG_DARK     lv_color_make( 20,  12,  36)   // deep purple backdrop
+#define MP_DIM         lv_color_make( 70,  56, 100)   // muted purple border
 #define MP_HIGHLIGHT   lv_color_make(122, 232, 255)   // cyan typed digits
 #define MP_LABEL_DIM   lv_color_make(170, 140, 200)   // dim purple placeholder
+#define MP_TEXT        lv_color_make(255, 220, 180)   // warm cream wisdom
+
+// S172 - class-static day-index of the last time the dialer popped its
+// fortune-of-the-day strip. UINT32_MAX is the "never shown" sentinel so
+// the very first open after a fresh boot greets the user; subsequent
+// opens on the SAME wall-clock day stay quiet (the user only wanted the
+// once-a-day ritual, not a per-tap pop-up). The static storage class is
+// deliberate: PhoneDialerScreen is allocated/destroyed per push, but the
+// "have I shown today's fortune yet" answer lives at the firmware level.
+uint32_t PhoneDialerScreen::s_fortuneLastDayIdx = UINT32_MAX;
 
 PhoneDialerScreen::PhoneDialerScreen()
 		: LVScreen(),
@@ -92,9 +107,26 @@ PhoneDialerScreen::PhoneDialerScreen()
 	// user taps the key, so normal dialling latency is unaffected;
 	// see buttonHeld(BTN_5) for the rollback + flashlight push.
 	setButtonHoldTime(BTN_5, 600);
+
+	// S172 - build the (initially-hidden) fortune-of-the-day overlay
+	// strip. Lives on top of the keypad in z-order so a `show...` call
+	// in onStart() can pop it without re-creating LVGL objects on every
+	// dialer entry. Hidden via LV_OBJ_FLAG_HIDDEN until the day-index
+	// check in onStart() decides this is a fresh wall-clock day.
+	buildFortuneOverlay();
 }
 
 PhoneDialerScreen::~PhoneDialerScreen() {
+	// S172 - belt-and-braces cleanup: kill the auto-dismiss timer if
+	// the screen is being torn down while the overlay is still up
+	// (e.g. a programmatic pop fired while the fortune was visible).
+	// The lv_obj_t children themselves are parented to `obj` and are
+	// freed by LVGL when the LVScreen base destructor runs.
+	if(fortuneTimer != nullptr) {
+		lv_timer_del(fortuneTimer);
+		fortuneTimer = nullptr;
+	}
+
 	// Children (wallpaper, statusBar, softKeys, pad, labels) are all
 	// parented to obj - LVGL frees them recursively when the screen's
 	// obj is destroyed by the LVScreen base destructor. Nothing manual.
@@ -102,10 +134,33 @@ PhoneDialerScreen::~PhoneDialerScreen() {
 
 void PhoneDialerScreen::onStart() {
 	Input::getInstance()->addListener(this);
+
+	// S172 - "Daily fortune in dialer (first open per day)".
+	//
+	// Compute today's day-index from the wall clock. PhoneClock::nowEpoch
+	// returns seconds-since-epoch, so dividing by 86400 yields a stable
+	// day counter that rolls forward every midnight. We compare against
+	// the class-static s_fortuneLastDayIdx (UINT32_MAX initially) and
+	// only show the fortune when the value has actually changed - so
+	// re-entering the dialer multiple times on the same day stays quiet,
+	// while the first open after midnight always greets the user.
+	const uint32_t dayIdx = PhoneClock::nowEpoch() / 86400UL;
+	if(dayIdx != s_fortuneLastDayIdx) {
+		s_fortuneLastDayIdx = dayIdx;
+		showDailyFortune();
+	}
 }
 
 void PhoneDialerScreen::onStop() {
 	Input::getInstance()->removeListener(this);
+
+	// S172 - hide the fortune-of-the-day overlay and kill its
+	// auto-dismiss timer the moment the dialer is torn off the
+	// stack. This keeps a stale timer pointer from pinging an
+	// already-popped screen if the user navigates away while the
+	// strip is still up. Idempotent and cheap on the hot path
+	// (the typical exit path has the overlay hidden already).
+	hideDailyFortune();
 }
 
 // ----- builders -----
@@ -310,9 +365,154 @@ void PhoneDialerScreen::launchFlashlight() {
 	this->push(flashlight);
 }
 
+// ----- S172 fortune-of-the-day overlay -----
+
+void PhoneDialerScreen::buildFortuneOverlay() {
+	// 144x64 backdrop strip centred on the 160x128 display, anchored
+	// just under the digit-buffer label (y=30) so the longest fortune
+	// (~50 chars wraps to two lines at pixelbasic7) reads without
+	// crowding the soft-key bar at y=118. Background is a near-opaque
+	// dark purple - the keypad behind shows through faintly so the
+	// overlay reads as a "the dialer is still here, this is just a
+	// greeting" rather than a hard takeover. 1 px cyan border ties
+	// it visually to the typed-digit cyan above.
+	fortuneOverlay = lv_obj_create(obj);
+	lv_obj_remove_style_all(fortuneOverlay);
+	lv_obj_set_size(fortuneOverlay, 144, 64);
+	lv_obj_set_align(fortuneOverlay, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(fortuneOverlay, 30);
+	lv_obj_set_style_bg_color(fortuneOverlay, MP_BG_DARK, 0);
+	lv_obj_set_style_bg_opa(fortuneOverlay, 235, 0);
+	lv_obj_set_style_border_color(fortuneOverlay, MP_HIGHLIGHT, 0);
+	lv_obj_set_style_border_width(fortuneOverlay, 1, 0);
+	lv_obj_set_style_border_opa(fortuneOverlay, LV_OPA_COVER, 0);
+	lv_obj_set_style_radius(fortuneOverlay, 2, 0);
+	lv_obj_set_style_pad_all(fortuneOverlay, 4, 0);
+	lv_obj_set_scrollbar_mode(fortuneOverlay, LV_SCROLLBAR_MODE_OFF);
+
+	// Hidden + non-interactive in z-stack until showDailyFortune flips
+	// the visibility flag. CLICKABLE off so a stray finger event the
+	// host might dispatch (no real touch input on Chatter, but defensive)
+	// cannot eat focus from the keypad behind.
+	lv_obj_add_flag(fortuneOverlay, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_clear_flag(fortuneOverlay, LV_OBJ_FLAG_CLICKABLE);
+	lv_obj_clear_flag(fortuneOverlay, LV_OBJ_FLAG_SCROLLABLE);
+
+	// "FORTUNE OF THE DAY" caption strip in cyan pixelbasic7 - same
+	// visual language as the typed-digit highlight. Anchored to the
+	// top of the overlay so the wisdom underneath has the maximum
+	// available vertical real estate to wrap into.
+	fortuneCaption = lv_label_create(fortuneOverlay);
+	lv_obj_set_style_text_font(fortuneCaption, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(fortuneCaption, MP_HIGHLIGHT, 0);
+	lv_label_set_text(fortuneCaption, "FORTUNE OF THE DAY");
+	lv_obj_set_align(fortuneCaption, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(fortuneCaption, 0);
+
+	// Wisdom body in cream pixelbasic7, centred and word-wrapped to
+	// the overlay's interior width (144 - 2*4 padding = 136 px).
+	// LV_LABEL_LONG_WRAP + a fixed width is the only reliable way
+	// to get LVGL 8.x to wrap a label into multiple visual rows.
+	fortuneText = lv_label_create(fortuneOverlay);
+	lv_obj_set_style_text_font(fortuneText, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(fortuneText, MP_TEXT, 0);
+	lv_obj_set_style_text_align(fortuneText, LV_TEXT_ALIGN_CENTER, 0);
+	lv_label_set_long_mode(fortuneText, LV_LABEL_LONG_WRAP);
+	lv_obj_set_width(fortuneText, 132);
+	lv_label_set_text(fortuneText, "");
+	lv_obj_set_align(fortuneText, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(fortuneText, 12);
+
+	// Bottom-of-strip dismiss hint in dim purple pixelbasic7 so the
+	// user knows the strip is transient. Centred just inside the
+	// bottom edge of the overlay.
+	fortuneFooter = lv_label_create(fortuneOverlay);
+	lv_obj_set_style_text_font(fortuneFooter, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(fortuneFooter, MP_LABEL_DIM, 0);
+	lv_label_set_text(fortuneFooter, "ANY KEY TO DISMISS");
+	lv_obj_set_align(fortuneFooter, LV_ALIGN_BOTTOM_MID);
+	lv_obj_set_y(fortuneFooter, 0);
+}
+
+void PhoneDialerScreen::showDailyFortune() {
+	if(fortuneOverlay == nullptr) return;
+	if(fortuneVisible) return;   // already up - no-op (don't reset timer)
+
+	// Pull the day's wisdom from the same 32-entry rotation
+	// PhoneFortuneCookie (S133) uses, so the dialer greeting and the
+	// fortune-cookie utility tell the user the same story on any
+	// given day. The dayIndex math here mirrors the one in onStart()
+	// to keep the two call sites trivially auditable.
+	const uint32_t dayIdx     = PhoneClock::nowEpoch() / 86400UL;
+	const uint8_t  fortuneIdx = PhoneFortuneCookie::fortuneOfDay(dayIdx);
+	const char*    text       = PhoneFortuneCookie::fortuneAt(fortuneIdx);
+	if(text == nullptr) text  = "HAVE A BEAUTIFUL DAY.";
+
+	if(fortuneText) lv_label_set_text(fortuneText, text);
+
+	// Reveal the strip. Bring it to the front of the z-stack so it
+	// sits cleanly above the keypad even if a future intermediate
+	// element (e.g. an Easter-egg overlay) ever lands between the
+	// pad and the screen container.
+	lv_obj_clear_flag(fortuneOverlay, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_move_foreground(fortuneOverlay);
+	fortuneVisible = true;
+
+	// One-shot auto-dismiss timer. lv_timer_set_repeat_count(t, 1)
+	// turns the recurring lv_timer_create into a fire-once that
+	// LVGL prunes for us, so we don't have to track the lifecycle
+	// from the dismiss callback. We still null-out fortuneTimer
+	// inside hideDailyFortune so the dtor / onStop path is idempotent
+	// regardless of whether the timer ran or was pre-empted.
+	if(fortuneTimer != nullptr) {
+		lv_timer_del(fortuneTimer);
+		fortuneTimer = nullptr;
+	}
+	fortuneTimer = lv_timer_create(&PhoneDialerScreen::onFortuneAutoDismissStatic,
+	                               FortuneAutoDismissMs, this);
+	lv_timer_set_repeat_count(fortuneTimer, 1);
+}
+
+void PhoneDialerScreen::hideDailyFortune() {
+	// Idempotent. Both the auto-dismiss timer and the user's any-key
+	// gesture funnel through here, and so does onStop(), so we have
+	// to handle the "already hidden" case cleanly. lv_timer_del on
+	// a nullptr is undefined - the explicit check is mandatory.
+	if(fortuneTimer != nullptr) {
+		lv_timer_del(fortuneTimer);
+		fortuneTimer = nullptr;
+	}
+	if(fortuneOverlay != nullptr) {
+		lv_obj_add_flag(fortuneOverlay, LV_OBJ_FLAG_HIDDEN);
+	}
+	fortuneVisible = false;
+}
+
+void PhoneDialerScreen::onFortuneAutoDismissStatic(lv_timer_t* timer) {
+	if(timer == nullptr) return;
+	auto* self = static_cast<PhoneDialerScreen*>(timer->user_data);
+	if(self == nullptr) return;
+
+	// Drop the local pointer first so hideDailyFortune does not also
+	// try to lv_timer_del a timer that LVGL is already tearing down
+	// for us via the repeat_count == 1 contract.
+	self->fortuneTimer = nullptr;
+	self->hideDailyFortune();
+}
+
 // ----- input -----
 
 void PhoneDialerScreen::buttonPressed(uint i) {
+	// S172 - any key dismisses the fortune-of-the-day strip the moment
+	// the user touches the keypad. The press itself still falls through
+	// the switch below and is processed normally, so a user who opens
+	// the dialer and immediately starts typing does not lose the first
+	// digit. We deliberately do NOT consume the event - the greeting
+	// is opportunistic, not modal.
+	if(fortuneVisible) {
+		hideDailyFortune();
+	}
+
 	switch(i) {
 		// Direct numpad input - route through the pad so the user sees
 		// the same press-flash + cursor-jump as if they had navigated
