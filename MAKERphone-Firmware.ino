@@ -23,6 +23,7 @@
 #include <Util/HWRevision.h>
 #include "src/Services/SleepService.h"
 #include "src/Services/PhoneIdleDim.h"
+#include "src/Services/PhoneKonamiCode.h"
 #include "src/Services/ShutdownService.h"
 #include "src/Services/BuzzerService.h"
 #include "src/Services/PhoneRingtoneEngine.h"
@@ -154,6 +155,16 @@ void boot(){
 	// SleepService still owns. Both share the same any-key activity
 	// reset semantics through Input::addListener().
 	IdleDim.begin();
+
+	// S166: global Konami-code Easter-egg detector. Listens to every
+	// button press for the canonical 10-press sequence and unlocks
+	// the rainbow theme on a successful match. Idle-cheap (no
+	// LoopManager subscription, just an InputListener); registering
+	// the listener at boot means the same gesture works on every
+	// screen without each LVScreen having to wire it. Ordered after
+	// IdleDim.begin() so Input is fully alive before we subscribe -
+	// matches the SleepService / BuzzerService / IdleDim pattern.
+	Konami.begin();
 
 
 	// S148: the Ringtone engine has to come up BEFORE PhoneBootSplash

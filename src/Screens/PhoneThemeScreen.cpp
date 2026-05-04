@@ -200,6 +200,7 @@ void PhoneThemeScreen::rebuildSwatch() {
 		case Theme::CyberpunkRed: drawCyberpunkRedSwatch(); break;
 		case Theme::Christmas:  drawChristmasSwatch();  break;
 		case Theme::SurpriseDailyCycle: drawSurpriseDailyCycleSwatch(); break;
+		case Theme::Rainbow:    drawRainbowSwatch();    break;
 		default:                drawDefaultSwatch();    break;  // defensive
 	}
 }
@@ -1292,5 +1293,52 @@ void PhoneThemeScreen::drawSurpriseDailyCycleSwatch() {
 		lv_obj_set_style_bg_opa(px, sparkle[i].opa, 0);
 		lv_obj_set_style_radius(px, 0, 0);
 		lv_obj_set_style_border_width(px, 0, 0);
+	}
+}
+
+// ---------------------------------------------------------------------
+// drawRainbowSwatch - S166 picker preview for the Konami-unlock
+// rainbow theme. Six horizontal stripes pulling each role colour
+// straight from the RAINBOW_* palette (deep indigo bg, hot magenta
+// accent, electric green highlight, muted violet dim, cream-white
+// text, pale cyan label-dim) so the swatch reads as a literal
+// 'all-the-roles-at-once' rainbow rather than a generic prismatic
+// gradient. Intentionally simple - no per-pixel canvas, no
+// horizon vignette - because the rainbow theme's signature is
+// 'every Phone* widget on the same screen ends up a different
+// hue', and a six-stripe swatch is the one-glance preview of
+// exactly that.
+// ---------------------------------------------------------------------
+void PhoneThemeScreen::drawRainbowSwatch() {
+	constexpr uint8_t kStripes = 6;
+	const lv_color_t kStripeColors[kStripes] = {
+		RAINBOW_BG_DARK,
+		RAINBOW_DIM,
+		RAINBOW_HIGHLIGHT,
+		RAINBOW_TEXT,
+		RAINBOW_LABEL_DIM,
+		RAINBOW_ACCENT,
+	};
+
+	// Floor-divide so the last stripe absorbs the rounding remainder
+	// rather than leaving an unpainted slice at the bottom of the
+	// swatch. SwatchH is 44 today so 44/6 = 7 with a 2-px remainder
+	// the last stripe absorbs.
+	const lv_coord_t baseH = SwatchH / kStripes;
+	const lv_coord_t lastH = SwatchH - baseH * (kStripes - 1);
+
+	lv_coord_t y = 0;
+	for(uint8_t i = 0; i < kStripes; ++i) {
+		const lv_coord_t h = (i == kStripes - 1) ? lastH : baseH;
+		lv_obj_t* stripe = lv_obj_create(swatchInner);
+		lv_obj_remove_style_all(stripe);
+		lv_obj_set_size(stripe, SwatchW, h);
+		lv_obj_set_pos(stripe, 0, y);
+		lv_obj_clear_flag(stripe, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_set_style_bg_color(stripe, kStripeColors[i], 0);
+		lv_obj_set_style_bg_opa(stripe, LV_OPA_COVER, 0);
+		lv_obj_set_style_radius(stripe, 0, 0);
+		lv_obj_set_style_border_width(stripe, 0, 0);
+		y += h;
 	}
 }

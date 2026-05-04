@@ -275,13 +275,45 @@ public:
 		// variants on top.
 		SurpriseDailyCycle = 10,
 
-		// Reserved 11..15 for the upcoming Phase O themes (none
-		// scheduled yet - S120 finishes Phase O by completing
-		// SurpriseDailyCycle's icon variants).
+		// Rainbow - S166 Konami-code Easter-egg unlock. Hidden behind
+		// the canonical 10-press LEFT LEFT RIGHT RIGHT LEFT RIGHT LEFT
+		// RIGHT BACK ENTER sequence (the literal NES Konami code mapped
+		// onto the Chatter hardware via Pins.hpp's BTN_UP=BTN_LEFT /
+		// BTN_DOWN=BTN_RIGHT / BTN_B=BTN_BACK / BTN_A=BTN_ENTER aliases),
+		// detected globally by the PhoneKonamiCode service. On unlock
+		// the service sets themeId to Rainbow (11), persists, plays a
+		// brief ascending chime, and flips Settings.rainbowUnlocked so
+		// the picker keeps Rainbow available on subsequent boots.
+		//
+		// Six-role palette is a saturated rainbow rotation - every UI
+		// role gets a different spectrum slice instead of the unified-
+		// hue family every other theme uses (Synthwave's purple +
+		// orange + cyan triad, Nokia's pea-green LCD mono, etc.). The
+		// effect is a deliberately-festive 'all the colours at once'
+		// feature-phone homage to the late-1990s carrier theme packs
+		// that shipped a 'Disco' / 'Carnival' / 'Party' rainbow skin
+		// alongside the more sober monochrome / aqua defaults. Reads
+		// light-on-dark like the Default Synthwave + Amber CRT + Sony
+		// Ericsson Aqua + RAZR Hot Pink + Stealth Black + Cyberpunk
+		// Red + Christmas + Surprise themes - keeping the bright
+		// accents-on-dark-panel reading direction consistent across
+		// every theme that's NOT the deliberately-monochrome Nokia /
+		// Game Boy DMG / Y2K Silver light-panel set. Wallpaper falls
+		// through to the Default Synthwave builder (PhoneSynthwaveBg's
+		// theme dispatch is a chain of equality checks against the
+		// known builders rather than a closed switch, so an unknown
+		// theme value lands on the Synthwave painter automatically) -
+		// the rainbow palette then re-tints every Phone* widget on top
+		// (icon-tile strokes, soft-key labels, focus borders, ...) so
+		// the unlock reads as 'a deeply different MAKERphone' without
+		// requiring its own per-pixel wallpaper variant.
+		Rainbow = 11,
+
+		// Reserved 12..15 for future themes.
 	};
 
 	/** Total number of themes the picker should expose today. */
-	static constexpr uint8_t ThemeCount = 11;
+	static constexpr uint8_t ThemeCount = 12;
 
 	/*
 	 * S119 - Surprise / Daily-Cycle engine.
@@ -1941,5 +1973,56 @@ public:
 #define SURPRISE_FROST_DIM        lv_color_make( 56,  80,  90)
 #define SURPRISE_FROST_TEXT       lv_color_make(220, 250, 250)
 #define SURPRISE_FROST_LABEL_DIM  lv_color_make(140, 180, 180)
+
+/*
+ * ---------------------------------------------------------------------
+ * Rainbow palette (S166).
+ *
+ * The Easter-egg "everything-at-once spectrum" theme unlocked by the
+ * Konami code (LEFT LEFT RIGHT RIGHT LEFT RIGHT LEFT RIGHT BACK ENTER
+ * - the canonical NES sequence on the Chatter d-pad). Six MP_*-equivalent
+ * roles each pull a different slice of the visible spectrum so the UI
+ * reads as a saturated rainbow rather than a single-hue family - the
+ * deliberate visual language of the late-1990s carrier "Disco" /
+ * "Carnival" / "Party" theme packs that shipped alongside the more
+ * sober Nokia / Sony Ericsson defaults.
+ *
+ *   RAINBOW_BG_DARK     - deep indigo, the panel-off colour. Kept dark
+ *                         (lower than RAINBOW_DIM) so cream / white
+ *                         body text stays legible against it. The
+ *                         hue is at the cool-violet end of the
+ *                         spectrum so the warm accent / highlight
+ *                         shades read against it without ever
+ *                         clashing.
+ *   RAINBOW_ACCENT      - hot magenta, the focus / "Sent" bubble fill
+ *                         / soft-key arrow tint. Saturated enough to
+ *                         dominate but not so saturated it blooms on
+ *                         16 bpp.
+ *   RAINBOW_HIGHLIGHT   - electric green, the icon-stroke / "edited"
+ *                         cyan-equivalent. Pulled toward green-yellow
+ *                         rather than pure green so it reads as
+ *                         deliberately-different from RAINBOW_DIM.
+ *   RAINBOW_DIM         - muted violet, the idle-border / "Received"
+ *                         bubble fill / inactive-chevron tint. Sits
+ *                         between RAINBOW_BG_DARK and RAINBOW_ACCENT
+ *                         on the colour wheel so dim borders fade
+ *                         into the panel rather than fighting it.
+ *   RAINBOW_TEXT        - cream-white, the default body-text colour.
+ *                         Slightly warm (closer to MP_TEXT than to a
+ *                         pure white) so the chrome reads as a
+ *                         continuation of the Synthwave family
+ *                         rather than a clinical UI.
+ *   RAINBOW_LABEL_DIM   - pale cyan, the timestamp / placeholder /
+ *                         idle-tile-label tint. Cool counter-balance
+ *                         to the warm RAINBOW_TEXT so the secondary
+ *                         labels never read as 'half-bright text'.
+ * ---------------------------------------------------------------------
+ */
+#define RAINBOW_BG_DARK    lv_color_make( 24,  12,  48)
+#define RAINBOW_ACCENT     lv_color_make(255,  64, 200)
+#define RAINBOW_HIGHLIGHT  lv_color_make( 80, 240, 140)
+#define RAINBOW_DIM        lv_color_make( 90,  60, 150)
+#define RAINBOW_TEXT       lv_color_make(255, 248, 200)
+#define RAINBOW_LABEL_DIM  lv_color_make(180, 220, 255)
 
 #endif // MAKERPHONE_THEME_H

@@ -258,6 +258,29 @@ struct SettingsData {
 	// from the SYSTEM section of PhoneSettingsScreen ("Speed dial"
 	// row, directly below "Operator").
 	uint64_t speedDial[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	// S166 - Konami-code Easter egg unlock flag for the Rainbow theme.
+	// The PhoneKonamiCode global service (src/Services/PhoneKonamiCode)
+	// listens to every button press and watches for the canonical
+	// 10-press sequence: LEFT LEFT RIGHT RIGHT LEFT RIGHT LEFT RIGHT
+	// BACK ENTER (the literal Konami code mapped onto the Chatter
+	// hardware, where BTN_UP/BTN_DOWN are aliased to BTN_LEFT/BTN_RIGHT
+	// per Pins.hpp, BTN_B == BTN_BACK, and BTN_A == BTN_ENTER, so the
+	// physical sequence is identical to the original NES UU DD LR LR B A
+	// pattern). On match the service flips this flag to true, sets
+	// themeId to MakerphoneTheme::Theme::Rainbow (11), persists via
+	// Settings.store(), and plays a brief one-shot ascending chime.
+	// Once unlocked the flag stays true across reboots so the user
+	// can swap back to Rainbow from PhoneThemeScreen without having
+	// to re-enter the code each session.
+	//
+	// Stored next to speedDial[] so the SettingsData blob stays plain
+	// old data and the existing NVS-resize pattern (that grew this
+	// struct via soundProfile / wallpaperStyle / themeId / keyTicks /
+	// ownerName / powerOffMessage / operatorText / operatorLogo /
+	// phoneProfile / profileRingtones / speedDial) reads the new byte
+	// as zero-initialised on a first boot after the firmware grows --
+	// which maps to false here, the correct factory default.
+	bool rainbowUnlocked = false;
 };
 
 class SettingsImpl {

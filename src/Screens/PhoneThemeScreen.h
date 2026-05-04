@@ -144,6 +144,7 @@ private:
 	void drawCyberpunkRedSwatch();
 	void drawChristmasSwatch();
 	void drawSurpriseDailyCycleSwatch();
+	void drawRainbowSwatch();
 };
 
 #endif // MAKERPHONE_PHONETHEMESCREEN_H

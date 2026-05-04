@@ -26,6 +26,7 @@ MakerphoneTheme::Theme MakerphoneTheme::themeFromByte(uint8_t raw){
 		                                              return Theme::Christmas;
 		case static_cast<uint8_t>(Theme::SurpriseDailyCycle):
 		                                              return Theme::SurpriseDailyCycle;
+		case static_cast<uint8_t>(Theme::Rainbow):    return Theme::Rainbow;
 		case static_cast<uint8_t>(Theme::Default):
 		default:                                      return Theme::Default;
 	}
@@ -48,6 +49,7 @@ const char* MakerphoneTheme::getName(Theme t){
 		case Theme::CyberpunkRed: return "CYBER RED";
 		case Theme::Christmas:  return "CHRISTMAS";
 		case Theme::SurpriseDailyCycle: return "SURPRISE";
+		case Theme::Rainbow:    return "RAINBOW";
 		default:                return "DEFAULT";
 	}
 }
@@ -217,6 +219,7 @@ lv_color_t MakerphoneTheme::bgDark(){
 		case Theme::Christmas:    return XMAS_BG_PINE;
 		case Theme::SurpriseDailyCycle:
 		                          return surpriseToday(SR_BG_DARK);
+		case Theme::Rainbow:    return RAINBOW_BG_DARK;
 		case Theme::Default:
 		default:                return MP_BG_DARK;
 	}
@@ -235,6 +238,7 @@ lv_color_t MakerphoneTheme::accent(){
 		case Theme::Christmas:    return XMAS_HOLLY;
 		case Theme::SurpriseDailyCycle:
 		                          return surpriseToday(SR_ACCENT);
+		case Theme::Rainbow:    return RAINBOW_ACCENT;
 		case Theme::Default:
 		default:                return MP_ACCENT;
 	}
@@ -253,6 +257,7 @@ lv_color_t MakerphoneTheme::highlight(){
 		case Theme::Christmas:    return XMAS_GOLD;
 		case Theme::SurpriseDailyCycle:
 		                          return surpriseToday(SR_HIGHLIGHT);
+		case Theme::Rainbow:    return RAINBOW_HIGHLIGHT;
 		case Theme::Default:
 		default:                return MP_HIGHLIGHT;
 	}
@@ -271,6 +276,7 @@ lv_color_t MakerphoneTheme::dim(){
 		case Theme::Christmas:    return XMAS_DIM;
 		case Theme::SurpriseDailyCycle:
 		                          return surpriseToday(SR_DIM);
+		case Theme::Rainbow:    return RAINBOW_DIM;
 		case Theme::Default:
 		default:                return MP_DIM;
 	}
@@ -289,6 +295,7 @@ lv_color_t MakerphoneTheme::text(){
 		case Theme::Christmas:    return XMAS_GOLD;
 		case Theme::SurpriseDailyCycle:
 		                          return surpriseToday(SR_TEXT);
+		case Theme::Rainbow:    return RAINBOW_TEXT;
 		case Theme::Default:
 		default:                return MP_TEXT;
 	}
@@ -307,6 +314,7 @@ lv_color_t MakerphoneTheme::labelDim(){
 		case Theme::Christmas:    return XMAS_DIM;
 		case Theme::SurpriseDailyCycle:
 		                          return surpriseToday(SR_LABEL_DIM);
+		case Theme::Rainbow:    return RAINBOW_LABEL_DIM;
 		case Theme::Default:
 		default:                return MP_LABEL_DIM;
 	}
@@ -340,6 +348,7 @@ lv_color_t MakerphoneTheme::iconStroke(){
 		case Theme::Christmas:    return XMAS_GOLD;
 		case Theme::SurpriseDailyCycle:
 		                          return surpriseToday(SR_HIGHLIGHT);
+		case Theme::Rainbow:    return RAINBOW_HIGHLIGHT;
 		case Theme::Default:
 		default:                return MP_HIGHLIGHT;
 	}
@@ -358,6 +367,7 @@ lv_color_t MakerphoneTheme::iconDetail(){
 		case Theme::Christmas:    return XMAS_HOLLY;
 		case Theme::SurpriseDailyCycle:
 		                          return surpriseToday(SR_ACCENT);
+		case Theme::Rainbow:    return RAINBOW_ACCENT;
 		case Theme::Default:
 		default:                return MP_ACCENT;
 	}
