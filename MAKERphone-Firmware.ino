@@ -14,6 +14,8 @@
 #include "src/Services/PhoneCallService.h"
 #include "src/Elements/IntroScreen.h"
 #include "src/Screens/PhoneBootSplash.h"
+#include "src/Screens/PhoneSimPinScreen.h"
+#include "src/MAKERphoneConfig.h"
 #include "src/Interface/Pics.h"
 #include "src/Services/ProfileService.h"
 #include "src/Screens/UserHWTest.h"
@@ -175,14 +177,21 @@ void boot(){
 	// screen takes over.
 	Vibrate.begin();
 
-	// S56: the very first screen on boot is now PhoneBootSplash - the
-	// MAKERphone-branded sunset wordmark splash. It holds for 3 s (or
-	// any-key skip) and on dismiss starts the legacy IntroScreen, which
-	// keeps doing all the post-intro routing into LockScreen ->
-	// PhoneHomeScreen and the Service.begin() side-effects below. This
-	// is a precede-not-replace wiring: the existing CircuitMess intro
-	// gif still plays, but the user sees the MAKERphone wordmark first.
-	auto* splash = new PhoneBootSplash([](){
+	// S56 + S162: the very first screen on boot is now PhoneBootSplash
+	// - the MAKERphone-branded sunset wordmark splash. It holds for 3 s
+	// (or any-key skip) and on dismiss runs the next stage of the boot
+	// chain. With MAKERPHONE_SHOW_SIM_PIN enabled (the default) that
+	// next stage is the decorative S162 "SIM PIN unlock" screen, which
+	// in turn dismisses into the legacy IntroScreen. The intro keeps
+	// doing all the post-intro routing into LockScreen -> PhoneHomeScreen
+	// and the Service.begin() side-effects below. This is a precede-
+	// not-replace wiring: the existing CircuitMess intro gif still plays,
+	// but the user sees MAKERphone-branded screens first.
+	//
+	// startIntro is the shared continuation - both the SIM PIN dismiss
+	// path (S162 enabled) and the direct splash-dismiss path (S162
+	// disabled) call it to instantiate + start the IntroScreen.
+	auto startIntro = [](){
 		auto intro = new IntroScreen([](){
 			Shutdown.begin();
 			Buzz.begin();
@@ -192,7 +201,31 @@ void boot(){
 			DeliveredChime.begin();
 		});
 		intro->start();
+	};
+#if MAKERPHONE_SHOW_SIM_PIN
+	auto* splash = new PhoneBootSplash([](){
+		// S162: between the boot splash and the intro gif, flash a
+		// decorative SIM-card PIN entry surface. Any 4-digit PIN
+		// unlocks; BACK on an empty buffer skips immediately. The
+		// dismiss callback below then starts the legacy intro,
+		// preserving every downstream side-effect.
+		auto* pin = new PhoneSimPinScreen([](){
+			auto intro = new IntroScreen([](){
+				Shutdown.begin();
+				Buzz.begin();
+				Alarms.begin();
+				Pet.begin();
+				ChargeChime.begin();
+				DeliveredChime.begin();
+			});
+			intro->start();
+		});
+		pin->start();
 	});
+#else
+	auto* splash = new PhoneBootSplash(startIntro);
+#endif
+	(void) startIntro;
 
 	lv_timer_handler();
 

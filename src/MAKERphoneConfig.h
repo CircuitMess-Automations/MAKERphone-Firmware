@@ -68,4 +68,25 @@
 #define MAKERPHONE_USE_T9_COMPOSER 1
 #endif
 
+/*
+ * MAKERPHONE_SHOW_SIM_PIN
+ *
+ * When 1 (default): a decorative Sony-Ericsson-style "SIM PIN unlock"
+ * screen (S162) is inserted between PhoneBootSplash and the legacy
+ * IntroScreen during boot. The user types any 4 digits to advance, or
+ * presses BACK on an empty buffer to skip the screen entirely - so a
+ * dev who has booted the phone a hundred times can blast through.
+ *
+ * When 0: the boot chain stays splash -> intro -> ... exactly as it
+ * was before S162. Useful for shaving the few extra hundred ms off
+ * the boot path during local development, or for hardware reviews
+ * that want to see the IntroScreen without intermediate chrome.
+ *
+ * Set via `-DMAKERPHONE_SHOW_SIM_PIN=0` in arduino-cli or by defining
+ * the macro before this header is included from the .ino.
+ */
+#ifndef MAKERPHONE_SHOW_SIM_PIN
+#define MAKERPHONE_SHOW_SIM_PIN 1
+#endif
+
 #endif // MAKERPHONE_CONFIG_H
