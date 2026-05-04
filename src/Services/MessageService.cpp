@@ -1,6 +1,7 @@
 #include <Loop/LoopManager.h>
 #include "MessageService.h"
 #include "LoRaService.h"
+#include "PhoneDeliveredChime.h"
 #include "../Storage/Storage.h"
 #include <Settings.h>
 
@@ -243,9 +244,24 @@ void MessageService::receiveAck(ReceivedPacket<MessagePacket>& packet){
 	Message msg = Storage.Messages.get(uid);
 	if(msg.uid == 0) return;
 
+	// S157 — Capture the previous delivery state so we can fire the
+	// double-tick chime on the genuine sent -> delivered edge only.
+	// `received` defaults to false on a freshly sent outgoing
+	// message; a duplicate ACK from a chatty peer (or any future
+	// replay path) lands here with `received` already true and must
+	// stay silent. PIC and incoming-side messages also flow through
+	// this method only via outgoing-message ACK packets, so the
+	// `outgoing` guard is a belt-and-braces check for any future
+	// caller that routes a non-outgoing message through here.
+	const bool wasDelivered = msg.received;
+
 	msg.received = true;
 	if(!Storage.Messages.update(msg)){
 		printf("Message ACK update failed\n");
+	}
+
+	if(!wasDelivered && msg.outgoing){
+		DeliveredChime.notifyDelivered();
 	}
 
 	WithListeners<MsgChangedListener>::iterateListeners([&msg](MsgChangedListener* listener){

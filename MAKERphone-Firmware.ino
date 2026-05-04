@@ -27,6 +27,7 @@
 #include "src/Services/PhoneAlarmService.h"
 #include "src/Services/PhoneVirtualPet.h"
 #include "src/Services/PhoneChargeChime.h"
+#include "src/Services/PhoneDeliveredChime.h"
 #include "src/JigHWTest/JigHWTest.h"
 #include "src/Games/GameEngine/Game.h"
 
@@ -176,6 +177,7 @@ void boot(){
 			Alarms.begin();
 			Pet.begin();
 			ChargeChime.begin();
+			DeliveredChime.begin();
 		});
 		intro->start();
 	});
