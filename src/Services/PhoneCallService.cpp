@@ -15,6 +15,7 @@
 
 #include "../Storage/PhoneContacts.h"
 #include "PhoneContactRingtone.h"
+#include "PhoneVibrationLibrary.h"
 
 // ---- singleton ----
 //
@@ -160,6 +161,18 @@ void PhoneCallService::showIncomingCall(UID_t peer) {
 	if(const auto* m = PhoneContactRingtone::resolve(storedRingtoneId)) {
 		incoming->setRingtone(m);
 	}
+
+	// S161 - per-ringtone vibration choreography. The vibration
+	// engine and the audible ringtone share the single piezo, so
+	// PhoneIncomingCall picks at most one of them per call (driven
+	// by the active phoneProfile -- vibration in Meeting, ringtone
+	// in Loud). We hand the matching pattern over here regardless
+	// of which path will run, so a profile change while the call
+	// screen is up still has a pattern ready when the user toggles
+	// to Meeting. The pattern pointer is owned by static storage
+	// in PhoneVibrationLibrary; lifetime is unbounded which is the
+	// semantics setVibration() documents.
+	incoming->setVibration(&PhoneVibrationLibrary::forRingtoneId(storedRingtoneId));
 
 	callActive = true;
 	host->push(incoming);

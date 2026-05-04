@@ -233,7 +233,7 @@ Tiny details that make the difference between "phone-shaped toy" and "this is ex
 - [x] **S158** — "Missed call" inverted-color flash on next wake.
 - [x] **S159** — Profile system (General / Silent / Meeting / Outdoor / Headset).
 - [x] **S160** — Per-profile ringtone selection (depends on S159 + S123).
-- [ ] **S161** — Vibration patterns per ringtone (buzzer-pulse choreography).
+- [x] **S161** — Vibration patterns per ringtone (buzzer-pulse choreography).
 - [ ] **S162** — SIM-card "PIN unlock" boot screen — decorative four-digit PIN entry.
 - [ ] **S163** — "Phone yawns" idle animation — eyes blink on home after 5 min idle.
 

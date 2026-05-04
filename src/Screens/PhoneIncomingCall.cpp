@@ -10,6 +10,9 @@
 #include "../Elements/PhonePixelAvatar.h"
 #include "../Fonts/font.h"
 #include "../Services/PhoneRingtoneLibrary.h"
+#include "../Services/PhoneVibrationEngine.h"
+#include "../Services/PhoneVibrationLibrary.h"
+#include <Settings.h>
 
 // MAKERphone retro palette - inlined per the established pattern in this
 // codebase (see PhoneMainMenu.cpp / PhoneHomeScreen.cpp / PhoneDialerScreen.cpp /
@@ -120,9 +123,12 @@ PhoneIncomingCall::~PhoneIncomingCall() {
 	// Defensive: hush the piezo if the screen is being
 	// torn down without a prior onStop() (rare, but a
 	// host that drops the unique_ptr without popping
-	// could trigger this). stopRingtone() is a no-op
-	// when ringtoneActive is already false.
+	// could trigger this). stopRingtone() / stopVibration()
+	// are both no-ops when their respective active flags
+	// are already false, so calling both unconditionally is
+	// the cheapest correct path.
 	stopRingtone();
+	stopVibration();
 	// All other children (wallpaper, statusBar, softKeys, avatar,
 	// labels) are parented to obj - LVScreen's destructor frees obj
 	// and LVGL recursively frees their lv_obj_t backing storage.
@@ -130,20 +136,28 @@ PhoneIncomingCall::~PhoneIncomingCall() {
 
 void PhoneIncomingCall::onStart() {
 	Input::getInstance()->addListener(this);
-	// S41: start ringing as soon as the screen takes over. We
-	// always start fresh in onStart() so re-entering the screen
-	// (e.g. dismissing a modal that suspended us) restarts the
-	// melody from the top — matches feature-phone behaviour.
-	startRingtone();
+	// S41 + S161: pick exactly one alert path -- audible ringtone
+	// when Settings.sound is true (Loud profiles), or buzzer-pulse
+	// vibration when sound is muted but the user is in Meeting
+	// profile. Silent / unsupported combinations fall through to
+	// no alert, matching the feature-phone "discreet" intent.
+	// Always (re)choose on every onStart() so re-entering the
+	// screen restarts whichever alert path is currently
+	// appropriate from the top.
+	chooseAlertPath();
 }
 
 void PhoneIncomingCall::onStop() {
 	// Hush the piezo before we hand input back to whoever is
-	// next on the screen stack. stopRingtone() is idempotent
-	// and only acts if THIS screen is currently the engine's
-	// driver, so a Settings-driven mute that already silenced
-	// playback does not double-stop the next caller.
+	// next on the screen stack. stopRingtone() / stopVibration()
+	// are both idempotent and only act if THIS screen is the
+	// active driver of the matching engine, so a Settings-driven
+	// mute that already silenced playback does not double-stop
+	// the next caller. We call both because chooseAlertPath()
+	// picked exactly one at onStart() time and the screen does
+	// not track which -- the cheaper of the two is the no-op.
 	stopRingtone();
+	stopVibration();
 	Input::getInstance()->removeListener(this);
 }
 
@@ -407,6 +421,83 @@ void PhoneIncomingCall::stopRingtone() {
 	if(!ringtoneActive) return;
 	ringtoneActive = false;
 	Ringtone.stop();
+}
+
+// ----- vibration (S161) -----
+
+// S161 wires the new PhoneVibrationEngine into the call flow as a
+// peer of the audible ringtone. Selection rule lives in
+// chooseAlertPath() below: only one of ringtone / vibration runs
+// per call because they multiplex the same physical piezo. The
+// host (PhoneCallService) calls setVibration() with the matching
+// PhoneVibrationLibrary pattern before push(); leaving it nullptr
+// degenerates the Meeting-profile branch to silent.
+
+void PhoneIncomingCall::setVibration(const PhoneVibrationEngine::Pattern* pattern) {
+	vibration = pattern;
+	// If the screen is already vibrating, switch patterns live so
+	// the host can preview their pick without leaving the screen.
+	// We only retune if WE were the engine driver -- otherwise some
+	// other component owns the piezo and we would clobber its
+	// pulses.
+	if(vibrationActive) {
+		if(pattern != nullptr) {
+			Vibrate.play(*pattern);
+		} else {
+			Vibrate.stop();
+			vibrationActive = false;
+		}
+	}
+}
+
+void PhoneIncomingCall::startVibration() {
+	if(vibration == nullptr) {
+		// No pattern wired -- silent fallback. We deliberately do
+		// NOT auto-pick a default here; the host knows which
+		// ringtone the call is associated with and is best
+		// positioned to pick the matching pattern.
+		return;
+	}
+	Vibrate.play(*vibration);
+	vibrationActive = true;
+}
+
+void PhoneIncomingCall::stopVibration() {
+	// Only stop the engine if WE started it. Belt-and-braces
+	// against a future caller that drives Vibrate for some other
+	// foreground event (e.g. a calendar buzz alert) while the
+	// call screen is still alive in the background.
+	if(!vibrationActive) return;
+	vibrationActive = false;
+	Vibrate.stop();
+}
+
+void PhoneIncomingCall::chooseAlertPath() {
+	if(!ringtoneEnabled) return;
+
+	// Single-piezo multiplex. Three cases:
+	//
+	//   sound on             -> ringtone path (Loud profiles:
+	//                           General / Outdoor / Headset).
+	//   sound off + Meeting  -> vibration path (the new S161
+	//                           buzzer-pulse choreography).
+	//   sound off otherwise  -> Silent profile, total quiet.
+	//
+	// PhoneProfileScreen::Profile::Meeting persists as 2 in
+	// Settings.phoneProfile (see SettingsData docs). We compare
+	// against the literal here rather than including the screen
+	// header to keep the dependency tree shallow.
+	const auto& cfg = Settings.get();
+	if(cfg.sound) {
+		startRingtone();
+		return;
+	}
+	const uint8_t kMeetingProfile = 2;
+	if(cfg.phoneProfile == kMeetingProfile) {
+		startVibration();
+		return;
+	}
+	// Silent profile (or any other muted state) -- no alert.
 }
 
 // ----- action dispatch -----

@@ -5,6 +5,7 @@
 #include <Input/InputListener.h>
 #include "../Interface/LVScreen.h"
 #include "../Services/PhoneRingtoneEngine.h"
+#include "../Services/PhoneVibrationEngine.h"
 
 class PhoneSynthwaveBg;
 class PhoneStatusBar;
@@ -153,6 +154,25 @@ public:
 	/** Accessor for the master enable. */
 	bool isRingtoneEnabled() const { return ringtoneEnabled; }
 
+	/**
+	 * S161 - override the buzzer-pulse vibration choreography played
+	 * while this screen is on top. Pass nullptr to suppress vibration
+	 * entirely. If left unset, PhoneIncomingCall does NOT auto-pick
+	 * a vibration pattern -- the host (PhoneCallService) wires one
+	 * matched to the chosen ringtone before push(). The ringtone and
+	 * vibration share the single piezo, so only one of the two is
+	 * driven per call: vibration runs when Settings.sound is false
+	 * AND the active phoneProfile is Meeting; otherwise the audible
+	 * ringtone takes over via the existing S41 path. Pointer must
+	 * outlive the screen -- pass a Pattern from
+	 * PhoneVibrationLibrary (their backing Pulse arrays are static
+	 * const).
+	 */
+	void setVibration(const PhoneVibrationEngine::Pattern* pattern);
+
+	/** Currently selected vibration pattern, or nullptr if none. */
+	const PhoneVibrationEngine::Pattern* getVibration() const { return vibration; }
+
 	const char* getCallerName()   const { return callerName; }
 	const char* getCallerNumber() const { return callerNumber; }
 	uint8_t     getAvatarSeed()   const { return avatarSeed; }
@@ -187,6 +207,13 @@ private:
 	bool ringtoneEnabled = true;
 	bool ringtoneActive  = false;  // we are the current driver of the engine
 
+	// S161 - buzzer-pulse vibration choreography. Mirrors the ringtone
+	// state machine but drives PhoneVibrationEngine instead of
+	// PhoneRingtoneEngine. Both share the single piezo so only one is
+	// active per call (selection rule documented on setVibration()).
+	const PhoneVibrationEngine::Pattern* vibration = nullptr;
+	bool vibrationActive = false;
+
 	ActionHandler answerCb = nullptr;
 	ActionHandler rejectCb = nullptr;
 
@@ -211,6 +238,14 @@ private:
 
 	void startRingtone();
 	void stopRingtone();
+
+	// S161 - vibration helpers. Symmetric with startRingtone /
+	// stopRingtone above; chooseAlertPath() picks one of the two
+	// based on Settings.sound + Settings.phoneProfile so the
+	// onStart() entry point stays a single call.
+	void startVibration();
+	void stopVibration();
+	void chooseAlertPath();
 
 	void buttonPressed(uint i) override;
 	void buttonReleased(uint i) override;

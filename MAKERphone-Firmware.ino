@@ -24,6 +24,7 @@
 #include "src/Services/ShutdownService.h"
 #include "src/Services/BuzzerService.h"
 #include "src/Services/PhoneRingtoneEngine.h"
+#include "src/Services/PhoneVibrationEngine.h"
 #include "src/Services/PhoneAlarmService.h"
 #include "src/Services/PhoneVirtualPet.h"
 #include "src/Services/PhoneChargeChime.h"
@@ -162,6 +163,17 @@ void boot(){
 	// dismiss callback so they keep their original ordering after the
 	// CircuitMess intro plays.
 	Ringtone.begin();
+
+	// S161: companion engine that drives the same piezo with low-pitch
+	// rhythmic pulses for the Meeting-profile vibration choreography.
+	// begin() is a pure state reset (no allocation, no LoopManager
+	// subscription until play() is called) so promoting it next to
+	// Ringtone.begin() above keeps both engines in lockstep without
+	// changing boot ordering. PhoneCallService wires the matching
+	// pattern into PhoneIncomingCall before push() so a Meeting-
+	// profile incoming call rings via vibration the moment the
+	// screen takes over.
+	Vibrate.begin();
 
 	// S56: the very first screen on boot is now PhoneBootSplash - the
 	// MAKERphone-branded sunset wordmark splash. It holds for 3 s (or
