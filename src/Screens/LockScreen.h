@@ -10,6 +10,7 @@
 #include "../Elements/PhoneNotificationPreview.h"
 #include "../Elements/PhoneChargingOverlay.h"
 #include "../Elements/PhoneChargeBars.h"
+#include "../Elements/PhoneMissedCallFlash.h"
 #include "../Services/MessageService.h"
 #include "../Elements/UserWithMessage.h"
 
@@ -42,6 +43,11 @@ private:
 	// chip already uses; nullptr until the constructor finishes
 	// building chargingOverlay (the bars need it as their source).
 	PhoneChargeBars*           chargeBars      = nullptr;
+	// S158 - full-screen white-pulse overlay that fires once per
+	// wake when MissedCallLog::consumePendingFlash() returns true.
+	// Built lazily in the ctor (last child = top of z-order) and
+	// hidden by default; onStarting() decides whether to start it.
+	PhoneMissedCallFlash*      missedFlash     = nullptr;
 	// S144 - small "OWNER" greeting label tucked between the status
 	// bar and the clock face. Mounted lazily by ensureOwnerLabel() the
 	// first time onStarting() sees a non-empty Settings.ownerName, then

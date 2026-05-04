@@ -230,7 +230,7 @@ Tiny details that make the difference between "phone-shaped toy" and "this is ex
 - [x] **S155** — Animated battery-charge fill bars on lock + home.
 - [x] **S156** — Envelope-flying SMS-sent animation.
 - [x] **S157** — "Delivered" double-tick chime.
-- [ ] **S158** — "Missed call" inverted-color flash on next wake.
+- [x] **S158** — "Missed call" inverted-color flash on next wake.
 - [ ] **S159** — Profile system (General / Silent / Meeting / Outdoor / Headset).
 - [ ] **S160** — Per-profile ringtone selection (depends on S159 + S123).
 - [ ] **S161** — Vibration patterns per ringtone (buzzer-pulse choreography).

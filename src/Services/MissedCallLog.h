@@ -105,11 +105,50 @@ public:
 	void addListener(MissedCallLogListener* listener);
 	void removeListener(MissedCallLogListener* listener);
 
+	/**
+	 * S158 - "Missed call inverted-color flash on next wake".
+	 *
+	 * Flag latched to `true` whenever `add()` registers a new
+	 * missed call (and only by `add()` - `clear()` deliberately
+	 * does NOT raise the flag). The lock screen consumes it on
+	 * the next `onStarting()` pass via `consumePendingFlash()`
+	 * and triggers its full-screen white-pulse overlay so the
+	 * user sees a Sony-Ericsson-style "you missed something" beat
+	 * the moment the lock face redraws on wake.
+	 *
+	 * Stored on the singleton (rather than on the lock screen
+	 * itself) so a missed call that arrives while the user is
+	 * deep inside the menu - or while the device is fully asleep
+	 * - still produces exactly one flash the next time the lock
+	 * screen activates, no matter which path got the user there.
+	 */
+	bool pendingFlash() const { return pendingFlash_; }
+
+	/**
+	 * Returns the current `pendingFlash()` value and clears it
+	 * atomically so a single arrival fires exactly one flash even
+	 * if the lock screen's `onStarting()` runs more than once
+	 * before the user dismisses the notification preview.
+	 */
+	bool consumePendingFlash();
+
+	/**
+	 * Manually clear the pending-flash flag without triggering
+	 * the overlay. Defensive escape hatch for screens that want
+	 * to suppress the flash (for example the call-history screen
+	 * already renders the missed entry inline).
+	 */
+	void clearPendingFlash() { pendingFlash_ = false; }
+
 private:
 	MissedCallLog() = default;
 
 	std::vector<Entry>                  entries;
 	std::vector<MissedCallLogListener*> listeners;
+	// S158 - latched on add(), consumed by the lock screen on its
+	// next onStarting() pass. Initialised to false so a fresh boot
+	// with no missed calls never fires a phantom flash.
+	bool                                pendingFlash_ = false;
 
 	void notify();
 };

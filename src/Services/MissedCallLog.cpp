@@ -37,9 +37,32 @@ uint8_t MissedCallLog::add(const char* name, uint8_t avatarSeed) {
 	}
 
 	entries.push_back(e);
+
+	// S158 - latch the "next-wake flash" flag so the lock screen
+	// fires its inverted-color pulse on the next onStarting() pass.
+	// We raise the flag on every add() (not just the first since the
+	// last clear) so a second / third missed call arriving while the
+	// user is still away still produces a flash the next time the
+	// device wakes - mirroring the Sony-Ericsson behaviour where the
+	// screen flashes once per wake regardless of how many notifications
+	// piled up while the user was gone.
+	pendingFlash_ = true;
+
 	notify();
 
 	return (uint8_t)(entries.size() - 1);
+}
+
+bool MissedCallLog::consumePendingFlash() {
+	// Read-and-clear in one shot so concurrent onStarting() passes
+	// (e.g. a quick lock -> unlock -> lock cycle) can never replay
+	// the flash for the same arrival. Cheap enough to be inlined,
+	// but kept out-of-line for symmetry with the rest of the
+	// non-trivial accessors and so future debug hooks can land
+	// here without a header churn.
+	const bool was = pendingFlash_;
+	pendingFlash_ = false;
+	return was;
 }
 
 void MissedCallLog::clear() {

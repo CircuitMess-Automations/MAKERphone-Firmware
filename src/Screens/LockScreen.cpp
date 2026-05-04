@@ -13,6 +13,8 @@
 #include "../Elements/PhoneNotificationPreview.h"
 #include "../Elements/PhoneChargingOverlay.h"
 #include "../Elements/PhoneChargeBars.h"
+#include "../Elements/PhoneMissedCallFlash.h"
+#include "../Services/MissedCallLog.h"
 #include <Input/Input.h>
 #include <Pins.hpp>
 
@@ -146,6 +148,14 @@ LockScreen::LockScreen() : LVScreen(){
 	refreshOwnerLabel();
 	layoutForOwner();
 
+	// S158 - "Missed call inverted-color flash on next wake".
+	// Built last so its full-screen sheet is the top-most child of
+	// `obj` and the pulse covers every other widget (status bar,
+	// clock, preview strip, soft-keys, charging chip, charge bars).
+	// Hidden by default; onStarting() flips it on whenever the
+	// shared MissedCallLog has a pending wake-flash queued up.
+	missedFlash = new PhoneMissedCallFlash(obj);
+
 	instance = this;
 }
 
@@ -182,6 +192,17 @@ void LockScreen::onStarting(){
 		lockHint->setBoost(false);
 		lockHint->setActive(true);
 	}
+
+	// S158 - "Missed call inverted-color flash on next wake".
+	// `consumePendingFlash()` is read-and-clear so even a quick
+	// lock -> unlock -> lock cycle can never replay the same
+	// flash. We trigger after the layout / preview refresh so the
+	// pulse fires over the just-redrawn missed-call line in the
+	// `PhoneNotificationPreview` strip - the eye snaps to the
+	// flashing screen, then settles on the populated preview row.
+	if(missedFlash != nullptr && MissedCallLog::instance().consumePendingFlash()){
+		missedFlash->start();
+	}
 }
 
 void LockScreen::onStart(){
@@ -195,6 +216,10 @@ void LockScreen::onStop(){
 		lockHint->setBoost(false);
 		lockHint->setActive(false);
 	}
+	// S158 - cancel any in-flight wake-flash so a screen pop
+	// mid-pulse does not leak the animation reference into
+	// the LVGL animator.
+	if(missedFlash) missedFlash->stop();
 	Input::getInstance()->removeListener(this);
 	Messages.removeUnreadListener(this);
 }
