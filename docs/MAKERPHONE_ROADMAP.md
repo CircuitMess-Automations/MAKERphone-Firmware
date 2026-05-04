@@ -245,7 +245,7 @@ The kind of thing customers post about when they discover it.
 - [x] **S166** — Konami code on the d-pad → unlocks rainbow theme.
 - [x] **S167** — Long-press `5` on dialer → flashlight quick-shortcut.
 - [x] **S168** — Tilt simulator (hold L+R together) → shake-to-randomize current screen.
-- [ ] **S169** — Random tip-of-the-day banner on home idle.
+- [x] **S169** — Random tip-of-the-day banner on home idle.
 - [ ] **S170** — ASCII art slideshow viewer — eight hand-pixeled drawings.
 - [ ] **S171** — `PhoneStressReliever` — tap a thing repeatedly, watch reactions.
 - [ ] **S172** — Daily fortune in dialer (first open per day).

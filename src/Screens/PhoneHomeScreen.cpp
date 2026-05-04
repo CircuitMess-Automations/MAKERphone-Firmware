@@ -13,6 +13,7 @@
 #include "../Elements/PhoneConfettiOverlay.h"
 #include "../Elements/PhoneNotificationToast.h"
 #include "../Elements/PhoneIdleHint.h"
+#include "../Elements/PhoneTipBanner.h"
 #include "../Elements/PhoneYawnOverlay.h"
 #include "PhoneBirthdayReminders.h"
 
@@ -103,6 +104,22 @@ PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
 	idleHint = new PhoneIdleHint(obj);
 	idleHint->setActive(true);
 
+	// S169 - "tip-of-the-day" random-tip strip. Boots invisible
+	// and only fades in after PhoneTipBanner::IdleMs (25 s) of
+	// stillness, so at boot the homescreen reads exactly the way
+	// the previous (S163-built) skeleton did - this is purely
+	// additive. The strip lives in the empty wallpaper band
+	// between the clock face (y = 11..43) and the yawn-overlay
+	// eyes (y = 60..66), centered horizontally, and never steals
+	// input focus from the existing softkey / quick-dial / lock-
+	// hold gestures (LV_OBJ_FLAG_CLICKABLE is cleared inside the
+	// widget). Gated off in the same setActive() pass as the
+	// idle hint and yawn overlay whenever the charging chip is
+	// visible, so the rotating tip never shares attention with
+	// the charging widget.
+	tipBanner = new PhoneTipBanner(obj);
+	tipBanner->setActive(true);
+
 	// S163 - "phone yawns" idle animation. Boots invisible and
 	// only fades in after PhoneYawnOverlay::IdleMs (5 min) of
 	// stillness, so at boot the homescreen reads exactly the
@@ -167,6 +184,16 @@ void PhoneHomeScreen::onStart() {
 	// now an immediate read is enough.
 	if(idleHint != nullptr && chargingOverlay != nullptr){
 		idleHint->setActive(!chargingOverlay->isCharging());
+	}
+
+	// S169 - same gate sync for the rotating "tip-of-the-day"
+	// strip so a homescreen surfaced while the chip is already
+	// up does not race a fresh tip fade against a visible
+	// charging widget. Activity counts that fire from the chip's
+	// own auto-detect pass naturally re-arm us on the next idle
+	// window, so a one-shot read here is enough.
+	if(tipBanner != nullptr && chargingOverlay != nullptr){
+		tipBanner->setActive(!chargingOverlay->isCharging());
 	}
 
 	// S163 - same gate sync for the "phone yawns" overlay so a

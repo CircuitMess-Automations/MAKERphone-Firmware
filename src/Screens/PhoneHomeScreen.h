@@ -15,6 +15,7 @@ class PhoneOperatorBanner;
 class PhoneConfettiOverlay;
 class PhoneNotificationToast;
 class PhoneIdleHint;
+class PhoneTipBanner;
 class PhoneYawnOverlay;
 
 /**
@@ -169,6 +170,16 @@ private:
 	// unaffected. Owned by the LVGL parent; we just keep the
 	// pointer to drive setActive() each loop().
 	PhoneIdleHint*           idleHint         = nullptr;
+	// S169 - "tip-of-the-day" random-tip strip that fades in
+	// after PhoneTipBanner::IdleMs (25 s) of stillness on the
+	// homescreen, between the PhoneIdleHint cue (10 s) and the
+	// PhoneYawnOverlay sleepy-eyes (5 min). Picks a fresh tip
+	// from an internal pool on every idle cycle, snaps invisible
+	// the moment the user touches a button, and shares the same
+	// charging-overlay gate as the other two idle widgets so the
+	// strip never overlaps the chip. Owned by the LVGL parent;
+	// we keep the pointer to drive setActive() each loop.
+	PhoneTipBanner*          tipBanner        = nullptr;
 	// S163 - "phone yawns" idle animation. After 5 minutes of
 	// stillness the overlay fades a pair of pixel-art eyes in
 	// over the synthwave wallpaper and lets them blink at a
