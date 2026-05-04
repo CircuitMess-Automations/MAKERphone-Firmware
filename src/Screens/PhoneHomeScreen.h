@@ -10,6 +10,7 @@ class PhoneStatusBar;
 class PhoneClockFace;
 class PhoneSoftKeyBar;
 class PhoneChargingOverlay;
+class PhoneOperatorBanner;
 
 /**
  * PhoneHomeScreen
@@ -110,6 +111,12 @@ private:
 	PhoneClockFace*       clockFace;
 	PhoneSoftKeyBar*      softKeys;
 	PhoneChargingOverlay* chargingOverlay = nullptr;
+	// S147 - operator-banner widget (carrier name + 5x16 user-pixelable
+	// logo). Mounted just under the status bar so the homescreen wears
+	// the classic Sony-Ericsson silhouette. Hidden when both the text
+	// and logo are empty (factory-cleared state) so a wiped banner
+	// does not leave an empty strip on the homescreen.
+	PhoneOperatorBanner*  operatorBanner  = nullptr;
 
 	SoftKeyHandler leftCb       = nullptr;
 	SoftKeyHandler rightCb      = nullptr;

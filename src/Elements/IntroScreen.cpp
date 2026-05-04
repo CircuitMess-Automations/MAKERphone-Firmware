@@ -27,6 +27,7 @@
 #include "../Screens/PhoneThemeScreen.h"
 #include "../Screens/PhoneOwnerNameScreen.h"
 #include "../Screens/PhonePowerOffMessageScreen.h"
+#include "../Screens/PhoneOperatorScreen.h"
 #include "../Screens/PhoneWelcomeScreen.h"
 #include "../Screens/PhoneGamesScreen.h"
 #include "../Interface/LVScreen.h"
@@ -256,6 +257,22 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// immediately, exactly the way every prior
 						// host expects.
 						self->push(new PhonePowerOffMessageScreen());
+						break;
+					case PhoneSettingsScreen::Item::Operator:
+						// S147: operator-banner editor replaces the
+						// OPERATOR placeholder stub. PhoneOperatorScreen
+						// is a two-mode editor (T9 entry for the carrier
+						// name + a 16x5 cursor-driven pixel toggler for
+						// the bitmap) that reads / writes
+						// Settings.operatorText and
+						// Settings.operatorLogo directly, so
+						// PhoneHomeScreen's PhoneOperatorBanner picks
+						// the new banner up on the next push without
+						// any extra wiring. The stub fallback in
+						// launchDefault() still works for any future
+						// row that lands without a dedicated screen
+						// yet.
+						self->push(new PhoneOperatorScreen());
 						break;
 					case PhoneSettingsScreen::Item::Theme:
 						// S101: global theme picker drills into the Default

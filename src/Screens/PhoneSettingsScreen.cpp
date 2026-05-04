@@ -79,6 +79,12 @@ const Section kLayout[] = {
 	// existing SYSTEM group; About stays anchored at the bottom of
 	// the list where feature-phone users expect to find it.
 	{ false, "Power-off msg",      "POWER-OFF MSG", PhoneSettingsScreen::Item::PowerOffMsg },
+	// S147 - operator-banner editor (text + 5x16 user-pixelable logo).
+	// Sits between Power-off msg and About so the three T9-typed identity
+	// slots cluster together (Owner name -> Power-off msg -> Operator)
+	// and About stays anchored at the bottom of the SYSTEM list where
+	// feature-phone users expect to find it.
+	{ false, "Operator",           "OPERATOR",    PhoneSettingsScreen::Item::Operator    },
 	{ false, "About",              "ABOUT",       PhoneSettingsScreen::Item::About       },
 };
 constexpr uint8_t kLayoutLen = sizeof(kLayout) / sizeof(kLayout[0]);
@@ -238,18 +244,19 @@ void PhoneSettingsScreen::buildList() {
 		lv_label_set_long_mode(r.labelObj, LV_LABEL_LONG_DOT);
 		lv_obj_set_width(r.labelObj, ListW - 24); // leave 24 px for chevron column
 		lv_label_set_text(r.labelObj, s.text);
-		// S146 - row label drops to y+1 to match the trimmed 8 px RowH.
-		// pixelbasic7 is 7 px tall so the label fits cleanly inside the
-		// row without bleeding into the next one. Header captions still
-		// use y+1 below (they remain on a 9 px HdrH so they keep their
-		// 2 px top halo unchanged from S144).
-		lv_obj_set_pos(r.labelObj, kColLabelX, y + 1);
+		// S147 - row label drops to y (was y+1) to match the trimmed
+		// 7 px RowH. pixelbasic7 is 7 px tall so the label fills the
+		// row with zero halo on either side -- still crisp on the
+		// muted-purple highlight rect that paints the focused row.
+		// Header captions still use y+1 below (they remain on a 9 px
+		// HdrH so they keep their 2 px top halo unchanged from S144).
+		lv_obj_set_pos(r.labelObj, kColLabelX, y);
 
 		r.chevronObj = lv_label_create(listContainer);
 		lv_obj_set_style_text_font(r.chevronObj, &pixelbasic7, 0);
 		lv_obj_set_style_text_color(r.chevronObj, MP_LABEL_DIM, 0);
 		lv_label_set_text(r.chevronObj, ">");
-		lv_obj_set_pos(r.chevronObj, kColChevX, y + 1);
+		lv_obj_set_pos(r.chevronObj, kColChevX, y);
 
 		y += RowH;
 		++rowIdx;

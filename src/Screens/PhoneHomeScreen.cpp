@@ -8,6 +8,7 @@
 #include "../Elements/PhoneClockFace.h"
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Elements/PhoneChargingOverlay.h"
+#include "../Elements/PhoneOperatorBanner.h"
 
 PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
 	// Full-screen container, no scrollbars, no inner padding - the four
@@ -39,6 +40,21 @@ PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
 	softKeys = new PhoneSoftKeyBar(obj);
 	softKeys->setLeft("CALL");
 	softKeys->setRight("MENU");
+
+	// S147 - operator banner just under the status bar. Reads
+	// Settings.operatorText / Settings.operatorLogo on construction and
+	// hides itself if both are empty. Mounted *after* the soft-key bar
+	// to keep it on top of the wallpaper but clear of the clock face.
+	// When the banner is visible we shift the clock face down by the
+	// banner height so the cyan time digits do not overlap the cream
+	// carrier label / sunset-orange logo cells. When the banner is
+	// hidden (factory-cleared state) we leave the clock face at its
+	// pre-S147 y so the homescreen reads exactly the way it always did.
+	operatorBanner = new PhoneOperatorBanner(obj);
+	if(clockFace != nullptr && operatorBanner->isVisible()) {
+		lv_obj_set_y(clockFace->getLvObj(),
+		             11 + PhoneOperatorBanner::BannerHeight);
+	}
 
 	// S59 charging overlay - hidden by default. Drops just above the
 	// soft-key bar so the wallpaper / clock face are untouched while

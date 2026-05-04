@@ -105,6 +105,15 @@ public:
 		// below "Owner name" so the two T9-typed identity slots
 		// cluster together inside the existing SYSTEM group.
 		PowerOffMsg= 8,        // S146
+		// S147 - operator-banner editor (text + 5x16 user-pixelable
+		// logo). Drills into PhoneOperatorScreen, which writes both
+		// Settings.operatorText and Settings.operatorLogo and flushes
+		// via SettingsImpl::store(). Lives in SYSTEM directly below
+		// Power-off msg so the three T9-typed identity slots cluster
+		// together (Owner name -> Power-off msg -> Operator) and
+		// About stays anchored at the bottom of the SYSTEM list
+		// where feature-phone users expect to find it.
+		Operator   = 9,        // S147
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);
@@ -154,7 +163,7 @@ public:
 	void flashRightSoftKey();
 
 	/** Number of selectable rows (excludes group headers). */
-	static constexpr uint8_t ItemCount = 9;
+	static constexpr uint8_t ItemCount = 10;
 
 	// --- Geometry, exposed for unit-test friendliness. -----------------
 
@@ -187,8 +196,16 @@ public:
 	 * pixelbasic7 with 0 px top halo + 0 px bottom halo, which
 	 * still reads crisply because the highlight rect's 70 % muted
 	 * purple keeps the cream label well-contrasted.
+	 *
+	 * S147 trims this further to 7 px so the new "Operator" row
+	 * fits inside the same 98 px window: 10 rows * 7 px + 3
+	 * headers * 9 px = 97 px -- 1 px slack against the soft-key
+	 * bar at y=118. pixelbasic7 is 7 px tall so the label fills
+	 * the row exactly with zero halo on either side, which still
+	 * reads crisply on the muted-purple highlight rect that
+	 * already carries the focused row.
 	 */
-	static constexpr lv_coord_t RowH   = 8;
+	static constexpr lv_coord_t RowH   = 7;
 	/**
 	 * Per-header height (group titles). Trimmed to 9 px in S101 (was
 	 * 10) for the same fit reason as RowH above. pixelbasic7 leaves

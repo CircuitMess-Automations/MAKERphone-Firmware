@@ -110,6 +110,41 @@ struct SettingsData {
 	// NVS-resize pattern reads the new field as zero-initialised on
 	// a first boot after the firmware grows.
 	char powerOffMessage[24] = "";
+	// S147 - operator-logo banner (text + 5x16 user-pixelable bitmap)
+	// painted just under the status bar on PhoneHomeScreen so the
+	// device wears the classic Sony-Ericsson / Nokia carrier-banner
+	// silhouette every time the user wakes to the homescreen.
+	//
+	// Two slots:
+	//
+	//   operatorText - up to 15 visible chars (16-byte buffer with
+	//   trailing nul) shown left-aligned in pixelbasic7 cream. Empty
+	//   string keeps the text half blank so a logo-only banner is
+	//   possible. The factory default "MAKERphone" makes the banner
+	//   meaningful on first boot.
+	//
+	//   operatorLogo - five 16-bit rows. Bit 15 of each row is the
+	//   leftmost column (pixel x = 0) and bit 0 is the rightmost
+	//   (pixel x = 15), so the bitmap reads naturally when written
+	//   out as binary literals. Pixels are rendered at 1 device-px
+	//   per cell on the homescreen so the on-screen size matches
+	//   the literal 16x5 cell budget. The factory default is all
+	//   zeros (an empty logo), which the banner widget treats as
+	//   "text only" -- no stray dots show up on first boot before
+	//   the user has touched the editor.
+	//
+	// Both slots are edited from PhoneOperatorScreen, reachable via
+	// the SYSTEM section of PhoneSettingsScreen ("Operator" row,
+	// directly below the S146 "Power-off msg" row). The screen
+	// switches between TEXT (T9 entry) and LOGO (16x5 cursor-driven
+	// pixel toggling) modes via the BTN_L bumper, so the keypad
+	// layout stays familiar even while editing the bitmap. On exit
+	// the screen calls Settings.store() so a power-cycle preserves
+	// both slots through the existing NVS-resize pattern that grew
+	// the struct via soundProfile / wallpaperStyle / themeId /
+	// keyTicks / ownerName / powerOffMessage.
+	char     operatorText[16] = "MAKERphone";
+	uint16_t operatorLogo[5]  = { 0, 0, 0, 0, 0 };
 };
 
 class SettingsImpl {
