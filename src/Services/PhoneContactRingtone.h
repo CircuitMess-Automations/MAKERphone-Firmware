@@ -130,6 +130,39 @@ public:
 	 *  or 0 (the DefaultId slot) when the id is not currently in
 	 *  the picker. */
 	static uint8_t pickerIndexOf(uint8_t id);
+
+	// ---------- per-profile ringtone (S160) ----------
+
+	/** Number of phone profiles the system models, mirroring the
+	 *  PhoneProfileScreen::ProfileCount enum (General / Silent /
+	 *  Meeting / Outdoor / Headset). Sized fixed at 5 so the
+	 *  Settings.profileRingtones byte array can be referenced without
+	 *  pulling in the screen header. */
+	static constexpr uint8_t ProfileCount = 5;
+
+	/** Read the persisted ringtone id for `profileIdx` (0..4) and
+	 *  return either that id (when usable) or `DefaultId`. The
+	 *  Settings layer holds the storage; this helper validates so
+	 *  callers always receive a playable id even if NVS holds garbage.
+	 *
+	 *  Out-of-range `profileIdx` collapses to profile 0 (General) so
+	 *  a stale phoneProfile byte never reads beyond the array. */
+	static uint8_t profileRingtoneId(uint8_t profileIdx);
+
+	/** Persist `id` as the ringtone for `profileIdx` and call
+	 *  `Settings.store()` so the choice survives a power-cycle.
+	 *  No-op for out-of-range `profileIdx`; out-of-range `id`s are
+	 *  clamped to `DefaultId` so a malformed picker never writes
+	 *  unplayable junk into NVS. */
+	static void    setProfileRingtoneId(uint8_t profileIdx, uint8_t id);
+
+	/** Convenience: ringtone id for the currently-active profile
+	 *  (read straight from `Settings.phoneProfile`). Used by
+	 *  PhoneCallService to pick the default tone for an incoming
+	 *  call from a peer that is not in PhoneContacts -- a
+	 *  paired-but-uncustomised peer rings with the active profile's
+	 *  audio rather than always falling back to Synthwave. */
+	static uint8_t activeProfileRingtoneId();
 };
 
 #endif // CHATTER_FIRMWARE_PHONE_CONTACT_RINGTONE_H

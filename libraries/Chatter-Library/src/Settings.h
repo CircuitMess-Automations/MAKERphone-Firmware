@@ -190,6 +190,54 @@ struct SettingsData {
 	// next to soundProfile / themeId / keyTicks so the profile-related
 	// settings cluster together in the SettingsData blob.
 	uint8_t phoneProfile = 0;
+	// S160 - per-profile ringtone selection. One ringtone id per
+	// PhoneProfileScreen profile (General / Silent / Meeting / Outdoor /
+	// Headset, indexed in the same order the phoneProfile byte
+	// enumerates). The id encoding mirrors PhoneContactRingtone:
+	//
+	//   0..4    - PhoneRingtoneLibrary::Id (Synthwave / Classic / Beep /
+	//             Boss / Silent), in the order the library defines them.
+	//   100..103 - PhoneComposer save slots 0..3 (the same offset the
+	//             per-contact ringtoneId field uses, so the picker can
+	//             reuse PhoneContactRingtone::pickerCount() / pickerIdAt()
+	//             without forking a parallel encoding).
+	//
+	// Defaults match the per-profile vibe documented in
+	// PhoneProfileScreen.h:
+	//
+	//   General  -> 1 (Classic)   - factory profile, full ringer.
+	//   Silent   -> 4 (Silent)    - looped rest, never asserts the piezo
+	//                                even if a future revision unmutes
+	//                                mid-ring.
+	//   Meeting  -> 4 (Silent)    - vibration-only intent today; the
+	//                                ringtone slot stays Silent so a
+	//                                misconfigured Meeting profile never
+	//                                surprises the user with audio.
+	//   Outdoor  -> 3 (Boss)      - loudest stock tone for a noisy
+	//                                environment.
+	//   Headset  -> 0 (Synthwave) - quieter melody for headset use.
+	//
+	// PhoneCallService reads the active profile's slot
+	// (Settings.profileRingtones[Settings.phoneProfile]) for any peer
+	// that does not have a contact override set, so a freshly-flashed
+	// device rings with profile-appropriate audio out of the box.
+	// Per-contact ringtones (S153) still take precedence: the call
+	// service first checks PhoneContacts::exists(peer) and, if a
+	// contact entry is present, hands over to its stored ringtoneId.
+	// Persisted values outside the documented encoding are clamped to
+	// PhoneContactRingtone::DefaultId (Synthwave) at the screen /
+	// resolver layer so a stale NVS blob never crashes playback.
+	// Sits next to phoneProfile so the profile-related settings stay
+	// clustered in the SettingsData blob; the existing NVS-resize
+	// pattern (that grew this struct via soundProfile / wallpaperStyle
+	// / themeId / keyTicks / ownerName / powerOffMessage / operatorText
+	// / operatorLogo / phoneProfile) reads the new five-byte slice as
+	// zero-initialised on a first boot after the firmware grows --
+	// which would map every profile to the Synthwave default; the
+	// resolver layer applies the documented per-profile defaults when
+	// the slot reads as 0 to keep first-boot behaviour matching the
+	// table above.
+	uint8_t profileRingtones[5] = { 1, 4, 4, 3, 0 };
 	// S151 - speed-dial slots mapping numeric keypad digits to LoRa
 	// peer UIDs. A long-press of BTN_1..BTN_9 on the homescreen
 	// (PhoneHomeScreen) looks up the matching slot and fires

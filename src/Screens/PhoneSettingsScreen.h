@@ -123,6 +123,17 @@ public:
 		// each other -- About stays anchored at the bottom of the
 		// SYSTEM list where feature-phone users expect to find it.
 		SpeedDial  = 10,       // S151
+		// S160 - per-profile ringtone selection. Drills into
+		// PhoneProfileRingtoneScreen (a two-mode list+pick screen
+		// patterned after PhoneSpeedDialScreen) which lets the user
+		// assign one ringtone id per phone profile (General / Silent /
+		// Meeting / Outdoor / Headset). Lives in the SOUND group right
+		// below "Profile" / "Key clicks" so the three profile-related
+		// rows cluster together inside the SOUND section. Persistence
+		// is via Settings.profileRingtones[5]; PhoneCallService reads
+		// the active profile's slot for any incoming call from a peer
+		// that does not have a contact override set.
+		ProfileRingtone = 11,  // S160
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);
@@ -172,7 +183,7 @@ public:
 	void flashRightSoftKey();
 
 	/** Number of selectable rows (excludes group headers). */
-	static constexpr uint8_t ItemCount = 11;
+	static constexpr uint8_t ItemCount = 12;
 
 	// --- Geometry, exposed for unit-test friendliness. -----------------
 

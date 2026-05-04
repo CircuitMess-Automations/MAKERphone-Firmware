@@ -133,17 +133,30 @@ void PhoneCallService::showIncomingCall(UID_t peer) {
 	incoming->setOnAnswer(&PhoneCallService::onAnswer);
 	incoming->setOnReject(&PhoneCallService::onReject);
 
-	// S153 — per-contact custom ringtone. PhoneContacts::ringtoneOf
-	// reads the contact override (default 0 = Synthwave). The
-	// PhoneContactRingtone helper validates the id (falling back to
-	// the default for empty composer slots) and resolves either a
+	// S153 / S160 — per-contact / per-profile custom ringtone.
+	// Selection rule:
+	//   1. If the peer has an explicit PhoneContacts override
+	//      (PhoneContacts::exists(peer) is true), use the contact's
+	//      stored ringtoneId — the S153 per-contact behaviour.
+	//   2. Otherwise fall back to the active profile's ringtone
+	//      (Settings.profileRingtones[Settings.phoneProfile]) — the
+	//      new S160 default. A paired-but-uncustomised peer rings
+	//      with whatever the user picked for the current profile
+	//      rather than always falling back to Synthwave.
+	//
+	// The PhoneContactRingtone helper validates the id (falling back
+	// to the default for empty composer slots) and resolves either a
 	// library tone or the user's composed ringtone into a Melody
 	// pointer. The pointer is owned by static storage in the helper
 	// for the lifetime of this incoming-call screen, which is the
 	// lifetime semantics PhoneIncomingCall::setRingtone documents.
-	const uint8_t storedRingtoneId =
-			PhoneContactRingtone::validatedOrDefault(
-					PhoneContacts::ringtoneOf(peer));
+	uint8_t storedRingtoneId;
+	if(PhoneContacts::exists(peer)) {
+		storedRingtoneId = PhoneContactRingtone::validatedOrDefault(
+				PhoneContacts::ringtoneOf(peer));
+	} else {
+		storedRingtoneId = PhoneContactRingtone::activeProfileRingtoneId();
+	}
 	if(const auto* m = PhoneContactRingtone::resolve(storedRingtoneId)) {
 		incoming->setRingtone(m);
 	}

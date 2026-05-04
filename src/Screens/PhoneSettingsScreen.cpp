@@ -75,6 +75,16 @@ const Section kLayout[] = {
 	// only fires while the device is in Mute / Vibrate; in Loud the
 	// existing 25 ms key tones already cover navigation feedback).
 	{ false, "Key clicks",         "KEY CLICKS",  PhoneSettingsScreen::Item::Haptics    },
+	// S160 - per-profile ringtone selection. Drills into the
+	// new PhoneProfileRingtoneScreen (two-mode list + pick
+	// screen, patterned after PhoneSpeedDialScreen) which
+	// reads / writes Settings.profileRingtones[5] so each of
+	// the five PhoneProfileScreen profiles can carry its own
+	// ringtone choice. Lives at the bottom of the SOUND group
+	// so the three profile-related rows ("Profile" / "Key
+	// clicks" / "Profile ring") cluster together inside the
+	// SOUND section.
+	{ false, "Profile ring",       "PROFILE RING", PhoneSettingsScreen::Item::ProfileRingtone },
 	{ true,  "SYSTEM",             nullptr,       PhoneSettingsScreen::Item::DateTime   },
 	{ false, "Date & Time",        "DATE & TIME", PhoneSettingsScreen::Item::DateTime   },
 	// S144 - owner name (lock-screen greeting). Sits between Date & Time

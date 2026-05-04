@@ -35,6 +35,7 @@
 #include "../Screens/PhonePowerOffMessageScreen.h"
 #include "../Screens/PhoneOperatorScreen.h"
 #include "../Screens/PhoneSpeedDialScreen.h"
+#include "../Screens/PhoneProfileRingtoneScreen.h"
 #include "../Screens/PhoneWelcomeScreen.h"
 #include "../Screens/PhoneGamesScreen.h"
 #include "../Interface/LVScreen.h"
@@ -315,6 +316,23 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// push picks up the matching palette + wallpaper via
 						// PhoneSynthwaveBg::resolveStyleFromSettings().
 						self->push(new PhoneThemeScreen());
+						break;
+					case PhoneSettingsScreen::Item::ProfileRingtone:
+						// S160: per-profile ringtone selection drills into
+						// PhoneProfileRingtoneScreen, a two-mode list+pick
+						// screen patterned after PhoneSpeedDialScreen. The
+						// list view shows the five PhoneProfileScreen
+						// profiles (General / Silent / Meeting / Outdoor /
+						// Headset) each with its current ringtone name; the
+						// pick view replays the standard PhoneContactRingtone
+						// picker (5 library tones plus any populated
+						// composer slots). Selection is persisted into
+						// Settings.profileRingtones[5] via
+						// PhoneContactRingtone::setProfileRingtoneId so
+						// PhoneCallService picks up the active profile's
+						// choice on the next incoming call from a peer that
+						// has no contact override set.
+						self->push(new PhoneProfileRingtoneScreen());
 						break;
 					default:
 						// Defensive: any future row that is added to

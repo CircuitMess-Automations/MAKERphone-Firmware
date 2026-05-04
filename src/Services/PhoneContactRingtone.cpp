@@ -4,6 +4,7 @@
 #include "PhoneComposerStorage.h"
 #include "PhoneComposerPlayback.h"
 #include "../Screens/PhoneComposer.h"
+#include <Settings.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -214,4 +215,37 @@ uint8_t PhoneContactRingtone::pickerIndexOf(uint8_t id) {
 		}
 	}
 	return 0;
+}
+
+// =====================================================================
+// S160 - per-profile ringtone selection
+//
+// Each phone profile (General / Silent / Meeting / Outdoor / Headset)
+// owns one slot in `Settings.profileRingtones`. The helpers here are
+// the read / write surface used by the new PhoneProfileRingtoneScreen
+// and PhoneCallService's "no contact override" fallback path.
+//
+// Validation is deliberately strict: any id that does not currently
+// resolve to a playable melody (an empty composer slot, a corrupted
+// NVS byte) collapses to DefaultId before being returned, so the
+// caller never has to second-guess whether resolve() will succeed.
+// =====================================================================
+
+uint8_t PhoneContactRingtone::profileRingtoneId(uint8_t profileIdx) {
+	if(profileIdx >= ProfileCount) profileIdx = 0;
+	const uint8_t raw = Settings.get().profileRingtones[profileIdx];
+	return validatedOrDefault(raw);
+}
+
+void PhoneContactRingtone::setProfileRingtoneId(uint8_t profileIdx, uint8_t id) {
+	if(profileIdx >= ProfileCount) return;
+	const uint8_t cleaned = validatedOrDefault(id);
+	Settings.get().profileRingtones[profileIdx] = cleaned;
+	Settings.store();
+}
+
+uint8_t PhoneContactRingtone::activeProfileRingtoneId() {
+	uint8_t idx = Settings.get().phoneProfile;
+	if(idx >= ProfileCount) idx = 0;
+	return profileRingtoneId(idx);
 }
