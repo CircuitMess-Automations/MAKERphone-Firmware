@@ -105,6 +105,7 @@ private:
 	lv_obj_t* horizonLine;  // thin orange line where sky meets ground
 	lv_obj_t* wordmark;     // "MAKERphone" pixelbasic16 label
 	lv_obj_t* tagline;      // "2.0" pixelbasic7 cyan accent
+	lv_obj_t* phrase;       // S177 - rotating motivational phrase (daily)
 	lv_obj_t* hint;         // "press any key" dim hint
 
 	lv_timer_t* dismissTimer;
@@ -115,7 +116,25 @@ private:
 	void buildSun();
 	void buildWordmark();
 	void buildTagline();
+	void buildPhrase();
 	void buildHint();
+
+	/**
+	 * S177 - return today's motivational boot phrase.
+	 *
+	 * Picks a phrase from a small fixed table indexed by the wall-
+	 * clock day number (PhoneClock::nowEpoch() / 86400). The same
+	 * phrase is returned every time it is queried within a single
+	 * calendar day, regardless of how many times the device boots
+	 * during that day, so a user who power-cycles in the morning and
+	 * again in the evening sees one consistent message of the day.
+	 *
+	 * Pure - no LVGL state. Exposed as a static so PhoneBootSplash
+	 * unit-style tests can verify the rotation without instantiating
+	 * the screen. Returns a pointer to a string-literal owned by the
+	 * boot splash translation unit; callers must NOT free it.
+	 */
+	static const char* phraseForToday();
 
 	void startDismissTimer();
 	void stopDismissTimer();

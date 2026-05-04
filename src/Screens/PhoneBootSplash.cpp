@@ -4,6 +4,7 @@
 #include <Pins.hpp>
 
 #include "../Fonts/font.h"
+#include "../Services/PhoneClock.h"
 #include "../Services/PhoneRingtoneEngine.h"
 
 // ---- MAKERphone retro palette ----------------------------------------------
@@ -65,6 +66,77 @@ static const PhoneRingtoneEngine::Melody kBootChime = {
 };
 
 
+// =====================================================================
+// S177 - Daily rotating motivational boot phrase
+//
+// A small handful of upbeat one-liners that cycle once per day, so the
+// boot splash feels a little more alive each morning than the static
+// "press any key" hint alone could. The phrase is picked by indexing
+// into kBootPhrases with the device's day number (PhoneClock::nowEpoch
+// floor-divided by 86400 seconds per day, modulo the table length), so
+// every reboot WITHIN the same calendar day surfaces the same line and
+// the next-day boot rolls on to the following one.
+//
+// Constraints driving the table:
+//  - Each line is short enough to render on a single pixelbasic7 line
+//    inside the 160-px display. Empirically the font fits ~26 short
+//    glyphs across the screen; we keep every entry well under 22 chars
+//    so kerning + ALIGN_CENTER never bleed over the screen edge.
+//  - Tone is intentionally light, builder-flavoured, and platform-
+//    appropriate (Sony-Ericsson-era flip-phone wallpaper energy). No
+//    motivational-poster cliches that would read as off-brand on a
+//    handheld whose primary use case is messing with electronics.
+//  - 21 entries chosen so a typical user does not see the same line
+//    on two consecutive Mondays - the rotation only repeats every
+//    three weeks, which is "feels fresh enough" for a free-form
+//    daily mood line without ballooning the .rodata footprint.
+//
+// All strings are stored in flash as PROGMEM-eligible string literals
+// (the Arduino toolchain places `static const char* const` arrays in
+// .rodata on ESP32, which is what we want). The returned pointer is
+// stable for the program's lifetime, so the LVGL label can hold it
+// without a copy.
+// =====================================================================
+static const char* const kBootPhrases[] = {
+	"STAY CURIOUS",
+	"SHIP IT",
+	"DO THE WORK",
+	"ONE MORE TRY",
+	"BE BRAVE TODAY",
+	"BUILD FAST",
+	"TRUST THE PROCESS",
+	"MAKE IT WORK",
+	"KEEP HACKING",
+	"DREAM BIGGER",
+	"ENJOY THE BUGS",
+	"EMBRACE CHAOS",
+	"QUESTION EVERYTHING",
+	"NEVER STOP LEARNING",
+	"BE KIND TO YOU",
+	"SOLDER ON",
+	"HELLO FUTURE YOU",
+	"READY PLAYER ONE",
+	"DEBUG WITH JOY",
+	"MAKE THINGS",
+	"LIVE LONG, CODE ON",
+};
+static constexpr uint16_t kBootPhraseCount =
+	sizeof(kBootPhrases) / sizeof(kBootPhrases[0]);
+
+const char* PhoneBootSplash::phraseForToday() {
+	// Day index = wall-clock seconds floor-divided by seconds per day.
+	// Wraps around naturally as new days tick by; the static table
+	// guarantees a non-empty pick regardless of clock state because we
+	// fall back to the first entry whenever the table is unexpectedly
+	// empty (defensive paranoia - the table is constexpr-sized > 0).
+	if(kBootPhraseCount == 0) return "MAKE TODAY COUNT";
+	const uint32_t epoch = PhoneClock::nowEpoch();
+	const uint32_t day   = epoch / 86400UL;
+	const uint16_t idx   = static_cast<uint16_t>(day % kBootPhraseCount);
+	return kBootPhrases[idx];
+}
+
+
 PhoneBootSplash::PhoneBootSplash(DismissHandler onDismiss,
 								 uint32_t       durationMs)
 		: LVScreen(),
@@ -77,6 +149,7 @@ PhoneBootSplash::PhoneBootSplash(DismissHandler onDismiss,
 		  horizonLine(nullptr),
 		  wordmark(nullptr),
 		  tagline(nullptr),
+		  phrase(nullptr),
 		  hint(nullptr),
 		  dismissTimer(nullptr) {
 
@@ -104,6 +177,7 @@ PhoneBootSplash::PhoneBootSplash(DismissHandler onDismiss,
 	buildSun();
 	buildWordmark();
 	buildTagline();
+	buildPhrase();
 	buildHint();
 }
 
@@ -261,6 +335,31 @@ void PhoneBootSplash::buildTagline() {
 	lv_label_set_text(tagline, "2 . 0");
 	lv_obj_set_align(tagline, LV_ALIGN_TOP_MID);
 	lv_obj_set_y(tagline, 50);
+}
+
+void PhoneBootSplash::buildPhrase() {
+	// S177 - daily rotating boot phrase. Anchored just below the "2.0"
+	// tagline (y = 50, height ~7) and just above the horizon glow line
+	// (y = 80) so the phrase sits in the dim purple twilight band that
+	// gradients the sky into the ground, framing the rising sun nicely
+	// without crowding either the wordmark above or the half-disc and
+	// "press any key" hint below.
+	//
+	// pixelbasic7 in warm cream so the phrase reads as a focal accent
+	// (one notch warmer than the cyan tagline so the eye still treats
+	// the wordmark as the brightest element, but the phrase is still
+	// clearly legible against the magenta-leaning sky band).
+	//
+	// LVGL center-aligns short labels on TOP_MID without further width
+	// hinting, so we let the label compute its own width rather than
+	// pinning it to 160 px (which would force a left-justified single
+	// line and ruin the centred composition).
+	phrase = lv_label_create(obj);
+	lv_obj_set_style_text_font(phrase, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(phrase, MP_TEXT, 0);
+	lv_label_set_text(phrase, phraseForToday());
+	lv_obj_set_align(phrase, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(phrase, 64);
 }
 
 void PhoneBootSplash::buildHint() {
