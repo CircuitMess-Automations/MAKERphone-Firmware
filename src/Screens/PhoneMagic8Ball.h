@@ -87,6 +87,14 @@ public:
 	void onStart() override;
 	void onStop() override;
 
+	// S168: PhoneTiltSimulator hook - "shake the phone" (hold BTN_L +
+	// BTN_R together) is the most thematically obvious gesture for
+	// the 8-ball, so it forwards straight to the existing beginShake()
+	// pipeline. A shake mid-tumble is silently absorbed by the same
+	// "active shake is a no-op" guard that protects against mashing
+	// the centre key.
+	void onShake() override;
+
 	/** Number of canon answers in the table. */
 	static constexpr uint8_t AnswerCount = 20;
 

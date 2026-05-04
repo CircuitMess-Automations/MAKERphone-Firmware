@@ -221,6 +221,16 @@ void PhoneDiceRoller::onStop() {
 	rolling = false;
 }
 
+// S168: shake-to-randomize hook. PhoneTiltSimulator fires this when
+// the user holds BTN_L + BTN_R together for the chord window. We
+// route straight through the existing beginRoll() entry point so
+// the dice tumble, the tone-coloured total render, and the
+// tumble-in-progress guard are all reused unchanged - a shake mid
+// tumble is the same no-op as mashing ROLL during a tumble.
+void PhoneDiceRoller::onShake() {
+	beginRoll();
+}
+
 // ---------- render ----------------------------------------------------
 
 void PhoneDiceRoller::renderMode() {

@@ -272,6 +272,14 @@ void PhoneMagic8Ball::onStop() {
 	shaking = false;
 }
 
+// S168: shake-to-randomize hook. The 8-ball is the most literal
+// shake gesture in the firmware, so this just forwards to
+// beginShake() - tumble animation, ball wobble, and answer reveal
+// are reused unchanged.
+void PhoneMagic8Ball::onShake() {
+	beginShake();
+}
+
 // ---------- render ----------------------------------------------------
 
 void PhoneMagic8Ball::renderIdle() {

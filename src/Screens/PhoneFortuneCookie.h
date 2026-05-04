@@ -100,6 +100,13 @@ public:
 	void onStart() override;
 	void onStop() override;
 
+	// S168: PhoneTiltSimulator hook - cracking a fortune cookie is
+	// a literal shake gesture in real life, so the L+R chord forwards
+	// to beginCrack(). A shake while a crack is already animating is
+	// silently absorbed by the same "active crack is a no-op" guard
+	// that protects against repeated centre-key mashing.
+	void onShake() override;
+
 	/** Number of fortunes in the inline table. */
 	static constexpr uint8_t  FortuneCount     = 32;
 

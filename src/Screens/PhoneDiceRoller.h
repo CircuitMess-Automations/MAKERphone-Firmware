@@ -106,6 +106,16 @@ public:
 	void onStart() override;
 	void onStop() override;
 
+	// S168: PhoneTiltSimulator hook - "shake the phone" (hold BTN_L +
+	// BTN_R together) re-rolls the current mode just like pressing
+	// the ROLL key. Defined inline so the header carries the contract
+	// alongside the rest of the public surface. Forwards to the
+	// existing beginRoll() pipeline so all the colour/tone logic and
+	// the tumble timer are reused unchanged - a shake mid-tumble is
+	// silently absorbed by beginRoll()'s "active tumble is a no-op"
+	// guard, matching the behaviour of repeated ROLL presses.
+	void onShake() override;
+
 	/** Number of supported face counts (d4, d6, d8, d10, d12, d20). */
 	static constexpr uint8_t FaceCount = 6;
 

@@ -24,6 +24,7 @@
 #include "src/Services/SleepService.h"
 #include "src/Services/PhoneIdleDim.h"
 #include "src/Services/PhoneKonamiCode.h"
+#include "src/Services/PhoneTiltSimulator.h"
 #include "src/Services/ShutdownService.h"
 #include "src/Services/BuzzerService.h"
 #include "src/Services/PhoneRingtoneEngine.h"
@@ -165,6 +166,17 @@ void boot(){
 	// IdleDim.begin() so Input is fully alive before we subscribe -
 	// matches the SleepService / BuzzerService / IdleDim pattern.
 	Konami.begin();
+
+	// S168: PhoneTiltSimulator - global "shake the phone" gesture
+	// detector (hold BTN_L + BTN_R together for HoldMs, then fire
+	// onShake() on whichever LVScreen is visible). Idle-cheap (single
+	// millis compare per loop while the chord is inactive). Ordered
+	// after Konami.begin() because both are passive Input listeners
+	// that benefit from being subscribed before the first screen
+	// pushes input through. Screens that opt-in to randomize via
+	// onShake() pick this up automatically; everyone else inherits
+	// the LVScreen::onShake() no-op default and is unaffected.
+	Tilt.begin();
 
 
 	// S148: the Ringtone engine has to come up BEFORE PhoneBootSplash

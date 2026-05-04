@@ -244,7 +244,7 @@ The kind of thing customers post about when they discover it.
 - [x] **S165** — `*#0000#` → firmware-info screen (Sony-Ericsson code).
 - [x] **S166** — Konami code on the d-pad → unlocks rainbow theme.
 - [x] **S167** — Long-press `5` on dialer → flashlight quick-shortcut.
-- [ ] **S168** — Tilt simulator (hold L+R together) → shake-to-randomize current screen.
+- [x] **S168** — Tilt simulator (hold L+R together) → shake-to-randomize current screen.
 - [ ] **S169** — Random tip-of-the-day banner on home idle.
 - [ ] **S170** — ASCII art slideshow viewer — eight hand-pixeled drawings.
 - [ ] **S171** — `PhoneStressReliever` — tap a thing repeatedly, watch reactions.

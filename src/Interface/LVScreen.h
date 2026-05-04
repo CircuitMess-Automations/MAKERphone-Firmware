@@ -15,6 +15,16 @@ public:
 	virtual void onStart();
 	virtual void onStop();
 
+	// S168: optional 'shake' gesture hook. PhoneTiltSimulator (the
+	// global L+R held-together detector) calls this on whichever
+	// LVScreen is currently visible when the gesture fires. Default
+	// is a no-op so existing screens are unaffected; opt-in screens
+	// (PhoneDiceRoller, PhoneMagic8Ball, PhoneFortuneCookie, ...)
+	// override this to randomize their state. Screens that already
+	// use BTN_L+BTN_R as a chord (PhonePinball flippers) inherit the
+	// no-op default and remain unaffected.
+	virtual void onShake() {}
+
 	void start(bool animate = false, lv_scr_load_anim_t animation = LV_SCR_LOAD_ANIM_MOVE_BOTTOM);
 	void stop();
 

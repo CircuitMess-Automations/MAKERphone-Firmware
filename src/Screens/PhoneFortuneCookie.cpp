@@ -362,6 +362,14 @@ void PhoneFortuneCookie::onStop() {
 	cracking = false;
 }
 
+// S168: shake-to-randomize hook. The L+R chord cracks the cookie
+// just like pressing the centre key would. Forwards to beginCrack()
+// so the wobble, the cookie-open visual, and the fortune reveal
+// are reused unchanged.
+void PhoneFortuneCookie::onShake() {
+	beginCrack();
+}
+
 // ---------- clock + state -------------------------------------------
 
 void PhoneFortuneCookie::refreshFromClock() {
