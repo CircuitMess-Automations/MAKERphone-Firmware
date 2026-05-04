@@ -20,6 +20,12 @@
 #include "../Screens/PhoneSettingsScreen.h"
 #include "../Screens/PhoneBrightnessScreen.h"
 #include "../Screens/PhoneSoundScreen.h"
+// S159 - classic Sony-Ericsson five-state Profile picker that supersedes
+// the S52 three-state PhoneSoundScreen as the user-facing surface for the
+// SOUND row of PhoneSettingsScreen. The legacy soundProfile + sound fields
+// are still written by PhoneProfileScreen on save so existing readers stay
+// untouched.
+#include "../Screens/PhoneProfileScreen.h"
 #include "../Screens/PhoneHapticsScreen.h"
 #include "../Screens/PhoneWallpaperScreen.h"
 #include "../Screens/PhoneDateTimeScreen.h"
@@ -195,12 +201,20 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						self->push(new PhoneWallpaperScreen());
 						break;
 					case PhoneSettingsScreen::Item::Sound:
-						// S52: Sound + Vibration toggles screen replaces the
-						// SOUND placeholder stub. PhoneSoundScreen reads the
-						// persisted profile from Settings and lets the user
-						// switch between Mute / Vibrate / Loud, persisting
-						// the choice on SAVE and reverting on BACK.
-						self->push(new PhoneSoundScreen());
+						// S159: classic Sony-Ericsson "Profile" five-state
+						// selector (General / Silent / Meeting / Outdoor /
+						// Headset) supersedes the S52 three-state Mute /
+						// Vibrate / Loud picker as the user-facing surface
+						// for the SOUND row of PhoneSettingsScreen.
+						// PhoneProfileScreen reads the persisted profile
+						// from Settings.phoneProfile, lets the user switch
+						// between the five named profiles, and on SAVE fans
+						// the choice out to the legacy soundProfile + sound
+						// fields so every existing reader (BuzzerService,
+						// PhoneRingtoneEngine, SettingsScreen,
+						// PhoneSoundScreen as a back-compat picker) keeps
+						// working with no churn.
+						self->push(new PhoneProfileScreen());
 						break;
 					case PhoneSettingsScreen::Item::Haptics:
 						// S68: subtle haptic-style nav-key tick toggle.

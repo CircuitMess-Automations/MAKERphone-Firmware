@@ -145,6 +145,51 @@ struct SettingsData {
 	// keyTicks / ownerName / powerOffMessage.
 	char     operatorText[16] = "MAKERphone";
 	uint16_t operatorLogo[5]  = { 0, 0, 0, 0, 0 };
+	// S159 - phone profile selector (the classic Sony-Ericsson / Nokia
+	// "General / Silent / Meeting / Outdoor / Headset" five-state
+	// system), enumerated in order:
+	//
+	//   0 = General  - ringer on, full volume, default factory profile.
+	//   1 = Silent   - no ringer, no key tones, no buzzer at all.
+	//   2 = Meeting  - ringer off, vibration-only intent (the buzzer
+	//                  stays silent today; a future hardware revision
+	//                  with a real vibration motor can light up on
+	//                  this profile without touching this enum).
+	//   3 = Outdoor  - loudest ringer + vibrate combo (today the
+	//                  buzzer shares the same loud tone budget as
+	//                  General; the distinction is preserved so S160
+	//                  / S161 can attach louder per-profile ringtones
+	//                  and a more aggressive vibration pattern here
+	//                  without churn).
+	//   4 = Headset  - ringer on, vibrate off (audio assumed routed
+	//                  through a wired/Bluetooth headset on a future
+	//                  hardware revision; today behaves identically
+	//                  to General audibly, but is preserved so the
+	//                  per-profile ringtone slot it owns can carry a
+	//                  quieter melody for headset use).
+	//
+	// PhoneProfileScreen (S159) reads + writes this field and on save
+	// also fans the choice out to the legacy sound boolean and the
+	// three-state soundProfile byte so existing readers
+	// (BuzzerService, PhoneRingtoneEngine, SettingsScreen,
+	// PhoneSoundScreen, PhoneHapticsScreen) keep working with no
+	// churn:
+	//
+	//   General  -> sound=true,  soundProfile=2 (Loud)
+	//   Silent   -> sound=false, soundProfile=0 (Mute)
+	//   Meeting  -> sound=false, soundProfile=1 (Vibrate)
+	//   Outdoor  -> sound=true,  soundProfile=2 (Loud)
+	//   Headset  -> sound=true,  soundProfile=2 (Loud)
+	//
+	// Default 0 (General) makes a freshly-flashed device boot into
+	// the most "phone-like" profile -- ringer on, full volume -- which
+	// matches how every Sony-Ericsson / Nokia of the era shipped from
+	// the factory. Persisted values outside [0..4] are clamped to
+	// General at the screen layer to be defensive against NVS-resize
+	// wipes that read the new byte as uninitialised garbage. Sits
+	// next to soundProfile / themeId / keyTicks so the profile-related
+	// settings cluster together in the SettingsData blob.
+	uint8_t phoneProfile = 0;
 	// S151 - speed-dial slots mapping numeric keypad digits to LoRa
 	// peer UIDs. A long-press of BTN_1..BTN_9 on the homescreen
 	// (PhoneHomeScreen) looks up the matching slot and fires

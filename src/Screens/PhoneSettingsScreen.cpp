@@ -60,7 +60,16 @@ const Section kLayout[] = {
 	// overrides the wallpaperStyle byte for as long as it is selected.
 	{ false, "Theme",              "THEME",       PhoneSettingsScreen::Item::Theme      },
 	{ true,  "SOUND",              nullptr,       PhoneSettingsScreen::Item::Sound      },
-	{ false, "Sound & Vibration",  "SOUND",       PhoneSettingsScreen::Item::Sound      },
+	// S159 - replaced the S52 "Sound & Vibration" three-state picker with
+	// the classic Sony-Ericsson "Profile" five-state selector
+	// (General / Silent / Meeting / Outdoor / Headset). The Item enum
+	// stays "Sound" so existing dispatch sites keep compiling; the
+	// IntroScreen launcher routes the activation to PhoneProfileScreen
+	// instead of PhoneSoundScreen, and the new screen fans the choice
+	// out to the legacy soundProfile + sound fields on save so every
+	// existing reader (BuzzerService, PhoneRingtoneEngine, etc.) keeps
+	// working with no churn.
+	{ false, "Profile",            "PROFILE",     PhoneSettingsScreen::Item::Sound      },
 	// S68 - haptic-style nav-key tick toggle. Listed in the SOUND
 	// group because it co-modulates with the sound profile (the tick
 	// only fires while the device is in Mute / Vibrate; in Loud the
