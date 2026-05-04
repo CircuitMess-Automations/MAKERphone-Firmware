@@ -13,6 +13,9 @@
 #include "../Screens/PhoneActiveCall.h"
 #include "../Screens/PhoneCallEnded.h"
 
+#include "../Storage/PhoneContacts.h"
+#include "PhoneContactRingtone.h"
+
 // ---- singleton ----
 //
 // Same global-instance pattern the rest of the firmware's services use
@@ -129,6 +132,21 @@ void PhoneCallService::showIncomingCall(UID_t peer) {
 	auto* incoming = new PhoneIncomingCall(activeName, activeNumber, activeAvatar);
 	incoming->setOnAnswer(&PhoneCallService::onAnswer);
 	incoming->setOnReject(&PhoneCallService::onReject);
+
+	// S153 — per-contact custom ringtone. PhoneContacts::ringtoneOf
+	// reads the contact override (default 0 = Synthwave). The
+	// PhoneContactRingtone helper validates the id (falling back to
+	// the default for empty composer slots) and resolves either a
+	// library tone or the user's composed ringtone into a Melody
+	// pointer. The pointer is owned by static storage in the helper
+	// for the lifetime of this incoming-call screen, which is the
+	// lifetime semantics PhoneIncomingCall::setRingtone documents.
+	const uint8_t storedRingtoneId =
+			PhoneContactRingtone::validatedOrDefault(
+					PhoneContacts::ringtoneOf(peer));
+	if(const auto* m = PhoneContactRingtone::resolve(storedRingtoneId)) {
+		incoming->setRingtone(m);
+	}
 
 	callActive = true;
 	host->push(incoming);

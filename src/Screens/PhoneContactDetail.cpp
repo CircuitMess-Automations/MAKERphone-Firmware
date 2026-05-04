@@ -11,6 +11,7 @@
 #include "../Elements/PhonePixelAvatar.h"
 #include "../Fonts/font.h"
 #include "../Storage/PhoneContacts.h"
+#include "PhoneContactRingtonePicker.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget so
 // the contact detail reads visually as part of the same family. Inlined
@@ -382,6 +383,19 @@ void PhoneContactDetail::buttonPressed(uint i) {
 		case BTN_L:
 			// Left bumper - shortcut to fire the MESSAGE action.
 			if(messageCb) messageCb(this);
+			break;
+
+		case BTN_5:
+			// S153 — open the per-contact ringtone picker. BTN_5 is
+			// otherwise unbound on this screen (CALL / MESSAGE focus
+			// already lives on BTN_2 / BTN_8 + bumpers). The picker
+			// reads + persists the new id itself, so the detail
+			// screen does not have to thread anything through.
+			if(uid != 0) {
+				push(new PhoneContactRingtonePicker(uid));
+			}else if(softKeys) {
+				softKeys->flashLeft();
+			}
 			break;
 
 		case BTN_BACK:
