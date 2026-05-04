@@ -11,6 +11,7 @@
 #include "../Elements/ConvoBox.h"
 #include "../Modals/ContextMenu.h"
 #include "../Elements/PicMenu.h"
+#include "../Elements/PhoneEnvelopeFly.h"
 #if MAKERPHONE_USE_T9_COMPOSER
 #include "../Elements/PhoneT9Input.h"
 #endif
@@ -51,6 +52,12 @@ private:
 #endif
 	PicMenu* picMenu;
 	ContextMenu* menuMessage;
+
+	// S156 - one-shot envelope-flying flourish that plays after
+	// every successful sendMessage(). Built once in the ctor, kept
+	// alive on top of every other widget on the screen, and started
+	// each time the user posts an outbound message.
+	PhoneEnvelopeFly* envelopeFly = nullptr;
 
 	Message selectedMessage;
 };

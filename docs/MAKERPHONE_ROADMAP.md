@@ -228,7 +228,7 @@ Tiny details that make the difference between "phone-shaped toy" and "this is ex
 - [x] **S153** — Per-contact custom ringtone (depends on S121–S123 composer output).
 - [x] **S154** — "Press any key" idle hint that fades in after 10 s of stillness.
 - [x] **S155** — Animated battery-charge fill bars on lock + home.
-- [ ] **S156** — Envelope-flying SMS-sent animation.
+- [x] **S156** — Envelope-flying SMS-sent animation.
 - [ ] **S157** — "Delivered" double-tick chime.
 - [ ] **S158** — "Missed call" inverted-color flash on next wake.
 - [ ] **S159** — Profile system (General / Silent / Meeting / Outdoor / Headset).

@@ -95,6 +95,14 @@ ConvoScreen::ConvoScreen(UID_t uid) : convo(uid){
 
 	menuMessage = new ContextMenu(this);
 
+	// S156 - envelope-flying SMS-sent flourish. Built *after* the
+	// PicMenu / ContextMenu so it sits one layer above them in the
+	// LVGL z-order and the envelope is always visible. Parent is
+	// the screen root (`obj`) rather than the inner container so
+	// the carrier coordinates are in screen space (matches the
+	// 160x128 anchors hard-coded in the widget).
+	envelopeFly = new PhoneEnvelopeFly(obj);
+
 
 #if !MAKERPHONE_USE_T9_COMPOSER
 	lv_obj_add_event_cb(textEntry->getLvObj(), [](lv_event_t* e){
@@ -348,6 +356,18 @@ void ConvoScreen::sendMessage(){
 	lv_timer_handler();
 
 	convoBox->addMessage(message);
+
+	// S156 - the envelope-flying flourish. Fires *after* the
+	// outbound bubble lands in the convo list so the user sees the
+	// message arrive then the envelope leave. The overlay was
+	// built in the ctor and lives on top of every other widget on
+	// this screen, so a re-trigger on a fast typist (one tap before
+	// the previous flight ends) cancels mid-flight and starts a
+	// fresh one. start() is idempotent.
+	if(envelopeFly != nullptr) {
+		lv_obj_move_foreground(envelopeFly->getLvObj());
+		envelopeFly->start();
+	}
 }
 
 void ConvoScreen::textEntryConfirm(){
