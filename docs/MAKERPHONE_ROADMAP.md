@@ -252,7 +252,7 @@ The kind of thing customers post about when they discover it.
 - [x] **S173** — Type "S-N-A-K-E" on dialer → instant Snake launch.
 - [x] **S174** — Find-Friends radar mini — animated sweep over the friends list.
 - [x] **S175** — T9 vocab pack expansion (more dictionary words).
-- [ ] **S176** — Drum kit on dialer keypad — each digit a different drum.
+- [x] **S176** — Drum kit on dialer keypad — each digit a different drum.
 - [ ] **S177** — Boot phrase rotates each day (motivational quotes).
 - [ ] **S178** — Day-of-week themed wallpaper accents.
 

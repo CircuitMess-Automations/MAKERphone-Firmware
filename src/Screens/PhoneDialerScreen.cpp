@@ -16,6 +16,7 @@
 #include "PhoneFirmwareInfoScreen.h"
 #include "PhoneFlashlight.h"
 #include "PhoneFortuneCookie.h"
+#include "PhoneDrumKitScreen.h"
 
 // S173 - "S-N-A-K-E" Easter egg launches the Snake game directly from
 // the dialer when the user types 76253 (S=7, N=6, A=2, K=5, E=3 on a
@@ -288,6 +289,26 @@ void PhoneDialerScreen::appendGlyph(char c) {
 			&& buffer[2] == '2' && buffer[3] == '5' && buffer[4] == '3') {
 		clearBuffer();
 		launchSnakeShortcut();
+	}
+
+	// S176 - Drum-kit Easter egg. The classic Roland TR-909 was the
+	// drum machine that defined a generation of beats, so we use its
+	// model number as the secret unlock here: typing `*#909#` on the
+	// dialer (six glyphs, exact match) clears the buffer and pushes
+	// PhoneDrumKitScreen, which re-binds the keypad so each digit
+	// 0..9 fires a distinct percussion voice through the piezo. The
+	// detection is on EXACT match for the same reason `*#06#` /
+	// `*#0000#` above are strict — a buffer that merely contains
+	// the code as a suffix mid-edit (e.g. before a backspace) would
+	// otherwise fire prematurely. clearBuffer() runs *before* the
+	// push so the user lands on a clean dialer when the drum kit
+	// pops them back here on exit.
+	if(bufferLen == 6 && buffer[0] == '*' && buffer[1] == '#'
+			&& buffer[2] == '9' && buffer[3] == '0' && buffer[4] == '9'
+			&& buffer[5] == '#') {
+		clearBuffer();
+		auto* drum = new PhoneDrumKitScreen();
+		this->push(drum);
 	}
 }
 
