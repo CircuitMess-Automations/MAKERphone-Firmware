@@ -12,6 +12,7 @@
 
 #include "PhoneImeiRevealScreen.h"
 #include "PhoneFirmwareInfoScreen.h"
+#include "PhoneFlashlight.h"
 
 // MAKERphone retro palette - inlined per the established pattern in this
 // codebase (see PhoneMainMenu.cpp / PhoneHomeScreen.cpp / PhoneAppStubScreen.cpp).
@@ -81,6 +82,16 @@ PhoneDialerScreen::PhoneDialerScreen()
 	// the rest of the MAKERphone shell, so the gesture feels identical
 	// from any screen.
 	setButtonHoldTime(BTN_BACK, 600);
+
+	// S167 - hold BTN_5 to launch the PhoneFlashlight (S134) without
+	// having to dive through the utility-apps grid. Same 600 ms hold
+	// threshold every other long-press in the shell uses (BTN_BACK
+	// here, BTN_0 / BTN_1..BTN_9 on PhoneHomeScreen for speed-dial),
+	// so the gesture feels identical from any screen. The short-press
+	// path still routes BTN_5 to pad->pressGlyph('5') the moment the
+	// user taps the key, so normal dialling latency is unaffected;
+	// see buttonHeld(BTN_5) for the rollback + flashlight push.
+	setButtonHoldTime(BTN_5, 600);
 }
 
 PhoneDialerScreen::~PhoneDialerScreen() {
@@ -267,6 +278,38 @@ void PhoneDialerScreen::flashRightSoftKey() {
 	if(softKeys) softKeys->flashRight();
 }
 
+
+// ----- S167 helpers -----
+
+void PhoneDialerScreen::launchFlashlight() {
+	// Roll back any digits the buffer accumulated since BTN_5 was first
+	// pressed. In practice this is exactly the speculative '5' the
+	// short-press handler appended, but key-repeat or a stuck shift
+	// register could have queued more presses while the user was still
+	// holding the key, so we loop until we are back to the snapshot.
+	// backspace() is a NO-OP on an empty buffer, so the worst-case
+	// edge (buffer was already empty and the speculative append also
+	// failed because of MaxDigits) is harmless.
+	while(bufferLen > fivePreBufferLen) {
+		backspace();
+	}
+
+	// Tactile feedback: flash the left soft-key the same way the CALL
+	// button flashes, so the user gets a click cue at the moment of
+	// hand-off to the flashlight screen. The flashlight's own ctor
+	// will repaint the chrome on the next frame.
+	if(softKeys) softKeys->flashLeft();
+
+	// Push the flashlight on top of the dialer. PhoneFlashlight is
+	// fully self-contained: it snapshots screenBrightness on entry,
+	// restores it on exit, and pops itself when the user presses
+	// BTN_BACK / BTN_R / BTN_0. The dialer's buffer / cursor state
+	// is preserved underneath so the user lands back on whatever they
+	// were typing the moment the torch is dismissed.
+	auto* flashlight = new PhoneFlashlight();
+	this->push(flashlight);
+}
+
 // ----- input -----
 
 void PhoneDialerScreen::buttonPressed(uint i) {
@@ -281,7 +324,17 @@ void PhoneDialerScreen::buttonPressed(uint i) {
 		case BTN_2: if(pad) pad->pressGlyph('2'); break;
 		case BTN_3: if(pad) pad->pressGlyph('3'); break;
 		case BTN_4: if(pad) pad->pressGlyph('4'); break;
-		case BTN_5: if(pad) pad->pressGlyph('5'); break;
+		case BTN_5: {
+			// S167 - snapshot the buffer length BEFORE the speculative
+			// append so a subsequent long-press (buttonHeld) can roll
+			// the buffer back to where it was when the user first
+			// touched the key. Snapshotting is one comparison + one
+			// store, so the normal short-press path stays free.
+			fivePreBufferLen = bufferLen;
+			fiveLongFired    = false;
+			if(pad) pad->pressGlyph('5');
+			break;
+		}
 		case BTN_6: if(pad) pad->pressGlyph('6'); break;
 		case BTN_7: if(pad) pad->pressGlyph('7'); break;
 		case BTN_8: if(pad) pad->pressGlyph('8'); break;
@@ -380,6 +433,19 @@ void PhoneDialerScreen::buttonHeld(uint i) {
 			} else {
 				pop();
 			}
+			break;
+
+		case BTN_5:
+			// S167 - hold-to-flashlight quick shortcut. The matching
+			// short-press handler in buttonPressed already speculatively
+			// appended '5' to the buffer; launchFlashlight() rolls that
+			// append back so the user lands on a clean dialer when
+			// they pop the torch, then pushes the flashlight. The
+			// fiveLongFired flag is set first so any future deferred
+			// short-press handler we wire up cannot double-fire on
+			// key release.
+			fiveLongFired = true;
+			launchFlashlight();
 			break;
 
 		default:

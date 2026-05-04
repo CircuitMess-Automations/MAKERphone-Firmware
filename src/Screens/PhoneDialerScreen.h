@@ -155,6 +155,33 @@ private:
 	// use - keeps the two short-press / long-press paths from double-firing.
 	bool backLongFired = false;
 
+	// S167 - long-press BTN_5 on the dialer is a feature-phone-style
+	// quick-shortcut that pops the PhoneFlashlight utility (S134) into
+	// view, mirroring the way real Sony-Ericsson handsets parked the
+	// torch under a hold gesture. The short-press path still appends
+	// '5' to the buffer the moment the user taps the key, so dialling
+	// 555... stays snappy; on a long-hold we revert the speculative
+	// '5' (or any digits the user might have queued in the meantime,
+	// e.g. via auto-repeat) and push the flashlight screen.
+	//
+	// fivePreBufferLen   -- bufferLen snapshot taken in buttonPressed
+	//                       before pad->pressGlyph('5') runs, so
+	//                       buttonHeld can roll the buffer back to
+	//                       exactly where it was before the press.
+	// fiveLongFired      -- true once buttonHeld(BTN_5) has fired the
+	//                       flashlight push, so a future short-press
+	//                       handler (none today, but keeps parity
+	//                       with the existing backLongFired pattern)
+	//                       cannot double-fire on key release.
+	uint8_t fivePreBufferLen = 0;
+	bool    fiveLongFired    = false;
+
+	/** Push a fresh PhoneFlashlight (S134) on top of the dialer.
+	 *  Forward-declared in the .cpp so the header doesn't have to
+	 *  pull the full flashlight screen include into every translation
+	 *  unit that touches PhoneDialerScreen. */
+	void launchFlashlight();
+
 	void buildBufferLabel();
 	void buildPad();
 	void appendGlyph(char c);
