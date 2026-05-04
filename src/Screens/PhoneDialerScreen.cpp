@@ -17,6 +17,18 @@
 #include "PhoneFlashlight.h"
 #include "PhoneFortuneCookie.h"
 
+// S173 - "S-N-A-K-E" Easter egg launches the Snake game directly from
+// the dialer when the user types 76253 (S=7, N=6, A=2, K=5, E=3 on a
+// classic feature-phone keypad). The launch sequence mirrors the
+// engine-style path PhoneGamesScreen uses for case 2 (Snake), so we
+// pull in the same three dependencies it does:
+//   Loop/LoopManager.h  - defer the launch out of the LVGL event chain
+//   FSLVGL              - drop the resource cache before the game starts
+//   Games/Snake/Snake.h - the game class itself
+#include <Loop/LoopManager.h>
+#include "../FSLVGL.h"
+#include "../Games/Snake/Snake.h"
+
 // MAKERphone retro palette - inlined per the established pattern in this
 // codebase (see PhoneMainMenu.cpp / PhoneHomeScreen.cpp / PhoneAppStubScreen.cpp).
 // Keeping the typed digits in cyan and the empty-buffer hint in dim
@@ -261,6 +273,22 @@ void PhoneDialerScreen::appendGlyph(char c) {
 		auto* info = new PhoneFirmwareInfoScreen();
 		this->push(info);
 	}
+
+	// S173 - "S-N-A-K-E" Easter egg. Typing the keypad sequence that
+	// spells SNAKE (S=7, N=6, A=2, K=5, E=3 on a classic feature-phone
+	// keypad) instantly launches the Snake game, no detour through
+	// the games grid required. Detection is on exact match (the
+	// whole buffer is "76253") for the same reason *#06# above is
+	// strict: a buffer that merely contains the code as a suffix
+	// mid-edit (e.g. before a backspace) does not fire, which keeps
+	// the gesture deliberate. clearBuffer() runs *before* the actual
+	// engine launch so the user lands on a clean dialer when Snake
+	// pops them back here on exit.
+	if(bufferLen == 5 && buffer[0] == '7' && buffer[1] == '6'
+			&& buffer[2] == '2' && buffer[3] == '5' && buffer[4] == '3') {
+		clearBuffer();
+		launchSnakeShortcut();
+	}
 }
 
 void PhoneDialerScreen::backspace() {
@@ -363,6 +391,43 @@ void PhoneDialerScreen::launchFlashlight() {
 	// were typing the moment the torch is dismissed.
 	auto* flashlight = new PhoneFlashlight();
 	this->push(flashlight);
+}
+
+// ----- S173 SNAKE Easter-egg launcher -----
+
+void PhoneDialerScreen::launchSnakeShortcut() {
+	// Mirror PhoneGamesScreen's engine-launch sequence for case 2
+	// (Snake) so the typed-cheat-code path and the games-grid path
+	// stay byte-for-byte equivalent. The host is the dialer itself:
+	// when Snake's GameEngine tears the game down it calls
+	// `host->start()`, which restarts this PhoneDialerScreen with
+	// the same buffer/cursor state we left it in (we have already
+	// called clearBuffer() at the call site, so the user lands on
+	// a fresh dialer). All three deferred steps are necessary:
+	//   - stop() detaches us from input/loop so the running
+	//     dialer cannot fight the game for the keypad.
+	//   - LoopManager::defer pushes the actual game construction
+	//     to the next loop tick, clear of the LVGL event chain
+	//     that fired the buffer-match in the first place.
+	//   - FSLVGL::unloadCache frees LVGL's image cache before
+	//     Snake's renderer takes over the framebuffer.
+	auto* host = this;
+	stop();
+	LoopManager::defer([host](uint32_t /*dt*/) {
+		FSLVGL::unloadCache();
+		// Snake has no splash blit in PhoneGamesScreen's engine path
+		// (Games[2].splash == nullptr), so we skip the splash-render
+		// + 2 s wait that the SPACE entry uses. The S173 Easter-egg
+		// gesture is supposed to feel *instant* anyway - a 2 s splash
+		// would steal the punchline.
+		Game* game = new Snake::Snake(host);
+		if(game == nullptr) return;
+		game->load();
+		while(!game->isLoaded()) {
+			delay(1);
+		}
+		game->start();
+	});
 }
 
 // ----- S172 fortune-of-the-day overlay -----

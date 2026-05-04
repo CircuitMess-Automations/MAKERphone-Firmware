@@ -182,6 +182,31 @@ private:
 	 *  unit that touches PhoneDialerScreen. */
 	void launchFlashlight();
 
+	// S173 - "S-N-A-K-E" Easter egg.
+	//
+	// Classic Sony-Ericsson handsets had a hidden gesture: typing the
+	// keypad sequence that spells "SNAKE" instantly fired up the
+	// game without having to dive through the menu. We replicate the
+	// muscle memory: on a feature-phone keypad S=7, N=6, A=2, K=5,
+	// E=3, so the trigger is the literal digit string "76253" typed
+	// into the dialer buffer.
+	//
+	// Detection in appendGlyph() is on EXACT match (the whole buffer
+	// equals "76253") for the same reason *#06# / *#0000# are strict:
+	// a buffer that merely contains the code as a suffix mid-edit
+	// (e.g. before a backspace) does not fire. This keeps the
+	// gesture deliberate and avoids accidentally bouncing a user
+	// into Snake when they were typing a real long number that
+	// happens to start with 76253.
+	//
+	// The launch path mirrors the engine-style flow PhoneGamesScreen
+	// uses for case 2 (Snake) - stop() the dialer, defer through
+	// LoopManager so we are clear of the LVGL event chain, drop
+	// LVGL's resource cache, and start a fresh Snake with `this`
+	// as the host so the engine pops the user back to the dialer
+	// (with a freshly-cleared buffer) when Snake terminates.
+	void launchSnakeShortcut();
+
 	// S172 - "Daily fortune in dialer (first open per day)".
 	//
 	// The classic Sony-Ericsson handsets used to drop a tiny
