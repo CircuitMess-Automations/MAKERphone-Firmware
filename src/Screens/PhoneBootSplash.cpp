@@ -4,6 +4,7 @@
 #include <Pins.hpp>
 
 #include "../Fonts/font.h"
+#include "../Services/PhoneRingtoneEngine.h"
 
 // ---- MAKERphone retro palette ----------------------------------------------
 // Inlined per the established convention in this codebase (see
@@ -25,6 +26,44 @@
 #define MP_TEXT        lv_color_make(255, 220, 180)   // warm cream wordmark
 #define MP_HIGHLIGHT   lv_color_make(122, 232, 255)   // cyan tagline ("2.0")
 #define MP_LABEL_DIM   lv_color_make(170, 140, 200)   // dim hint text
+
+// =====================================================================
+// S148 - Boot melody (Sony-Ericsson-style four-note chime)
+//
+// A bright, ascending major-arpeggio chime that plays the moment the
+// boot splash appears. Four notes sized to land well inside the 3 s
+// splash hold, so the chime always completes naturally before the
+// splash auto-dismisses (any earlier user-driven dismiss stops the
+// melody via Ringtone.stop() in onStop() below).
+//
+// Pitch choice: G5 - B5 - D6 - G6 (G-major triad, last note is the
+// octave). Mirrors the unmistakable rising "ta-da-da-DAA" cadence the
+// late-2000s Sony-Ericsson feature phones used as their startup mark.
+// The final note is held longer so the chime feels resolved rather
+// than truncated. 30 ms inter-note gap keeps the strikes distinct
+// without sounding mechanical.
+//
+// Volume / mute is delegated entirely to the Ringtone engine: the
+// engine already respects Settings.sound (PhoneRingtoneEngine.cpp
+// emitTone()) and the Piezo.setMute(!Settings.sound) gate set in
+// setup(), so a muted prototype boots silently.
+//
+// Total duration: 110 + 110 + 110 + 320 + 3*30 ~= 740 ms
+// =====================================================================
+static const PhoneRingtoneEngine::Note kBootChimeNotes[] = {
+	{  784, 110 },  // G5
+	{  988, 110 },  // B5
+	{ 1175, 110 },  // D6
+	{ 1568, 320 },  // G6 (held)
+};
+static const PhoneRingtoneEngine::Melody kBootChime = {
+	kBootChimeNotes,
+	(uint16_t)(sizeof(kBootChimeNotes) / sizeof(kBootChimeNotes[0])),
+	30,    // gapMs - tiny breath between notes
+	false, // play once - boot chime never loops
+	"BootChime"
+};
+
 
 PhoneBootSplash::PhoneBootSplash(DismissHandler onDismiss,
 								 uint32_t       durationMs)
@@ -91,11 +130,26 @@ void PhoneBootSplash::onStart() {
 	// visible, not when it was constructed.
 	dismissedAlready = false;
 	startDismissTimer();
+
+	// S148 - launch the boot chime the instant the splash becomes
+	// visible. Routed through the global Ringtone engine so it shares
+	// the same mute / Settings.sound gating as every other Phone* sound
+	// surface. The chime is one-shot (kBootChime.loop == false) and
+	// short enough (~740 ms) to finish well inside the 3 s splash hold;
+	// onStop() below stops it explicitly to cover any-key early dismiss.
+	Ringtone.play(kBootChime);
 }
 
 void PhoneBootSplash::onStop() {
 	stopDismissTimer();
 	Input::getInstance()->removeListener(this);
+
+	// S148 - silence the boot chime if the splash is leaving while the
+	// melody is still playing (any-key dismiss before the chime
+	// finishes). When the chime has already completed naturally this is
+	// a no-op: the engine's loop() advance has already returned to its
+	// idle state and Ringtone.stop() short-circuits on !playing.
+	Ringtone.stop();
 }
 
 // ---- builders --------------------------------------------------------------

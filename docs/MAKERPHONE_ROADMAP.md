@@ -220,7 +220,7 @@ Tiny details that make the difference between "phone-shaped toy" and "this is ex
 - [x] **S145** — Custom welcome greeting on boot ("Hello, $NAME!").
 - [x] **S146** — Custom power-off message.
 - [x] **S147** — Operator-logo banner — text + 5×16 user-pixelable logo.
-- [ ] **S148** — Boot melody (Sony-Ericsson-style four-note chime).
+- [x] **S148** — Boot melody (Sony-Ericsson-style four-note chime).
 - [ ] **S149** — Upgraded power-off melody (real descending arpeggio, replaces the S57 placeholder).
 - [ ] **S150** — Charge-complete chime (one-shot on charger transition).
 - [ ] **S151** — Speed dial 1–9 — long-press digit on home dials that contact.

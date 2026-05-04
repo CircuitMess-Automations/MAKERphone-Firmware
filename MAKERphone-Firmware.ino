@@ -151,6 +151,16 @@ void boot(){
 	IdleDim.begin();
 
 
+	// S148: the Ringtone engine has to come up BEFORE PhoneBootSplash
+	// starts playing the four-note boot chime in its onStart(). The
+	// engine's begin() is a pure state reset (no allocation, no
+	// LoopManager subscription until play() is called), so promoting it
+	// to here is side-effect free for the rest of the boot flow. The
+	// remaining service begin()s stay tucked inside the IntroScreen
+	// dismiss callback so they keep their original ordering after the
+	// CircuitMess intro plays.
+	Ringtone.begin();
+
 	// S56: the very first screen on boot is now PhoneBootSplash - the
 	// MAKERphone-branded sunset wordmark splash. It holds for 3 s (or
 	// any-key skip) and on dismiss starts the legacy IntroScreen, which
@@ -162,7 +172,6 @@ void boot(){
 		auto intro = new IntroScreen([](){
 			Shutdown.begin();
 			Buzz.begin();
-			Ringtone.begin();
 			Alarms.begin();
 			Pet.begin();
 		});
