@@ -5,7 +5,7 @@
 #include "../Interface/LVScreen.h"
 
 /**
- * PhonePowerDown (S57 / S146)
+ * PhonePowerDown (S57 / S146 / S149)
  *
  * The "powering off" overlay that ships the MAKERphone's signature CRT
  * shrink animation + descending piezo tone. Modeled on the way an old
@@ -30,15 +30,27 @@
  *   t=0.75 s : band has collapsed to a 4 px x 4 px centre dot
  *   t=1.30 s : centre dot fades to black; piezo silenced
  *
- * Audio:
- *   - The piezo descends exponentially from ~1500 Hz to ~180 Hz over
- *     the full ~1.3 s, with a final 30 ms low click on the very last
- *     frame for a tactile "and then it's off" cue. The tone updates
- *     every animation tick (~30 ms) by recomputing the frequency from
- *     the current normalized progress.
- *   - Piezo.setMute() state is honoured: if the user has globally
- *     muted sound (PhoneSoundScreen / Settings.sound == false) the
- *     animation still plays visually but the piezo is left silent.
+ * Audio (S149):
+ *   - A descending G-major arpeggio (G6 - D6 - B5 - G5) plays once
+ *     through the global PhoneRingtoneEngine the moment the CRT
+ *     shrink begins. The first three notes strike in 110 ms each
+ *     and the final G5 is held for 320 ms, mirroring the rising
+ *     S148 boot chime in reverse so power-on and power-off bracket
+ *     the session as a matched pair. Total melody length is ~740 ms,
+ *     comfortably inside the 1.3 s shrink so the dot fade is heard
+ *     in silence -- the closing breath after the chime resolves.
+ *   - Replaces the S57 placeholder exponential frequency sweep,
+ *     which read as a continuous siren rather than a deliberate
+ *     "goodbye" gesture. The arpeggio is a real four-note phrase.
+ *   - Settings.sound is honoured: PhoneRingtoneEngine emitTone()
+ *     skips the piezo when the user has globally muted, so the
+ *     animation plays visually with no audio under mute. We also
+ *     short-circuit before kicking the engine to avoid stealing
+ *     the playhead from any concurrent buzzer-service beep.
+ *   - The S146 message preamble (when active) holds the chime
+ *     until the preamble window elapses; the user reads the
+ *     goodbye in silence, then the arpeggio fires at the
+ *     boundary into the CRT shrink.
  *
  *   +----------------------------------------+
  *   |                                        |  <- pure black canvas
@@ -152,6 +164,14 @@ private:
 	uint32_t       durationMs;
 	uint32_t       elapsedMs;
 	bool           firedAlready;
+
+	// S149 - guards against re-firing the descending arpeggio. Set
+	// once when applyTone() crosses out of the S146 preamble window
+	// (or at t=0 when no message is set), so subsequent ticks let
+	// PhoneRingtoneEngine drive the melody to completion without
+	// our timer interrupting it. Reset in onStart() so a re-used
+	// screen instance plays the chime each run.
+	bool           meloFired;
 
 	lv_obj_t*   plate;       // shrinking warm-cream phosphor rectangle
 	lv_obj_t*   dot;         // centre afterglow dot, fades at the end

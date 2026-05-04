@@ -2,8 +2,9 @@
 
 #include <Audio/Piezo.h>
 #include <Settings.h>
-#include <math.h>
 #include <string.h>
+
+#include "../Services/PhoneRingtoneEngine.h"
 
 #include "../Fonts/font.h"
 
@@ -19,14 +20,42 @@
 #define MP_HIGHLIGHT   lv_color_make(122, 232, 255)   // cyan scanline halo
 #define MP_BLACK       lv_color_make(  0,   0,   0)   // CRT-off canvas
 
-// CRT-tone envelope, in Hz. The piezo descends exponentially across the
-// run so the perceived pitch drop sounds linear to the human ear (a CRT
-// flyback transformer winding down is the reference). Final click is
-// emitted as a brief tap at TONE_CLICK to give the animation a tactile
-// "and then it's off" cue.
-static constexpr uint16_t TONE_START_HZ  = 1500;
-static constexpr uint16_t TONE_END_HZ    =  180;
-static constexpr uint16_t TONE_CLICK_HZ  =   90;
+// =====================================================================
+// S149 - Power-off melody (descending G-major arpeggio)
+//
+// Replaces the original S57 exponential-frequency sweep with a real
+// four-note phrase: G6 - D6 - B5 - G5, the exact reverse of the S148
+// boot chime. Power-on and power-off now bracket the device session
+// as a matched ascending / descending pair, the way late-2000s feature
+// phones cued their startup and shutdown.
+//
+// Pitch choice: keeping the boot chime's pitch material (G major
+// triad, octave span) means a host that listens to the device wake
+// up and shut down hears the same harmony resolved in opposite
+// directions. The first three strikes are short (110 ms each) so
+// the descent has momentum; the final G5 is held for 320 ms so
+// the chime feels like it lands rather than falling off a cliff.
+//
+// Volume / mute is delegated entirely to PhoneRingtoneEngine: the
+// engine already respects Settings.sound (emitTone()) and the
+// Piezo.setMute(!Settings.sound) gate set in setup(), so a muted
+// prototype shuts down silently while the visual still plays.
+//
+// Total duration: 110 + 110 + 110 + 320 + 3*30 = 740 ms
+// =====================================================================
+static const PhoneRingtoneEngine::Note kPowerOffNotes[] = {
+	{ 1568, 110 },  // G6
+	{ 1175, 110 },  // D6
+	{  988, 110 },  // B5
+	{  784, 320 },  // G5 (held)
+};
+static const PhoneRingtoneEngine::Melody kPowerOffMelody = {
+	kPowerOffNotes,
+	(uint16_t)(sizeof(kPowerOffNotes) / sizeof(kPowerOffNotes[0])),
+	30,    // gapMs - tiny breath between notes, mirrors kBootChime
+	false, // play once - power-off chime never loops
+	"PowerOffChime"
+};
 
 // Pixel budgets for the phosphor plate. The plate is centred on the
 // 160x128 display. The minimum height during phase 0 is 2 px so the
@@ -50,6 +79,7 @@ PhonePowerDown::PhonePowerDown(DismissHandler onComplete,
 		  durationMs(durationMs),
 		  elapsedMs(0),
 		  firedAlready(false),
+		  meloFired(false),
 		  plate(nullptr),
 		  dot(nullptr),
 		  tickTimer(nullptr),
@@ -101,6 +131,10 @@ PhonePowerDown::~PhonePowerDown() {
 	// Cancel the animation ticker ahead of LVGL teardown so its
 	// callback never fires against a freed screen during destruction.
 	stopTicker();
+	// S149 - silence the descending arpeggio first; if we left the
+	// ringtone engine pumping notes after the screen vanished, the
+	// next host's LoopManager tick would still hear our melody.
+	Ringtone.stop();
 	// The piezo may still be holding a tone if the destructor runs
 	// mid-animation (e.g. host force-pops us). Silence it defensively
 	// so a stuck PWM does not survive the screen swap.
@@ -116,11 +150,17 @@ void PhonePowerDown::onStart() {
 	// for a power-down overlay, but cheap to support) starts fresh.
 	elapsedMs = 0;
 	firedAlready = false;
+	// S149 - the descending arpeggio fires once per run. Reset the
+	// guard here so a host that re-pushes us after a previous run
+	// (or a test harness that re-uses the same instance) hears the
+	// chime again.
+	meloFired = false;
 
 	// Render frame 0 explicitly so the very first paint shows a
 	// full-bleed phosphor plate rather than whatever geometry the ctor
-	// left behind. The piezo also kicks the descending sweep at the
-	// top of the envelope.
+	// left behind. applyTone(0.0f) below kicks the descending
+	// arpeggio at the top of the run when no S146 preamble is
+	// active; with a preamble it stays silent until the boundary.
 	applyFrame(0.0f);
 	applyTone(0.0f);
 
@@ -129,6 +169,11 @@ void PhonePowerDown::onStart() {
 
 void PhonePowerDown::onStop() {
 	stopTicker();
+	// S149 - silence the descending arpeggio if it is still in flight
+	// (e.g. host force-pops us before the chime finishes). A no-op
+	// when the melody has already completed naturally - Ringtone.stop()
+	// short-circuits when the engine is idle.
+	Ringtone.stop();
 	Piezo.noTone();
 }
 
@@ -400,68 +445,39 @@ void PhonePowerDown::applyFrame(float progress) {
 }
 
 void PhonePowerDown::applyTone(float progress) {
-	if(progress < 0.0f) progress = 0.0f;
-	if(progress > 1.0f) progress = 1.0f;
+	// S149 - the descending arpeggio is a one-shot fire-and-forget
+	// melody: once kicked, PhoneRingtoneEngine drives the playback
+	// independently from the global LoopManager. Our 30 ms LVGL
+	// ticker therefore only needs to decide *when* to fire it, not
+	// to walk the frequency envelope by hand the way S57 did.
+	(void) progress;  // melody-driven; the visual is the sole consumer
 
-	// Honour the user's global mute setting. PhoneSoundScreen / S52
-	// drives Settings.sound; if it is off we leave the piezo silent
-	// and let the visual carry the animation alone. This matches the
-	// way PhoneRingtoneEngine eats its own output when sound is off.
-	if(!Settings.get().sound){
-		Piezo.noTone();
+	// Honour the user's global mute setting. PhoneRingtoneEngine
+	// (emitTone) already respects Settings.sound, but kicking off a
+	// melody we know cannot be heard would still steal the
+	// engine's playhead from any concurrent BuzzerService beep.
+	// Skip the play() entirely when muted so the engine stays free.
+	if(!Settings.get().sound) {
 		return;
 	}
 
-	// S146 - suppress the descending sweep while the preamble is
-	// holding the plate at full brightness. The user reads the
-	// message in silence; once the preamble window elapses the
-	// existing exponential sweep takes over from the top of the
-	// envelope just like the original S57 timeline.
-	if(messagePreambleMs > 0 && elapsedMs < messagePreambleMs){
-		Piezo.noTone();
+	// S146 - hold the chime while the message preamble is on screen.
+	// The user reads the goodbye in silence; once the preamble window
+	// elapses we fall through and fire the melody at the boundary
+	// into the CRT shrink. messagePreambleMs == 0 (factory default,
+	// no S146 message persisted) drops us straight into the chime
+	// at t=0, exactly the way the original S57 timeline behaves.
+	if(messagePreambleMs > 0 && elapsedMs < messagePreambleMs) {
 		return;
 	}
 
-	// Final tail: Phase 2 silences the descending sweep and emits a
-	// single brief click at TONE_CLICK_HZ on the very first frame of
-	// the dot fade. The click is short by design - a long buzz here
-	// would fight the visual "and then it's off" cue.
-	if(progress >= 1.0f){
-		Piezo.noTone();
-		return;
-	}
-	if(progress >= PhaseHorizontalEnd){
-		// Emit the click exactly once at the boundary, then go silent.
-		// We detect "first frame past the boundary" by checking that
-		// elapsedMs is within one tick of the boundary timestamp.
-		// S146 - the boundary lives in the post-preamble timeline, so
-		// add messagePreambleMs to the durationMs-based offset.
-		// messagePreambleMs is zero on the legacy (no-message) path so
-		// the original S57 timing is preserved exactly when no power-off
-		// message is persisted.
-		const uint32_t boundaryMs =
-			messagePreambleMs +
-			(uint32_t) (PhaseHorizontalEnd * (float) durationMs);
-		if(elapsedMs >= boundaryMs && elapsedMs < boundaryMs + AnimTickMs){
-			Piezo.tone(TONE_CLICK_HZ, AnimTickMs);
-		}else{
-			Piezo.noTone();
-		}
-		return;
-	}
-
-	// Descending sweep across phases 0 + 1. Exponential curve in
-	// frequency space so the perceived pitch drop sounds linear to
-	// the human ear (Hz scales geometrically with perceived pitch).
-	// We use the running progress over the [0 .. PhaseHorizontalEnd]
-	// window so the sweep finishes exactly as the plate becomes a dot.
-	const float t = progress / PhaseHorizontalEnd;
-	const float ratio = (float) TONE_END_HZ / (float) TONE_START_HZ;
-	const float freqF = (float) TONE_START_HZ * powf(ratio, t);
-	uint16_t freq = (uint16_t) freqF;
-	if(freq < TONE_END_HZ)   freq = TONE_END_HZ;
-	if(freq > TONE_START_HZ) freq = TONE_START_HZ;
-	Piezo.tone(freq);
+	// Fire the descending arpeggio exactly once per run. Subsequent
+	// ticks see meloFired == true and become no-ops, so the engine
+	// is allowed to drive the four-note phrase to completion without
+	// our 30 ms ticker re-asserting the first note every frame.
+	if(meloFired) return;
+	meloFired = true;
+	Ringtone.play(kPowerOffMelody);
 }
 
 // ---- completion dispatch ---------------------------------------------------
@@ -477,6 +493,12 @@ void PhonePowerDown::fireComplete() {
 	// heavyweight Sleep.turnOff() work) cannot let it re-enter
 	// fireComplete via the static callback.
 	stopTicker();
+	// S149 - silence the chime if any portion of it is still
+	// pumping. With melody length 740 ms vs total run 1300 ms the
+	// engine has typically returned to idle by the time we land
+	// here, so this is usually a no-op; it only matters when a
+	// host swaps durationMs down for a faster animation in tests.
+	Ringtone.stop();
 	Piezo.noTone();
 
 	// Stash the handler on the stack first so the `this` access
