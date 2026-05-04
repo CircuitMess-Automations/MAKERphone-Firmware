@@ -26,6 +26,7 @@
 #include "src/Services/PhoneRingtoneEngine.h"
 #include "src/Services/PhoneAlarmService.h"
 #include "src/Services/PhoneVirtualPet.h"
+#include "src/Services/PhoneChargeChime.h"
 #include "src/JigHWTest/JigHWTest.h"
 #include "src/Games/GameEngine/Game.h"
 
@@ -174,6 +175,7 @@ void boot(){
 			Buzz.begin();
 			Alarms.begin();
 			Pet.begin();
+			ChargeChime.begin();
 		});
 		intro->start();
 	});

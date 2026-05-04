@@ -222,7 +222,7 @@ Tiny details that make the difference between "phone-shaped toy" and "this is ex
 - [x] **S147** — Operator-logo banner — text + 5×16 user-pixelable logo.
 - [x] **S148** — Boot melody (Sony-Ericsson-style four-note chime).
 - [x] **S149** — Upgraded power-off melody (real descending arpeggio, replaces the S57 placeholder).
-- [ ] **S150** — Charge-complete chime (one-shot on charger transition).
+- [x] **S150** — Charge-complete chime (one-shot on charger transition).
 - [ ] **S151** — Speed dial 1–9 — long-press digit on home dials that contact.
 - [ ] **S152** — Birthday confetti animation when system date matches a contact (depends on S135).
 - [ ] **S153** — Per-contact custom ringtone (depends on S121–S123 composer output).
