@@ -10,6 +10,7 @@
 #include "../Elements/PhoneSynthwaveBg.h"
 #include "../Elements/PhoneStatusBar.h"
 #include "../Elements/PhoneSoftKeyBar.h"
+#include "../Elements/PhoneT9Vocab.h"
 #include "../Fonts/font.h"
 
 // MAKERphone retro palette - identical to every other Phone* widget so
@@ -49,27 +50,12 @@ inline uint8_t lettersInKey(uint8_t digit){
 	return static_cast<uint8_t>(strlen(kKeyLetters[digit]));
 }
 
-// Inline word list. 5-7 letters each, all common English nouns / verbs
-// so a feature-phone player has a fair shot. ~50 entries keeps the
-// firmware footprint trivial and the same-word-twice-in-a-row chance
-// near zero. Letters are uppercase here because that's the format the
-// reveal label uses.
-static const char* kWords[] = {
-	"APPLE", "BREAD", "CHAIR", "DREAM", "EAGLE",
-	"FROST", "GIANT", "HONEY", "IGLOO", "JOLLY",
-	"KNIFE", "LEMON", "MUSIC", "NIGHT", "OCEAN",
-	"PIANO", "QUIET", "RIVER", "SUGAR", "TIGER",
-	"UNCLE", "VOICE", "WATER", "YOUTH", "ZEBRA",
-	"BRAVE", "CLOUD", "DANCE", "EMBER", "FLAME",
-	"GLOBE", "HORSE", "INDEX", "KAYAK", "LIGHT",
-	"MAGIC", "NORTH", "OASIS", "PIXEL", "QUEEN",
-	"ROBOT", "SMILE", "TRAIN", "ULTRA", "VIVID",
-	"WHEEL", "YACHT", "BEACH", "CANDY", "DEPTH",
-	"PLANET", "RETRO", "SPARK", "SUNNY", "TURTLE",
-	"VAPOR", "WONDER", "BRIDGE", "CASTLE", "DOLPHIN"
-};
-
-constexpr uint8_t kWordCount = sizeof(kWords) / sizeof(kWords[0]);
+// Word pool moved to the shared `PhoneT9Vocab` dictionary in S175 so
+// `PhoneHangman` and `PhoneWordle` (and any future predictive-T9 work)
+// stay in sync. The mixed-length pool is a strict superset of the
+// original S87 seed list -- ~130 entries instead of 60, with a much
+// healthier 6 / 7-letter distribution that exercises the gallows
+// reveal up to its `MaxWordLen` = 7 cap.
 
 // Convert an uppercase A-Z to 0..25, returns -1 otherwise.
 inline int8_t letterIndex(char c){
@@ -312,8 +298,12 @@ void PhoneHangman::newRound() {
 void PhoneHangman::pickWord() {
 	// random() is seeded by the kernel jitter of the boot path; we take
 	// it as-is to avoid touching global RNG seed elsewhere in the firmware.
-	const uint8_t idx = static_cast<uint8_t>(rand() % kWordCount);
-	const char* w = kWords[idx];
+	const uint16_t count = PhoneT9Vocab::mixedCount();
+	const uint16_t idx = (count == 0)
+			? 0
+			: static_cast<uint16_t>(rand() % count);
+	const char* w = PhoneT9Vocab::mixed(idx);
+	if(w == nullptr) w = "APPLE";
 	const size_t len = strlen(w);
 	wordLen = static_cast<uint8_t>(len > MaxWordLen ? MaxWordLen : len);
 	memset(currentWord, 0, sizeof(currentWord));

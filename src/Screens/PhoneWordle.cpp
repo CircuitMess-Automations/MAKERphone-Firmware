@@ -10,6 +10,7 @@
 #include "../Elements/PhoneSynthwaveBg.h"
 #include "../Elements/PhoneStatusBar.h"
 #include "../Elements/PhoneSoftKeyBar.h"
+#include "../Elements/PhoneT9Vocab.h"
 #include "../Fonts/font.h"
 
 // MAKERphone retro palette -- identical to every other Phone* widget so
@@ -49,32 +50,10 @@ inline uint8_t lettersInKey(uint8_t digit) {
 	return static_cast<uint8_t>(strlen(kKeyLetters[digit]));
 }
 
-// Inline word list. All five-letter common English words, uppercase A-Z.
-// The list is kept tight (well under 1 KB of RODATA) so a couple of
-// rounds in a row almost never repeat. The target is picked uniformly
-// at random by pickWord().
-static const char* kWords[] = {
-	"APPLE", "BREAD", "CHAIR", "DREAM", "EAGLE",
-	"FROST", "GIANT", "HONEY", "IGLOO", "JOLLY",
-	"KNIFE", "LEMON", "MUSIC", "NIGHT", "OCEAN",
-	"PIANO", "QUIET", "RIVER", "SUGAR", "TIGER",
-	"UNCLE", "VOICE", "WATER", "YOUTH", "ZEBRA",
-	"BRAVE", "CLOUD", "DANCE", "EMBER", "FLAME",
-	"GLOBE", "HORSE", "INDEX", "KAYAK", "LIGHT",
-	"MAGIC", "NORTH", "OASIS", "PIXEL", "QUEEN",
-	"ROBOT", "SMILE", "TRAIN", "ULTRA", "VIVID",
-	"WHEEL", "YACHT", "BEACH", "CANDY", "DEPTH",
-	"RETRO", "SPARK", "SUNNY", "VAPOR", "BRICK",
-	"CLOCK", "DRIVE", "FRESH", "GLARE", "JEWEL",
-	"MINER", "PAINT", "QUEST", "SHINE", "TOWER",
-	"WORLD", "ZESTY", "AMBER", "BERRY", "CABIN",
-	"DIZZY", "ECHOY", "FANCY", "GLOOM", "HOTEL",
-	"IVORY", "JOKER", "LATCH", "MERRY", "NOVEL",
-	"OLIVE", "PEARL", "RAVEN", "SOLAR", "TONIC",
-	"WINDY", "BLAZE", "CRAFT", "DAILY", "FLOAT"
-};
-
-constexpr uint8_t kWordCount = sizeof(kWords) / sizeof(kWords[0]);
+// Word pool moved to the shared `PhoneT9Vocab` dictionary in S175 so
+// `PhoneWordle` and `PhoneHangman` (and any future predictive-T9 work)
+// stay in sync. The five-letter pool is a strict superset of the
+// original S96 seed list -- ~200 entries instead of 90.
 
 inline char toUpperAZ(char c) {
 	if(c >= 'a' && c <= 'z') return static_cast<char>(c - 32);
@@ -240,8 +219,12 @@ void PhoneWordle::newRound() {
 }
 
 void PhoneWordle::pickWord() {
-	const uint8_t idx = static_cast<uint8_t>(rand() % kWordCount);
-	const char* w = kWords[idx];
+	const uint16_t count = PhoneT9Vocab::fiveLetterCount();
+	const uint16_t idx = (count == 0)
+			? 0
+			: static_cast<uint16_t>(rand() % count);
+	const char* w = PhoneT9Vocab::fiveLetter(idx);
+	if(w == nullptr) w = "APPLE";
 	for(uint8_t i = 0; i < kCols; ++i) {
 		const char c = (w[i] != '\0') ? w[i] : 'A';
 		target[i] = toUpperAZ(c);
