@@ -254,7 +254,7 @@ The kind of thing customers post about when they discover it.
 - [x] **S175** — T9 vocab pack expansion (more dictionary words).
 - [x] **S176** — Drum kit on dialer keypad — each digit a different drum.
 - [x] **S177** — Boot phrase rotates each day (motivational quotes).
-- [ ] **S178** — Day-of-week themed wallpaper accents.
+- [x] **S178** — Day-of-week themed wallpaper accents.
 
 ## Phase T — Personalisation Deep Dive (S179–S188)
 Beyond themes — let users actually make the phone *theirs*.

@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <Settings.h>
 #include "../MakerphoneTheme.h"
+#include "../Services/PhoneClock.h"
+#include "../Fonts/font.h"
 
 // MAKERphone retro palette (kept consistent with PhoneStatusBar /
 // PhoneSoftKeyBar / PhoneClockFace).
@@ -291,6 +293,18 @@ PhoneSynthwaveBg::PhoneSynthwaveBg(lv_obj_t* parent, Style style) : LVObject(par
 	if(style == Style::Synthwave || style == Style::Stars){
 		buildStars();
 	}
+
+	// S178 - day-of-week celestial accent. Painted last so the small
+	// motif (top-left corner, ~18x16 px) sits on top of any twinkle
+	// star or grid horizontal that might otherwise crowd the patch.
+	// Runs for every Synthwave variant - the gradient sky is shared
+	// across Synthwave / Plain / GridOnly / Stars so the accent reads
+	// consistently regardless of which sub-variant the user picked.
+	// Theme overrides (Nokia / DMG / Amber CRT / Aqua / RAZR /
+	// Stealth Black / Y2K Silver / Cyberpunk Red / Christmas /
+	// Surprise) bypass the call entirely - they each return early
+	// above with their own dedicated builder.
+	buildDayAccent();
 }
 
 // ----- builders -----
@@ -574,6 +588,155 @@ void PhoneSynthwaveBg::buildStars(){
 		lv_anim_set_delay(&a, starList[i].delay);
 		lv_anim_start(&a);
 	}
+}
+
+void PhoneSynthwaveBg::buildDayAccent(){
+	// S178 - tiny "celestial of the day" motif painted at the wallpaper's
+	// TOP-LEFT corner. The accent reads as part of the Synthwave sky
+	// rather than a HUD chrome, so it shares the same z-band as the
+	// stars (children of `obj`, drawn after every other Synthwave
+	// builder so it lands on top of the gradient + the brightest twinkle
+	// stars without competing with the centered clock face or the
+	// TOP_MID operator banner).
+	//
+	// Reads the current weekday from PhoneClock::now(); a defensive
+	// clamp falls back to weekday 0 (SUN) so a corrupted clock can
+	// never crash the wallpaper. Each weekday gets a classical-planet
+	// glyph + matching accent tint so the homescreen quietly rotates
+	// through seven looks across the week.
+
+	uint16_t y; uint8_t mo, d, hh, mi, ss, wd;
+	PhoneClock::now(y, mo, d, hh, mi, ss, wd);
+	if(wd > 6) wd = 0;
+
+	// Per-day accent tint. The colour matches the classical "ruling
+	// planet" of the day, dialled into a Synthwave-friendly saturation
+	// so the motif reads warm against the deep-purple sky band rather
+	// than punching a chrome-bright hole in the wallpaper. Brightness
+	// is roughly equalised across the week so no single day reads
+	// noticeably louder than the others.
+	static const lv_color_t kDayTint[7] = {
+		lv_color_make(255, 220,  60),  // 0 SUN  - solar gold
+		lv_color_make(210, 220, 255),  // 1 MON  - moon silver
+		lv_color_make(255, 100,  90),  // 2 TUE  - mars red
+		lv_color_make(122, 232, 255),  // 3 WED  - mercury cyan
+		lv_color_make(255, 175,  60),  // 4 THU  - jupiter orange
+		lv_color_make(255, 165, 205),  // 5 FRI  - venus pink
+		lv_color_make(160, 200, 255),  // 6 SAT  - saturn blue
+	};
+	static const char* const kDayName[7] = {
+		"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"
+	};
+
+	const lv_color_t tint = kDayTint[wd];
+
+	// ----- Anchor box (transparent) -----
+	//
+	// Holds the day glyph + 3-letter caption as siblings so positioning
+	// is local to the box rather than the full 160x128 canvas. The box
+	// itself paints nothing (transparent bg, zero border) so the
+	// gradient sky shines through every gap in the glyph.
+	lv_obj_t* box = lv_obj_create(obj);
+	lv_obj_remove_style_all(box);
+	lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_clear_flag(box, LV_OBJ_FLAG_CLICKABLE);
+	lv_obj_add_flag(box, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_size(box, 18, 16);
+	lv_obj_set_pos(box, 2, 12);
+	lv_obj_set_style_bg_opa(box, LV_OPA_TRANSP, 0);
+	lv_obj_set_style_border_width(box, 0, 0);
+	lv_obj_set_style_pad_all(box, 0, 0);
+
+	// Helper: drop a tinted pixel-art rectangle into the anchor box.
+	// Captures `box` by reference so each glyph branch reads as a
+	// short flat list of (dx, dy, w, h, color, opa) lines rather than
+	// a wall of LVGL boilerplate.
+	auto pix = [&](int8_t dx, int8_t dy, uint8_t w, uint8_t h,
+				   lv_color_t c, lv_opa_t opa){
+		lv_obj_t* p = lv_obj_create(box);
+		lv_obj_remove_style_all(p);
+		lv_obj_clear_flag(p, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_clear_flag(p, LV_OBJ_FLAG_CLICKABLE);
+		lv_obj_add_flag(p, LV_OBJ_FLAG_IGNORE_LAYOUT);
+		lv_obj_set_size(p, w, h);
+		lv_obj_set_pos(p, dx, dy);
+		lv_obj_set_style_bg_color(p, c, 0);
+		lv_obj_set_style_bg_opa(p, opa, 0);
+		lv_obj_set_style_radius(p, 0, 0);
+		lv_obj_set_style_border_width(p, 0, 0);
+		lv_obj_set_style_pad_all(p, 0, 0);
+	};
+
+	// ----- Day-specific 7x7 pixel-art glyph -----
+	//
+	// Each branch composes the glyph out of 1-4 pixel rectangles drawn
+	// in the day's tint (with a single warm/cool highlight pixel where
+	// the real planet would catch sun-light). The 7x7 cell is anchored
+	// at (0, 0) inside the box so the caption underneath always lines
+	// up regardless of the day.
+	const lv_color_t hi  = lv_color_make(255, 250, 220);   // warm highlight
+	const lv_color_t shd = lv_color_make( 60,  30,  90);   // purple shadow
+
+	switch(wd){
+		case 0: // SUN - bright solar disk with a brighter core pixel
+			pix(0, 1, 7, 5, tint, LV_OPA_COVER);
+			pix(1, 0, 5, 7, tint, LV_OPA_COVER);
+			pix(2, 2, 3, 3, hi,   LV_OPA_COVER);
+			break;
+		case 1: // MON - lunar crescent: tinted disk with a shadow disk on the right
+			pix(0, 1, 6, 5, tint, LV_OPA_COVER);
+			pix(1, 0, 5, 7, tint, LV_OPA_COVER);
+			pix(3, 0, 4, 7, shd,  LV_OPA_COVER);
+			break;
+		case 2: // TUE - Mars: red disk with a small upper-right spear pixel
+			pix(0, 2, 5, 4, tint, LV_OPA_COVER);
+			pix(1, 1, 4, 5, tint, LV_OPA_COVER);
+			pix(5, 0, 2, 2, tint, LV_OPA_COVER);
+			pix(2, 2, 1, 1, hi,   LV_OPA_COVER);
+			break;
+		case 3: // WED - Mercury: cyan dot with two short caduceus wings
+			pix(2, 1, 3, 5, tint, LV_OPA_COVER);
+			pix(0, 2, 7, 1, tint, LV_OPA_COVER);
+			pix(3, 2, 1, 1, hi,   LV_OPA_COVER);
+			break;
+		case 4: // THU - Jupiter: banded ring (disk crossed by darker stripe)
+			pix(0, 1, 7, 5, tint, LV_OPA_COVER);
+			pix(1, 0, 5, 7, tint, LV_OPA_COVER);
+			pix(0, 3, 7, 1, shd,  LV_OPA_COVER);
+			pix(2, 1, 1, 1, hi,   LV_OPA_COVER);
+			break;
+		case 5: // FRI - Venus: pixel-art heart (two lobes + bottom point)
+			pix(0, 1, 3, 3, tint, LV_OPA_COVER);
+			pix(4, 1, 3, 3, tint, LV_OPA_COVER);
+			pix(1, 3, 5, 2, tint, LV_OPA_COVER);
+			pix(2, 5, 3, 1, tint, LV_OPA_COVER);
+			pix(3, 6, 1, 1, tint, LV_OPA_COVER);
+			break;
+		case 6: // SAT - Saturn: ringed planet (disk with a horizontal ring)
+		default:
+			pix(1, 1, 5, 5, tint, LV_OPA_COVER);
+			pix(0, 3, 7, 1, tint, LV_OPA_COVER);
+			pix(2, 2, 1, 1, hi,   LV_OPA_COVER);
+			break;
+	}
+
+	// ----- 3-letter day caption (pixelbasic7) -----
+	//
+	// Sits directly under the glyph at y = 8 so the box's 16 px height
+	// holds the 7 px glyph + a 1 px gap + the 7 px caption. The label
+	// inherits the tint at LV_OPA_80 so it reads as a softly-glowing
+	// caption rather than a flat chrome chip - same restraint the
+	// PhoneTipBanner caption uses against the wallpaper.
+	lv_obj_t* lbl = lv_label_create(box);
+	lv_label_set_text(lbl, kDayName[wd]);
+	lv_obj_set_style_text_font(lbl, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(lbl, tint, 0);
+	lv_obj_set_style_text_letter_space(lbl, 1, 0);
+	lv_obj_set_style_text_opa(lbl, LV_OPA_80, 0);
+	lv_obj_clear_flag(lbl, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_clear_flag(lbl, LV_OBJ_FLAG_CLICKABLE);
+	lv_obj_add_flag(lbl, LV_OBJ_FLAG_IGNORE_LAYOUT);
+	lv_obj_set_pos(lbl, 0, 8);
 }
 
 void PhoneSynthwaveBg::twinkleExec(void* var, int32_t v){

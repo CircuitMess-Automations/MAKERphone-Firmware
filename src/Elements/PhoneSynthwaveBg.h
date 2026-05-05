@@ -492,6 +492,33 @@ private:
 	// theme builders' still-image philosophy.
 	void buildSurpriseDailyCycleWallpaper();
 
+	// S178 - subtle "day-of-week celestial" accent layered on top of
+	// any of the four Synthwave variants (Synthwave, Plain, GridOnly,
+	// Stars). Reads the current weekday from PhoneClock::now() at
+	// construction time and paints a small (~18x16) pixel-art motif
+	// at the wallpaper's TOP-LEFT corner (x = 2, y = 12 - just below
+	// the 10 px status bar, clear of the centered clock face and the
+	// TOP_MID operator banner). Each weekday gets its own classical-
+	// planet glyph + matching accent tint + 3-letter caption:
+	//
+	//      0 SUN  - bright solar disk         gold   "SUN"
+	//      1 MON  - lunar crescent            silver "MON"
+	//      2 TUE  - Mars spear-and-disc       red    "TUE"
+	//      3 WED  - Mercury caduceus dot      cyan   "WED"
+	//      4 THU  - Jupiter banded ring       orange "THU"
+	//      5 FRI  - Venus heart               pink   "FRI"
+	//      6 SAT  - Saturn ringed planet      blue   "SAT"
+	//
+	// Only ever called for the four Synthwave variants; the dedicated
+	// theme builders (Nokia / DMG / Amber CRT / Aqua / RAZR / Stealth
+	// / Y2K / Cyberpunk / Christmas / Surprise) own their own end-
+	// to-end look and skip the accent so the brand-specific motif is
+	// not diluted. ~6-8 LVGL primitives per accent, no animations -
+	// matches the still-image philosophy of the rest of the static
+	// wallpaper layers (only the sun halo / stars / grid horizontals
+	// animate; everything else is paint-once-on-build).
+	void buildDayAccent();
+
 	// Drives the per-star opacity animation. Free function semantics
 	// (matches LVGL's lv_anim_exec_xcb_t signature). Defined in the .cpp
 	// translation unit.
