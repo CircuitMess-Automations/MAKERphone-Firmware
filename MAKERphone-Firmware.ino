@@ -23,6 +23,7 @@
 #include <Util/HWRevision.h>
 #include "src/Services/SleepService.h"
 #include "src/Services/PhoneIdleDim.h"
+#include "src/Services/PhoneLvglCost.h"
 #include "src/Services/PhoneKonamiCode.h"
 #include "src/Services/PhoneTiltSimulator.h"
 #include "src/Services/ShutdownService.h"
@@ -156,6 +157,15 @@ void boot(){
 	// SleepService still owns. Both share the same any-key activity
 	// reset semantics through Input::addListener().
 	IdleDim.begin();
+
+	// S198: passive LVGL/loop-cost metrics service. Subscribes to the
+	// LoopManager tick stream right after IdleDim so the rolling-window
+	// counters cover the whole post-services lifetime of the device.
+	// Idle-cheap (one ring-buffer write + a millis() compare per loop
+	// tick), no allocation, no Input subscription - the diag screen
+	// pulls the readouts on its own 1 Hz refresh, so this service has
+	// zero UI side-effects until something asks for the numbers.
+	LvglCost.begin();
 
 	// S166: global Konami-code Easter-egg detector. Listens to every
 	// button press for the canonical 10-press sequence and unlocks

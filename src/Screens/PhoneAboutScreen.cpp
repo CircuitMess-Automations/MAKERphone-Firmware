@@ -8,6 +8,7 @@
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Fonts/font.h"
 #include "../Storage/Storage.h"
+#include "PhoneDiagScreen.h"
 
 // MAKERphone retro palette - inlined per the established pattern in this
 // codebase (see PhoneSettingsScreen.cpp, PhoneBrightnessScreen.cpp). Cyan
@@ -238,6 +239,16 @@ void PhoneAboutScreen::buttonPressed(uint i) {
 			// behaves the same as BACK -- a friendly second way out.
 			if(softKeys) softKeys->flashRight();
 			pop();
+			break;
+		case BTN_R:
+			// S198: hidden battery-life / LVGL-cost diagnostics surface,
+			// reachable only via this BTN_R Easter-egg gesture from the
+			// About page. The page is read-only and harmless to a user
+			// who lands on it accidentally - BACK / ENTER pop right
+			// back to About - so leaving the gesture undocumented in
+			// the visible UI matches the Sony-Ericsson-era "service
+			// menu" skeuomorph the rest of Phase S leans into.
+			push(new PhoneDiagScreen());
 			break;
 		default:
 			break;
