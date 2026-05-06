@@ -115,6 +115,16 @@ const Section kLayout[] = {
 	// cluster together inside the SOUND section, with SYSTEM staying
 	// anchored as the next group below. Drills into PhoneSoftKeyToneScreen.
 	{ false, "Softkey tone",       "SOFTKEY TONE", PhoneSettingsScreen::Item::SoftKeyTone     },
+	// S193 - alarm-tone picker. Sits at the bottom of the SOUND group so
+	// the five sound-related rows ("Profile" / "Key clicks" / "Profile
+	// ring" / "Softkey tone" / "Alarm tone") cluster together inside the
+	// SOUND section, with SYSTEM staying anchored as the next group
+	// below. Drills into PhoneAlarmTonePicker, a single-mode list picker
+	// over PhoneAlarmTone's Factory + library + populated composer-slot
+	// catalogue. Selection is persisted into Settings.alarmTone and
+	// PhoneAlarmService picks it up on the next triggerFire() call
+	// without any extra wiring.
+	{ false, "Alarm tone",        "ALARM TONE",  PhoneSettingsScreen::Item::AlarmTone       },
 	{ true,  "SYSTEM",             nullptr,       PhoneSettingsScreen::Item::DateTime   },
 	{ false, "Date & Time",        "DATE & TIME", PhoneSettingsScreen::Item::DateTime   },
 	// S144 - owner name (lock-screen greeting). Sits between Date & Time

@@ -42,6 +42,7 @@
 #include "../Screens/PhoneSpeedDialScreen.h"
 #include "../Screens/PhoneProfileRingtoneScreen.h"
 #include "../Screens/PhoneSoftKeyToneScreen.h"
+#include "../Screens/PhoneAlarmTonePicker.h"
 #include "../Screens/PhoneWelcomeScreen.h"
 #include "../Screens/PhoneGamesScreen.h"
 #include "../Interface/LVScreen.h"
@@ -438,6 +439,33 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// looks byte-identical until the user
 						// dials in a custom hue.
 						self->push(new PhoneAccentScreen());
+						break;
+					case PhoneSettingsScreen::Item::AlarmTone:
+						// S193: alarm-tone customisation. Drills into
+						// PhoneAlarmTonePicker, a single-mode list picker
+						// patterned after PhoneContactRingtonePicker that
+						// iterates PhoneAlarmTone::pickerCount() /
+						// pickerIdAt(). The picker offers the special
+						// "Factory" entry (the legacy four-note arpeggio
+						// originally hard-coded inside PhoneAlarmService and
+						// kept as the safe NVS-resize default at id 0), the
+						// five PhoneRingtoneLibrary tones, plus every
+						// populated PhoneComposer save slot -- so a user
+						// who has saved a composition through the composer
+						// (S121-S123) sees their slot appear automatically
+						// without any extra wiring. On PICK the screen calls
+						// PhoneAlarmTone::setActiveId() which writes
+						// Settings.alarmTone and flushes via Settings.store();
+						// PhoneAlarmService::triggerFire() picks the chosen
+						// tone up on the next ring through
+						// PhoneAlarmTone::resolveActive(), and an empty /
+						// corrupt composer slot falls back to factory so the
+						// alarm always rings. With the byte left at the
+						// factory default 0 (Factory) the resolver returns
+						// the legacy arpeggio so a freshly-flashed device
+						// rings byte-identically to every prior firmware on
+						// its alarms.
+						self->push(new PhoneAlarmTonePicker());
 						break;
 					default:
 						// Defensive: any future row that is added to

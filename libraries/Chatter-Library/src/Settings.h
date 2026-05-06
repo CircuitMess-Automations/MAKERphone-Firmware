@@ -526,6 +526,38 @@ struct SettingsData {
 	// on a first boot after the firmware grows -- which maps to
 	// Continuous, the correct factory default.
 	uint8_t musicPlayMode = 0;
+	// S193 - PhoneAlarmService ringtone selection. The byte indexes into
+	// the PhoneAlarmTone catalogue, which extends PhoneContactRingtone
+	// with one extra "Factory" slot at id 0:
+	//
+	//   0          - Factory alarm (the legacy four-note arpeggio that
+	//                shipped with S124; defined in PhoneAlarmTone.cpp).
+	//   1..5       - PhoneRingtoneLibrary tones, shifted by one so
+	//                Synthwave is id 1, Classic id 2, ... Silent id 5.
+	//                The shift keeps id 0 reserved for Factory so a
+	//                first boot after an NVS resize reads as Factory
+	//                (the byte-identical pre-S193 behaviour) instead
+	//                of mapping zero straight to Synthwave.
+	//   100..103   - PhoneComposer save slots 0..3 (encoding shared
+	//                with PhoneContactRingtone so a composition saved
+	//                from PhoneComposer is reachable both as a contact
+	//                ringer and as the alarm tone without a duplicate
+	//                NVS slot).
+	//   anything else - falls back to Factory at the resolver layer so
+	//                a stale NVS blob never crashes triggerFire().
+	//
+	// Edited from PhoneAlarmTonePicker, reachable from the SOUND
+	// section of PhoneSettingsScreen ("Alarm tone" row, directly
+	// below "Softkey tone" so the alarm-related personalisation row
+	// clusters with the rest of the SOUND group). Persisted values
+	// outside the documented encoding clamp to Factory at the
+	// resolver layer so a freshly-flashed device rings with the
+	// legacy four-note arpeggio out of the box. Sits at the end of
+	// the blob next to musicPlayMode so the existing NVS-resize
+	// pattern reads the new byte as zero-initialised on a first
+	// boot after the firmware grows -- which maps to Factory, the
+	// correct factory default.
+	uint8_t alarmTone = 0;
 };
 
 class SettingsImpl {

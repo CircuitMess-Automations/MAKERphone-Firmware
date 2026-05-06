@@ -201,6 +201,23 @@ public:
 		// pattern); LockScreen picks the chosen glyph up on the next
 		// push without any extra wiring.
 		OwnerEmoji      = 16,  // S188
+		// S193 - alarm-tone customisation. Drills into the new
+		// PhoneAlarmTonePicker, a single-mode list picker patterned
+		// after PhoneContactRingtonePicker. Lets the user pick which
+		// melody PhoneAlarmService rings when an alarm slot fires:
+		// the special "Factory" entry (the legacy four-note arpeggio
+		// that shipped with S124, kept as the safe NVS-resize default
+		// at id 0), plus the five PhoneRingtoneLibrary tones, plus any
+		// populated PhoneComposer save slot (the "composer-fed" half of
+		// S193 -- a saved composition is now reachable both as a
+		// per-contact ringer (S153) and as the alarm tone). Lives in
+		// the SOUND group right under "Softkey tone" so the alarm row
+		// clusters with the rest of the audio personalisation rows
+		// inside the SOUND section. Persistence is via Settings.alarmTone
+		// (a single byte slot grown alongside the existing SettingsData
+		// NVS-resize pattern); PhoneAlarmService picks the chosen tone
+		// up on the next triggerFire() call without any extra wiring.
+		AlarmTone       = 17,  // S193
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);
@@ -250,7 +267,7 @@ public:
 	void flashRightSoftKey();
 
 	/** Number of selectable rows (excludes group headers). */
-	static constexpr uint8_t ItemCount = 17;
+	static constexpr uint8_t ItemCount = 18;
 
 	// --- Geometry, exposed for unit-test friendliness. -----------------
 

@@ -2,6 +2,7 @@
 
 #include "PhoneClock.h"
 #include "PhoneRingtoneEngine.h"
+#include "PhoneAlarmTone.h"
 
 #include <Arduino.h>
 #include <Loop/LoopManager.h>
@@ -60,24 +61,15 @@ constexpr size_t kHeaderSize  = 4;
 constexpr size_t kPayloadSize = PhoneAlarmService::MaxAlarms * 2;
 constexpr size_t kBlobSize    = kHeaderSize + kPayloadSize;
 
-// Alarm melody: rising 4-note arpeggio that loops while the alarm is
-// firing. Uses the same NOTE_* constants as PhoneTimer's alarm so the
-// two sound family-related; the 250 ms cadence keeps it urgent without
-// straying into shrillness. Static const so it lives in flash.
-const PhoneRingtoneEngine::Note kAlarmNotes[] = {
-		{ NOTE_E5,  240 },
-		{ NOTE_A5,  240 },
-		{ NOTE_C6,  240 },
-		{ NOTE_A5,  240 },
-};
-
-const PhoneRingtoneEngine::Melody kAlarmMelody = {
-		kAlarmNotes,
-		sizeof(kAlarmNotes) / sizeof(kAlarmNotes[0]),
-		70,        // gapMs — same family as PhoneTimer's TimerAlm
-		true,      // loop until dismissed
-		"AlarmClk",
-};
+// S193 - the previously-static kAlarmMelody arpeggio now lives inside
+// PhoneAlarmTone (under the FactoryId encoding). Resolution at fire
+// time goes through PhoneAlarmTone::resolveActive() so a user-picked
+// library tone or composer composition rings instead of the factory
+// arpeggio when the user has set one. The factory melody itself is
+// byte-identical to the original so a freshly-flashed device or a
+// device whose persisted alarmTone byte falls through validatedOrDefault
+// to FactoryId rings with the exact same audio cue every prior firmware
+// shipped.
 
 // Single shared NVS handle. Mirrors PhoneComposerStorage's lazy-open
 // pattern so we never spam nvs_open() retries on the keypad-event hot
@@ -250,7 +242,16 @@ void PhoneAlarmService::triggerFire(uint8_t slot, uint32_t nowMinute) {
 	snoozeIdx        = -1;
 	snoozeUntilEpoch = 0;
 
-	Ringtone.play(kAlarmMelody);
+	// S193 - resolve the user's alarmTone choice (factory / library /
+	// composer). PhoneAlarmTone::resolveActive() always returns a non-
+	// null pointer; an empty / corrupt composer slot falls back to
+	// factory so the alarm always rings.
+	const PhoneRingtoneEngine::Melody* mel = PhoneAlarmTone::resolveActive();
+	if(mel != nullptr) {
+		Ringtone.play(*mel);
+	} else {
+		Ringtone.play(*PhoneAlarmTone::factoryMelody());
+	}
 }
 
 void PhoneAlarmService::loop(uint /*micros*/) {
