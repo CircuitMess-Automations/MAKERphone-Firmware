@@ -35,6 +35,7 @@
 #include "../Screens/PhoneHomeLayoutScreen.h"
 #include "../Screens/PhoneAccentScreen.h"
 #include "../Screens/PhoneOwnerNameScreen.h"
+#include "../Screens/PhoneOwnerEmojiScreen.h"
 #include "../Screens/PhonePowerOffMessageScreen.h"
 #include "../Screens/PhoneOperatorScreen.h"
 #include "../Screens/PhoneSpeedDialScreen.h"
@@ -263,6 +264,20 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// for any future row that lands without a
 						// dedicated screen yet.
 						self->push(new PhoneOwnerNameScreen());
+						break;
+					case PhoneSettingsScreen::Item::OwnerEmoji:
+						// S188: owner emoji / avatar picker replaces the
+						// OWNER EMOJI placeholder stub. PhoneOwnerEmojiScreen
+						// is a horizontal pager over the curated
+						// PhoneOwnerEmoji catalogue (None / Heart / Star /
+						// Smile / Music / Crown / Skull / Bolt / Cat /
+						// Coffee / Pizza / Dice / Rocket) that reads /
+						// writes Settings.ownerEmoji directly, so the
+						// LockScreen picks the new glyph up on the next
+						// push without any extra wiring. The stub fallback
+						// in launchDefault() still works for any future row
+						// that lands without a dedicated screen yet.
+						self->push(new PhoneOwnerEmojiScreen());
 						break;
 					case PhoneSettingsScreen::Item::PowerOffMsg:
 						// S146: custom power-off message editor

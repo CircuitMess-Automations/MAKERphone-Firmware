@@ -187,6 +187,20 @@ public:
 		// NVS-resize pattern); MakerphoneTheme::accent() picks the chosen
 		// override up on the next screen build without any extra wiring.
 		Accent          = 15,  // S187
+		// S188 - owner emoji / avatar picker. Drills into
+		// PhoneOwnerEmojiScreen, a horizontal pager over the curated
+		// PhoneOwnerEmoji catalogue (None / Heart / Star / Smile /
+		// Music / Crown / Skull / Bolt / Cat / Coffee / Pizza / Dice
+		// / Rocket). Lives in the SYSTEM group right under "Owner
+		// name" so the two phone-identity rows ("Owner name" /
+		// "Owner emoji") cluster together inside the existing SYSTEM
+		// group, with About staying anchored at the bottom of the
+		// list where feature-phone users expect to find it.
+		// Persistence is via Settings.ownerEmoji (a single byte slot
+		// grown alongside the existing SettingsData NVS-resize
+		// pattern); LockScreen picks the chosen glyph up on the next
+		// push without any extra wiring.
+		OwnerEmoji      = 16,  // S188
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);
@@ -236,7 +250,7 @@ public:
 	void flashRightSoftKey();
 
 	/** Number of selectable rows (excludes group headers). */
-	static constexpr uint8_t ItemCount = 16;
+	static constexpr uint8_t ItemCount = 17;
 
 	// --- Geometry, exposed for unit-test friendliness. -----------------
 

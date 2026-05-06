@@ -63,6 +63,21 @@ private:
 	// the clock face / preview / unread container by exactly the right
 	// amount without re-deriving constants in two places.
 	lv_coord_t                 ownerStripH = 0;
+	// S188 - small 9x9 pixel-art owner-emoji glyph painted just under
+	// the status bar (sharing the strip with any owner-name text).
+	// The container hosts a 9x9 grid of 1px-cell rects whose fill is
+	// flipped on / off in refreshOwnerEmoji() based on the catalogue
+	// entry pointed to by Settings.ownerEmoji. Mounted lazily the first
+	// time onStarting() sees a non-zero ownerEmoji byte, then kept
+	// around (just cells recoloured) for the rest of the screen's
+	// lifetime so a later edit -> back-to-lock cycle picks the new
+	// glyph up without leaking widgets. Stays nullptr (and the strip
+	// renders text-only) when the user has never picked an emoji.
+	lv_obj_t*                  ownerEmojiBox = nullptr;
+	// 9x9 cell grid pre-allocated alongside ownerEmojiBox so the
+	// repaint just recolours each cell in place rather than rebuilding
+	// the LVGL tree on every onStarting() pass.
+	lv_obj_t*                  ownerEmojiCells[9][9] = {{nullptr}};
 
 	void buttonPressed(uint i) override;
 	void buttonReleased(uint i) override;
@@ -81,6 +96,12 @@ private:
 	// persisted value is blank so the layout falls back to its
 	// pre-S144 form.
 	void refreshOwnerLabel();
+	// S188 - mount or refresh the small 9x9 pixel-art owner-emoji
+	// glyph next to the owner-name strip based on the current
+	// Settings.ownerEmoji byte. Safe to call repeatedly; hides the
+	// glyph (LV_OBJ_FLAG_HIDDEN) when the persisted byte is 0 (None)
+	// so the strip falls back to a text-only owner greeting.
+	void refreshOwnerEmoji();
 	// S144 - re-anchor the clock face / preview / unread container
 	// based on whether the owner-name label is currently visible. Run
 	// once from the constructor and from refreshOwnerLabel() so a

@@ -122,6 +122,11 @@ const Section kLayout[] = {
 	// cluster and the existing About row stays at the bottom of the list
 	// where users expect a feature-phone About entry.
 	{ false, "Owner name",         "OWNER",       PhoneSettingsScreen::Item::Owner       },
+	// S188 - owner emoji / avatar picker. Sits directly below
+	// "Owner name" so the two phone-identity rows cluster together
+	// inside the existing SYSTEM group; About stays anchored at the
+	// bottom of the list where feature-phone users expect to find it.
+	{ false, "Owner emoji",        "OWNER EMOJI", PhoneSettingsScreen::Item::OwnerEmoji  },
 	// S146 - custom power-off message painted over the PhonePowerDown
 	// CRT-shrink animation. Sits directly below "Owner name" so the
 	// two T9-typed personalisation slots cluster together inside the

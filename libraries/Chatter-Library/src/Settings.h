@@ -465,6 +465,31 @@ struct SettingsData {
 	uint8_t customAccentR = 255;
 	uint8_t customAccentG = 140;
 	uint8_t customAccentB = 30;
+	// S188 - owner emoji / avatar selection. A small curated index
+	// into the PhoneOwnerEmoji catalogue (None / Heart / Star / Smile /
+	// Music / Crown / Skull / Bolt / Cat / Coffee / Pizza / Dice /
+	// Rocket). When non-zero the LockScreen pins a small 9x9 pixel-
+	// art glyph just under the status bar (sharing the strip with any
+	// Settings.ownerName text) so the device wears a personal "this
+	// is who I am" icon every time the user wakes it -- the kind of
+	// Sony-Ericsson personalisation knob a feature-phone user expects
+	// to find right next to the owner-name greeting. Edited from the
+	// new PhoneOwnerEmojiScreen, reachable from the SYSTEM section of
+	// PhoneSettingsScreen ("Owner emoji" row, directly below "Owner
+	// name") so the two phone-identity rows cluster together inside
+	// the existing SYSTEM group. Persisted values outside the
+	// catalogue range clamp to 0 (None) at the resolver layer to be
+	// defensive against NVS-resize wipes that read the new byte as
+	// uninitialised garbage. Sits at the end of the blob so the
+	// existing NVS-resize pattern (that grew this struct via
+	// soundProfile / wallpaperStyle / themeId / keyTicks / ownerName
+	// / powerOffMessage / operatorText / operatorLogo / phoneProfile
+	// / profileRingtones / speedDial / rainbowUnlocked / softKeyTone
+	// / lockWidgetMode / homeLayoutMode / wallpaperOfDay /
+	// customAccentEnabled / customAccentR / G / B) reads the new
+	// byte as zero-initialised on a first boot after the firmware
+	// grows -- which maps to None, the correct factory default.
+	uint8_t ownerEmoji = 0;
 };
 
 class SettingsImpl {

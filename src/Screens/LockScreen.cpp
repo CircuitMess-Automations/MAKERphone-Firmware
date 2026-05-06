@@ -15,6 +15,7 @@
 #include "../Elements/PhoneChargeBars.h"
 #include "../Elements/PhoneMissedCallFlash.h"
 #include "../Services/MissedCallLog.h"
+#include "../Services/PhoneOwnerEmoji.h"
 #include "../Services/PhoneAlarmService.h"
 #include <Input/Input.h>
 #include <Pins.hpp>
@@ -148,6 +149,7 @@ LockScreen::LockScreen() : LVScreen(){
 	// helpers only touch widgets that this constructor has already
 	// created.
 	refreshOwnerLabel();
+	refreshOwnerEmoji();
 	layoutForOwner();
 
 	// S158 - "Missed call inverted-color flash on next wake".
@@ -192,6 +194,7 @@ void LockScreen::onStarting(){
 	// was inside PhoneOwnerNameScreen propagates here on the next
 	// onStarting() pass without requiring a screen rebuild.
 	refreshOwnerLabel();
+	refreshOwnerEmoji();
 	layoutForOwner();
 	// S184 - re-apply the persisted lock-widget mode so a
 	// PhoneLockWidgetScreen edit -> pop-back-to-lock cycle picks up
@@ -417,6 +420,77 @@ void LockScreen::refreshOwnerLabel(){
 		ownerStripH = 0;
 	}
 }
+
+// ----- S188: owner-emoji glyph ---------------------------------------------
+
+void LockScreen::refreshOwnerEmoji(){
+	const uint8_t idx = PhoneOwnerEmoji::clampedId(Settings.get().ownerEmoji);
+	const bool    on  = PhoneOwnerEmoji::isVisible(idx);
+
+	if(on){
+		// Lazy-construct the host container and its 9x9 cell grid the
+		// first time we need them. The container is anchored to the top
+		// edge of the screen at x=4 so the glyph sits flush against the
+		// left wallpaper margin -- the owner-name label sits centred in
+		// the same strip so the two never overlap horizontally (the
+		// label dot-truncates at 156 px which already accounts for the
+		// 11 px-wide emoji column on the left).
+		if(ownerEmojiBox == nullptr){
+			ownerEmojiBox = lv_obj_create(obj);
+			lv_obj_remove_style_all(ownerEmojiBox);
+			lv_obj_add_flag(ownerEmojiBox, LV_OBJ_FLAG_IGNORE_LAYOUT);
+			lv_obj_clear_flag(ownerEmojiBox, LV_OBJ_FLAG_SCROLLABLE);
+			lv_obj_set_size(ownerEmojiBox,
+				PhoneOwnerEmoji::Width, PhoneOwnerEmoji::Height);
+			lv_obj_set_pos(ownerEmojiBox, 4, 12);
+			lv_obj_set_style_pad_all(ownerEmojiBox, 0, 0);
+			lv_obj_set_style_bg_opa(ownerEmojiBox, LV_OPA_TRANSP, 0);
+			lv_obj_set_style_border_width(ownerEmojiBox, 0, 0);
+
+			for(uint8_t y = 0; y < PhoneOwnerEmoji::Height; ++y){
+				for(uint8_t x = 0; x < PhoneOwnerEmoji::Width; ++x){
+					lv_obj_t* c = lv_obj_create(ownerEmojiBox);
+					lv_obj_remove_style_all(c);
+					lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
+					lv_obj_set_size(c, 1, 1);
+					lv_obj_set_pos(c, x, y);
+					lv_obj_set_style_radius(c, 0, 0);
+					lv_obj_set_style_border_width(c, 0, 0);
+					lv_obj_set_style_bg_opa(c, LV_OPA_TRANSP, 0);
+					ownerEmojiCells[y][x] = c;
+				}
+			}
+		}
+
+		// Repaint: walk the catalogue glyph one cell at a time and flip
+		// each cell's fill on / off. Set pixels paint in MP_ACCENT
+		// (sunset orange) so the small glyph reads as a deliberate
+		// identity marker against the synthwave wallpaper.
+		for(uint8_t y = 0; y < PhoneOwnerEmoji::Height; ++y){
+			for(uint8_t x = 0; x < PhoneOwnerEmoji::Width; ++x){
+				lv_obj_t* c = ownerEmojiCells[y][x];
+				if(c == nullptr) continue;
+				const bool px = PhoneOwnerEmoji::pixelAt(idx, x, y);
+				if(px){
+					lv_obj_set_style_bg_color(c,
+						lv_color_make(255, 140, 30), 0);
+					lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
+				}else{
+					lv_obj_set_style_bg_opa(c, LV_OPA_TRANSP, 0);
+				}
+			}
+		}
+
+		lv_obj_clear_flag(ownerEmojiBox, LV_OBJ_FLAG_HIDDEN);
+	}else{
+		// idx == 0 (None) -- hide the glyph so the strip falls back to
+		// the pre-S188 owner-name-only / blank layout.
+		if(ownerEmojiBox != nullptr){
+			lv_obj_add_flag(ownerEmojiBox, LV_OBJ_FLAG_HIDDEN);
+		}
+	}
+}
+
 
 void LockScreen::layoutForOwner(){
 	// Re-anchor the clock face: y = 11 (base) when the strip is hidden,
