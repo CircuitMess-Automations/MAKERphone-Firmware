@@ -10,6 +10,7 @@
 #include "../Elements/PhoneEqualizerVisualiser.h"
 #include "../Fonts/font.h"
 #include "../Services/PhoneMusicLibrary.h"
+#include "PhoneKaraokeScreen.h"
 #include <Settings.h>
 
 // MAKERphone retro palette - inlined per the established pattern in this
@@ -687,6 +688,20 @@ void PhoneMusicPlayer::buttonPressed(uint i) {
 			// on a Sony-Ericsson phone.
 			cyclePlayMode();
 			break;
+
+		case BTN_3: {
+			// S196 - keypad shortcut to push the karaoke title-display
+			// over the currently playing track. We deliberately do NOT
+			// stop, pause, or restart the engine here: the karaoke
+			// screen is a passive observer that crawls a highlight
+			// across the title in lockstep with `Ringtone.currentStep()`,
+			// so the music keeps playing exactly as it was. The user
+			// returns from karaoke via BTN_BACK and finds the player
+			// in the same state they left it.
+			auto* karaoke = new PhoneKaraokeScreen();
+			this->push(karaoke);
+			break;
+		}
 
 		case BTN_BACK:
 			// Always stop playback before popping so the parent screen

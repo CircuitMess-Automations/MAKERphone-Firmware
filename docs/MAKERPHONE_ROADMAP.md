@@ -280,7 +280,7 @@ Buzzer is what we have, so we lean into it.
 - [x] **S193** — Custom buzzer alarm tone (composer-fed).
 - [x] **S194** — `PhoneBeatMaker` — 16-step drum sequencer.
 - [x] **S195** — `PhoneRadio` — fake FM dial with eight stations of pre-canned melody loops.
-- [ ] **S196** — Karaoke title-display mode while a melody plays.
+- [x] **S196** — Karaoke title-display mode while a melody plays.
 
 ## Phase V — Final Polish & v2.0 Release (S197–S200)
 

@@ -81,6 +81,16 @@ public:
 	 *  visualisers that want to detect note-onset events. */
 	uint16_t currentStep() const { return playing ? step : (uint16_t) 0; }
 
+	/**
+	 * S196 — total step count of the currently playing melody, or 0
+	 * when idle. Symmetric with currentStep() so a host can compute
+	 * progress as `currentStep() / totalSteps()`. Used by the
+	 * `PhoneKaraokeScreen` karaoke title-display to drive its
+	 * left-to-right "highlight" fill across the title text. Cheap
+	 * inline read of two members already kept hot by loop().
+	 */
+	uint16_t totalSteps() const { return playing ? current.count : (uint16_t) 0; }
+
 	void loop(uint micros) override;
 
 private:
