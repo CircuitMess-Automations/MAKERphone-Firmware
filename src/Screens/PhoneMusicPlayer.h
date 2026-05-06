@@ -119,6 +119,30 @@ public:
 	/** True while the engine is being driven by this screen. */
 	bool isPlaying() const { return playing; }
 
+	/**
+	 * S190 — playback mode selector. Cycles through the classic feature-
+	 * phone modes; setPlayMode() persists the choice via Settings.store()
+	 * so a reboot keeps the user's selection. Out-of-range values clamp
+	 * to Continuous at the setter so a stale NVS blob never sticks the
+	 * player into a mode the screen does not understand.
+	 */
+	enum PlayMode : uint8_t {
+		Continuous = 0,   // advance, stop after last track (factory default)
+		RepeatAll  = 1,   // advance, wrap to first track at end of list
+		RepeatOne  = 2,   // replay same track at end of track
+		Shuffle    = 3,   // pick a random next track at end / manual next
+		ModeCount  = 4
+	};
+
+	/** Set the playback mode. Persists via Settings.store(). */
+	void setPlayMode(uint8_t mode);
+
+	/** Currently active playback mode (always in [0..ModeCount-1]). */
+	uint8_t getPlayMode() const { return playMode; }
+
+	/** Cycle to the next playback mode (wraps). */
+	void cyclePlayMode();
+
 	/** Public so a host can pre-load a track + auto-play after push(). */
 	void play();
 	void pause();
@@ -147,12 +171,19 @@ private:
 	lv_obj_t* prevGlyph;        // pixelbasic7 "<<"
 	lv_obj_t* playGlyph;        // pixelbasic7 ">" or "||"
 	lv_obj_t* nextGlyph;        // pixelbasic7 ">>"
+	lv_obj_t* modeLabel;        // S190 - "MODE: SHUFFLE" caption (pixelbasic7)
 
 	// ----- track state -----
 	const PhoneRingtoneEngine::Melody* const* tracks;
 	uint8_t trackCount;
 	uint8_t trackIndex;
 	bool    playing;
+
+	// S190 - playback mode (Continuous / RepeatAll / RepeatOne / Shuffle).
+	// Loaded from Settings.musicPlayMode in the ctor and persisted via
+	// setPlayMode(); kept in [0..ModeCount-1] at all times.
+	uint8_t playMode;
+	uint8_t lastShuffleIdx;     // remembered to avoid re-rolling the same track twice in a row
 
 	// S189 — optional playlist label shown alongside the track index.
 	// Pointer is owned by the caller and assumed to outlive the screen.
@@ -168,11 +199,16 @@ private:
 	void buildTitle();
 	void buildProgressBar();
 	void buildTransport();
+	void buildMode();          // S190 - small "MODE: ..." caption above the soft-key bar
 
 	// ----- helpers -----
 	void refreshTrackLabels();
 	void refreshPlayIcon();
 	void refreshProgress();
+	void refreshMode();              // S190 - paint the current PlayMode caption
+	void advanceForEndOfTrack();     // S190 - end-of-track behaviour gated on playMode
+	uint8_t pickShuffleIndex() const;// S190 - random index different from trackIndex when possible
+	static const char* modeLabelOf(uint8_t mode);
 	uint32_t currentElapsedMs() const;
 	static uint32_t computeTotalMs(const PhoneRingtoneEngine::Melody* m);
 	static void onTick(lv_timer_t* t);

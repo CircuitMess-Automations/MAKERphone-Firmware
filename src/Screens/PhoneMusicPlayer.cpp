@@ -9,6 +9,7 @@
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Fonts/font.h"
 #include "../Services/PhoneMusicLibrary.h"
+#include <Settings.h>
 
 // MAKERphone retro palette - inlined per the established pattern in this
 // codebase (see PhoneMainMenu.cpp / PhoneHomeScreen.cpp / PhoneDialerScreen.cpp).
@@ -54,10 +55,15 @@ PhoneMusicPlayer::PhoneMusicPlayer()
 		  prevGlyph(nullptr),
 		  playGlyph(nullptr),
 		  nextGlyph(nullptr),
+		  modeLabel(nullptr),
 		  tracks(defaultTracks()),
 		  trackCount(PhoneMusicLibrary::Count),
 		  trackIndex(0),
 		  playing(false),
+		  // S190 - read persisted PlayMode; clamp out-of-range NVS to Continuous.
+		  playMode(Settings.get().musicPlayMode < ModeCount
+				   ? Settings.get().musicPlayMode : (uint8_t) Continuous),
+		  lastShuffleIdx(0),
 		  trackTotalMs(0),
 		  playStartMs(0),
 		  pausedAtMs(0),
@@ -82,6 +88,7 @@ PhoneMusicPlayer::PhoneMusicPlayer()
 	buildTitle();
 	buildProgressBar();
 	buildTransport();
+	buildMode();
 
 	// Bottom: feature-phone soft-keys. Left: PLAY/PAUSE depending on state;
 	// right: EXIT (BTN_BACK) which stops + pops the screen.
@@ -96,6 +103,7 @@ PhoneMusicPlayer::PhoneMusicPlayer()
 	refreshTrackLabels();
 	refreshPlayIcon();
 	refreshProgress();
+	refreshMode();
 }
 
 PhoneMusicPlayer::~PhoneMusicPlayer() {
@@ -259,6 +267,107 @@ void PhoneMusicPlayer::buildTransport() {
 	}
 }
 
+void PhoneMusicPlayer::buildMode() {
+	// S190 - small "MODE: SHUFFLE" caption tucked between the transport
+	// row and the soft-key bar so the user can see at a glance which
+	// playback mode is active. Pixelbasic7 + dim purple keeps it well
+	// below the transport icons in visual hierarchy without being
+	// invisible. Centred on the 160 px panel; y = 102 leaves a 6 px
+	// gap above the 10 px soft-key bar at y = 118.
+	modeLabel = lv_label_create(obj);
+	lv_obj_set_style_text_font(modeLabel, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(modeLabel, MP_LABEL_DIM, 0);
+	lv_label_set_text(modeLabel, "");
+	lv_obj_set_align(modeLabel, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(modeLabel, 104);
+}
+
+const char* PhoneMusicPlayer::modeLabelOf(uint8_t mode) {
+	switch(mode){
+		case RepeatAll: return "MODE: REPEAT ALL";
+		case RepeatOne: return "MODE: REPEAT ONE";
+		case Shuffle:   return "MODE: SHUFFLE";
+		case Continuous:
+		default:        return "MODE: CONTINUOUS";
+	}
+}
+
+void PhoneMusicPlayer::refreshMode() {
+	if(modeLabel == nullptr) return;
+	lv_label_set_text(modeLabel, modeLabelOf(playMode));
+	// Highlight non-default modes in cyan so the user spots a mode
+	// change immediately. Continuous keeps the dim purple body so the
+	// "factory default" reads as quiet visual noise.
+	lv_obj_set_style_text_color(
+		modeLabel,
+		(playMode == Continuous) ? MP_LABEL_DIM : MP_HIGHLIGHT,
+		0);
+}
+
+uint8_t PhoneMusicPlayer::pickShuffleIndex() const {
+	// Pick a random track index different from the current one. With a
+	// 1-track playlist (or a defensive 0) we just hand back the current
+	// index so the caller never reads garbage.
+	if(trackCount <= 1) return trackIndex;
+
+	// random(N) is uniformly distributed in [0..N-1]. Re-roll up to a
+	// few times if we land on the current index so a 2-track playlist
+	// alternates predictably without a 50% "same again" rate.
+	uint8_t pick = trackIndex;
+	for(uint8_t attempt = 0; attempt < 6; ++attempt){
+		pick = (uint8_t) random(trackCount);
+		if(pick != trackIndex && pick != lastShuffleIdx) return pick;
+	}
+	// Last resort: step forward by one. Guarantees a change.
+	return (uint8_t)((trackIndex + 1) % trackCount);
+}
+
+void PhoneMusicPlayer::advanceForEndOfTrack() {
+	// S190 end-of-track gate. The onTick auto-advance hook calls this
+	// when Ringtone.isPlaying() goes false during a play() session.
+	if(trackCount == 0) return;
+
+	switch(playMode){
+		case RepeatOne:
+			// Replay the same track. selectTrack() would re-run play()
+			// anyway via its index path, but calling play() directly
+			// avoids an unnecessary refresh of the index labels.
+			playStartMs = millis();
+			pausedAtMs  = 0;
+			play();
+			break;
+
+		case Shuffle: {
+			const uint8_t pick = pickShuffleIndex();
+			lastShuffleIdx = trackIndex;
+			selectTrack(pick);
+			break;
+		}
+
+		case RepeatAll:
+			// Advance + wrap to first on end-of-list. selectTrack already
+			// wraps modulo, so the trackIndex+1 path naturally lands on 0.
+			selectTrack((uint8_t)((trackIndex + 1) % trackCount));
+			break;
+
+		case Continuous:
+		default:
+			// Legacy behaviour: advance until end of list, then stop.
+			if(trackIndex + 1 < trackCount){
+				selectTrack((uint8_t)(trackIndex + 1));
+			}else{
+				// End of playlist - leave the player paused on the last
+				// track so the user can re-press play if they want to
+				// hear it again.
+				playing    = false;
+				pausedAtMs = trackTotalMs;
+				refreshPlayIcon();
+				refreshProgress();
+			}
+			break;
+	}
+}
+
 // =========================================================================
 // helpers
 // =========================================================================
@@ -391,6 +500,21 @@ void PhoneMusicPlayer::refreshProgress() {
 // public API
 // =========================================================================
 
+void PhoneMusicPlayer::setPlayMode(uint8_t mode) {
+	// Out-of-range values clamp to Continuous so a stale NVS blob or a
+	// future-firmware downgrade never sticks the player into a mode the
+	// screen does not understand.
+	if(mode >= ModeCount) mode = Continuous;
+	playMode = mode;
+	Settings.get().musicPlayMode = mode;
+	Settings.store();
+	refreshMode();
+}
+
+void PhoneMusicPlayer::cyclePlayMode() {
+	setPlayMode((uint8_t)((playMode + 1) % ModeCount));
+}
+
 void PhoneMusicPlayer::setPlaylistName(const char* name) {
 	// Empty strings collapse to nullptr so the rest of the screen has
 	// a single "no playlist label" predicate to check (just != nullptr).
@@ -472,6 +596,17 @@ void PhoneMusicPlayer::togglePlay() {
 
 void PhoneMusicPlayer::next() {
 	if(trackCount == 0) return;
+	// In Shuffle mode the manual next button rolls a fresh random
+	// track too, matching the S190 expectation that the user can
+	// "next-skip" through a shuffled queue. Every other mode keeps
+	// the natural sequential advance so power users can still walk
+	// the playlist in order without changing modes.
+	if(playMode == Shuffle && trackCount > 1){
+		const uint8_t pick = pickShuffleIndex();
+		lastShuffleIdx = trackIndex;
+		selectTrack(pick);
+		return;
+	}
 	selectTrack((uint8_t)((trackIndex + 1) % trackCount));
 }
 
@@ -492,16 +627,16 @@ void PhoneMusicPlayer::onTick(lv_timer_t* t) {
 	if(self == nullptr) return;
 
 	// Auto-detect end-of-track for non-loop melodies: the engine has
-	// already stopped, so we reflect that in our own state and either
-	// advance or freeze the UI.
+	// already stopped, so we reflect that in our own state and route
+	// through the S190 advanceForEndOfTrack() gate so the playback mode
+	// (Continuous / RepeatAll / RepeatOne / Shuffle) governs what
+	// happens next.
 	if(self->playing && !Ringtone.isPlaying()){
 		self->playing    = false;
 		self->pausedAtMs = self->trackTotalMs;
-		// For a non-loop track we advance to the next one for a smooth
-		// "albums playing through" feel. With looping melodies this
-		// branch never fires because Ringtone.isPlaying() stays true.
-		if(self->trackCount > 1){
-			self->next();
+		if(self->trackCount > 1 ||
+		   self->playMode == PhoneMusicPlayer::RepeatOne){
+			self->advanceForEndOfTrack();
 		}else{
 			self->refreshPlayIcon();
 		}
@@ -524,6 +659,14 @@ void PhoneMusicPlayer::buttonPressed(uint i) {
 
 		case BTN_ENTER:
 			togglePlay();
+			break;
+
+		case BTN_0:
+			// S190 - keypad shortcut to cycle the playback mode in place.
+			// BTN_0 was free in the music player input contract; using it
+			// matches the muscle memory of pressing 0 to swap player modes
+			// on a Sony-Ericsson phone.
+			cyclePlayMode();
 			break;
 
 		case BTN_BACK:

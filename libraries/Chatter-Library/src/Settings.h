@@ -490,6 +490,42 @@ struct SettingsData {
 	// byte as zero-initialised on a first boot after the firmware
 	// grows -- which maps to None, the correct factory default.
 	uint8_t ownerEmoji = 0;
+	// S190 - music player playback mode. The PhoneMusicPlayer uses this
+	// byte to decide what happens at end-of-track (and on user-driven
+	// next/prev) so the four classic feature-phone modes are reachable
+	// without a sub-menu:
+	//
+	//   0 = Continuous - the legacy "albums playing through" behaviour.
+	//                    Auto-advance to the next track on end-of-track,
+	//                    stop after the last track in the playlist.
+	//                    Factory default; a freshly-flashed device that
+	//                    has never touched the new mode key behaves
+	//                    byte-identically to every prior firmware.
+	//   1 = RepeatAll  - same advance logic as Continuous, but on
+	//                    end-of-playlist the player wraps to track 0
+	//                    and keeps going. The traditional "loop the
+	//                    whole playlist" Sony-Ericsson default.
+	//   2 = RepeatOne  - end-of-track replays the same track. Manual
+	//                    next/prev still advances by one (so the user
+	//                    can step out of the loop without changing
+	//                    modes); only the auto-advance hook treats
+	//                    RepeatOne as "stay here".
+	//   3 = Shuffle    - end-of-track and the manual next button pick
+	//                    a random track index different from the
+	//                    current one (when the playlist has >= 2
+	//                    tracks). prev still walks the natural order
+	//                    so the user can step back to the previously-
+	//                    played track without rerolling.
+	//
+	// Persisted via PhoneMusicPlayer's setPlayMode() so toggling the
+	// mode on the screen survives a reboot. Persisted values outside
+	// [0..3] clamp to Continuous at the screen layer to be defensive
+	// against NVS-resize wipes that read the new byte as uninitialised
+	// garbage. Sits at the end of the blob next to ownerEmoji so the
+	// existing NVS-resize pattern reads the new byte as zero-initialised
+	// on a first boot after the firmware grows -- which maps to
+	// Continuous, the correct factory default.
+	uint8_t musicPlayMode = 0;
 };
 
 class SettingsImpl {

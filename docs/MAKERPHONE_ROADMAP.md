@@ -274,7 +274,7 @@ Beyond themes — let users actually make the phone *theirs*.
 Buzzer is what we have, so we lean into it.
 
 - [x] **S189** — Music player — playlist support.
-- [ ] **S190** — Music player — shuffle / repeat / continuous.
+- [x] **S190** — Music player — shuffle / repeat / continuous.
 - [ ] **S191** — Equalizer visualiser — bars dance to active melody.
 - [ ] **S192** — Richer system-tone library — 15+ chimes for every action.
 - [ ] **S193** — Custom buzzer alarm tone (composer-fed).
