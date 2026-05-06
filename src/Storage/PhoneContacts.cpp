@@ -221,4 +221,48 @@ bool birthdayOf(UID_t uid, uint8_t* outMonth, uint8_t* outDay){
 	return true;
 }
 
+// ----------------------------------------------------------------------
+// S181 — per-contact wallpaper override
+//
+// One byte on the PhoneContact record, gated by ContactFlag_HasWallpaper.
+// Mirrors the structure of S153's ringtoneId field: stored raw on the
+// record, exposed through tiny helpers, and consumed by
+// PhoneSynthwaveBg::styleFromByte() at render time. Unset records
+// transparently fall back to the global Settings.wallpaperStyle.
+// ----------------------------------------------------------------------
+
+bool setWallpaper(UID_t uid, uint8_t styleByte){
+	PhoneContact c = getOrDefault(uid);
+	c.wallpaperStyle = styleByte;
+	c.flags |= ContactFlag_HasWallpaper;
+	return upsert(c);
+}
+
+bool clearWallpaper(UID_t uid){
+	if(!Storage.PhoneContacts.exists(uid)){
+		// Nothing to clear; treat as a no-op success so callers don't
+		// need to special-case "never set" vs "set then cleared".
+		return true;
+	}
+	PhoneContact c = Storage.PhoneContacts.get(uid);
+	c.wallpaperStyle = 0;
+	c.flags &= ~ContactFlag_HasWallpaper;
+	return upsert(c);
+}
+
+bool hasWallpaper(UID_t uid){
+	if(!Storage.PhoneContacts.exists(uid)) return false;
+	return (Storage.PhoneContacts.get(uid).flags & ContactFlag_HasWallpaper) != 0;
+}
+
+uint8_t wallpaperOf(UID_t uid){
+	if(Storage.PhoneContacts.exists(uid)){
+		const PhoneContact c = Storage.PhoneContacts.get(uid);
+		if(c.flags & ContactFlag_HasWallpaper){
+			return c.wallpaperStyle;
+		}
+	}
+	return 0;
+}
+
 }

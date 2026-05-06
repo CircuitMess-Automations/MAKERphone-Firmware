@@ -91,11 +91,21 @@ struct PhoneContact : Entity {
 	uint8_t birthdayMonth = 0;
 	uint8_t birthdayDay   = 0;
 
+	// S181 — Per-contact wallpaper override. Claims 1 of the previously
+	// 6 reserved tail bytes without changing the on-disk record size.
+	// Only meaningful when ContactFlag_HasWallpaper is set in `flags`;
+	// otherwise the field is ignored and the contact uses the global
+	// Settings.wallpaperStyle (the same byte PhoneSynthwaveBg already
+	// reads). Stored as the raw `PhoneSynthwaveBg::Style` enum value
+	// so PhoneSynthwaveBg::styleFromByte() can consume it directly.
+	uint8_t wallpaperStyle = 0;
+
 	// Reserved bytes for future struct evolution (mute toggle, pinned
 	// flag, custom palette index, ...). New fields claim from the tail
 	// without changing the on-disk record size. Originally 8; S135
-	// claimed 2 (birthdayMonth + birthdayDay) so 6 remain.
-	uint8_t reserved[6] = {0};
+	// claimed 2 (birthdayMonth + birthdayDay) and S181 claimed 1
+	// (wallpaperStyle) so 5 remain.
+	uint8_t reserved[5] = {0};
 };
 
 // Bit-flag constants for `PhoneContact::flags`.
@@ -106,6 +116,10 @@ enum PhoneContactFlag : uint8_t {
 	// S135 — set when `birthdayMonth` / `birthdayDay` carry a
 	// user-supplied date. Cleared when the user removes the birthday.
 	ContactFlag_HasBirthday    = 1 << 3,
+	// S181 — set when the user has explicitly chosen a wallpaper for
+	// this contact. Cleared by clearWallpaper() to fall back to the
+	// global Settings.wallpaperStyle.
+	ContactFlag_HasWallpaper   = 1 << 4,
 };
 
 // Group tag constants for `PhoneContact::group`. Kept tiny so the

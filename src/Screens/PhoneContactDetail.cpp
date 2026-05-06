@@ -12,6 +12,7 @@
 #include "../Fonts/font.h"
 #include "../Storage/PhoneContacts.h"
 #include "PhoneContactRingtonePicker.h"
+#include "PhoneContactWallpaperPicker.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget so
 // the contact detail reads visually as part of the same family. Inlined
@@ -107,7 +108,17 @@ void PhoneContactDetail::buildLayout() {
 
 	// Wallpaper at the bottom of LVGL's z-order so every other element
 	// overlays it cleanly. Same z-order as PhoneIncomingCall.
-	wallpaper = new PhoneSynthwaveBg(obj);
+	// S181 — honour the per-contact wallpaper override if the user
+	// pinned one on this contact via PhoneContactWallpaperPicker.
+	// Falls through to the default (Settings.wallpaperStyle-driven)
+	// constructor when no override is set, preserving the global look
+	// for un-customised contacts.
+	if(uid != 0 && PhoneContacts::hasWallpaper(uid)) {
+		const uint8_t rawByte = PhoneContacts::wallpaperOf(uid);
+		wallpaper = new PhoneSynthwaveBg(obj, PhoneSynthwaveBg::styleFromByte(rawByte));
+	} else {
+		wallpaper = new PhoneSynthwaveBg(obj);
+	}
 
 	// Top: standard signal | clock | battery (10 px tall).
 	statusBar = new PhoneStatusBar(obj);
@@ -393,6 +404,19 @@ void PhoneContactDetail::buttonPressed(uint i) {
 			// screen does not have to thread anything through.
 			if(uid != 0) {
 				push(new PhoneContactRingtonePicker(uid));
+			}else if(softKeys) {
+				softKeys->flashLeft();
+			}
+			break;
+
+		case BTN_6:
+			// S181 — open the per-contact wallpaper picker. Sits on
+			// BTN_6 directly under BTN_5's ringtone picker so the
+			// two override pickers stay grouped on the keypad. Same
+			// uid==0 fallback as BTN_5: flash the LEFT softkey so the
+			// user gets a visible cue rather than a silent no-op.
+			if(uid != 0) {
+				push(new PhoneContactWallpaperPicker(uid));
 			}else if(softKeys) {
 				softKeys->flashLeft();
 			}

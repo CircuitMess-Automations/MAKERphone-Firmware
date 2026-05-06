@@ -109,6 +109,35 @@ bool clearBirthday(UID_t uid);
 bool hasBirthday(UID_t uid);
 bool birthdayOf(UID_t uid, uint8_t* outMonth, uint8_t* outDay);
 
+// ------------------------------------------------------------------
+// S181 — per-contact wallpaper override
+//
+// Stores a single byte (`PhoneSynthwaveBg::Style` enum value) on the
+// `PhoneContact` record gated by the `ContactFlag_HasWallpaper` flag.
+// When the flag is unset, the contact transparently inherits the
+// user's global `Settings.wallpaperStyle` choice — same fallback
+// pattern S153's ringtoneOf already uses.
+//
+// `setWallpaper(uid, raw)` accepts any non-zero byte the future
+// `PhoneSynthwaveBg::styleFromByte()` clamps. Passing 0 is treated as
+// "use Synthwave" (the default style id) and the flag is still set,
+// so callers can persist "the user explicitly chose Synthwave"
+// distinct from "no override".
+//
+// `clearWallpaper(uid)` removes the override and re-flags the contact
+// as inheriting the global setting. `hasWallpaper(uid)` returns true
+// only when the contact has an override stored. `wallpaperOf(uid)`
+// returns the contact's effective raw style byte: the per-contact
+// override if set, otherwise the contact's stored ringtoneId-style
+// default of 0 (Synthwave). Callers that want the *resolved* (theme-
+// aware) Style should still feed the result through
+// `PhoneSynthwaveBg::styleFromByte()`.
+// ------------------------------------------------------------------
+bool setWallpaper(UID_t uid, uint8_t styleByte);
+bool clearWallpaper(UID_t uid);
+bool hasWallpaper(UID_t uid);
+uint8_t wallpaperOf(UID_t uid);
+
 // Deterministic fallback seed derived from a uid - exposed so other
 // widgets (e.g. an inbox row that shows an avatar without ever
 // touching the repo) match the contacts screen.
