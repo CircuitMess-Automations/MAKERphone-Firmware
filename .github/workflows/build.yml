@@ -75,10 +75,18 @@ jobs:
           # A wrapper script keeps argv[0]="python3", so the dispatcher
           # finds the real interpreter.
           mkdir -p "$HOME/bin"
-          if [ ! -x "$HOME/bin/python" ]; then
-            printf '%s\n%s\n' '#!/usr/bin/env bash' 'exec python3 "$@"' > "$HOME/bin/python"
-            chmod +x "$HOME/bin/python"
-          fi
+          # Always overwrite any pre-existing shim — earlier runs of this
+          # workflow used a symlink that was broken on macOS (see commit
+          # message of 21b77f0). The leftover symlink is still on the
+          # runner's filesystem and tests as -x, so skip-if-exists would
+          # never replace it.
+          rm -f "$HOME/bin/python"
+          printf '%s\n%s\n' '#!/usr/bin/env bash' 'exec python3 "$@"' > "$HOME/bin/python"
+          chmod +x "$HOME/bin/python"
+          # Sanity check that python3 itself works (Xcode Command Line
+          # Tools must be installed; otherwise /usr/bin/python3 is a stub).
+          echo "xcode-select -p: $(xcode-select -p 2>&1 || true)"
+          python3 --version
           # Persist for subsequent steps in this job.
           echo "$HOME/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/bin:$PATH"
