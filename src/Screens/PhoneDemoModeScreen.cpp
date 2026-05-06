@@ -2,6 +2,7 @@
 
 #include <Input/Input.h>
 #include <Pins.hpp>
+#include <Settings.h>
 
 #include "../Elements/PhoneSynthwaveBg.h"
 #include "../Elements/PhoneStatusBar.h"
@@ -97,7 +98,7 @@ PhoneDemoModeScreen::PhoneDemoModeScreen()
 		  dotsLabel(nullptr),
 		  hintLabel(nullptr),
 		  slideTimer(nullptr),
-		  slideIdx(0) {
+		  slideIdx(resolveStartSlide()) {
 
 	// Full-screen container, no scrollbars, no inner padding. Same
 	// blank-canvas pattern PhoneAboutScreen / PhoneSettingsScreen use.
@@ -295,5 +296,32 @@ void PhoneDemoModeScreen::buttonPressed(uint /*i*/) {
 	if(softKeys != nullptr) {
 		softKeys->flashRight();
 	}
+	// S203 - persist whichever slide the camera was looking at when
+	// the user dismissed the screen so the next run resumes on the
+	// same slide. Auto-advances during an open run are intentionally
+	// NOT persisted (only the dismiss-time write hits NVS) so a
+	// nightly auto-cycle does not burn the device's NVS write budget.
+	persistCurrentSlide();
 	pop();
+}
+
+// ----- S203: persisted slide pointer ----------------------------------
+
+uint8_t PhoneDemoModeScreen::resolveStartSlide() {
+	// Defensive clamp against NVS-resize wipes that read the new byte
+	// as uninitialised garbage; matches the wallpaperStyle / themeId /
+	// soundProfile / lockWidgetMode pattern.
+	const uint8_t persisted = Settings.get().demoSlideStart;
+	if(persisted >= kSlideCount) return 0;
+	return persisted;
+}
+
+void PhoneDemoModeScreen::persistCurrentSlide() {
+	// Write only when the value actually changed -- saves the NVS layer
+	// from a redundant store() if the user opens + closes the demo on
+	// the same slide they last left it on.
+	const uint8_t cur = (slideIdx < kSlideCount) ? slideIdx : 0;
+	if(Settings.get().demoSlideStart == cur) return;
+	Settings.get().demoSlideStart = cur;
+	Settings.store();
 }

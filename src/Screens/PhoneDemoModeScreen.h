@@ -95,6 +95,15 @@ public:
 	/** Total number of slides in the looping demo deck. */
 	static constexpr uint8_t kSlideCount = 9;
 
+	/**
+	 * S203 - resolve the slide index the screen should open on, reading
+	 * Settings.demoSlideStart and clamping it to [0..kSlideCount-1] so a
+	 * stale or NVS-resize-wiped byte never crashes the constructor.
+	 * Public + static so a host or unit test can introspect the resume
+	 * point without having to instantiate the screen.
+	 */
+	static uint8_t resolveStartSlide();
+
 private:
 	PhoneSynthwaveBg*    wallpaper;
 	PhoneStatusBar*      statusBar;
@@ -128,6 +137,14 @@ private:
 	/** Tick-side helper: increments slideIdx modulo kSlideCount and
 	 *  re-renders. */
 	void advanceSlide();
+
+	/**
+	 * S203 - write the currently visible slide into Settings.demoSlideStart
+	 * (calling Settings.store() to persist) when the user dismisses the
+	 * screen. No-op when the value already matches what NVS holds, so a
+	 * dismiss-on-the-same-slide path never burns a redundant store().
+	 */
+	void persistCurrentSlide();
 
 	void buttonPressed(uint i) override;
 };

@@ -558,6 +558,36 @@ struct SettingsData {
 	// boot after the firmware grows -- which maps to Factory, the
 	// correct factory default.
 	uint8_t alarmTone = 0;
+	// S203 - persisted slide pointer for PhoneDemoModeScreen (S200).
+	// Today the demo deck always opens at slide 0 because the screen
+	// is short-lived and the marketing camera takes a continuous shot
+	// of the full nine-slide loop. A release engineer who wants to
+	// start the take mid-deck (e.g. to re-shoot just the "audio
+	// studio" slide without re-rolling through the first three) had
+	// to either count the auto-advances on camera or recompile the
+	// firmware. demoSlideStart fixes that: the screen reads this byte
+	// in its constructor and seeds slideIdx from it (clamped to
+	// PhoneDemoModeScreen::kSlideCount-1) so the first slide painted
+	// is whichever one the previous run exited on. On every press of
+	// any key the screen writes the *currently visible* slide back
+	// here and calls Settings.store() so a power-cycle preserves the
+	// pointer through the existing NVS-resize pattern. Auto-advances
+	// inside an open run are NOT persisted -- the byte only updates
+	// when the user actively dismisses the screen, so the nightly
+	// auto-cycle never burns NVS write budget. Persisted values
+	// outside [0..kSlideCount-1] clamp to 0 at the screen layer to
+	// be defensive against NVS-resize wipes that read the new byte
+	// as uninitialised garbage. Sits at the end of the blob next to
+	// alarmTone so the existing NVS-resize pattern (that grew this
+	// struct via soundProfile / wallpaperStyle / themeId / keyTicks
+	// / ownerName / powerOffMessage / operatorText / operatorLogo /
+	// phoneProfile / profileRingtones / speedDial / rainbowUnlocked
+	// / softKeyTone / lockWidgetMode / homeLayoutMode /
+	// wallpaperOfDay / customAccentEnabled / customAccentR / G / B /
+	// ownerEmoji / musicPlayMode / alarmTone) reads the new byte as
+	// zero-initialised on a first boot after the firmware grows --
+	// which maps to slide 0, the byte-identical pre-S203 default.
+	uint8_t demoSlideStart = 0;
 };
 
 class SettingsImpl {

@@ -182,12 +182,20 @@ polish for v2.1.
 
 ## v2.0-fresh polish
 
-- [ ] **`PhoneDemoModeScreen` (S200) carries no persisted slide
-  pointer.** Exiting via any key restarts from slide 0 on the next
-  launch. Intentional today (the screen is short-lived, the camera
-  shoot is a continuous take), but a `Settings.demoSlideStart` byte
-  would let a release engineer pick which slide to open on so the
-  marketing video can start mid-deck.
+- [x] **`PhoneDemoModeScreen` (S200) carries no persisted slide
+  pointer** — fixed in S203. `SettingsData` now grows a
+  `demoSlideStart` byte (default 0, clamped to `[0..kSlideCount-1]`
+  at the screen layer). The screen seeds `slideIdx` from the byte
+  in its constructor via a new public `resolveStartSlide()`
+  accessor, and writes the currently visible slide back via a new
+  private `persistCurrentSlide()` helper on dismiss (any-key exit).
+  Auto-advances inside an open run are intentionally NOT persisted
+  so the nightly auto-cycle never burns NVS write budget; only the
+  dismiss-time write hits NVS, and only when the value actually
+  changed. The byte sits at the end of the blob next to `alarmTone`
+  so the existing NVS-resize pattern reads it as zero-initialised
+  on a first boot after the firmware grows — which maps to slide 0,
+  the byte-identical pre-S203 default.
 
 - [ ] **`PhoneDemoModeScreen` slide pace is not user-tunable.**
   3 s/slide is hard-coded in `kSlidePeriodMs`. A future `ADVANCED →

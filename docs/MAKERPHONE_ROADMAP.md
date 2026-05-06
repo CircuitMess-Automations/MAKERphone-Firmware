@@ -318,6 +318,23 @@ lowest-numbered `[ ]`.
   REPLACE / CLEAR + CANCEL in confirm mode. Resolves the matching
   v2.1 polish item in `KNOWN_ISSUES.md`.
 
+- [x] **S203** — `PhoneDemoModeScreen` persisted slide pointer — adds
+  a `Settings.demoSlideStart` byte (default 0, clamped to
+  `[0..kSlideCount-1]`) so the v2.0 demo deck (S200) resumes on the
+  slide the previous run dismissed on instead of always restarting
+  from slide 0. The screen seeds `slideIdx` from the persisted byte
+  via a new public `resolveStartSlide()` accessor in its constructor,
+  and writes the currently visible slide back via a new private
+  `persistCurrentSlide()` helper on dismiss (any-key exit). Auto-
+  advances inside an open run are intentionally NOT persisted so
+  the nightly auto-cycle never burns NVS write budget; only the
+  dismiss-time write hits NVS, and only when the value actually
+  changed. Sits at the end of the `SettingsData` blob so the
+  existing NVS-resize pattern reads the new byte as zero-initialised
+  on a first boot after the firmware grows -- which maps to slide 0,
+  the byte-identical pre-S203 default. Resolves the matching v2.1
+  polish item in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file
