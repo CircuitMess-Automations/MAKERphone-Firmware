@@ -64,6 +64,12 @@ const Section kLayout[] = {
 	// rows (Wallpaper / Theme / Lock widget) cluster together inside the
 	// DISPLAY section, with SOUND staying anchored as the next group below.
 	{ false, "Lock widget",        "LOCK WIDGET", PhoneSettingsScreen::Item::LockWidget },
+	// S185 - home-screen layout-mode picker. Sits at the bottom of the
+	// DISPLAY group so all four "what does my phone look like when
+	// idle" rows (Wallpaper / Theme / Lock widget / Home layout)
+	// cluster together inside the DISPLAY section, with SOUND staying
+	// anchored as the next group below.
+	{ false, "Home layout",        "HOME LAYOUT", PhoneSettingsScreen::Item::HomeLayout },
 	{ true,  "SOUND",              nullptr,       PhoneSettingsScreen::Item::Sound      },
 	// S159 - replaced the S52 "Sound & Vibration" three-state picker with
 	// the classic Sony-Ericsson "Profile" five-state selector

@@ -191,6 +191,17 @@ private:
 	// parent; we keep the pointer to drive setActive() each
 	// loop, mirroring the PhoneIdleHint wiring two lines above.
 	PhoneYawnOverlay*        yawnOverlay      = nullptr;
+	// S185 - "Stack" home layout shortcut hint. A static dim-purple
+	// pixelbasic7 strip painted in the empty wallpaper band between
+	// the clock face and the soft-key bar that surfaces the long-
+	// press gestures muscle-memory expects from a Sony-Ericsson
+	// feature phone ("HOLD 0:DIAL  HOLD #:LOCK"). Created lazily
+	// the first time applyHomeLayoutMode() lands on the Stack mode,
+	// hidden / shown by setting LV_OBJ_FLAG_HIDDEN on every layout
+	// change so the pointer stays valid for the screen's lifetime.
+	// Owned by the LVGL parent; nullptr until the user picks Stack
+	// from PhoneHomeLayoutScreen.
+	lv_obj_t*                shortcutHint     = nullptr;
 
 	SoftKeyHandler leftCb       = nullptr;
 	SoftKeyHandler rightCb      = nullptr;
@@ -212,6 +223,38 @@ private:
 	// double-firing on key release after a long-press has already
 	// triggered the speed-dial callback.
 	bool digitLongFired[10] = { false, false, false, false, false, false, false, false, false, false };
+
+	/**
+	 * S185 - apply the persisted Settings.homeLayoutMode byte to the
+	 * widgets owned by this screen. Called from the constructor (so
+	 * the freshly-built homescreen picks up the user's choice on the
+	 * very first frame) and again from onStart() (so a layout edit
+	 * that bounces back through PhoneHomeLayoutScreen takes effect on
+	 * the next homescreen push without rebuilding the screen).
+	 *
+	 *   - Classic (0) - factory default; every widget visible / gated
+	 *                   exactly the way the pre-S185 home screen
+	 *                   shipped. Re-shows the operator banner and re-
+	 *                   activates the rotating tip banner / idle hint
+	 *                   so a user who flips back from Minimal / Stack
+	 *                   gets the full silhouette without a reboot.
+	 *   - Minimal (1) - hides the operator banner and gates off both
+	 *                   the rotating tip banner and the "PRESS ANY
+	 *                   KEY" idle hint. The yawn overlay still ticks
+	 *                   so a forgotten device still drifts off into
+	 *                   the sleepy-eyes animation after 5 minutes.
+	 *   - Stack   (2) - same gating as Minimal plus a static dim-
+	 *                   purple "HOLD 0:DIAL  HOLD #:LOCK" shortcut
+	 *                   hint painted in the empty wallpaper band so
+	 *                   the long-press gestures muscle-memory expects
+	 *                   from a Sony-Ericsson feature phone are
+	 *                   discoverable without reaching for the manual.
+	 *
+	 * Persisted values outside [0..2] clamp to Classic so a NVS-resize
+	 * wipe that lands the new byte at 0xFF degrades gracefully to the
+	 * documented factory default.
+	 */
+	void applyHomeLayoutMode();
 
 	void buttonPressed(uint i) override;
 	void buttonReleased(uint i) override;

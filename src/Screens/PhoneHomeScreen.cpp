@@ -15,7 +15,10 @@
 #include "../Elements/PhoneIdleHint.h"
 #include "../Elements/PhoneTipBanner.h"
 #include "../Elements/PhoneYawnOverlay.h"
+#include "../Fonts/font.h"
 #include "PhoneBirthdayReminders.h"
+
+#include <Settings.h>
 
 PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
 	// Full-screen container, no scrollbars, no inner padding - the four
@@ -164,6 +167,13 @@ PhoneHomeScreen::PhoneHomeScreen() : LVScreen() {
 	setButtonHoldTime(BTN_7, 600);
 	setButtonHoldTime(BTN_8, 600);
 	setButtonHoldTime(BTN_9, 600);
+
+	// S185 - apply the persisted home-layout mode to the freshly-built
+	// widget tree so the very first frame already honours the user's
+	// pick from PhoneHomeLayoutScreen. The same call fires again from
+	// onStart() so a layout edit that bounces back through the picker
+	// takes effect on the next push without rebuilding the screen.
+	applyHomeLayoutMode();
 }
 
 PhoneHomeScreen::~PhoneHomeScreen() {
@@ -205,6 +215,13 @@ void PhoneHomeScreen::onStart() {
 	if(yawnOverlay != nullptr && chargingOverlay != nullptr){
 		yawnOverlay->setActive(!chargingOverlay->isCharging());
 	}
+
+	// S185 - re-apply the persisted home-layout mode every time the
+	// homescreen surfaces. A user who walked into PhoneHomeLayoutScreen,
+	// flipped from Classic to Minimal, and popped back lands here on
+	// the way out -- so this call is what makes the freshly-saved
+	// layout visible without rebuilding the screen.
+	applyHomeLayoutMode();
 
 	// S152 - check whether today is anyone's birthday and, if so,
 	// drop a one-shot confetti volley + a slide-down toast on top of
@@ -423,5 +440,112 @@ void PhoneHomeScreen::buttonHeld(uint i) {
 
 		default:
 			break;
+	}
+}
+
+
+// ----- S185: home-screen layout mode ----------------------------------
+
+void PhoneHomeScreen::applyHomeLayoutMode() {
+	// MAKERphone retro palette (kept inline per the established
+	// pattern -- see PhoneHomeLayoutScreen.cpp / PhoneLockWidgetScreen.cpp).
+	// Only the dim-purple caption colour is needed here for the
+	// shortcut hint label; the rest of the home screen builds its
+	// widgets with their own palette baked in.
+	const lv_color_t MP_LABEL_DIM = lv_color_make(170, 140, 200);
+
+	// Defensive read - clamp persisted values outside [0..2] to
+	// Classic, the documented factory default. Same defensive
+	// pattern soundProfile / wallpaperStyle / themeId / lockWidgetMode
+	// already use against NVS-resize wipes that read the new byte
+	// as uninitialised garbage.
+	uint8_t mode = Settings.get().homeLayoutMode;
+	if(mode > 2) mode = 0;
+
+	const bool wantOperator = (mode == 0); // Classic only
+	const bool wantBanners  = (mode == 0); // Classic only (tip + idle hint)
+	const bool wantShortcut = (mode == 2); // Stack only
+
+	// Operator banner: hide on Minimal / Stack, restore on Classic.
+	// LV_OBJ_FLAG_HIDDEN is cheap to toggle and leaves the widget
+	// otherwise unchanged so the next Classic flip simply re-shows
+	// it. The widget already paints itself blank when both
+	// Settings.operatorText and Settings.operatorLogo are empty,
+	// so a Classic flip on a wiped banner leaves no stray pixels
+	// on the homescreen either.
+	if(operatorBanner != nullptr) {
+		lv_obj_t* banner = operatorBanner->getLvObj();
+		if(banner) {
+			if(wantOperator) {
+				if(operatorBanner->isVisible()) {
+					lv_obj_clear_flag(banner, LV_OBJ_FLAG_HIDDEN);
+				} else {
+					// banner has nothing to render anyway; keep hidden
+					lv_obj_add_flag(banner, LV_OBJ_FLAG_HIDDEN);
+				}
+			} else {
+				lv_obj_add_flag(banner, LV_OBJ_FLAG_HIDDEN);
+			}
+		}
+	}
+
+	// Clock-face vertical re-anchor. The constructor already pushed the
+	// face down by PhoneOperatorBanner::BannerHeight when the banner is
+	// populated, so a Classic homescreen with a non-empty operator
+	// banner reads with its clock cleared of the banner. Minimal /
+	// Stack hide the banner regardless, so the band the banner used to
+	// occupy is empty and the clock should slide back up to the legacy
+	// y = 11 anchor; Classic with a populated banner keeps the shifted
+	// y so the cyan time digits do not overlap the cream carrier
+	// label / sunset-orange logo cells. PhoneClockFace is anchored at
+	// y = 11 by its constructor when no banner is present, so setting
+	// the legacy value is also the default-restore path here.
+	if(clockFace != nullptr) {
+		const bool bannerPainted =
+			(operatorBanner != nullptr && wantOperator && operatorBanner->isVisible());
+		const int16_t targetY =
+			bannerPainted
+				? static_cast<int16_t>(11 + PhoneOperatorBanner::BannerHeight)
+				: static_cast<int16_t>(11);
+		lv_obj_set_y(clockFace->getLvObj(), targetY);
+	}
+
+	// Tip banner + idle hint: gate off on Minimal / Stack so neither
+	// the rotating tip strip nor the "PRESS ANY KEY" hint can fade
+	// in over the cleaner layouts. Classic re-arms both via setActive
+	// (true), and the existing onStart() / charging-overlay gate
+	// pass that runs immediately after still has the final word --
+	// so a charging device still suppresses both widgets even on
+	// Classic, exactly the way it did before S185.
+	if(tipBanner != nullptr) {
+		tipBanner->setActive(wantBanners);
+	}
+	if(idleHint != nullptr) {
+		idleHint->setActive(wantBanners);
+	}
+
+	// Stack-only shortcut hint. Lazily allocated the first time the
+	// user picks Stack so a Classic / Minimal session pays no LVGL
+	// cost; once allocated the label is just toggled visible /
+	// hidden on every layout change so the pointer stays valid for
+	// the screen's lifetime.
+	if(wantShortcut) {
+		if(shortcutHint == nullptr) {
+			shortcutHint = lv_label_create(obj);
+			lv_obj_set_style_text_font(shortcutHint, &pixelbasic7, 0);
+			lv_obj_set_style_text_color(shortcutHint, MP_LABEL_DIM, 0);
+			lv_label_set_text(shortcutHint, "HOLD 0:DIAL  HOLD #:LOCK");
+			lv_obj_set_align(shortcutHint, LV_ALIGN_TOP_MID);
+			// Anchor in the empty wallpaper band between the clock
+			// face (y = 11..43) and the soft-key bar (y = 118..128),
+			// just above where the idle hint would otherwise sit.
+			lv_obj_set_y(shortcutHint, 92);
+			// Keep the hint out of the input layer so the existing
+			// softkey / quick-dial / lock-hold gestures keep firing.
+			lv_obj_clear_flag(shortcutHint, LV_OBJ_FLAG_CLICKABLE);
+		}
+		lv_obj_clear_flag(shortcutHint, LV_OBJ_FLAG_HIDDEN);
+	} else if(shortcutHint != nullptr) {
+		lv_obj_add_flag(shortcutHint, LV_OBJ_FLAG_HIDDEN);
 	}
 }

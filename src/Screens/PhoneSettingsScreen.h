@@ -160,6 +160,20 @@ public:
 		// NVS-resize pattern); LockScreen picks the chosen mode up on
 		// the next push without any extra wiring.
 		LockWidget      = 13,  // S184
+		// S185 - home-screen layout-mode picker. Drills into
+		// PhoneHomeLayoutScreen, which lets the user pick whether the
+		// PhoneHomeScreen renders the classic Sony-Ericsson silhouette
+		// (Classic, factory default), a watch-face-style minimalist
+		// composition (Minimal), or an extra "HOLD 0:DIAL HOLD #:LOCK"
+		// shortcut hint baked into the wallpaper band (Stack). Lives in
+		// the DISPLAY group right under "Lock widget" so all four
+		// "what does my phone look like when idle" rows (Wallpaper /
+		// Theme / Lock widget / Home layout) cluster together inside
+		// the DISPLAY section. Persistence is via Settings.homeLayoutMode
+		// (a single byte slot grown alongside the existing SettingsData
+		// NVS-resize pattern); PhoneHomeScreen picks the chosen mode
+		// up on the next push without any extra wiring.
+		HomeLayout      = 14,  // S185
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);
@@ -209,7 +223,7 @@ public:
 	void flashRightSoftKey();
 
 	/** Number of selectable rows (excludes group headers). */
-	static constexpr uint8_t ItemCount = 14;
+	static constexpr uint8_t ItemCount = 15;
 
 	// --- Geometry, exposed for unit-test friendliness. -----------------
 

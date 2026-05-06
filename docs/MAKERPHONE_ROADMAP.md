@@ -265,7 +265,7 @@ Beyond themes — let users actually make the phone *theirs*.
 - [x] **S182** — Avatar editor — pixel-paint mini editor (32×32, replaces the S38 picker).
 - [x] **S183** — Soft-key tone customisation.
 - [x] **S184** — Lock screen widget picker (clock-only / clock+date / clock+next-event).
-- [ ] **S185** — Home screen layout switcher.
+- [x] **S185** — Home screen layout switcher.
 - [ ] **S186** — Wallpaper of the day — daily auto-rotate from a curated list.
 - [ ] **S187** — Custom RGB picker for accent color (real-time preview).
 - [ ] **S188** — Owner emoji / avatar selection (used on lock + status bar).

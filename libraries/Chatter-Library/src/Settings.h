@@ -342,6 +342,48 @@ struct SettingsData {
 	// boot after the firmware grows, which maps to ClockDate -- the
 	// correct factory default.
 	uint8_t lockWidgetMode = 0;
+	// S185 - home-screen layout switcher. Lets the user pick which top-
+	// level composition the PhoneHomeScreen renders on the synthwave
+	// wallpaper, so the same hardware can present three distinct
+	// homescreen "vibes" without rebuilding any widget tree:
+	//
+	//   0 = Classic  - the factory default. Status bar + operator
+	//                  banner (when populated) + big clock face +
+	//                  rotating tip / idle hints + soft-key bar
+	//                  exactly the way every prior firmware shipped,
+	//                  so a freshly-flashed device looks byte-
+	//                  identical out of the box.
+	//   1 = Minimal  - operator banner is hidden and the rotating
+	//                  tip banner / "PRESS ANY KEY" idle hint are
+	//                  gated off, leaving just the status bar, the
+	//                  clock face and the soft-key bar floating on
+	//                  the synthwave wallpaper. The result reads as
+	//                  a quiet "watch face" mode for users who do
+	//                  not want any text on their homescreen apart
+	//                  from the time.
+	//   2 = Stack    - operator banner is hidden, the rotating tip
+	//                  banner / idle hint are gated off, and a
+	//                  static "HOLD 0:DIAL  HOLD #:LOCK" shortcut
+	//                  hint is painted in the empty wallpaper band
+	//                  between the clock face and the soft-key bar.
+	//                  Surfaces the long-press gestures muscle-memory
+	//                  expects from a Sony-Ericsson feature phone so
+	//                  a new user can discover them without reaching
+	//                  for the manual.
+	//
+	// Edited from PhoneHomeLayoutScreen, reachable from the DISPLAY
+	// section of PhoneSettingsScreen ("Home layout" row, directly
+	// below "Lock widget"). Persisted values outside [0..2] clamp to
+	// Classic at the home-screen layer, the same defensive pattern
+	// soundProfile / wallpaperStyle / themeId / keyTicks / lockWidgetMode
+	// already use against NVS-resize wipes that read the new byte as
+	// uninitialised garbage. Sits next to lockWidgetMode so the two
+	// "what does my phone look like when idle" knobs cluster together
+	// in the SettingsData blob; the existing NVS-resize pattern reads
+	// the new field as zero-initialised on a first boot after the
+	// firmware grows, which maps to Classic -- the correct factory
+	// default.
+	uint8_t homeLayoutMode = 0;
 };
 
 class SettingsImpl {

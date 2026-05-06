@@ -32,6 +32,7 @@
 #include "../Screens/PhoneAboutScreen.h"
 #include "../Screens/PhoneThemeScreen.h"
 #include "../Screens/PhoneLockWidgetScreen.h"
+#include "../Screens/PhoneHomeLayoutScreen.h"
 #include "../Screens/PhoneOwnerNameScreen.h"
 #include "../Screens/PhonePowerOffMessageScreen.h"
 #include "../Screens/PhoneOperatorScreen.h"
@@ -372,6 +373,27 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// device looks byte-identical to every prior firmware
 						// on its lock screen.
 						self->push(new PhoneLockWidgetScreen());
+						break;
+					case PhoneSettingsScreen::Item::HomeLayout:
+						// S185: home-screen layout-mode picker. Drills
+						// into PhoneHomeLayoutScreen, a single-list
+						// picker patterned after PhoneLockWidgetScreen
+						// that lets the user pick whether
+						// PhoneHomeScreen renders the classic Sony-
+						// Ericsson silhouette (Classic, factory default),
+						// a watch-face-style minimalist composition
+						// (Minimal, no operator banner / tip banner /
+						// idle hint), or an extra "HOLD 0:DIAL HOLD #:
+						// LOCK" shortcut hint baked into the wallpaper
+						// band (Stack). On SAVE the screen writes
+						// Settings.homeLayoutMode and flushes via
+						// Settings.store(); the home screen picks the
+						// chosen mode up on the next push without any
+						// extra wiring. Classic (id 0, the factory
+						// default) keeps the legacy full-feature
+						// homescreen so a freshly-flashed device looks
+						// byte-identical to every prior firmware.
+						self->push(new PhoneHomeLayoutScreen());
 						break;
 					default:
 						// Defensive: any future row that is added to
