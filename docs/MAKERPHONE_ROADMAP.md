@@ -432,6 +432,33 @@ lowest-numbered `[ ]`.
   are new. Resolves the matching v2.1 polish item in
   `KNOWN_ISSUES.md`.
 
+- [x] **S209** — `PhoneT9Input` pending-strip width clamp -- the
+  feature-phone multi-tap hint strip below the entry textbox houses
+  two free-floating labels (a left-anchored `pendingLabel` showing
+  the active key's letter ring with the live letter bracketed, e.g.
+  `[p]qrs7` for key 7, and a right-anchored `caseLabel` showing the
+  case mode `abc` / `Abc` / `ABC`). Before S209 neither label had a
+  width budget, so a long pending hint string -- longer than the
+  current ITU-T E.161 keymap produces, but reachable by a
+  future localisation, an extended-glyph keymap, or simply a future
+  host that narrows the strip -- could collide with the case pill,
+  the v2.1 "Long T9 entries overrun the 1-line caret hint on very
+  narrow notes" polish item in `KNOWN_ISSUES.md`. `buildPendingStrip()`
+  now reserves a fixed 24 px box on the right for the case label
+  (right-aligned text, `LV_LABEL_LONG_CLIP` so a future wider case
+  glyph cluster cannot push back into the hint either), keeps a 4 px
+  gap between the two labels, and clamps `pendingLabel` to the
+  remaining width with `LV_LABEL_LONG_DOT` so a hint that does not
+  fit truncates with an ellipsis instead of crashing into the case
+  pill. The geometry constants land as locals (kPendingLeftX,
+  kCaseRightGap, kCaseReserveW, kInterLabelGap, kPendingMaxW) so
+  they read like every other Phone* widget's geometry block. Visible
+  output on every existing host (PhoneNotepad, ConvoScreen,
+  PhoneContactEdit) is byte-identical because the longest current
+  pending hint `[p]qrs7` (~30 px) still fits comfortably inside the
+  new ~125 px hint budget. Resolves the matching v2.1 polish item
+  in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file

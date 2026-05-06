@@ -107,8 +107,20 @@ on a usable home screen on a fresh device.
   Arduino `random()` stream stays untouched and other widgets /
   games / ringtone phases that depend on it remain deterministic.
 
-- [ ] Long T9 entries in `PhoneNotepad` overrun the 1-line caret hint on
-  very narrow notes (≤ 8 chars). Truncate the hint to fit.
+- [x] Long T9 entries in `PhoneNotepad` overrun the 1-line caret hint on
+  very narrow notes (≤ 8 chars). Truncate the hint to fit. -- fixed in
+  S209. `PhoneT9Input::buildPendingStrip()` now reserves a fixed 24 px
+  case-label box on the right edge, leaves a 4 px gap, and clamps the
+  pending-hint label to the remaining width with `LV_LABEL_LONG_DOT`,
+  so a long pending hint string can no longer collide with the case
+  pill. The case label itself is now box-bounded with right-aligned
+  text and `LV_LABEL_LONG_CLIP`, so a future localised case glyph
+  cluster cannot push back into the hint. The text rendered for the
+  current ITU-T E.161 keymap (longest hint `[p]qrs7` ~ 30 px) still
+  fits comfortably inside the new 125 px hint budget, so the visible
+  output on every existing host (PhoneNotepad, ConvoScreen,
+  PhoneContactEdit) is byte-identical -- this is a defensive layout
+  hardening, not a visible redesign.
 
 ## Hardware-only (cannot reproduce in CI)
 

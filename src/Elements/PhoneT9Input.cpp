@@ -132,12 +132,34 @@ void PhoneT9Input::buildPendingStrip(){
 	lv_obj_set_align(pendingStrip, LV_ALIGN_TOP_LEFT);
 	lv_obj_set_pos(pendingStrip, 0, Height);
 
+	// S209: reserve a fixed pixel budget on the right edge for the
+	// case label so the pending hint cannot collide with it. "ABC" /
+	// "Abc" / "abc" are at most 3 pixelbasic7 glyphs (~5 px advance
+	// each); we reserve 24 px (3 px right gutter + glyphs + slack)
+	// and leave a 4 px gap between the two labels. The pending hint
+	// then gets the remaining width and falls back to LV_LABEL_LONG_DOT
+	// if the rendered help string overflows. Before S209 both labels
+	// were free-floating and a long pending hint (e.g. localised
+	// "[p]qrs7" on a host that narrowed the strip) could overrun the
+	// case label -- the v2.1 "Long T9 entries overrun the 1-line
+	// caret hint on very narrow notes" polish item in KNOWN_ISSUES.md.
+	const lv_coord_t kPendingLeftX  = 3;
+	const lv_coord_t kCaseRightGap  = 3;   // matches caseLabel x = -3
+	const lv_coord_t kCaseReserveW  = 24;  // case-label box width
+	const lv_coord_t kInterLabelGap = 4;
+	const lv_coord_t kPendingMaxW   = (lv_coord_t) Width
+			- kPendingLeftX
+			- kCaseReserveW
+			- kInterLabelGap;
+
 	pendingLabel = lv_label_create(pendingStrip);
 	lv_obj_add_flag(pendingLabel, LV_OBJ_FLAG_IGNORE_LAYOUT);
 	lv_obj_set_style_text_font(pendingLabel, &pixelbasic7, 0);
 	lv_obj_set_style_text_color(pendingLabel, MP_TEXT, 0);
 	lv_obj_set_align(pendingLabel, LV_ALIGN_LEFT_MID);
-	lv_obj_set_x(pendingLabel, 3);
+	lv_obj_set_x(pendingLabel, kPendingLeftX);
+	lv_obj_set_width(pendingLabel, kPendingMaxW);
+	lv_label_set_long_mode(pendingLabel, LV_LABEL_LONG_DOT);
 	lv_label_set_text(pendingLabel, "");
 
 	caseLabel = lv_label_create(pendingStrip);
@@ -145,7 +167,10 @@ void PhoneT9Input::buildPendingStrip(){
 	lv_obj_set_style_text_font(caseLabel, &pixelbasic7, 0);
 	lv_obj_set_style_text_color(caseLabel, MP_HIGHLIGHT, 0);
 	lv_obj_set_align(caseLabel, LV_ALIGN_RIGHT_MID);
-	lv_obj_set_x(caseLabel, -3);
+	lv_obj_set_x(caseLabel, -kCaseRightGap);
+	lv_obj_set_width(caseLabel, kCaseReserveW);
+	lv_obj_set_style_text_align(caseLabel, LV_TEXT_ALIGN_RIGHT, 0);
+	lv_label_set_long_mode(caseLabel, LV_LABEL_LONG_CLIP);
 	lv_label_set_text(caseLabel, "Abc");
 }
 
