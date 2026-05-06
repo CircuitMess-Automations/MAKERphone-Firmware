@@ -62,10 +62,25 @@ jobs:
         run: |
           # The cm:esp32 1.7.5 toolchain invokes bare 'python' (e.g.
           # gen_esp32part.py and esptool.py wrappers). macOS removed
-          # /usr/bin/python years ago, so we need a python -> python3 shim.
-          if ! command -v python >/dev/null 2>&1; then
-            mkdir -p "$HOME/bin"
-            ln -sf "$(command -v python3)" "$HOME/bin/python"
+          # /usr/bin/python years ago, so we need a python shim that hands
+          # off to python3.
+          #
+          # IMPORTANT: do NOT symlink \$HOME/bin/python -> /usr/bin/python3.
+          # On macOS, /usr/bin/python3 is itself a dispatcher that uses
+          # xcrun to look up a tool whose name matches argv[0]. Invoked as
+          # "python", it tries to find a "python" tool in the Command Line
+          # Tools — which doesn't exist (CLT ships python3 only) — and
+          # exits with "Failed to locate 'python'".
+          #
+          # A wrapper script keeps argv[0]="python3", so the dispatcher
+          # finds the real interpreter.
+          mkdir -p "$HOME/bin"
+          if [ ! -x "$HOME/bin/python" ]; then
+            cat > "$HOME/bin/python" <<'SHIM'
+#!/usr/bin/env bash
+exec python3 "$@"
+SHIM
+            chmod +x "$HOME/bin/python"
           fi
           # Persist for subsequent steps in this job.
           echo "$HOME/bin" >> "$GITHUB_PATH"
