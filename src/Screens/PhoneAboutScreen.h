@@ -91,7 +91,7 @@ public:
 	void onStop() override;
 
 	/** Firmware version string baked into this build. */
-	static constexpr const char* kFirmwareVersion = "MAKERphone v0.55";
+	static constexpr const char* kFirmwareVersion = "MAKERphone v2.0";
 
 	/** Live-update tick period (ms) for the heap + uptime fields. */
 	static constexpr uint32_t kRefreshPeriodMs = 1000;

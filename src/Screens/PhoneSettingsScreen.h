@@ -218,6 +218,19 @@ public:
 		// NVS-resize pattern); PhoneAlarmService picks the chosen tone
 		// up on the next triggerFire() call without any extra wiring.
 		AlarmTone       = 17,  // S193
+		// S200 - v2.0 release "auto-cycling demo mode for the marketing
+		// video" entry. Drills into PhoneDemoModeScreen, which loops a
+		// short slideshow of the headline v2.0 features (calls, games,
+		// audio studio, themes, alarms, virtual pet, personalisation,
+		// 200-session credit) for an unattended camera shoot. Sits at
+		// the very bottom of the settings list under a fresh ADVANCED
+		// group so the row is never confused with the rest of the
+		// per-feature personalisation rows above; About stays anchored
+		// directly above it as the last SYSTEM row where feature-phone
+		// users expect to find it. Persistence is intentionally absent -
+		// the demo carries no user state, the screen exits on any key,
+		// and the next launch starts fresh from slide 0.
+		DemoMode        = 18,  // S200
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);
@@ -267,7 +280,7 @@ public:
 	void flashRightSoftKey();
 
 	/** Number of selectable rows (excludes group headers). */
-	static constexpr uint8_t ItemCount = 18;
+	static constexpr uint8_t ItemCount = 19;
 
 	// --- Geometry, exposed for unit-test friendliness. -----------------
 

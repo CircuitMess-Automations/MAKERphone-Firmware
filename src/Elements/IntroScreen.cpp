@@ -43,6 +43,7 @@
 #include "../Screens/PhoneProfileRingtoneScreen.h"
 #include "../Screens/PhoneSoftKeyToneScreen.h"
 #include "../Screens/PhoneAlarmTonePicker.h"
+#include "../Screens/PhoneDemoModeScreen.h"
 #include "../Screens/PhoneWelcomeScreen.h"
 #include "../Screens/PhoneGamesScreen.h"
 #include "../Interface/LVScreen.h"
@@ -466,6 +467,17 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// rings byte-identically to every prior firmware on
 						// its alarms.
 						self->push(new PhoneAlarmTonePicker());
+						break;
+					case PhoneSettingsScreen::Item::DemoMode:
+						// S200: v2.0 release "auto-cycling demo mode for
+						// the marketing video" surface. Drills into
+						// PhoneDemoModeScreen, which loops a short
+						// slideshow of the headline v2.0 features for
+						// an unattended camera shoot. Carries no
+						// persisted state - the screen exits on any
+						// key and the next launch starts fresh from
+						// slide 0.
+						self->push(new PhoneDemoModeScreen());
 						break;
 					default:
 						// Defensive: any future row that is added to

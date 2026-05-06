@@ -287,7 +287,7 @@ Buzzer is what we have, so we lean into it.
 - [x] **S197** — Memory-leak audit — push/pop every screen 1000× in test mode, heap must stay flat.
 - [x] **S198** — Battery-life pass + idle-dim tuning + LVGL-cost measurement.
 - [x] **S199** — Final QA — exercise every flow, fix critical regressions in the same commit.
-- [ ] **S200** — v2.0 changelog + KNOWN_ISSUES sweep + auto-cycling demo mode for the marketing video.
+- [x] **S200** — v2.0 changelog + KNOWN_ISSUES sweep + auto-cycling demo mode for the marketing video.
 
 ---
 

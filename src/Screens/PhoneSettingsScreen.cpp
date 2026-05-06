@@ -156,6 +156,17 @@ const Section kLayout[] = {
 	// the very end where feature-phone users expect to find it.
 	{ false, "Speed dial",         "SPEED DIAL",  PhoneSettingsScreen::Item::SpeedDial   },
 	{ false, "About",              "ABOUT",       PhoneSettingsScreen::Item::About       },
+	// S200 - v2.0 release "auto-cycling demo mode for the marketing video"
+	// row. Sits in a fresh ADVANCED group at the very bottom of the
+	// settings list so the row is never confused with the rest of the
+	// per-feature personalisation rows above; About stays anchored as
+	// the last SYSTEM entry where feature-phone users expect to find
+	// it, and the new ADVANCED group is reserved for "release-engineer"
+	// affordances that future sessions can grow into. Drills into
+	// PhoneDemoModeScreen, which loops a short slideshow of the
+	// headline v2.0 features for an unattended camera shoot.
+	{ true,  "ADVANCED",            nullptr,       PhoneSettingsScreen::Item::DemoMode    },
+	{ false, "Demo mode",           "DEMO MODE",   PhoneSettingsScreen::Item::DemoMode    },
 };
 constexpr uint8_t kLayoutLen = sizeof(kLayout) / sizeof(kLayout[0]);
 } // namespace

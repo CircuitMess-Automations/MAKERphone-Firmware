@@ -139,3 +139,103 @@ end-to-end UX QA pass that signs off on the v1.0 surface.
   still compiles for fall-back.
 
 [v1.0]: https://github.com/CircuitMess-Automations/MAKERphone-Firmware/releases/tag/v1.0
+
+## [v2.0] — 2026-05-06 — "Sunset Boulevard" (S70–S200)
+
+The full MAKERphone 2.0 firmware. Sessions S70–S199 grew the Sunset
+v1.0 surface into a 200-session feature phone — Phase N games,
+Phase O themes, Phase P organisers, Phase Q nostalgia toys, Phase R
+quirks + personalisation, Phase S diagnostics, Phase T audio + voice,
+Phase U audio deep-dive, Phase V final polish. S200 is the v2.0
+sign-off: this changelog entry, the KNOWN_ISSUES sweep, the
+"MAKERphone v2.0" version-string bump in `PhoneAboutScreen`, and the
+new auto-cycling demo mode for the marketing video.
+
+### Added — Phase N — Games (S71–S100)
+- 12 phone-style retro games on top of the v1.0 four (Snake, Pong,
+  Space Invaders, Space Rocks): Tetris, 2048, Air Hockey, Pinball,
+  Frogger, Breakout, Sokoban, Memory, Whack-a-Mole, Solitaire, Bonk,
+  Reflex.
+- Pixel-art game tiles + 2×2 paged grid in `PhoneGamesScreen` —
+  scrolls through every entry without scrollbars.
+
+### Added — Phase O — Themes (S101–S119)
+- Global theme picker at `Settings → Theme` with 10 presets
+  (Synthwave, Nokia 3310 Mono, Cyberpunk, Vapor, Pixel Forest,
+  Coral Reef, Ice Field, Volcano, Cassette Tape, Retro Arcade).
+- Per-theme palette + wallpaper pair, applied to every
+  `Phone*Screen` on the next push without a reboot.
+- Custom RGB accent override at `Settings → Accent` (S187) — three
+  channels with a live preview slab.
+
+### Added — Phase P — Organisers (S120–S150)
+- Composer + saved-melody slots feeding ringtones, alarms, and the
+  music player (S121–S123).
+- Owner name (S144) + welcome screen, owner emoji (S188).
+- Operator banner editor — 5×16 user-pixelable carrier logo (S147).
+- Speed-dial editor and 1..9 long-press home gesture (S151).
+- Per-contact ringtone (S153) and per-profile ringtone (S160).
+
+### Added — Phase Q — Nostalgia (S151–S170)
+- Idle-hint, tip-of-the-day and "phone yawns" animations on the
+  homescreen (S154 / S163 / S169).
+- Konami-code Easter egg unlocks the rainbow theme (S166).
+- Tilt simulator — hold L+R to "shake" any opt-in screen (S168).
+- Decorative SIM PIN unlock screen between boot splash and intro
+  (S162).
+
+### Added — Phase R — Personalisation (S171–S188)
+- Wallpaper-of-the-day rotator (S186).
+- Home-screen layout switcher: Classic / Minimal / Stack (S185).
+- Lock-screen widget composer: ClockDate / ClockOnly / ClockEvent
+  (S184).
+- Soft-key click-tone customisation (S183).
+- Power-off message overlaid on the CRT-shrink animation (S146).
+
+### Added — Phase S — Diagnostics + service menu (S189–S198)
+- Hidden `PhoneDiagScreen` (BTN_R Easter egg from About) shows the
+  rolling LVGL/loop-cost samples and idle-dim stage in real time.
+- Memory-leak audit infrastructure — push/pop every screen 1000×
+  in test mode, heap stays flat (S197).
+- Battery-life pass: `PhoneIdleDim` two-stage dim @ 30 s and 90 s,
+  LVGL-cost measurement service (S198).
+
+### Added — Phase T — Audio + voice (S171–S180)
+- Virtual pet (S173) — feed, play, watch it level up.
+- Beat-maker — 16-step drum sequencer (S194).
+- Fake FM dial — eight stations of pre-canned melody loops (S195).
+
+### Added — Phase U — Audio deep-dive (S189–S196)
+- Music player playlists (S189), shuffle / repeat / continuous (S190).
+- Equalizer visualiser dancing to the active melody (S191).
+- 18-chime system-tone library (S192).
+- Custom buzzer alarm tone, composer-fed (S193).
+- Karaoke title display while a melody plays (S196).
+
+### Added — Phase V — Final polish + v2.0 release (S197–S200)
+- S199 final QA exercised every reachable flow and committed the
+  critical-regression fixes inline.
+- S200 ships:
+  - This v2.0 CHANGELOG entry.
+  - `PhoneDemoModeScreen` — looped 9-slide marketing slideshow at
+    `Settings → ADVANCED → Demo mode`. Synthwave wallpaper, big
+    cream pixelbasic16 title, two cream sub-lines, dim purple
+    breadcrumb, sunset-orange progress dots. 3 s per slide; any key
+    exits.
+  - `kFirmwareVersion` bumped from `MAKERphone v0.55` to
+    `MAKERphone v2.0` so the About page (S55) and the firmware-info
+    screen (S178) read the v2.0 release tag.
+  - KNOWN_ISSUES.md sweep — v1.0 polish items still relevant carry
+    forward, v2.0 fresh items added, hardware-only items relabelled
+    against v2.0 hardware.
+
+### Notes
+- v2.0 builds cleanly against `cm:esp32@1.7.5` on the self-hosted
+  `bit-flash` Mac runner. Both legacy build flags
+  (`MAKERPHONE_USE_HOMESCREEN=0`, `MAKERPHONE_SHOW_SIM_PIN=0`,
+  `MAKERPHONE_USE_T9_COMPOSER=0`) still compile.
+- `KNOWN_ISSUES.md` reflects the v2.0 audit; nothing critical
+  remains on the v2.0 surface, every entry is opt-in polish for
+  v2.1.
+
+[v2.0]: https://github.com/CircuitMess-Automations/MAKERphone-Firmware/releases/tag/v2.0

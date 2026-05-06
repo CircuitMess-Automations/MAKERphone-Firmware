@@ -124,3 +124,117 @@ listing here only so the QA pass notes they are not bugs in v1.0:
 
 When v2.0 lands these stop being "out of scope" and the matching
 sessions tick off the roadmap.
+
+---
+
+# v2.0 sweep (S200)
+
+The S200 audit walked the full Phase N–V surface that grew the v1.0
+Sunset build into the 200-session v2.0 release. Headline finding: no
+critical regressions, every Phase N–V screen reaches its happy path,
+the legacy boot path (`MAKERPHONE_USE_HOMESCREEN=0`) and the legacy
+T9 composer fallback (`MAKERPHONE_USE_T9_COMPOSER=0`) both still
+compile, and the entire batch of v1.0 polish items above is either
+fixed-on-the-side by a later session or carried forward as opt-in
+polish for v2.1.
+
+## Status of v1.0 polish items
+
+- **Boot-service init order race for ringtones** — fixed. S148 promoted
+  `Ringtone.begin()` ahead of the IntroScreen dismiss callback so the
+  ringtone engine is initialised before `Phone.begin()` subscribes to
+  the message pipeline. A `CALL_REQUEST` payload that lands during the
+  splash window now rings cleanly.
+- **`PhoneAppStubScreen` reachable from the Settings default-case** —
+  carried forward. Still a soft runtime fallback rather than a
+  `static_assert`. Worth converting in v2.1 once the Item enum has
+  stabilised through the v2.0 release.
+- **Sample-row contacts (uid==0) silently no-op** — fixed. S171 wires
+  a `PhoneNotificationToast("Sample contact — add a real one")` when
+  the user fires CALL/MESSAGE/EDIT on a placeholder row.
+- **`loadMock()` is dead code** — carried forward. The
+  `MAKERPHONE_LOAD_MOCK_DATA` build flag is still on the wishlist.
+- **`Settings.sound = false` boot override** — carried forward. The
+  override block in `setup()` still mutes a fresh production Chatter
+  on boot. Phase J's `PhoneProfileScreen` (S159) is the new
+  authoritative knob; remove the override block in v2.1 once we are
+  confident every shipped device has migrated.
+- **`InboxScreen` legacy `MainMenu`-style row layout** — carried
+  forward. The new `PhoneMessageRow` (S31) is the path used by the
+  rest of the firmware; the legacy class survives behind a build flag
+  and can be deleted in v2.1.
+- **No persisted owner name / call-history limit** — partially fixed.
+  S144 ships the persisted owner name; the call history is still an
+  in-memory ring buffer.
+- **`PhoneSoftKeyBar` flash duration** — fixed during the S199 final
+  QA pass.
+- **Battery-low modal threshold tuning** — carried forward
+  (hardware-only).
+- **`PhoneCameraScreen` shutter sound clipping** — fixed. The S192
+  system-tone library "duck" hook quiets the active ringtone for
+  ~80 ms during the shutter chirp.
+- **`PhoneIdleDim` floor reads as black on partially-failed
+  backlights** — carried forward (hardware-only).
+
+## v2.0-fresh polish
+
+- [ ] **`PhoneDemoModeScreen` (S200) carries no persisted slide
+  pointer.** Exiting via any key restarts from slide 0 on the next
+  launch. Intentional today (the screen is short-lived, the camera
+  shoot is a continuous take), but a `Settings.demoSlideStart` byte
+  would let a release engineer pick which slide to open on so the
+  marketing video can start mid-deck.
+
+- [ ] **`PhoneDemoModeScreen` slide pace is not user-tunable.**
+  3 s/slide is hard-coded in `kSlidePeriodMs`. A future `ADVANCED →
+  Demo speed` row could expose Slow / Medium / Fast presets without
+  touching the slide content.
+
+- [ ] **Speed-dial editor (S151) does not warn before overwriting an
+  assigned slot.** Picking a contact for an already-assigned digit
+  silently replaces the previous binding. Add a "Replace existing
+  speed-dial?" confirmation modal in v2.1.
+
+- [ ] **`PhoneVirtualPet` save data lives in NVS but never garbage-
+  collects on a wipe.** A user who factory-resets through the Settings
+  → System submenu keeps their pet level/name; arguably the right
+  behaviour, but should be documented or explicitly paired with a
+  "Reset pet" action.
+
+- [ ] **`PhoneRadio` (S195) does not gate against the Silent profile.**
+  Selecting a station while the device is set to Silent still plays
+  the melody loop because the radio routes through `BuzzerService`
+  directly rather than through `PhoneRingtoneEngine`'s profile-aware
+  wrapper. Low priority: the profile UI explicitly calls out that the
+  music app is exempt from Silent.
+
+- [ ] **`PhoneBeatMaker` (S194) save slots are limited to 4 by the
+  current `Settings.beatPatterns[4]` array.** Real users will quickly
+  fill all four; bump to 8 in v2.1 once the NVS-resize migration plan
+  is in place.
+
+- [ ] **`PhoneOperatorBanner` (S147) renders the user-pixelable logo
+  every frame.** The 5×16 grid is small enough that this is cheap, but
+  it would be tidier to render once into an `lv_canvas` on edit and
+  reuse on every push.
+
+## Hardware-only (cannot reproduce in CI)
+
+- [ ] All v1.0 hardware-only items above still apply to v2.0 hardware.
+- [ ] **Beat-maker step velocity at full volume clips on some Chatter
+  units when stepping at >180 BPM.** Cap the duty cycle at 90 % when
+  BPM > 160 in v2.1 once we have hardware test data.
+- [ ] **CRT-shrink power-down animation (S57) appears mis-timed on
+  units running an older Chatter-Library build that ships
+  `Display::flush()` synchronously rather than async.** Detection
+  hint: the message preamble (S146) reads correctly on a S199-flashed
+  device but truncates by ~120 ms on a v2024-Q3 unit. Re-flash from
+  v2.0 onward to resolve.
+
+## Out of scope for v2.0
+
+The v2.0 release closes out the original 200-session roadmap. Any
+new work (a v2.1 hotfix series or a v3.0 platform shift) starts on a
+fresh roadmap document and a new CHANGELOG section. The items above
+are the v2.1 candidate pool; everything else is by-design behaviour
+shipped in v2.0.
