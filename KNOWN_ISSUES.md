@@ -95,9 +95,17 @@ on a usable home screen on a fresh device.
   (4 / 10) that approximate the original glyph dot positions, so the
   visual cadence and placement match the pre-S207 rendering.
 
-- [ ] `PhoneSynthwaveBg` star-twinkle pseudo-RNG is reseeded on every
+- [x] `PhoneSynthwaveBg` star-twinkle pseudo-RNG is reseeded on every
   screen mount, so the same constellation reappears. Seed off
-  `millis()` so each home-screen entry feels fresh.
+  `millis()` so each home-screen entry feels fresh. -- fixed in S208.
+  `buildStars()` now seeds a tiny local Numerical-Recipes LCG from
+  `millis()` at mount time and walks each star through a small X
+  offset in `[-2..+2]` px / Y offset in `[-1..+1]` px (clamped to
+  keep the star inside the upper sky band) plus a phase shift in
+  `[0, 2*period)` so the twinkle cadence lands at a different point
+  of its ping-pong cycle each push. The LCG is local, so the global
+  Arduino `random()` stream stays untouched and other widgets /
+  games / ringtone phases that depend on it remain deterministic.
 
 - [ ] Long T9 entries in `PhoneNotepad` overrun the 1-line caret hint on
   very narrow notes (≤ 8 chars). Truncate the hint to fit.

@@ -599,13 +599,57 @@ void PhoneSynthwaveBg::buildStars(){
 			{  82, 24, 1, LV_OPA_30,    1900,  300 },
 	};
 
+	// S208 - Per-mount jitter so each home-screen entry feels fresh
+	// instead of redrawing the byte-identical pre-S208 constellation.
+	// A tiny linear-congruential generator seeded from millis() at
+	// mount time walks each star through:
+	//   * a small X offset (-2..+2 px) and Y offset (-1..+1 px) that
+	//     drifts the constellation a few pixels each entry without
+	//     unbalancing the hand-picked layout, clamped to keep the
+	//     star inside the upper sky band; and
+	//   * a phase shift in [0, 2*period) so the twinkle cadence lands
+	//     at a different point of its ping-pong cycle each push, so
+	//     the field never blinks the same way twice in a row.
+	// The LCG is local (Numerical Recipes constants), so the global
+	// Arduino random() stream stays untouched and other widgets /
+	// games / ringtone phases that depend on it remain deterministic.
+	uint32_t lcg = static_cast<uint32_t>(millis()) ^ 0xA5A5A5A5UL;
+	auto rng = [&]() -> uint32_t {
+		lcg = lcg * 1664525UL + 1013904223UL;
+		return lcg;
+	};
+
 	for(uint8_t i = 0; i < StarCount; i++){
+		// Per-mount X/Y jitter, clamped to keep the star inside the
+		// upper sky band (x in [0, BgWidth-size], y in [0, 30-size])
+		// so a +2 px drift on the right-edge stars (124, 144) cannot
+		// fall off the 160 px wallpaper.
+		const int16_t jx = static_cast<int16_t>(rng() % 5u) - 2;
+		const int16_t jy = static_cast<int16_t>(rng() % 3u) - 1;
+		int16_t px = static_cast<int16_t>(starList[i].x + jx);
+		int16_t py = static_cast<int16_t>(starList[i].y + jy);
+		const int16_t maxX = static_cast<int16_t>(BgWidth) - starList[i].size;
+		const int16_t maxY = 30 - starList[i].size;
+		if(px < 0)    px = 0;
+		if(py < 0)    py = 0;
+		if(px > maxX) px = maxX;
+		if(py > maxY) py = maxY;
+
+		// Per-mount phase shift across the full ping-pong cycle so the
+		// star starts somewhere new each entry. The original starList
+		// delay (0..1000 ms range) is dropped on purpose -- the
+		// jittered delay supersedes it and reuses the per-star period
+		// to scale the spread, which keeps the relative cadence
+		// between bright and dim stars intact.
+		const uint32_t fullCycle = static_cast<uint32_t>(starList[i].period) * 2u;
+		const uint16_t jdelay    = static_cast<uint16_t>(rng() % fullCycle);
+
 		lv_obj_t* s = lv_obj_create(sky);
 		lv_obj_remove_style_all(s);
 		lv_obj_clear_flag(s, LV_OBJ_FLAG_SCROLLABLE);
 		lv_obj_add_flag(s, LV_OBJ_FLAG_IGNORE_LAYOUT);
 		lv_obj_set_size(s, starList[i].size, starList[i].size);
-		lv_obj_set_pos(s, starList[i].x, starList[i].y);
+		lv_obj_set_pos(s, px, py);
 		lv_obj_set_style_bg_color(s, MP_STAR, 0);
 		// Initial bg_opa is set to peak so the star is visible during the
 		// pre-animation delay; the anim immediately overwrites it once it
@@ -628,7 +672,7 @@ void PhoneSynthwaveBg::buildStars(){
 		lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
 		lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
 		lv_anim_set_exec_cb(&a, twinkleExec);
-		lv_anim_set_delay(&a, starList[i].delay);
+		lv_anim_set_delay(&a, jdelay);
 		lv_anim_start(&a);
 	}
 }

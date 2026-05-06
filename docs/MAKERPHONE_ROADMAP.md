@@ -412,6 +412,26 @@ lowest-numbered `[ ]`.
   old field. Resolves the matching v2.1 polish item in
   `KNOWN_ISSUES.md`.
 
+- [x] **S208** — `PhoneSynthwaveBg` star-field millis()-seeded jitter --
+  the v2.0 wallpaper's seven-star `buildStars()` lookup table is
+  hand-picked, so before S208 every mount of the home-screen
+  produced the byte-identical constellation (same x/y, same
+  ping-pong delay) and the sky never felt fresh. `buildStars()`
+  now seeds a tiny local Numerical-Recipes LCG from `millis()` at
+  mount time and walks each star through (a) a small X offset in
+  [-2..+2] px and Y offset in [-1..+1] px, clamped to keep the
+  star inside the upper sky band (`x in [0, BgWidth-size]`,
+  `y in [0, 30-size]`) so a +2 px drift on the right-edge stars
+  (124, 144) cannot fall off the 160 px wallpaper, and (b) a
+  phase shift in `[0, 2*period)` so the twinkle cadence lands at
+  a different point of its cycle each push. The LCG is local, so
+  the global Arduino `random()` stream stays untouched and other
+  widgets / games / ringtone phases that depend on it remain
+  deterministic. The hand-picked positions, sizes and per-star
+  peaks are unchanged -- only the per-mount drift + phase shift
+  are new. Resolves the matching v2.1 polish item in
+  `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file
