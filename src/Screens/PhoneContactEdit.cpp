@@ -12,6 +12,7 @@
 #include "../Elements/PhoneT9Input.h"
 #include "../Fonts/font.h"
 #include "../Storage/PhoneContacts.h"
+#include "PhoneAvatarEditor.h"
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the editor reads visually as part of the same family. Inlined here
@@ -152,6 +153,11 @@ void PhoneContactEdit::buildLayout() {
 	// Long-press detection on BTN_BACK so the user can hold it to bail
 	// out to the homescreen. Short-press still fires the BACK softkey.
 	setButtonHoldTime(BTN_BACK, kBackHoldMs);
+
+	// S182: long-press BTN_ENTER while AVATAR focus is active opens
+	// the pixel-paint mini editor. Same hold cadence as BACK so the
+	// muscle memory transfers cleanly.
+	setButtonHoldTime(BTN_ENTER, kBackHoldMs);
 }
 
 void PhoneContactEdit::buildHeaders() {
@@ -379,16 +385,11 @@ void PhoneContactEdit::buttonPressed(uint i) {
 			break;
 
 		case BTN_ENTER:
-			// Toggle which section is focused. We auto-commit any
-			// pending T9 letter when we leave NAME so the user does
-			// not silently lose an in-flight character mid-edit.
-			if(focus == Focus::Name) {
-				if(nameInput) nameInput->commitPending();
-				focus = Focus::Avatar;
-			}else{
-				focus = Focus::Name;
-			}
-			refreshFocus();
+			// S182: short-press toggles focus, long-press opens the
+			// avatar editor when AVATAR is focused. Defer the toggle
+			// to buttonReleased so the long-press handler can pre-empt
+			// it via the enterHoldFired flag.
+			enterHoldFired = false;
 			break;
 
 		case BTN_LEFT:
@@ -409,6 +410,16 @@ void PhoneContactEdit::buttonPressed(uint i) {
 }
 
 void PhoneContactEdit::buttonHeld(uint i) {
+	if(i == BTN_ENTER) {
+		// S182: hold-ENTER while AVATAR focus is active opens the
+		// pixel-paint mini editor. The held flag suppresses the
+		// matching short-press focus toggle on the eventual release.
+		enterHoldFired = true;
+		if(focus != Focus::Avatar) return;
+		auto* editor = new PhoneAvatarEditor(uid);
+		push(editor);
+		return;
+	}
 	if(i == BTN_BACK) {
 		// Hold-BACK = bail to homescreen. We pop our own screen here
 		// (the parent will continue the unwind chain when the user
@@ -424,6 +435,19 @@ void PhoneContactEdit::buttonHeld(uint i) {
 }
 
 void PhoneContactEdit::buttonReleased(uint i) {
+	if(i == BTN_ENTER) {
+		// S182: short-press ENTER toggles focus, unless a hold has
+		// already fired the avatar-editor push on the same cycle.
+		if(enterHoldFired) return;
+		if(focus == Focus::Name) {
+			if(nameInput) nameInput->commitPending();
+			focus = Focus::Avatar;
+		}else{
+			focus = Focus::Name;
+		}
+		refreshFocus();
+		return;
+	}
 	if(i == BTN_BACK || i == BTN_RIGHT) {
 		// Short-press BACK / RIGHT softkey - fire the BACK action
 		// unless a hold has already done so on the same cycle.

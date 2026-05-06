@@ -172,6 +172,11 @@ private:
 	// fired pop-to-home on the same hold cycle.
 	bool backHoldFired = false;
 
+	// S182: suppress short-press BTN_ENTER focus-toggle once a
+	// long-press has already fired the PhoneAvatarEditor push on
+	// the same hold cycle.
+	bool enterHoldFired = false;
+
 	void initSeedsFrom(uint8_t initialSeed);
 
 	void buildLayout();
