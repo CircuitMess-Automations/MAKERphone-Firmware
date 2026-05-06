@@ -231,6 +231,17 @@ public:
 		// the demo carries no user state, the screen exits on any key,
 		// and the next launch starts fresh from slide 0.
 		DemoMode        = 18,  // S200
+		// S206 - user-tunable slide pace for PhoneDemoModeScreen.
+		// Drills into PhoneDemoSpeedScreen, a three-row picker
+		// (Slow / Medium / Fast) patterned after PhoneLockWidgetScreen
+		// that reads / writes Settings.demoSpeed so the demo deck's
+		// slide period is no longer hard-coded at 3 s. Sits in the
+		// ADVANCED group directly above the existing "Demo mode" row
+		// so the speed knob clusters with the demo-mode entry it
+		// configures; the row is invisible to anyone who never opens
+		// the demo deck, which keeps the SYSTEM cluster (About anchored
+		// at the bottom) untouched.
+		DemoSpeed       = 19,  // S206
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);

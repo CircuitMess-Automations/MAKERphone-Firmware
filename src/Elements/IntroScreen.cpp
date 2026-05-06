@@ -44,6 +44,7 @@
 #include "../Screens/PhoneSoftKeyToneScreen.h"
 #include "../Screens/PhoneAlarmTonePicker.h"
 #include "../Screens/PhoneDemoModeScreen.h"
+#include "../Screens/PhoneDemoSpeedScreen.h"
 #include "../Screens/PhoneWelcomeScreen.h"
 #include "../Screens/PhoneGamesScreen.h"
 #include "../Interface/LVScreen.h"
@@ -467,6 +468,16 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// rings byte-identically to every prior firmware on
 						// its alarms.
 						self->push(new PhoneAlarmTonePicker());
+						break;
+					case PhoneSettingsScreen::Item::DemoSpeed:
+						// S206: user-tunable slide pace for the v2.0 demo deck.
+						// Drills into PhoneDemoSpeedScreen, a three-row picker
+						// (Slow / Medium / Fast) that reads / writes
+						// Settings.demoSpeed. PhoneDemoModeScreen consults the
+						// byte through resolveSlidePeriodMs() on every push so
+						// the chosen pace takes effect on the next launch of
+						// the demo deck without any extra wiring.
+						self->push(new PhoneDemoSpeedScreen());
 						break;
 					case PhoneSettingsScreen::Item::DemoMode:
 						// S200: v2.0 release "auto-cycling demo mode for

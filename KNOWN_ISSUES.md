@@ -197,10 +197,24 @@ polish for v2.1.
   on a first boot after the firmware grows — which maps to slide 0,
   the byte-identical pre-S203 default.
 
-- [ ] **`PhoneDemoModeScreen` slide pace is not user-tunable.**
-  3 s/slide is hard-coded in `kSlidePeriodMs`. A future `ADVANCED →
-  Demo speed` row could expose Slow / Medium / Fast presets without
-  touching the slide content.
+- [x] **`PhoneDemoModeScreen` slide pace is not user-tunable** -- fixed
+  in S206. `PhoneDemoModeScreen` now grows a public `Speed` enum
+  (Medium / Slow / Fast), the per-preset constants
+  `kSlidePeriodMediumMs` (3000, the byte-identical pre-S206 default),
+  `kSlidePeriodSlowMs` (5000), `kSlidePeriodFastMs` (1500), and a
+  `resolveSlidePeriodMs()` static helper that reads
+  `Settings.demoSpeed` and falls back to Medium for any out-of-range
+  value. `lv_timer_create` ticks at the resolved cadence so the
+  chosen pace takes effect on the next push of the demo deck. A new
+  `PhoneDemoSpeedScreen` picker (Slow / Medium / Fast, modelled on
+  the `PhoneLockWidgetScreen` three-row dirty-aware picker) is
+  wired into the ADVANCED group of `PhoneSettingsScreen` directly
+  above the existing "Demo mode" row so the speed knob clusters
+  with the demo entry it configures. The new byte sits at the end
+  of the SettingsData blob next to `demoSlideStart` so the existing
+  NVS-resize pattern reads it as zero-initialised on a first boot
+  after the firmware grows -- which maps to Medium, the byte-
+  identical pre-S206 default.
 
 - [x] **Speed-dial editor (S151) does not warn before overwriting an
   assigned slot** — fixed in S202. `PhoneSpeedDialScreen` now grows a

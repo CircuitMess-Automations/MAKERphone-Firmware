@@ -166,6 +166,12 @@ const Section kLayout[] = {
 	// PhoneDemoModeScreen, which loops a short slideshow of the
 	// headline v2.0 features for an unattended camera shoot.
 	{ true,  "ADVANCED",            nullptr,       PhoneSettingsScreen::Item::DemoMode    },
+	// S206 - user-tunable demo slide pace. Sits directly above the existing
+	// "Demo mode" row so the speed knob clusters with the demo-mode entry it
+	// configures; ADVANCED stays a two-row group with the speed knob first
+	// (set the pace, then play the deck) which mirrors the natural left-to-
+	// right reading order a release engineer follows when prepping a take.
+	{ false, "Demo speed",          "DEMO SPEED",  PhoneSettingsScreen::Item::DemoSpeed   },
 	{ false, "Demo mode",           "DEMO MODE",   PhoneSettingsScreen::Item::DemoMode    },
 };
 constexpr uint8_t kLayoutLen = sizeof(kLayout) / sizeof(kLayout[0]);

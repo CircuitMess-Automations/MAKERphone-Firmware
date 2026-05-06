@@ -370,6 +370,29 @@ lowest-numbered `[ ]`.
   glance why the radio is silent. Resolves the matching v2.1
   polish item in `KNOWN_ISSUES.md`.
 
+- [x] **S206** — `PhoneDemoModeScreen` user-tunable slide pace --
+  adds a `Settings.demoSpeed` byte (default 0 = Medium / 3000 ms,
+  1 = Slow / 5000 ms, 2 = Fast / 1500 ms) so the v2.0 demo deck's
+  slide period (S200) is no longer hard-coded. `PhoneDemoModeScreen`
+  grows a public `Speed` enum, the per-preset constants
+  `kSlidePeriodSlowMs / MediumMs / FastMs`, a `speedFromByte()`
+  clamp, and a `resolveSlidePeriodMs()` static helper that reads
+  the new byte and falls back to Medium for any out-of-range
+  value; `lv_timer_create` then ticks at the resolved cadence so
+  the chosen pace takes effect on the next push. A new
+  `PhoneDemoSpeedScreen` picker (Slow / Medium / Fast, modelled on
+  `PhoneLockWidgetScreen`'s three-row dirty-aware picker) is wired
+  into the ADVANCED group of `PhoneSettingsScreen` directly above
+  the existing "Demo mode" row so the speed knob clusters with the
+  demo entry it configures. Persisted values outside [0..2] clamp
+  to Medium at the screen layer to be defensive against NVS-resize
+  wipes that read the new byte as uninitialised garbage; the byte
+  sits at the end of the SettingsData blob next to demoSlideStart
+  so the existing NVS-resize pattern reads it as zero-initialised
+  on a first boot after the firmware grows -- which maps to
+  Medium, the byte-identical pre-S206 3 s default. Resolves the
+  matching v2.1 polish item in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file

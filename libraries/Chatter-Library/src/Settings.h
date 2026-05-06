@@ -588,6 +588,44 @@ struct SettingsData {
 	// zero-initialised on a first boot after the firmware grows --
 	// which maps to slide 0, the byte-identical pre-S203 default.
 	uint8_t demoSlideStart = 0;
+	// S206 - user-tunable slide pace for PhoneDemoModeScreen (S200).
+	// The v2.0 demo deck shipped with a hard-coded 3 s slide period
+	// (kSlidePeriodMs in PhoneDemoModeScreen.cpp), which is fine for
+	// the marketing-video unattended shoot but feels rushed when a
+	// release engineer wants to read each slide in detail at a desk
+	// or, conversely, drag-y when someone is just sanity-checking the
+	// loop in passing. demoSpeed exposes that period as a three-state
+	// preset the user can flip from PhoneDemoSpeedScreen, reachable
+	// from the ADVANCED section of PhoneSettingsScreen ("Demo speed"
+	// row, directly above the existing "Demo mode" entry):
+	//
+	//   0 = Medium - 3000 ms / slide. Factory default; a freshly-
+	//                flashed device that has never touched the new
+	//                row behaves byte-identically to every prior
+	//                firmware on the demo deck.
+	//   1 = Slow   - 5000 ms / slide. Comfortable read-each-slide
+	//                pace for a desk demo.
+	//   2 = Fast   - 1500 ms / slide. Rapid sanity-check pace for
+	//                an at-a-glance loop.
+	//
+	// PhoneDemoModeScreen reads this byte through a new
+	// resolveSlidePeriodMs() static helper in its constructor and
+	// onStart() so the chosen period takes effect on the next push
+	// of the screen. Persisted values outside [0..2] clamp to Medium
+	// at the screen layer to be defensive against NVS-resize wipes
+	// that read the new byte as uninitialised garbage. Sits at the
+	// end of the blob next to demoSlideStart so the existing NVS-
+	// resize pattern (that grew this struct via soundProfile /
+	// wallpaperStyle / themeId / keyTicks / ownerName /
+	// powerOffMessage / operatorText / operatorLogo / phoneProfile /
+	// profileRingtones / speedDial / rainbowUnlocked / softKeyTone /
+	// lockWidgetMode / homeLayoutMode / wallpaperOfDay /
+	// customAccentEnabled / customAccentR / G / B / ownerEmoji /
+	// musicPlayMode / alarmTone / demoSlideStart) reads the new
+	// byte as zero-initialised on a first boot after the firmware
+	// grows -- which maps to Medium, the byte-identical pre-S206
+	// 3 s default.
+	uint8_t demoSpeed = 0;
 };
 
 class SettingsImpl {

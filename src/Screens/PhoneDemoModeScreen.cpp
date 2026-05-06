@@ -151,7 +151,7 @@ void PhoneDemoModeScreen::onStart() {
 	// one. lv_timer_create pins user_data to `this` so the static
 	// callback can route back to the correct instance.
 	if(slideTimer == nullptr) {
-		slideTimer = lv_timer_create(onSlideTick, kSlidePeriodMs, this);
+		slideTimer = lv_timer_create(onSlideTick, resolveSlidePeriodMs(), this);
 	}
 	// Repaint immediately so a screen that re-enters from onStart()
 	// after a long detach does not show stale content for one tick.
@@ -324,4 +324,33 @@ void PhoneDemoModeScreen::persistCurrentSlide() {
 	if(Settings.get().demoSlideStart == cur) return;
 	Settings.get().demoSlideStart = cur;
 	Settings.store();
+}
+
+// ----- S206: user-tunable slide pace ----------------------------------
+
+PhoneDemoModeScreen::Speed PhoneDemoModeScreen::speedFromByte(uint8_t b) {
+	// Defensive clamp against NVS-resize wipes that read the new byte
+	// as uninitialised garbage; matches the wallpaperStyle / themeId /
+	// soundProfile / lockWidgetMode / demoSlideStart pattern. Out-of-
+	// range values fall back to Medium (the byte-identical pre-S206
+	// 3 s default) so first-touch behaviour never depends on which
+	// garbage value happened to land in NVS.
+	switch(b) {
+		case 0:  return Speed::Medium;
+		case 1:  return Speed::Slow;
+		case 2:  return Speed::Fast;
+		default: return Speed::Medium;
+	}
+}
+
+uint32_t PhoneDemoModeScreen::resolveSlidePeriodMs() {
+	// One byte read, one switch -- table-free so the call site stays
+	// idle-cheap on the lv_timer_create path. resolveStartSlide() uses
+	// the same pattern; this is the speed-axis sibling.
+	switch(speedFromByte(Settings.get().demoSpeed)) {
+		case Speed::Slow:   return kSlidePeriodSlowMs;
+		case Speed::Fast:   return kSlidePeriodFastMs;
+		case Speed::Medium: // fall through
+		default:            return kSlidePeriodMediumMs;
+	}
 }

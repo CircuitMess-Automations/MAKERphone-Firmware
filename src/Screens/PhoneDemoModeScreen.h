@@ -104,6 +104,43 @@ public:
 	 */
 	static uint8_t resolveStartSlide();
 
+	/** S206 - user-tunable slide pace presets, byte-aligned with the
+	 *  persisted Settings.demoSpeed encoding. Order matches the
+	 *  documented enum in Settings.h so a host or test reading the
+	 *  byte directly does not need a translation table.
+	 */
+	enum class Speed : uint8_t {
+		Medium = 0,    // 3000 ms / slide, factory default
+		Slow   = 1,    // 5000 ms / slide
+		Fast   = 2,    // 1500 ms / slide
+	};
+
+	/** S206 - per-preset slide period in ms. Public so picker / test
+	 *  code can introspect the cadence without standing the screen
+	 *  up. Static + constexpr keeps the table in flash with zero RAM
+	 *  cost. */
+	static constexpr uint32_t kSlidePeriodSlowMs   = 5000;
+	static constexpr uint32_t kSlidePeriodMediumMs = kSlidePeriodMs;  // 3000
+	static constexpr uint32_t kSlidePeriodFastMs   = 1500;
+
+	/**
+	 * S206 - resolve the slide period the screen should tick at,
+	 * reading Settings.demoSpeed and falling back to Medium
+	 * (kSlidePeriodMs, the byte-identical pre-S206 3 s default) for
+	 * any out-of-range value so a stale or NVS-resize-wiped byte
+	 * never produces a zero-period timer. Public + static so a host
+	 * or unit test can introspect the cadence without having to
+	 * instantiate the screen.
+	 */
+	static uint32_t resolveSlidePeriodMs();
+
+	/** S206 - clamp a raw byte from Settings.demoSpeed into a valid
+	 *  Speed enum value. Out-of-range values fall back to Medium,
+	 *  the factory default; matches the resolveSlidePeriodMs()
+	 *  behaviour. Public + static so the picker screen can share a
+	 *  single source of truth for the clamp. */
+	static Speed speedFromByte(uint8_t b);
+
 private:
 	PhoneSynthwaveBg*    wallpaper;
 	PhoneStatusBar*      statusBar;
