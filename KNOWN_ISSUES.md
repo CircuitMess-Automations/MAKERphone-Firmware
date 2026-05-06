@@ -78,10 +78,19 @@ on a usable home screen on a fresh device.
 
 ## Cosmetic
 
-- [ ] `PhoneSoftKeyBar` flash duration is ~80 ms which feels slightly
+- [x] `PhoneSoftKeyBar` flash duration is ~80 ms which feels slightly
   short on the dimmed state set by `PhoneIdleDim` — the flash can be
   invisible if the user presses a softkey within the dim-fade window.
-  Lengthen to 120 ms or wake the dim before flashing.
+  Lengthen to 120 ms or wake the dim before flashing. -- fixed in S210.
+  `PhoneSoftKeyBar::flashSide()` now calls `IdleDim.resetActivity()`
+  before painting the press-feedback flash, so the panel is always
+  driven to the user's full brightness for the duration of the
+  `FlashMs` (180 ms) timer regardless of the prior idle stage. The
+  call is a cheap idempotent no-op when already bright, and it
+  short-circuits while `Chatter.backlightPowered() == false` so the
+  SleepService fade-in/out path is unaffected. The flash visuals
+  themselves are unchanged byte-for-byte; only the brightness floor
+  is lifted.
 
 - [x] `PhoneClockFace` redraws the seconds dot at 1 Hz, which causes a
   one-pixel cyan ghost on some panels (LovyanGFX rounding). Switch the

@@ -1,6 +1,7 @@
 #include "PhoneSoftKeyBar.h"
 #include "../Fonts/font.h"
 #include "../MakerphoneTheme.h"
+#include "../Services/PhoneIdleDim.h"
 #include <string.h>
 
 // MAKERphone retro palette (kept consistent with PhoneStatusBar).
@@ -207,6 +208,21 @@ void PhoneSoftKeyBar::flashSide(Side side){
 	lv_timer_t** slot = (side == Side::Left) ? &leftFlashTimer : &rightFlashTimer;
 
 	if(label == nullptr) return;
+
+	// S210: wake PhoneIdleDim before painting the flash so the user
+	// always sees the press-feedback at the user's full brightness,
+	// even if the panel was sitting in Stage::Dim or Stage::DeepDim
+	// at the moment the softkey fired. Without this poke, a flash
+	// triggered programmatically from a screen (i.e. without the
+	// hardware button event reaching IdleDim's anyKeyPressed listener
+	// first) could land entirely inside the dim window and be
+	// effectively invisible. resetActivity() is a cheap idempotent
+	// no-op when the panel is already at full brightness, and it
+	// short-circuits while the backlight is electrically off so the
+	// SleepService fade-in/out path is unaffected. The flash visuals
+	// below are unchanged byte-for-byte. Resolves the matching v2.1
+	// polish item in `KNOWN_ISSUES.md`.
+	IdleDim.resetActivity();
 
 	// If a previous flash is still in flight on this side, kill it first
 	// so we always end up in the "flashing" visual state for FlashMs more

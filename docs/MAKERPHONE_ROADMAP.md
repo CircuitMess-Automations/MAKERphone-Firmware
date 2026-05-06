@@ -459,6 +459,34 @@ lowest-numbered `[ ]`.
   new ~125 px hint budget. Resolves the matching v2.1 polish item
   in `KNOWN_ISSUES.md`.
 
+- [x] **S210** — `PhoneSoftKeyBar` press-flash dim-wake -- the v2.1
+  polish item flagged that the soft-key bar's press-feedback flash
+  (`flashLeft()` / `flashRight()`, S21, ~180 ms cyan<->sunset-orange
+  swap on the label/arrow) can land entirely inside `PhoneIdleDim`'s
+  Stage::Dim (30 % of user brightness after 30 s) or Stage::DeepDim
+  (12 % after 90 s) window, where the orange-on-purple invert is too
+  faint for the user to register. The natural per-key path
+  (`anyKeyPressed` listener) does wake `IdleDim` before the screen
+  routes its softkey handler, but the order between LVGL listeners
+  is not guaranteed across boards, and `flashLeft()` /
+  `flashRight()` are also called programmatically from screens
+  (e.g. confirmation modals, transient toasts, and any future
+  caller that invokes the flash without a hardware key event). To
+  make the flash self-sufficient, `PhoneSoftKeyBar::flashSide()`
+  now begins with an explicit `IdleDim.resetActivity()` call that
+  drives the panel back to the user's full brightness before the
+  visual invert lands. The call is intentionally idempotent: when
+  already in `Stage::Bright` it short-circuits via the
+  `currentStage != Stage::Bright` guard inside
+  `PhoneIdleDim::resetActivity()`, and when the backlight is
+  electrically off (mid-`SleepService` fade-out / light-sleep) it
+  early-returns so the carefully balanced
+  deinit/`fadeIn` pair is untouched. Visuals are byte-identical
+  on every existing host -- only the brightness floor is lifted.
+  The new include is `src/Services/PhoneIdleDim.h`; no header
+  surface changes. Resolves the matching v2.1 polish item in
+  `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file
