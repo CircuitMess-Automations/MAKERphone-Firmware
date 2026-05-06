@@ -58,6 +58,7 @@ PhoneMusicPlayer::PhoneMusicPlayer()
 		  playGlyph(nullptr),
 		  nextGlyph(nullptr),
 		  modeLabel(nullptr),
+		  karaokeHint(nullptr),
 		  equalizer(nullptr),
 		  tracks(defaultTracks()),
 		  trackCount(PhoneMusicLibrary::Count),
@@ -93,6 +94,7 @@ PhoneMusicPlayer::PhoneMusicPlayer()
 	buildEqualizer();
 	buildTransport();
 	buildMode();
+	buildKaraokeHint();
 
 	// Bottom: feature-phone soft-keys. Left: PLAY/PAUSE depending on state;
 	// right: EXIT (BTN_BACK) which stops + pops the screen.
@@ -298,6 +300,30 @@ void PhoneMusicPlayer::buildMode() {
 	lv_label_set_text(modeLabel, "");
 	lv_obj_set_align(modeLabel, LV_ALIGN_TOP_MID);
 	lv_obj_set_y(modeLabel, 104);
+}
+
+void PhoneMusicPlayer::buildKaraokeHint() {
+	// S199 - small "3: KARAOKE" affordance for the BTN_3 shortcut to
+	// PhoneKaraokeScreen (S196). Without this label there is no in-UI
+	// trace of the karaoke feature, so users who don't read the docs
+	// never discover it - which the karaoke header doc explicitly
+	// promised existed ("Launched from PhoneMusicPlayer via BTN_3
+	// ('3:KARAOKE' hint)"). Mirrors the discoverability pattern
+	// PhonePlaylistsScreen uses for its "5: FM RADIO" hint.
+	//
+	// Pinned at y = 44 in the 9 px gap between the indexLabel
+	// (y = 34, ends ~y=41) and the progress bar (y = 50). Pixelbasic7
+	// + dim purple keeps it well below the title in visual hierarchy
+	// without being invisible. Right-aligned to the equivalent of the
+	// progress bar's right edge (BarLeft + BarWidth = 150) so the hint
+	// reads as a footnote attached to the player chrome rather than
+	// competing with the centred title.
+	karaokeHint = lv_label_create(obj);
+	lv_obj_set_style_text_font(karaokeHint, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(karaokeHint, MP_LABEL_DIM, 0);
+	lv_label_set_text(karaokeHint, "3: KARAOKE");
+	lv_obj_set_align(karaokeHint, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(karaokeHint, 44);
 }
 
 const char* PhoneMusicPlayer::modeLabelOf(uint8_t mode) {

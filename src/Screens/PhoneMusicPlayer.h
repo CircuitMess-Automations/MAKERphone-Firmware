@@ -173,6 +173,7 @@ private:
 	lv_obj_t* playGlyph;        // pixelbasic7 ">" or "||"
 	lv_obj_t* nextGlyph;        // pixelbasic7 ">>"
 	lv_obj_t* modeLabel;        // S190 - "MODE: SHUFFLE" caption (pixelbasic7)
+	lv_obj_t* karaokeHint;      // S199 - "3: KARAOKE" discoverability hint for the BTN_3 shortcut
 	PhoneEqualizerVisualiser* equalizer;  // S191 — bars dance with the active melody
 
 	// ----- track state -----
@@ -203,6 +204,7 @@ private:
 	void buildTransport();
 	void buildMode();          // S190 - small "MODE: ..." caption above the soft-key bar
 	void buildEqualizer();     // S191 - 7-bar equalizer between progress bar and transport row
+	void buildKaraokeHint();   // S199 - tiny "3: KARAOKE" hint surfaces the BTN_3 shortcut to PhoneKaraokeScreen (S196)
 
 	// ----- helpers -----
 	void refreshTrackLabels();
