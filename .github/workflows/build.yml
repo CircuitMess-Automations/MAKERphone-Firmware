@@ -76,10 +76,7 @@ jobs:
           # finds the real interpreter.
           mkdir -p "$HOME/bin"
           if [ ! -x "$HOME/bin/python" ]; then
-            cat > "$HOME/bin/python" <<'SHIM'
-#!/usr/bin/env bash
-exec python3 "$@"
-SHIM
+            printf '%s\n%s\n' '#!/usr/bin/env bash' 'exec python3 "$@"' > "$HOME/bin/python"
             chmod +x "$HOME/bin/python"
           fi
           # Persist for subsequent steps in this job.
