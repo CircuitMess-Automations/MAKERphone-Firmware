@@ -393,6 +393,25 @@ lowest-numbered `[ ]`.
   Medium, the byte-identical pre-S206 3 s default. Resolves the
   matching v2.1 polish item in `KNOWN_ISSUES.md`.
 
+- [x] **S207** — `PhoneClockFace` 2x2 colon blink anti-ghost — replaces
+  the pixelbasic16 `":"` glyph used as the live blinking colon between
+  HH and MM with two `lv_obj_t` 2x2 cyan blocks (top + bottom dot).
+  The single-pixel-wide colon dots in the font otherwise leave a
+  stale 1-pixel cyan ghost on the 1 Hz blink-off frame on panels
+  where LovyanGFX rounds odd anti-alias spans differently across
+  the row pair (matching the v2.1 polish item in `KNOWN_ISSUES.md`).
+  The two blocks share the existing `colonOn` state and toggle
+  together via `LV_OBJ_FLAG_HIDDEN` so the cells are cleanly cleared
+  to the parent's background on the off frame -- no ghost can
+  survive across frames. Both blocks are anchored to `LV_ALIGN_TOP_MID`
+  with explicit y offsets (4 / 10) that approximate where the
+  original glyph dots rendered within the 14 px line height, so the
+  visual cadence and placement match the pre-S207 rendering. The
+  field swap (`colonLabel` -> `colonDotTop` / `colonDotBot`) is
+  internal to `PhoneClockFace`; no external callers reference the
+  old field. Resolves the matching v2.1 polish item in
+  `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file

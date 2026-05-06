@@ -60,10 +60,16 @@ public:
 	static constexpr uint16_t FaceHeight = 32;
 
 private:
-	lv_obj_t* clockLabel;   // "HH MM" - colon is a separate label so it can blink
-	lv_obj_t* colonLabel;
-	lv_obj_t* dowLabel;     // day-of-week + day-of-month (e.g. "THU 30")
-	lv_obj_t* monthLabel;   // month + year             (e.g. "APR 2026")
+	lv_obj_t* clockLabel;     // "HH MM" with a blank gap where the colon sits
+	// S207 - the colon is rendered as two 2x2 cyan blocks (instead of a
+	// pixelbasic16 ":" glyph) so the 1 Hz blink leaves no 1-pixel cyan
+	// ghost on panels where LovyanGFX rounds odd anti-alias spans. The
+	// blocks share the colonOn state and toggle together via
+	// LV_OBJ_FLAG_HIDDEN. Replaces the single colonLabel field.
+	lv_obj_t* colonDotTop;
+	lv_obj_t* colonDotBot;
+	lv_obj_t* dowLabel;       // day-of-week + day-of-month (e.g. "THU 30")
+	lv_obj_t* monthLabel;     // month + year             (e.g. "APR 2026")
 
 	uint16_t lastMin     = 0xFFFF;  // last drawn HH*60+MM
 	uint32_t lastDayKey  = 0xFFFFFFFFu; // last drawn day key (year*512 + ordinal)

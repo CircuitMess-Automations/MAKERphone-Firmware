@@ -83,9 +83,17 @@ on a usable home screen on a fresh device.
   invisible if the user presses a softkey within the dim-fade window.
   Lengthen to 120 ms or wake the dim before flashing.
 
-- [ ] `PhoneClockFace` redraws the seconds dot at 1 Hz, which causes a
+- [x] `PhoneClockFace` redraws the seconds dot at 1 Hz, which causes a
   one-pixel cyan ghost on some panels (LovyanGFX rounding). Switch the
-  dot to a 2×2 block or rate-limit the redraw to 0.5 Hz.
+  dot to a 2×2 block or rate-limit the redraw to 0.5 Hz. — fixed in
+  S207. The pixelbasic16 `":"` glyph is replaced with two 2x2 cyan
+  `lv_obj_t` blocks (top + bottom dot) that share the existing
+  `colonOn` state and toggle together via `LV_OBJ_FLAG_HIDDEN`. The
+  hidden cells are cleanly cleared to the parent's background on the
+  off frame, so no 1-pixel ghost can survive across frames. The two
+  blocks are anchored to `LV_ALIGN_TOP_MID` with explicit y offsets
+  (4 / 10) that approximate the original glyph dot positions, so the
+  visual cadence and placement match the pre-S207 rendering.
 
 - [ ] `PhoneSynthwaveBg` star-twinkle pseudo-RNG is reseeded on every
   screen mount, so the same constellation reappears. Seed off

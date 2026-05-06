@@ -10,10 +10,12 @@
 #define MP_TEXT        lv_color_make(255, 220, 180)  // warm cream (secondary)
 
 PhoneClockFace::PhoneClockFace(lv_obj_t* parent) : LVObject(parent){
-	clockLabel = nullptr;
-	colonLabel = nullptr;
-	dowLabel   = nullptr;
-	monthLabel = nullptr;
+	clockLabel  = nullptr;
+	// S207 - colon is now two 2x2 lv_obj_t blocks; see header comment.
+	colonDotTop = nullptr;
+	colonDotBot = nullptr;
+	dowLabel    = nullptr;
+	monthLabel  = nullptr;
 
 	// Anchor to the area directly under the status bar regardless of parent layout.
 	lv_obj_add_flag(obj, LV_OBJ_FLAG_IGNORE_LAYOUT);
@@ -50,12 +52,37 @@ void PhoneClockFace::buildLabels(){
 	// Layout: hours label right-aligned to the colon, colon centered, minutes
 	// label left-aligned to the colon.
 
-	colonLabel = lv_label_create(obj);
-	lv_obj_set_style_text_font(colonLabel, &pixelbasic16, 0);
-	lv_obj_set_style_text_color(colonLabel, MP_HIGHLIGHT, 0);
-	lv_label_set_text(colonLabel, ":");
-	lv_obj_set_align(colonLabel, LV_ALIGN_TOP_MID);
-	lv_obj_set_y(colonLabel, 0);
+	// S207 - replace the pixelbasic16 ":" glyph with two 2x2 cyan blocks.
+	// The single-pixel colon dots in the font would otherwise leave a
+	// stale 1-pixel cyan ghost on the 1 Hz blink-off frame on panels
+	// where LovyanGFX rounds odd anti-alias spans differently across
+	// the row pair. A 2x2 block is bigger than the rounding error in
+	// every direction, so the redraw cleanly clears the previous frame.
+	// The blocks share the existing colonOn state and toggle together
+	// via LV_OBJ_FLAG_HIDDEN. Both blocks are anchored to TOP_MID with
+	// explicit y offsets that approximate the original glyph's dot
+	// positions, so the visual cadence and placement match the
+	// pre-S207 rendering.
+	auto makeColonDot = [&](int yOffset) -> lv_obj_t* {
+		lv_obj_t* dot = lv_obj_create(obj);
+		lv_obj_remove_style_all(dot);
+		lv_obj_set_size(dot, 2, 2);
+		lv_obj_set_style_bg_color(dot, MP_HIGHLIGHT, 0);
+		lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+		lv_obj_set_style_radius(dot, 0, 0);
+		lv_obj_set_style_pad_all(dot, 0, 0);
+		lv_obj_set_style_border_width(dot, 0, 0);
+		lv_obj_clear_flag(dot, LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_set_align(dot, LV_ALIGN_TOP_MID);
+		lv_obj_set_y(dot, yOffset);
+		return dot;
+	};
+	// Y offsets chosen to sit roughly where the pixelbasic16 ":" glyph
+	// dots used to render within a 14 px line. Top dot near the upper
+	// third, bottom dot near the lower third; the gap between them
+	// reads as a chunky retro colon at 160x128 panel pitch.
+	colonDotTop = makeColonDot(4);
+	colonDotBot = makeColonDot(10);
 
 	clockLabel = lv_label_create(obj);
 	lv_obj_set_style_text_font(clockLabel, &pixelbasic16, 0);
@@ -158,7 +185,17 @@ void PhoneClockFace::updateColon(){
 	if(now - lastBlinkMs < 500) return;
 	lastBlinkMs = now;
 	colonOn = !colonOn;
-	lv_obj_set_style_text_opa(colonLabel, colonOn ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+	// S207 - toggle both 2x2 dots together via LV_OBJ_FLAG_HIDDEN. Hidden
+	// is a clean clear of the cells (LVGL repaints the parent's bg in
+	// the hidden region) so no 1-pixel ghost can survive across frames.
+	if(colonDotTop != nullptr){
+		if(colonOn) lv_obj_clear_flag(colonDotTop, LV_OBJ_FLAG_HIDDEN);
+		else        lv_obj_add_flag  (colonDotTop, LV_OBJ_FLAG_HIDDEN);
+	}
+	if(colonDotBot != nullptr){
+		if(colonOn) lv_obj_clear_flag(colonDotBot, LV_OBJ_FLAG_HIDDEN);
+		else        lv_obj_add_flag  (colonDotBot, LV_OBJ_FLAG_HIDDEN);
+	}
 }
 
 void PhoneClockFace::loop(uint micros){
