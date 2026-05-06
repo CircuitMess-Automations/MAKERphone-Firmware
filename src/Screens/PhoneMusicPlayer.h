@@ -96,6 +96,20 @@ public:
 	 */
 	void setTracks(const PhoneRingtoneEngine::Melody* const* tracks, uint8_t count);
 
+	/**
+	 * S189 — display the active playlist's name above the per-track
+	 * caption ("Chill Vibes 2/4" instead of "Track 2 / 10"). Set to
+	 * nullptr or "" to revert to the bare "Track X / N" formatting
+	 * the player ships with by default. The pointer is *not* copied —
+	 * the caller (typically PhoneMusicPlaylists::nameOf) must outlive
+	 * the screen, which is the case for every built-in playlist
+	 * because their names live in static const storage.
+	 */
+	void setPlaylistName(const char* name);
+
+	/** Currently displayed playlist label, or nullptr if none. */
+	const char* getPlaylistName() const { return playlistName; }
+
 	/** Switch to the given track index (wraps). Auto-plays. */
 	void selectTrack(uint8_t index);
 
@@ -139,6 +153,10 @@ private:
 	uint8_t trackCount;
 	uint8_t trackIndex;
 	bool    playing;
+
+	// S189 — optional playlist label shown alongside the track index.
+	// Pointer is owned by the caller and assumed to outlive the screen.
+	const char* playlistName;
 
 	// ----- progress state -----
 	uint32_t trackTotalMs;  // total play time of the current track (ms)

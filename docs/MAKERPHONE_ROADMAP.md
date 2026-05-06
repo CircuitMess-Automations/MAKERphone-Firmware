@@ -273,7 +273,7 @@ Beyond themes — let users actually make the phone *theirs*.
 ## Phase U — Audio / Music (S189–S196)
 Buzzer is what we have, so we lean into it.
 
-- [ ] **S189** — Music player — playlist support.
+- [x] **S189** — Music player — playlist support.
 - [ ] **S190** — Music player — shuffle / repeat / continuous.
 - [ ] **S191** — Equalizer visualiser — bars dance to active melody.
 - [ ] **S192** — Richer system-tone library — 15+ chimes for every action.

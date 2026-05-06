@@ -8,6 +8,7 @@
 #include "../Screens/PhoneMainMenu.h"
 #include "../Screens/PhoneAppStubScreen.h"
 #include "../Screens/PhoneMusicPlayer.h"
+#include "../Screens/PhonePlaylistsScreen.h"
 #include "../Screens/PhoneCameraScreen.h"
 #include "../Screens/PhoneDialerScreen.h"
 #include "../Screens/InboxScreen.h"
@@ -460,12 +461,17 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 
 		case PhoneIconTile::Icon::Music:
 			// S42: real music-player screen replaces the placeholder stub.
-			// S43: PhoneMusicPlayer now self-seeds with the proper 10-tune
+			// S43: PhoneMusicPlayer self-seeds with the proper 10-tune
 			// PhoneMusicLibrary (Neon Drive, Pixel Sunrise, Cyber Dawn,
 			// Crystal Cave, Hyperloop, Starfall, Retro Quest, Moonlit
 			// Drift, Arcade Hero, Sunset Blvd) — non-looping tracks that
 			// auto-advance through the playlist.
-			dest = new PhoneMusicPlayer();
+			// S189: route the Music tile through PhonePlaylistsScreen so
+			// the user picks a curated playlist (All Tracks, Chill Vibes,
+			// Energy Boost, Synthwave Drive) before drilling into the
+			// player. The playlists screen builds the PhoneMusicPlayer
+			// itself with the chosen track-set + name.
+			dest = new PhonePlaylistsScreen();
 			break;
 
 		case PhoneIconTile::Icon::Camera:

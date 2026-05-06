@@ -61,7 +61,8 @@ PhoneMusicPlayer::PhoneMusicPlayer()
 		  trackTotalMs(0),
 		  playStartMs(0),
 		  pausedAtMs(0),
-		  tickTimer(nullptr) {
+		  tickTimer(nullptr),
+		  playlistName(nullptr) {
 
 	// Full-screen container, no scrollbars, no inner padding - same blank
 	// canvas pattern PhoneHomeScreen / PhoneDialerScreen use. Children below
@@ -302,17 +303,37 @@ uint32_t PhoneMusicPlayer::currentElapsedMs() const {
 void PhoneMusicPlayer::refreshTrackLabels() {
 	if(trackCount == 0 || tracks == nullptr || tracks[trackIndex] == nullptr){
 		lv_label_set_text(titleLabel, "-");
-		lv_label_set_text(indexLabel, "No tracks");
+		// S189 — when a playlist is bound but has no playable tracks
+		// (defensive — never happens with the four built-ins) we still
+		// show the playlist name so the user knows where they are.
+		if(playlistName != nullptr && playlistName[0] != '\0'){
+			char buf[40];
+			snprintf(buf, sizeof(buf), "%s / empty", playlistName);
+			lv_label_set_text(indexLabel, buf);
+		}else{
+			lv_label_set_text(indexLabel, "No tracks");
+		}
 		return;
 	}
 
 	const PhoneRingtoneEngine::Melody* m = tracks[trackIndex];
 	lv_label_set_text(titleLabel, (m->name != nullptr) ? m->name : "?");
 
-	char buf[24];
-	snprintf(buf, sizeof(buf), "Track %u / %u",
-			 (unsigned)(trackIndex + 1),
-			 (unsigned) trackCount);
+	char buf[40];
+	if(playlistName != nullptr && playlistName[0] != '\0'){
+		// S189 — playlist-aware caption: the playlist name doubles as a
+		// breadcrumb so the user always knows which set is queued, with
+		// the per-track index trimmed to "X/N" to keep the line short
+		// enough to fit in the 150 px label width on a 160 px panel.
+		snprintf(buf, sizeof(buf), "%s  %u/%u",
+				 playlistName,
+				 (unsigned)(trackIndex + 1),
+				 (unsigned) trackCount);
+	}else{
+		snprintf(buf, sizeof(buf), "Track %u / %u",
+				 (unsigned)(trackIndex + 1),
+				 (unsigned) trackCount);
+	}
 	lv_label_set_text(indexLabel, buf);
 }
 
@@ -369,6 +390,13 @@ void PhoneMusicPlayer::refreshProgress() {
 // =========================================================================
 // public API
 // =========================================================================
+
+void PhoneMusicPlayer::setPlaylistName(const char* name) {
+	// Empty strings collapse to nullptr so the rest of the screen has
+	// a single "no playlist label" predicate to check (just != nullptr).
+	playlistName = (name != nullptr && name[0] != '\0') ? name : nullptr;
+	refreshTrackLabels();
+}
 
 void PhoneMusicPlayer::setTracks(const PhoneRingtoneEngine::Melody* const* t,
 								 uint8_t count) {
