@@ -230,10 +230,18 @@ polish for v2.1.
   fill all four; bump to 8 in v2.1 once the NVS-resize migration plan
   is in place.
 
-- [ ] **`PhoneOperatorBanner` (S147) renders the user-pixelable logo
-  every frame.** The 5×16 grid is small enough that this is cheap, but
-  it would be tidier to render once into an `lv_canvas` on edit and
-  reuse on every push.
+- [x] **`PhoneOperatorBanner` (S147) renders the user-pixelable logo
+  every frame** — fixed in S204. The pre-S204 banner spawned up to 80
+  per-cell `lv_obj` rectangles inside `rebuildLogo()` and threw them
+  away on the next screen push. S204 swaps that for a single
+  `lv_canvas` whose 16×5 `LV_IMG_CF_TRUE_COLOR_ALPHA` backing buffer
+  (240 bytes, an inline member with no heap churn) is rasterised
+  once on edit and reused on every subsequent push. Lit cells are
+  stamped via `lv_canvas_draw_rect`, the LVGL 8.x portable API that
+  survives both the older `set_px()` and the newer
+  `set_px_color`/`set_px_opa` split. Rendered output is byte-
+  identical; the LVGL object count for the banner drops from
+  "1 host + up to 80 cells" to "1 host + 1 canvas".
 
 ## Hardware-only (cannot reproduce in CI)
 

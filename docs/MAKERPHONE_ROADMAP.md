@@ -335,6 +335,22 @@ lowest-numbered `[ ]`.
   the byte-identical pre-S203 default. Resolves the matching v2.1
   polish item in `KNOWN_ISSUES.md`.
 
+- [x] **S204** — `PhoneOperatorBanner` lv_canvas logo cache — replaces
+  the up-to-80 per-cell `lv_obj` rectangles the v2.0 banner spawned
+  inside `rebuildLogo()` with a single `lv_canvas` whose 16x5
+  `LV_IMG_CF_TRUE_COLOR_ALPHA` backing buffer (240 bytes) is
+  rasterised once on edit and reused on every subsequent screen
+  push. The buffer is an inline member, so its lifetime exactly
+  matches the banner instance with no malloc/free churn; lit cells
+  are stamped via `lv_canvas_draw_rect` (the LVGL 8.x portable API
+  that survives both the older `set_px()` and the newer
+  `set_px_color`/`set_px_opa` split). Rendered output is
+  byte-identical to the pre-S204 banner -- same MP_ACCENT cells,
+  same 1 px stride, same right-anchored placement -- but the LVGL
+  object count for the banner drops from "1 host + up to 80 cells"
+  to "1 host + 1 canvas". Resolves the matching v2.1 polish item
+  in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file
