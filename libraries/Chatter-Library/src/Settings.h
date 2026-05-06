@@ -384,6 +384,38 @@ struct SettingsData {
 	// firmware grows, which maps to Classic -- the correct factory
 	// default.
 	uint8_t homeLayoutMode = 0;
+	// S186 - "Wallpaper of the day" auto-rotation toggle. When non-zero
+	// the PhoneSynthwaveBg::resolveStyleFromSettings() resolver bypasses
+	// the user's persisted wallpaperStyle byte and instead returns one
+	// of the four core Synthwave variants (Synthwave / Plain / GridOnly
+	// / Stars) picked from the day-of-epoch counter, so the homescreen,
+	// lock screen, settings family and every other screen that drops a
+	// `new PhoneSynthwaveBg(obj)` automatically rotates through the
+	// curated list once per day. The wallpaperStyle byte stays
+	// persisted underneath so flipping the auto-rotate toggle back off
+	// (PhoneWallpaperScreen's "DAILY ROTATE" pager entry) instantly
+	// restores the user's previously-chosen Synthwave variant. Theme
+	// overrides (Nokia 3310 / DMG / Amber CRT / Aqua / RAZR / Stealth
+	// Black / Y2K Silver / Cyberpunk Red / Christmas / Surprise) still
+	// take precedence: when a non-default theme is selected the daily
+	// rotation is suppressed and the theme's matching wallpaper is
+	// drawn instead, the same way wallpaperStyle is suppressed today.
+	//
+	// Encoding:
+	//   0 = OFF (factory default; resolver falls back to wallpaperStyle).
+	//   1 = ON  (resolver returns wallpaperOfDayStyle()).
+	//
+	// Persisted values outside [0..1] clamp to OFF at the wallpaper
+	// layer to be defensive against NVS-resize wipes that read the
+	// new byte as uninitialised garbage. Sits at the end of the blob
+	// so the existing NVS-resize pattern (that grew this struct via
+	// soundProfile / wallpaperStyle / themeId / keyTicks / ownerName /
+	// powerOffMessage / operatorText / operatorLogo / phoneProfile /
+	// profileRingtones / speedDial / rainbowUnlocked / softKeyTone /
+	// lockWidgetMode / homeLayoutMode) reads the new field as zero-
+	// initialised on a first boot after the firmware grows -- which
+	// maps to OFF, the correct factory default.
+	uint8_t wallpaperOfDay = 0;
 };
 
 class SettingsImpl {

@@ -31,6 +31,34 @@ PhoneSynthwaveBg::Style PhoneSynthwaveBg::styleFromByte(uint8_t raw){
 	}
 }
 
+
+uint8_t PhoneSynthwaveBg::wallpaperOfDayIndex(){
+	// S186 - day-of-cycle index for the "Wallpaper of the day" rotation.
+	// Mirrors MakerphoneTheme::surpriseDayIndex()'s strategy: divide a
+	// monotonically-increasing seconds counter by the number of seconds
+	// in a day to get a stable day-of-epoch value, then modulo 4 to land
+	// inside the four-variant Synthwave rotation. Reads PhoneClock::
+	// nowEpoch() so the rotation rolls on the *civil-time* midnight
+	// boundary, not on a millis()-derived 24-hour boundary -- a user who
+	// power-cycles the device mid-afternoon still sees the same variant
+	// they had before the reboot, because PhoneClock anchors the wall
+	// clock to a fixed Thu 2026-01-01 boot epoch (S54). Per-uptime drift
+	// is irrelevant: the variant resolves the same value all day long,
+	// only flipping at the next midnight cross.
+	const uint32_t epoch = PhoneClock::nowEpoch();
+	return static_cast<uint8_t>((epoch / 86400UL) % 4u);
+}
+
+PhoneSynthwaveBg::Style PhoneSynthwaveBg::wallpaperOfDayStyle(){
+	// Convenience wrapper: resolves the day-of-cycle index from
+	// wallpaperOfDayIndex() into the matching Style enum entry. The
+	// styleFromByte() defensive clamp does the actual mapping so any
+	// arithmetic surprise (an out-of-range modulo on a future encoding)
+	// degrades gracefully to the canonical Synthwave default rather
+	// than rendering a blank screen.
+	return styleFromByte(wallpaperOfDayIndex());
+}
+
 PhoneSynthwaveBg::Style PhoneSynthwaveBg::resolveStyleFromSettings(){
 	// S101 - the global theme overrides the per-Synthwave wallpaperStyle:
 	// if the user has selected a non-default theme (Nokia 3310 today),
@@ -115,6 +143,21 @@ PhoneSynthwaveBg::Style PhoneSynthwaveBg::resolveStyleFromSettings(){
 	// buildSurpriseDailyCycleWallpaper().
 	if(MakerphoneTheme::getCurrent() == MakerphoneTheme::Theme::SurpriseDailyCycle){
 		return Style::SurpriseDailyCycle;
+	}
+	// S186 - "Wallpaper of the day" auto-rotation. With every theme
+	// override above already short-circuited, the user's wallpaperStyle
+	// byte is the only remaining input. When Settings.wallpaperOfDay is
+	// non-zero (the user has flipped the auto-rotate toggle on via
+	// PhoneWallpaperScreen's "DAILY ROTATE" pager entry) we return the
+	// day-of-cycle Synthwave variant instead so every screen that drops
+	// a `new PhoneSynthwaveBg(obj)` automatically picks up today's
+	// rotated look. The wallpaperStyle byte stays persisted underneath
+	// so flipping the toggle back off restores the previously-chosen
+	// variant unchanged. Persisted values outside [0..1] clamp to OFF
+	// here, the same defensive pattern wallpaperStyle / themeId already
+	// use against NVS-resize wipes that read the new byte as garbage.
+	if(Settings.get().wallpaperOfDay != 0){
+		return wallpaperOfDayStyle();
 	}
 	return styleFromByte(Settings.get().wallpaperStyle);
 }

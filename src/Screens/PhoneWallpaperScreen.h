@@ -73,8 +73,30 @@ class PhoneWallpaperScreen : public LVScreen, private InputListener {
 public:
 	using Style = PhoneSynthwaveBg::Style;
 
-	/** Number of selectable styles (so the pager reads as 1/4 .. 4/4). */
-	static constexpr uint8_t StyleCount = 4;
+	/**
+	 * Number of selectable pager entries (so the pager reads as 1/5 ..
+	 * 5/5). Index 0..3 maps 1:1 onto PhoneSynthwaveBg::Style for the
+	 * four core Synthwave variants (Synthwave / Plain / GridOnly /
+	 * Stars); the new index 4 is the S186 "Wallpaper of the day"
+	 * auto-rotate pseudo-entry which doesn't pick a single variant but
+	 * instead writes Settings.wallpaperOfDay = 1 so every subsequent
+	 * `new PhoneSynthwaveBg(obj)` resolves through
+	 * PhoneSynthwaveBg::wallpaperOfDayStyle() and rotates through the
+	 * four variants once per day. Selecting any of the first four
+	 * pager entries flips Settings.wallpaperOfDay back to 0 and writes
+	 * the selected style to Settings.wallpaperStyle the way the prior
+	 * S53 picker did, so the auto-rotate toggle and the per-variant
+	 * pick stay mutually exclusive.
+	 */
+	static constexpr uint8_t StyleCount = 5;
+
+	/**
+	 * Pager index that selects the "Wallpaper of the day" auto-rotate
+	 * pseudo-entry. Used by PhoneWallpaperScreen's swatch builder /
+	 * persistence path / dirty-aware soft-key labels to distinguish
+	 * the rotation toggle from the four concrete-variant entries.
+	 */
+	static constexpr uint8_t DailyRotateIndex = 4;
 
 	PhoneWallpaperScreen();
 	virtual ~PhoneWallpaperScreen() override;
@@ -108,6 +130,11 @@ private:
 
 	uint8_t cursor;             // 0..StyleCount-1
 	uint8_t initialStyle;       // value the screen opened with (BACK ignores it)
+	// S186 - snapshot of Settings.wallpaperOfDay at screen-open. Lets
+	// the dirty-aware soft-key labels distinguish "the user kept the
+	// auto-rotate toggle they had before" from "the user flipped it"
+	// without re-reading NVS on every refresh tick.
+	bool    initialDailyEnabled;
 
 	void buildCaption();
 	void buildSwatch();
@@ -139,6 +166,19 @@ private:
 	void drawPlainSwatch();
 	void drawGridOnlySwatch();
 	void drawStarsSwatch();
+	/**
+	 * S186 - "Wallpaper of the day" preview swatch. Draws today's
+	 * resolved Synthwave variant (PhoneSynthwaveBg::
+	 * wallpaperOfDayStyle()) into the swatchInner box exactly like
+	 * the four concrete variants do, then layers a small "TODAY"
+	 * caption + the day-of-cycle index "DAY 1/4 .. 4/4" along the
+	 * bottom of the swatch so the user can read the rotation
+	 * position at a glance. Every time the user steps the pager
+	 * onto the DailyRotateIndex entry the swatch is rebuilt fresh,
+	 * so a screen kept open across midnight rerenders with the
+	 * next variant once the user navigates to it.
+	 */
+	void drawDailyRotateSwatch();
 
 	/** Friendly all-caps name for a style (matches Sony-Ericsson option list style). */
 	static const char* nameForIndex(uint8_t idx);

@@ -266,7 +266,7 @@ Beyond themes — let users actually make the phone *theirs*.
 - [x] **S183** — Soft-key tone customisation.
 - [x] **S184** — Lock screen widget picker (clock-only / clock+date / clock+next-event).
 - [x] **S185** — Home screen layout switcher.
-- [ ] **S186** — Wallpaper of the day — daily auto-rotate from a curated list.
+- [x] **S186** — Wallpaper of the day — daily auto-rotate from a curated list.
 - [ ] **S187** — Custom RGB picker for accent color (real-time preview).
 - [ ] **S188** — Owner emoji / avatar selection (used on lock + status bar).
 

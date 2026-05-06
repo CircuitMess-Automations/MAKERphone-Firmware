@@ -56,13 +56,27 @@ PhoneWallpaperScreen::PhoneWallpaperScreen()
 	// destructive change, so we don't strictly need this, but it lets
 	// hosts / tests reason about "did the user actually change it?".
 	initialStyle = Settings.get().wallpaperStyle;
+	// S186 - snapshot the persisted wallpaperOfDay flag the same way so
+	// dirty detection can compare the focused pager entry against both
+	// axes (selected variant byte + auto-rotate toggle byte) and only
+	// flash the SAVE/CANCEL pair when the user has actually changed
+	// either knob. Persisted values outside [0..1] clamp to 0 the same
+	// defensive way the wallpaperStyle byte does above.
+	initialDailyEnabled = (Settings.get().wallpaperOfDay != 0);
 
-	// Start with the persisted style focused, falling back to Synthwave
-	// for any out-of-range NVS byte. Same defensive pattern as
-	// PhoneSoundScreen / PhoneBrightnessScreen.
-	uint8_t snapped = initialStyle;
-	if(snapped >= StyleCount) snapped = 0;
-	cursor = snapped;
+	// Start with the persisted state focused. When auto-rotate is on
+	// the cursor opens on the new DailyRotateIndex (index 4) so the
+	// user lands directly on the toggle they last chose; otherwise it
+	// opens on the persisted Synthwave variant byte, falling back to
+	// Synthwave for any out-of-range NVS byte. Same defensive pattern
+	// as PhoneSoundScreen / PhoneBrightnessScreen.
+	if(initialDailyEnabled){
+		cursor = DailyRotateIndex;
+	} else {
+		uint8_t snapped = initialStyle;
+		if(snapped >= 4u) snapped = 0;
+		cursor = snapped;
+	}
 
 	// Full-screen container, no scrollbars, no padding - same blank-canvas
 	// pattern PhoneSettingsScreen / PhoneBrightnessScreen use.
@@ -112,6 +126,14 @@ void PhoneWallpaperScreen::onStop() {
 }
 
 PhoneWallpaperScreen::Style PhoneWallpaperScreen::getCurrentStyle() const {
+	// S186 - the new "DAILY ROTATE" pager entry isn't a concrete Style
+	// of its own; it resolves to today's day-of-cycle variant via
+	// PhoneSynthwaveBg::wallpaperOfDayStyle() so introspecting hosts /
+	// tests get a meaningful Style back instead of a byte that would
+	// clamp to Synthwave through styleFromByte's defensive default.
+	if(cursor == DailyRotateIndex){
+		return PhoneSynthwaveBg::wallpaperOfDayStyle();
+	}
 	return PhoneSynthwaveBg::styleFromByte(cursor);
 }
 
@@ -121,6 +143,12 @@ const char* PhoneWallpaperScreen::nameForIndex(uint8_t idx) {
 		case 1:  return "PLAIN";
 		case 2:  return "GRID ONLY";
 		case 3:  return "STARS";
+		// S186 - "DAILY ROTATE" pseudo-entry that flips the
+		// Settings.wallpaperOfDay toggle on. The all-caps two-word
+		// label keeps the visual rhythm of the prior four entries so
+		// the pager doesn't shift in size when the user steps onto
+		// the new index.
+		case 4:  return "DAILY ROTATE";
 		default: return "WALLPAPER";
 	}
 }
@@ -222,11 +250,12 @@ void PhoneWallpaperScreen::rebuildSwatch() {
 	// inner container. We don't paint a default backdrop here so the
 	// per-style builder fully owns the composition.
 	switch(cursor){
-		case 0:  drawSynthwaveSwatch(); break;
-		case 1:  drawPlainSwatch();     break;
-		case 2:  drawGridOnlySwatch();  break;
-		case 3:  drawStarsSwatch();     break;
-		default: drawPlainSwatch();     break;  // defensive
+		case 0:  drawSynthwaveSwatch();   break;
+		case 1:  drawPlainSwatch();       break;
+		case 2:  drawGridOnlySwatch();    break;
+		case 3:  drawStarsSwatch();       break;
+		case 4:  drawDailyRotateSwatch(); break;
+		default: drawPlainSwatch();       break;  // defensive
 	}
 }
 
@@ -490,11 +519,88 @@ void PhoneWallpaperScreen::drawStarsSwatch() {
 	}
 }
 
+void PhoneWallpaperScreen::drawDailyRotateSwatch() {
+	// S186 - "Wallpaper of the day" preview. The swatch shows the
+	// variant the resolver will land on today (PhoneSynthwaveBg::
+	// wallpaperOfDayIndex() / wallpaperOfDayStyle()), then layers a
+	// small "TODAY" caption + day-of-cycle index along the bottom of
+	// the swatch so the user can read the rotation position at a
+	// glance. The underlying composition reuses one of the four
+	// existing per-variant builders rather than forking a fifth, so
+	// every swatch the picker can show stays byte-identical to its
+	// matching homescreen render -- no risk of the preview drifting
+	// out of step with the real wallpaper.
+	const uint8_t day = PhoneSynthwaveBg::wallpaperOfDayIndex();
+	switch(day){
+		case 0:  drawSynthwaveSwatch(); break;
+		case 1:  drawPlainSwatch();     break;
+		case 2:  drawGridOnlySwatch();  break;
+		case 3:  drawStarsSwatch();     break;
+		default: drawPlainSwatch();     break;  // defensive
+	}
+
+	// Translucent muted-purple band across the bottom of the swatch so
+	// the caption + index labels read crisply against whatever variant
+	// the day-of-cycle picked. Sized to the bottom 12 px of the swatch
+	// so the day-of-cycle text has comfortable vertical halo.
+	lv_obj_t* band = lv_obj_create(swatchInner);
+	lv_obj_remove_style_all(band);
+	lv_obj_set_size(band, SwatchW, 12);
+	lv_obj_set_pos(band, 0, SwatchH - 12);
+	lv_obj_clear_flag(band, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_set_style_bg_color(band, MP_BG_DARK, 0);
+	lv_obj_set_style_bg_opa(band, LV_OPA_70, 0);
+	lv_obj_set_style_radius(band, 0, 0);
+	lv_obj_set_style_border_width(band, 0, 0);
+
+	// "TODAY" caption left-aligned inside the band, sunset-orange so it
+	// reads as the temporal-status accent the rest of the MAKERphone UI
+	// uses for "this changes over time" cues.
+	lv_obj_t* todayLabel = lv_label_create(band);
+	lv_obj_set_style_text_font(todayLabel, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(todayLabel, MP_ACCENT, 0);
+	lv_label_set_text(todayLabel, "TODAY");
+	lv_obj_set_align(todayLabel, LV_ALIGN_LEFT_MID);
+	lv_obj_set_x(todayLabel, 3);
+
+	// Day-of-cycle index right-aligned inside the band, warm cream so
+	// it reads as the matching value half of the "TODAY: 1/4" pair.
+	char dayBuf[12];
+	snprintf(dayBuf, sizeof(dayBuf), "%u/4", static_cast<unsigned>(day) + 1u);
+	lv_obj_t* dayLabel = lv_label_create(band);
+	lv_obj_set_style_text_font(dayLabel, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(dayLabel, MP_TEXT, 0);
+	lv_label_set_text(dayLabel, dayBuf);
+	lv_obj_set_align(dayLabel, LV_ALIGN_RIGHT_MID);
+	lv_obj_set_x(dayLabel, -3);
+
+	// Tiny rotation arrow centred between the two captions so the
+	// "this rotates" cue is visible even at a quick glance. Using the
+	// pixelbasic7 ASCII arrow keeps the swatch zero-asset.
+	lv_obj_t* arrowLabel = lv_label_create(band);
+	lv_obj_set_style_text_font(arrowLabel, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(arrowLabel, MP_HIGHLIGHT, 0);
+	lv_label_set_text(arrowLabel, ">>");
+	lv_obj_set_align(arrowLabel, LV_ALIGN_CENTER);
+}
+
 // ----- input + commit --------------------------------------------------
 
 void PhoneWallpaperScreen::refreshSoftKeys() {
 	if(softKeys == nullptr) return;
-	const bool dirty = (cursor != initialStyle);
+	// S186 - dirty detection now spans both axes:
+	//   - The user opened with auto-rotate ON  and is still on the
+	//     "DAILY ROTATE" entry      -> pristine.
+	//   - The user opened with auto-rotate OFF and is still on their
+	//     persisted variant byte    -> pristine.
+	//   - Anything else              -> dirty (variant changed and/or
+	//     auto-rotate toggle changed), flash the SAVE/CANCEL pair.
+	bool dirty;
+	if(initialDailyEnabled){
+		dirty = (cursor != DailyRotateIndex);
+	} else {
+		dirty = (cursor != initialStyle) || (cursor == DailyRotateIndex);
+	}
 	softKeys->set(dirty ? "SAVE"   : "",
 	              dirty ? "CANCEL" : "BACK");
 }
@@ -516,7 +622,21 @@ void PhoneWallpaperScreen::saveAndExit() {
 	// Persist the chosen style. The very next screen that drops a
 	// `new PhoneSynthwaveBg(obj)` will pick up the new look (the
 	// default ctor reads Settings on every build).
-	Settings.get().wallpaperStyle = cursor;
+	//
+	// S186 - the two axes (per-variant byte + auto-rotate toggle) stay
+	// mutually exclusive on save: picking the new "DAILY ROTATE"
+	// pseudo-entry flips Settings.wallpaperOfDay = 1 without touching
+	// the persisted wallpaperStyle byte underneath, so flipping the
+	// toggle back off later restores the previously-chosen variant
+	// unchanged. Picking any of the four concrete variants flips
+	// Settings.wallpaperOfDay = 0 and writes the new variant the same
+	// way the prior S53 picker did.
+	if(cursor == DailyRotateIndex){
+		Settings.get().wallpaperOfDay = 1;
+	} else {
+		Settings.get().wallpaperOfDay = 0;
+		Settings.get().wallpaperStyle = cursor;
+	}
 	Settings.store();
 	if(softKeys) softKeys->flashLeft();
 	pop();

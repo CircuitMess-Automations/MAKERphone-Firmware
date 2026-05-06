@@ -276,6 +276,35 @@ public:
 	 */
 	static Style resolveStyleFromSettings();
 
+	/**
+	 * S186 - "Wallpaper of the day" rotation engine. Returns the day-
+	 * of-cycle index the wallpaper-of-day resolver should land on
+	 * (0..3, mapping 1:1 onto the four core Synthwave variants in the
+	 * Style enum: 0 Synthwave -> 1 Plain -> 2 GridOnly -> 3 Stars ->
+	 * wraps). Reads PhoneClock::nowEpoch() at call time and divides by
+	 * 86400 to get a stable day-of-epoch counter, modulo 4 to land
+	 * inside the four-variant rotation. Stable for the duration of
+	 * one civil day -- two PhoneSynthwaveBg constructions on the same
+	 * day always resolve the same variant -- and rolls to the next
+	 * variant on the next midnight cross.
+	 *
+	 * The chosen rotation order matches the on-screen pager order in
+	 * PhoneWallpaperScreen, so a user who steps the pager to the
+	 * "DAILY ROTATE" entry sees today's wallpaper preview match the
+	 * day-of-cycle position they would expect (today + Synthwave on
+	 * day 0, today + Plain on day 1, etc).
+	 */
+	static uint8_t wallpaperOfDayIndex();
+
+	/**
+	 * S186 - convenience wrapper around wallpaperOfDayIndex() that
+	 * resolves the index to the matching Style enum entry. Used by
+	 * resolveStyleFromSettings() when Settings.wallpaperOfDay is set
+	 * and by PhoneWallpaperScreen's swatch builder when the user is
+	 * previewing the "DAILY ROTATE" pager entry.
+	 */
+	static Style wallpaperOfDayStyle();
+
 	static constexpr uint16_t BgWidth   = 160;
 	static constexpr uint16_t BgHeight  = 128;
 	static constexpr uint16_t HorizonY  = 72;        // pixel row of the horizon
