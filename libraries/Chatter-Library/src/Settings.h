@@ -281,6 +281,31 @@ struct SettingsData {
 	// as zero-initialised on a first boot after the firmware grows --
 	// which maps to false here, the correct factory default.
 	bool rainbowUnlocked = false;
+	// S183 - soft-key click-tone customisation. Selects which of a small
+	// hand-tuned tone library the BuzzerService plays when the user
+	// presses BTN_LEFT or BTN_RIGHT (the two Sony-Ericsson-style soft-key
+	// hardware buttons that PhoneSoftKeyBar drives). Encoding matches the
+	// PhoneSoftKeyToneLib::Id enum (src/Services/PhoneSoftKeyTone.h):
+	//
+	//   0 = Classic - NOTE_B4 / 25 ms (the legacy default; byte-identical
+	//                 to the soft-key feedback every prior firmware shipped
+	//                 so a freshly-flashed device sounds exactly the same
+	//                 out of the box).
+	//   1 = Click   - NOTE_C6 / 8 ms (snappy high-pitched click).
+	//   2 = Bloop   - NOTE_A3 / 30 ms (low buzzy blip).
+	//   3 = Chirp   - NOTE_E5 / 18 ms (mid-range chirp).
+	//   4 = Silent  - tone suppressed even in Loud profile (lets users
+	//                 keep ringer + key tones while opting the soft-keys
+	//                 out of the audible feedback layer).
+	//
+	// The tick layer driven by keyTicks (S68) is unaffected by this byte:
+	// in Mute / Vibrate the optional 4 ms / NOTE_F6 navigation click
+	// still fires regardless of softKeyTone, so the haptic-feel experience
+	// stays consistent across both axes. The screen layer
+	// (PhoneSoftKeyToneScreen) clamps out-of-range values to Classic on
+	// read so a NVS-resize wipe that lands the new byte at 0xFF degrades
+	// gracefully to the documented factory default.
+	uint8_t softKeyTone = 0;
 };
 
 class SettingsImpl {

@@ -134,6 +134,19 @@ public:
 		// the active profile's slot for any incoming call from a peer
 		// that does not have a contact override set.
 		ProfileRingtone = 11,  // S160
+		// S183 - soft-key click-tone customisation. Drills into
+		// PhoneSoftKeyToneScreen, which lets the user pick which of the
+		// five PhoneSoftKeyToneLib entries (Classic / Click / Bloop /
+		// Chirp / Silent) the BuzzerService plays when the user taps
+		// BTN_LEFT or BTN_RIGHT (the two Sony-Ericsson-style soft-key
+		// hardware buttons). Lives in the SOUND group right under
+		// "Profile ring" so the four soft-key / ringer-related rows
+		// cluster together inside the SOUND section. Persistence is via
+		// Settings.softKeyTone (a single byte slot grown alongside the
+		// existing SettingsData NVS-resize pattern); BuzzerService picks
+		// the chosen tone up on the next BTN_LEFT / BTN_RIGHT press
+		// without any extra wiring.
+		SoftKeyTone     = 12,  // S183
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);

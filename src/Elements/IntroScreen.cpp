@@ -36,6 +36,7 @@
 #include "../Screens/PhoneOperatorScreen.h"
 #include "../Screens/PhoneSpeedDialScreen.h"
 #include "../Screens/PhoneProfileRingtoneScreen.h"
+#include "../Screens/PhoneSoftKeyToneScreen.h"
 #include "../Screens/PhoneWelcomeScreen.h"
 #include "../Screens/PhoneGamesScreen.h"
 #include "../Interface/LVScreen.h"
@@ -333,6 +334,25 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// choice on the next incoming call from a peer that
 						// has no contact override set.
 						self->push(new PhoneProfileRingtoneScreen());
+						break;
+					case PhoneSettingsScreen::Item::SoftKeyTone:
+						// S183: soft-key click-tone customisation. Drills
+						// into PhoneSoftKeyToneScreen, a single-list picker
+						// patterned after PhoneHapticsScreen / PhoneSoundScreen.
+						// Lets the user pick which of the five PhoneSoftKeyToneLib
+						// entries (Classic / Click / Bloop / Chirp / Silent)
+						// the BuzzerService plays when the user taps BTN_LEFT
+						// or BTN_RIGHT (the two Sony-Ericsson-style soft-key
+						// hardware buttons). On SAVE the screen calls
+						// PhoneSoftKeyToneLib::setActive() which writes
+						// Settings.softKeyTone and flushes via Settings.store(),
+						// so the BuzzerService picks the new tone up on the
+						// next BTN_LEFT / BTN_RIGHT press without any extra
+						// wiring. Classic (id 0, the factory default) keeps
+						// the legacy NOTE_B4 / 25 ms feedback so a freshly-
+						// flashed device sounds byte-identical to every prior
+						// firmware on its soft-keys.
+						self->push(new PhoneSoftKeyToneScreen());
 						break;
 					default:
 						// Defensive: any future row that is added to

@@ -85,6 +85,12 @@ const Section kLayout[] = {
 	// clicks" / "Profile ring") cluster together inside the
 	// SOUND section.
 	{ false, "Profile ring",       "PROFILE RING", PhoneSettingsScreen::Item::ProfileRingtone },
+	// S183 - soft-key click-tone customisation. Sits at the bottom of the
+	// SOUND group so the four soft-key / ringer-related rows
+	// ("Profile" / "Key clicks" / "Profile ring" / "Softkey tone")
+	// cluster together inside the SOUND section, with SYSTEM staying
+	// anchored as the next group below. Drills into PhoneSoftKeyToneScreen.
+	{ false, "Softkey tone",       "SOFTKEY TONE", PhoneSettingsScreen::Item::SoftKeyTone     },
 	{ true,  "SYSTEM",             nullptr,       PhoneSettingsScreen::Item::DateTime   },
 	{ false, "Date & Time",        "DATE & TIME", PhoneSettingsScreen::Item::DateTime   },
 	// S144 - owner name (lock-screen greeting). Sits between Date & Time

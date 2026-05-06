@@ -5,6 +5,7 @@
 #include <Loop/LoopManager.h>
 #include <Input/Input.h>
 #include <Settings.h>
+#include "PhoneSoftKeyTone.h"   // S183 - soft-key click-tone customisation library.
 
 BuzzerService Buzz;
 
@@ -97,6 +98,24 @@ void BuzzerService::buttonPressed(uint i){
 		}
 		return;
 	}
+
+	// S183 - soft-key click-tone customisation. The two soft-key hardware
+	// buttons (BTN_LEFT / BTN_RIGHT, the buttons PhoneSoftKeyBar visually
+	// labels) take their tone from the user-selected entry in the
+	// PhoneSoftKeyToneLib catalogue rather than the hard-coded NOTE_B4 /
+	// 25 ms pair the noteMap lists. Classic (id 0) maps back to exactly
+	// that legacy default so a freshly-flashed device sounds byte-
+	// identical to every prior firmware on its soft-keys; Silent (id 4)
+	// suppresses the tone even in Loud profile so users can opt the
+	// soft-keys out of the audible feedback layer while keeping the rest
+	// of the keypad's musical clicks. The non-soft-key buttons keep the
+	// per-key noteMap entry so the dialer / alpha keys retain their
+	// distinct musical-tone identity.
+	if(i == BTN_LEFT || i == BTN_RIGHT){
+		PhoneSoftKeyToneLib::playActive();
+		return;
+	}
+
 	Piezo.tone(noteMap.at(i), 25);
 }
 

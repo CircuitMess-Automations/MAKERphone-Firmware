@@ -263,7 +263,7 @@ Beyond themes — let users actually make the phone *theirs*.
 - [x] ~~**S180** — Custom contact ringtone (per friend, depends on S123).~~ — already shipped as S153 (PhoneContactRingtonePicker + ringtoneOf wiring); duplicate.
 - [x] **S181** — Custom contact wallpaper (per friend).
 - [x] **S182** — Avatar editor — pixel-paint mini editor (32×32, replaces the S38 picker).
-- [ ] **S183** — Soft-key tone customisation.
+- [x] **S183** — Soft-key tone customisation.
 - [ ] **S184** — Lock screen widget picker (clock-only / clock+date / clock+next-event).
 - [ ] **S185** — Home screen layout switcher.
 - [ ] **S186** — Wallpaper of the day — daily auto-rotate from a curated list.
