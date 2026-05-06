@@ -10,6 +10,7 @@
 class PhoneSynthwaveBg;
 class PhoneStatusBar;
 class PhoneSoftKeyBar;
+class PhoneEqualizerVisualiser;
 
 /**
  * PhoneMusicPlayer
@@ -172,6 +173,7 @@ private:
 	lv_obj_t* playGlyph;        // pixelbasic7 ">" or "||"
 	lv_obj_t* nextGlyph;        // pixelbasic7 ">>"
 	lv_obj_t* modeLabel;        // S190 - "MODE: SHUFFLE" caption (pixelbasic7)
+	PhoneEqualizerVisualiser* equalizer;  // S191 — bars dance with the active melody
 
 	// ----- track state -----
 	const PhoneRingtoneEngine::Melody* const* tracks;
@@ -200,6 +202,7 @@ private:
 	void buildProgressBar();
 	void buildTransport();
 	void buildMode();          // S190 - small "MODE: ..." caption above the soft-key bar
+	void buildEqualizer();     // S191 - 7-bar equalizer between progress bar and transport row
 
 	// ----- helpers -----
 	void refreshTrackLabels();

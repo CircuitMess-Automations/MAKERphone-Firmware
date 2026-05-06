@@ -63,6 +63,24 @@ public:
 	/** Name of the currently playing melody, or nullptr. */
 	const char* currentName() const { return current.name; }
 
+	/**
+	 * S191 — current note frequency in Hz (0 if idle, in a rest, or in
+	 * the inter-note gap). Used by `PhoneEqualizerVisualiser` to drive
+	 * code-only equalizer bars that dance to whatever melody the engine
+	 * is pushing through the piezo. Cheap inline read of three members
+	 * already kept hot by loop().
+	 */
+	uint16_t currentFreq() const {
+		if(!playing) return 0;
+		if(inGap) return 0;
+		if(step >= current.count || current.notes == nullptr) return 0;
+		return current.notes[step].freq;
+	}
+
+	/** Index of the currently playing note, or 0 when idle. Useful for
+	 *  visualisers that want to detect note-onset events. */
+	uint16_t currentStep() const { return playing ? step : (uint16_t) 0; }
+
 	void loop(uint micros) override;
 
 private:

@@ -7,6 +7,7 @@
 #include "../Elements/PhoneSynthwaveBg.h"
 #include "../Elements/PhoneStatusBar.h"
 #include "../Elements/PhoneSoftKeyBar.h"
+#include "../Elements/PhoneEqualizerVisualiser.h"
 #include "../Fonts/font.h"
 #include "../Services/PhoneMusicLibrary.h"
 #include <Settings.h>
@@ -56,6 +57,7 @@ PhoneMusicPlayer::PhoneMusicPlayer()
 		  playGlyph(nullptr),
 		  nextGlyph(nullptr),
 		  modeLabel(nullptr),
+		  equalizer(nullptr),
 		  tracks(defaultTracks()),
 		  trackCount(PhoneMusicLibrary::Count),
 		  trackIndex(0),
@@ -87,6 +89,7 @@ PhoneMusicPlayer::PhoneMusicPlayer()
 	// Centre stack: title -> caption -> progress bar -> time -> transport.
 	buildTitle();
 	buildProgressBar();
+	buildEqualizer();
 	buildTransport();
 	buildMode();
 
@@ -146,6 +149,7 @@ void PhoneMusicPlayer::onStop() {
 		Ringtone.stop();
 		playing = false;
 	}
+	if(equalizer != nullptr) equalizer->setActive(false);
 	if(tickTimer != nullptr){
 		lv_timer_del(tickTimer);
 		tickTimer = nullptr;
@@ -217,6 +221,19 @@ void PhoneMusicPlayer::buildProgressBar() {
 	lv_label_set_text(timeLabel, "0:00 / 0:00");
 	lv_obj_set_align(timeLabel, LV_ALIGN_TOP_MID);
 	lv_obj_set_y(timeLabel, BarY + BarHeight + 4);
+}
+
+void PhoneMusicPlayer::buildEqualizer() {
+	// S191 - retro 7-bar equalizer slotted between the progress caption
+	// (y ~= 64) and the transport icons (y = 84). The widget self-drives
+	// from the global Ringtone engine via its own lv_timer, so we only
+	// have to position it here. Centred horizontally on the 160 px panel
+	// (54 px wide -> x = 53), pinned at y = 68 with 2 px breathing room
+	// above the transport row at y = 84.
+	equalizer = new PhoneEqualizerVisualiser(obj);
+	lv_obj_set_pos(equalizer->getLvObj(),
+				   (lv_coord_t)((ScreenW - PhoneEqualizerVisualiser::WidgetWidth) / 2),
+				   68);
 }
 
 void PhoneMusicPlayer::buildTransport() {
@@ -576,6 +593,7 @@ void PhoneMusicPlayer::play() {
 	playStartMs  = millis();
 	pausedAtMs   = 0;
 	trackTotalMs = computeTotalMs(m);
+	if(equalizer != nullptr) equalizer->setActive(true);
 	refreshPlayIcon();
 	refreshProgress();
 }
@@ -585,6 +603,7 @@ void PhoneMusicPlayer::pause() {
 	pausedAtMs = currentElapsedMs();
 	Ringtone.stop();
 	playing = false;
+	if(equalizer != nullptr) equalizer->setActive(false);
 	refreshPlayIcon();
 	refreshProgress();
 }
