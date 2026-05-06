@@ -16,9 +16,21 @@ jobs:
 
       - name: Ensure arduino-cli is available
         run: |
-          if ! command -v arduino-cli &> /dev/null; then
-            echo "Installing arduino-cli..."
-            brew install arduino-cli || curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s -- --dest /usr/local/bin
+          # Make any user-local arduino-cli install visible to subsequent steps.
+          if [ -d "$HOME/bin" ]; then
+            export PATH="$HOME/bin:$PATH"
+            echo "$HOME/bin" >> "$GITHUB_PATH"
+          fi
+          if ! command -v arduino-cli >/dev/null 2>&1; then
+            echo "Installing arduino-cli into ~/bin (no sudo / no brew dependency)..."
+            mkdir -p "$HOME/bin"
+            # The official installer reads BINDIR. Passing --dest as a positional
+            # arg breaks its OS detection (it builds URLs like
+            # arduino-cli_--dest_macOS_ARM64.tar.gz), so use the env var instead.
+            curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh \
+              | BINDIR="$HOME/bin" sh
+            export PATH="$HOME/bin:$PATH"
+            echo "$HOME/bin" >> "$GITHUB_PATH"
           fi
           arduino-cli version
 
