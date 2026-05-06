@@ -52,6 +52,7 @@ void lvglFlush(lv_disp_drv_t* disp, const lv_area_t* area, lv_color_t* color_p){
 	lv_disp_flush_ready(disp);
 }
 
+#if MAKERPHONE_LOAD_MOCK_DATA
 struct {
 	UID_t uid;
 	const char* nickname;
@@ -123,6 +124,7 @@ void printData(){
 		}
 	}
 }
+#endif // MAKERPHONE_LOAD_MOCK_DATA
 
 void boot(){
 	lv_timer_handler();
@@ -146,8 +148,15 @@ void boot(){
 	// listener subscription is active before LoRa starts delivering.
 	Phone.begin();
 
-	//loadMock(true);
-	//printData();
+#if MAKERPHONE_LOAD_MOCK_DATA
+	// Dev-only seed: populate Storage.Friends / Convos / Messages with the
+	// six "Chatter v0.x" test peers so the inbox / friends list has
+	// something to look at without a paired second device. Gated by the
+	// MAKERPHONE_LOAD_MOCK_DATA build flag (default 0); flip via
+	// `-DMAKERPHONE_LOAD_MOCK_DATA=1` in arduino-cli for local dev.
+	loadMock(true);
+	printData();
+#endif
 
 	Sleep.begin();
 

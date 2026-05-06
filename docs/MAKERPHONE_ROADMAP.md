@@ -289,6 +289,22 @@ Buzzer is what we have, so we lean into it.
 - [x] **S199** — Final QA — exercise every flow, fix critical regressions in the same commit.
 - [x] **S200** — v2.0 changelog + KNOWN_ISSUES sweep + auto-cycling demo mode for the marketing video.
 
+## Phase W — v2.1 Hotfix Series (S201+)
+The 200-session v2.0 roadmap is closed. Phase W picks up the v2.1
+candidate-pool items called out at the bottom of `KNOWN_ISSUES.md` —
+short, self-contained polish / cleanup tasks that didn't make the
+v2.0 cut. Sessions are appended one-by-one as the autonomous agent
+claims and ships them, so the next un-done line is always the
+lowest-numbered `[ ]`.
+
+- [x] **S201** — `MAKERPHONE_LOAD_MOCK_DATA` build flag — gates the
+  dev-only `loadMock()` / `printData()` helpers + `Chatters[]` test
+  peer table behind a 0/1 macro in `src/MAKERphoneConfig.h`. Default
+  0 (production parity); flip via `-DMAKERPHONE_LOAD_MOCK_DATA=1` in
+  arduino-cli for local dev. Replaces the commented-out
+  `//loadMock(true);` call site in the .ino. Resolves the matching
+  v2.1 polish item in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file

@@ -89,4 +89,32 @@
 #define MAKERPHONE_SHOW_SIM_PIN 1
 #endif
 
+
+/*
+ * MAKERPHONE_LOAD_MOCK_DATA
+ *
+ * When 1: the .ino's dev-only `loadMock(true)` + `printData()` helpers are
+ * compiled in and called from `boot()` once the storage / messaging /
+ * profile services come up. This populates `Storage.Friends`,
+ * `Storage.Convos`, and `Storage.Messages` with the six "Chatter v0.x"
+ * test peers used during local development so the inbox / friends list
+ * has something to look at without a paired second device.
+ *
+ * When 0 (default): the helpers and the static `Chatters[]` table are
+ * stripped from the build entirely (the `loadMock` / `printData` /
+ * `Chatters[]` symbols don't even exist), so a fresh production flash
+ * boots into a clean storage state. Intentional — KNOWN_ISSUES v2.1
+ * polish item: "loadMock() is dead code in MAKERphone-Firmware.ino —
+ * kept commented out behind //loadMock(true); for development
+ * convenience. Worth gating behind a build flag so a future
+ * contributor can flip it without editing the .ino."
+ *
+ * Set via `-DMAKERPHONE_LOAD_MOCK_DATA=1` in arduino-cli or by defining
+ * the macro before this header is included from the .ino. Default
+ * stays 0 (off) so production CI builds match what end users flash.
+ */
+#ifndef MAKERPHONE_LOAD_MOCK_DATA
+#define MAKERPHONE_LOAD_MOCK_DATA 0
+#endif
+
 #endif // MAKERPHONE_CONFIG_H

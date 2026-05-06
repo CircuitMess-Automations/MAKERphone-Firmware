@@ -51,11 +51,12 @@ on a usable home screen on a fresh device.
   `PhoneNotificationToast` "Sample contact — add a real one" so the
   feedback is explicit.
 
-- [ ] **`loadMock()` is dead code** in `MAKERphone-Firmware.ino` — kept
-  commented out behind `//loadMock(true);` for development convenience.
-  Worth gating behind a `MAKERPHONE_LOAD_MOCK_DATA` build flag in
-  `MAKERphoneConfig.h` so a future contributor can flip it without
-  editing the .ino.
+- [x] **`loadMock()` is dead code** in `MAKERphone-Firmware.ino` — fixed
+  in S201. The `MAKERPHONE_LOAD_MOCK_DATA` build flag (default 0) now
+  lives in `src/MAKERphoneConfig.h`; the helpers and the `Chatters[]`
+  table compile out unless a developer flips the flag via
+  `-DMAKERPHONE_LOAD_MOCK_DATA=1` in arduino-cli, removing the need to
+  edit the .ino just to seed dev data.
 
 - [ ] **`Settings.sound = false` override on every boot.** `setup()`
   forcibly mutes the device on boot for the prototype, which means the
@@ -152,8 +153,11 @@ polish for v2.1.
 - **Sample-row contacts (uid==0) silently no-op** — fixed. S171 wires
   a `PhoneNotificationToast("Sample contact — add a real one")` when
   the user fires CALL/MESSAGE/EDIT on a placeholder row.
-- **`loadMock()` is dead code** — carried forward. The
-  `MAKERPHONE_LOAD_MOCK_DATA` build flag is still on the wishlist.
+- **`loadMock()` is dead code** — fixed in S201. The
+  `MAKERPHONE_LOAD_MOCK_DATA` build flag (default 0) now lives in
+  `src/MAKERphoneConfig.h`; the helpers and the `Chatters[]` table
+  compile out unless a developer flips the flag via
+  `-DMAKERPHONE_LOAD_MOCK_DATA=1` in arduino-cli.
 - **`Settings.sound = false` boot override** — carried forward. The
   override block in `setup()` still mutes a fresh production Chatter
   on boot. Phase J's `PhoneProfileScreen` (S159) is the new
