@@ -305,6 +305,19 @@ lowest-numbered `[ ]`.
   `//loadMock(true);` call site in the .ino. Resolves the matching
   v2.1 polish item in `KNOWN_ISSUES.md`.
 
+- [x] **S202** — `PhoneSpeedDialScreen` overwrite-guard prompt — adds
+  a third `Mode::Confirm` to the speed-dial editor (S151) that
+  intercepts a destructive PICK before any `Settings.speedDial[d]`
+  mutation. When the focused slot already binds to a *different*
+  contact, ENTER hands off to a centered "REPLACE? / CLEAR?" panel
+  showing `SLOT N`, the current binding, an arrow, and the new pick;
+  ENTER persists, BACK returns to pick mode with the cursor still on
+  the contact the user picked (no rebuild, no flicker). Trivial
+  cases (slot empty, picking the same contact, clearing an already-
+  empty slot) still apply directly. Soft-keys flip to
+  REPLACE / CLEAR + CANCEL in confirm mode. Resolves the matching
+  v2.1 polish item in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file

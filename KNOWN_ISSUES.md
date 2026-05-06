@@ -194,10 +194,15 @@ polish for v2.1.
   Demo speed` row could expose Slow / Medium / Fast presets without
   touching the slide content.
 
-- [ ] **Speed-dial editor (S151) does not warn before overwriting an
-  assigned slot.** Picking a contact for an already-assigned digit
-  silently replaces the previous binding. Add a "Replace existing
-  speed-dial?" confirmation modal in v2.1.
+- [x] **Speed-dial editor (S151) does not warn before overwriting an
+  assigned slot** — fixed in S202. `PhoneSpeedDialScreen` now grows a
+  third `Mode::Confirm` that intercepts a destructive PICK before
+  any `Settings.speedDial[d]` mutation. ENTER on a contact that
+  would overwrite a *different* existing binding hands off to a
+  centered "REPLACE? / CLEAR?" panel; ENTER persists, BACK returns
+  to pick mode with the cursor still on the contact the user picked.
+  Trivial cases (empty slot, picking the same contact, clearing an
+  already-empty slot) still apply directly without a prompt.
 
 - [ ] **`PhoneVirtualPet` save data lives in NVS but never garbage-
   collects on a wipe.** A user who factory-resets through the Settings

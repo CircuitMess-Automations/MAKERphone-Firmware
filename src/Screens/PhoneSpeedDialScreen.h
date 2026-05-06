@@ -93,8 +93,27 @@ class PhoneSoftKeyBar;
  *                                    "(Clear)") into the slot, persist,
  *                                    and return to list mode. Flashes
  *                                    the PICK softkey on the way out.
+ *                                    If the slot is already assigned
+ *                                    to a different contact (S202
+ *                                    overwrite-guard), pick mode hands
+ *                                    off to confirm mode before any
+ *                                    Settings mutation -- destructive
+ *                                    edits never happen on a single
+ *                                    keystroke.
  *   - BTN_BACK                     : cancel the pick, return to list
  *                                    mode without mutating the slot.
+ *
+ * Controls (confirm mode -- S202 overwrite guard)
+ *   - BTN_ENTER                    : confirm the replace/clear, persist
+ *                                    Settings, return to list mode.
+ *                                    Soft-key reads "REPLACE" (or
+ *                                    "CLEAR" when the new pick is the
+ *                                    "(Clear)" sentinel).
+ *   - BTN_BACK                     : cancel the replace, return to
+ *                                    pick mode with the cursor still
+ *                                    on the contact the user picked
+ *                                    so they can either re-confirm or
+ *                                    pick a different contact.
  *
  * Implementation notes
  *   - 100 % code-only -- no SPIFFS assets. Reuses PhoneSynthwaveBg /
@@ -162,13 +181,18 @@ public:
 
 	/** Visible mode of the screen. Public so tests can introspect. */
 	enum class Mode : uint8_t {
-		List = 0,    // 9 digit slots
-		Pick = 1,    // contact picker for the slot in editingDigit
+		List    = 0,    // 9 digit slots
+		Pick    = 1,    // contact picker for the slot in editingDigit
+		Confirm = 2,    // S202 overwrite-guard prompt before persist
 	};
 
 	Mode    getMode()         const { return mode; }
 	uint8_t getCursor()       const { return cursor; }
 	uint8_t getEditingDigit() const { return editingDigit; }
+	/** Test-only: which contact the confirm prompt is currently asking
+	 *  about. 0 means the "(Clear)" sentinel; non-zero is a real uid.
+	 *  Only meaningful while getMode() == Mode::Confirm. */
+	UID_t   getPendingUid()   const { return pendingUid; }
 
 private:
 	PhoneSynthwaveBg* wallpaper = nullptr;
@@ -203,15 +227,34 @@ private:
 	std::vector<PickEntry> pickEntries;
 	uint8_t pickWindowTop = 0;           // first visible entry index
 
+	// ---- confirm (S202 overwrite-guard) view ----
+	// Centered panel that appears on top of the (still-laid-out) pick
+	// container when the user tries to overwrite a slot that already
+	// resolves to a different contact. The pick container stays mounted
+	// underneath -- BACK in confirm mode just hides confirmContainer
+	// again so the user lands back on the same focused row.
+	lv_obj_t* confirmContainer = nullptr;
+	lv_obj_t* confirmTitle     = nullptr;   // "REPLACE?" or "CLEAR?" (cyan)
+	lv_obj_t* confirmSlotLabel = nullptr;   // "SLOT 3"           (warm cream)
+	lv_obj_t* confirmFromLabel = nullptr;   // current binding    (dim)
+	lv_obj_t* confirmArrow     = nullptr;   // "->"               (accent)
+	lv_obj_t* confirmToLabel   = nullptr;   // new pick / "Empty" (warm cream)
+	lv_obj_t* confirmHint      = nullptr;   // "ENTER yes / BACK no" hint
+
 	// ---- state ----
 	Mode    mode         = Mode::List;
 	uint8_t cursor       = 0;            // index into digitRows[] OR pickEntries[]
 	uint8_t editingDigit = 1;            // 1..9 -- which slot pick mode is editing
+	UID_t   pendingUid   = 0;            // S202: which uid the confirm prompt
+	                                     // is asking about. 0 = "(Clear)".
+	uint8_t pickReturnCursor = 0;        // S202: cursor to restore on cancel
+	                                     // back into pick mode.
 
 	// ---- builders ----
 	void buildCaption();
 	void buildDigitView();
 	void buildPickView();
+	void buildConfirmView();   // S202 overwrite-guard panel
 
 	// ---- data refresh ----
 	void refreshDigitRow(uint8_t slotIdx);
@@ -222,17 +265,26 @@ private:
 	void refreshPickRows();
 	void refreshPickHighlight();
 
+	void refreshConfirmText(); // S202: rebuild the "Slot N: OLD -> NEW?" body
+
 	void refreshCaption();
 	void refreshSoftKeys();
 
 	// ---- mode + cursor ----
 	void enterListMode();
 	void enterPickMode(uint8_t digit);
+	void enterConfirmMode(UID_t newUid);   // S202 overwrite guard
 	void moveCursorBy(int8_t delta);
 	void jumpCursorToDigit(uint8_t digit);
 
 	// ---- commit ----
-	void commitPickedSlot();
+	void commitPickedSlot();   // evaluate destructive vs. trivial; may
+	                           // hand off to confirm mode (S202).
+	void applyPickedSlot(UID_t newUid);   // unconditional persist + return
+	                                       // to list. Called by commit
+	                                       // for trivial cases and by
+	                                       // confirm-mode ENTER for
+	                                       // destructive ones.
 
 	// ---- input ----
 	void buttonPressed(uint i) override;

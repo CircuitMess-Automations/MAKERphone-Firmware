@@ -84,6 +84,7 @@ PhoneSpeedDialScreen::PhoneSpeedDialScreen()
 	buildCaption();
 	buildDigitView();
 	buildPickView();
+	buildConfirmView();   // S202 overwrite-guard panel (hidden by default)
 
 	// Bottom: feature-phone soft-keys. EDIT in list mode opens the
 	// pick view for the focused slot; PICK in pick mode commits the
@@ -254,6 +255,132 @@ void PhoneSpeedDialScreen::buildPickView() {
 	}
 }
 
+// ----- confirm (S202 overwrite guard) view -----------------------------
+
+void PhoneSpeedDialScreen::buildConfirmView() {
+	// Centered panel sitting on top of (but layered above) the pick
+	// container. Sized 140 x 80 so it leaves a 10 px frame around the
+	// edge of the 160 x 128 display while still giving the body text
+	// enough room to render the "SLOT N", current binding, arrow, and
+	// new-pick lines on separate baselines without overlap.
+	confirmContainer = lv_obj_create(obj);
+	lv_obj_remove_style_all(confirmContainer);
+	lv_obj_set_size(confirmContainer, 140, 80);
+	lv_obj_set_pos(confirmContainer,
+				   (160 - 140) / 2,
+				   ListY + ((PickVisibleRows * PickRowH) - 80) / 2);
+	lv_obj_set_scrollbar_mode(confirmContainer, LV_SCROLLBAR_MODE_OFF);
+	lv_obj_clear_flag(confirmContainer, LV_OBJ_FLAG_SCROLLABLE);
+	lv_obj_set_style_pad_all(confirmContainer, 4, 0);
+	lv_obj_set_style_radius(confirmContainer, 3, 0);
+	lv_obj_set_style_bg_color(confirmContainer, MP_BG_DARK, 0);
+	lv_obj_set_style_bg_opa(confirmContainer, LV_OPA_COVER, 0);
+	lv_obj_set_style_border_color(confirmContainer, MP_ACCENT, 0);
+	lv_obj_set_style_border_opa(confirmContainer, LV_OPA_COVER, 0);
+	lv_obj_set_style_border_width(confirmContainer, 1, 0);
+	lv_obj_add_flag(confirmContainer, LV_OBJ_FLAG_HIDDEN);
+
+	// "REPLACE?" / "CLEAR?" title -- cyan, top-centered. Text is set
+	// by refreshConfirmText() because it depends on whether the new
+	// pick is the "(Clear)" sentinel or a real contact.
+	confirmTitle = lv_label_create(confirmContainer);
+	lv_obj_set_style_text_font(confirmTitle, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(confirmTitle, MP_HIGHLIGHT, 0);
+	lv_label_set_text(confirmTitle, "REPLACE?");
+	lv_obj_set_align(confirmTitle, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(confirmTitle, 2);
+
+	// "SLOT 3" line under the title -- warm cream so it pops as the
+	// fact the user is acting on.
+	confirmSlotLabel = lv_label_create(confirmContainer);
+	lv_obj_set_style_text_font(confirmSlotLabel, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(confirmSlotLabel, MP_TEXT, 0);
+	lv_label_set_text(confirmSlotLabel, "SLOT 0");
+	lv_obj_set_align(confirmSlotLabel, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(confirmSlotLabel, 14);
+
+	// "Old name" -- dim purple, dot-truncates if needed. Width leaves
+	// 2 px margin inside the panel.
+	confirmFromLabel = lv_label_create(confirmContainer);
+	lv_obj_set_style_text_font(confirmFromLabel, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(confirmFromLabel, MP_LABEL_DIM, 0);
+	lv_label_set_long_mode(confirmFromLabel, LV_LABEL_LONG_DOT);
+	lv_obj_set_width(confirmFromLabel, 132);
+	lv_obj_set_style_text_align(confirmFromLabel, LV_TEXT_ALIGN_CENTER, 0);
+	lv_label_set_text(confirmFromLabel, "");
+	lv_obj_set_align(confirmFromLabel, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(confirmFromLabel, 26);
+
+	// "->" arrow -- sunset orange so the swap reads at a glance.
+	confirmArrow = lv_label_create(confirmContainer);
+	lv_obj_set_style_text_font(confirmArrow, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(confirmArrow, MP_ACCENT, 0);
+	lv_label_set_text(confirmArrow, "v");
+	lv_obj_set_align(confirmArrow, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(confirmArrow, 36);
+
+	// "New name" -- warm cream, dot-truncated.
+	confirmToLabel = lv_label_create(confirmContainer);
+	lv_obj_set_style_text_font(confirmToLabel, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(confirmToLabel, MP_TEXT, 0);
+	lv_label_set_long_mode(confirmToLabel, LV_LABEL_LONG_DOT);
+	lv_obj_set_width(confirmToLabel, 132);
+	lv_obj_set_style_text_align(confirmToLabel, LV_TEXT_ALIGN_CENTER, 0);
+	lv_label_set_text(confirmToLabel, "");
+	lv_obj_set_align(confirmToLabel, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(confirmToLabel, 46);
+
+	// Hint strip at the bottom of the panel reinforces the soft-key
+	// labels for users who haven't read the soft-keys yet.
+	confirmHint = lv_label_create(confirmContainer);
+	lv_obj_set_style_text_font(confirmHint, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(confirmHint, MP_LABEL_DIM, 0);
+	lv_label_set_text(confirmHint, "ENTER=yes  BACK=no");
+	lv_obj_set_align(confirmHint, LV_ALIGN_BOTTOM_MID);
+	lv_obj_set_y(confirmHint, -2);
+}
+
+void PhoneSpeedDialScreen::refreshConfirmText() {
+	if(confirmTitle == nullptr) return;
+
+	// Title flips between "REPLACE?" and "CLEAR?" so the action verb
+	// matches what ENTER will actually do.
+	const bool clearing = (pendingUid == 0);
+	lv_label_set_text(confirmTitle, clearing ? "CLEAR?" : "REPLACE?");
+
+	// "SLOT 3" subtitle so the user knows which digit the prompt is
+	// about even if they got here by digit-jumping mid-flow.
+	if(confirmSlotLabel != nullptr) {
+		char buf[12];
+		snprintf(buf, sizeof(buf), "SLOT %u", (unsigned) editingDigit);
+		lv_label_set_text(confirmSlotLabel, buf);
+	}
+
+	// Current binding name (the thing about to be overwritten).
+	if(confirmFromLabel != nullptr) {
+		const UID_t curUid = Settings.get().speedDial[editingDigit];
+		const char* curName = (curUid != 0)
+			? PhoneContacts::displayNameOf(curUid)
+			: kUnsetText;
+		if(curName == nullptr || curName[0] == '\0') curName = "Contact";
+		lv_label_set_text(confirmFromLabel, curName);
+	}
+
+	// New pick name. "(Clear)" sentinel renders dim purple so it reads
+	// as a destructive action; real contacts stay warm cream.
+	if(confirmToLabel != nullptr) {
+		if(clearing) {
+			lv_label_set_text(confirmToLabel, kClearText);
+			lv_obj_set_style_text_color(confirmToLabel, MP_LABEL_DIM, 0);
+		} else {
+			const char* newName = PhoneContacts::displayNameOf(pendingUid);
+			if(newName == nullptr || newName[0] == '\0') newName = "Contact";
+			lv_label_set_text(confirmToLabel, newName);
+			lv_obj_set_style_text_color(confirmToLabel, MP_TEXT, 0);
+		}
+	}
+}
+
 // ----- digit view repaint ----------------------------------------------
 
 void PhoneSpeedDialScreen::refreshDigitRow(uint8_t slotIdx) {
@@ -421,13 +548,24 @@ void PhoneSpeedDialScreen::refreshCaption() {
 	if(mode == Mode::List) {
 		lv_label_set_text(captionLabel, kListCaption);
 		lv_obj_set_style_text_color(captionLabel, MP_HIGHLIGHT, 0);
-	} else {
+	} else if(mode == Mode::Pick) {
 		// "SLOT 3 - PICK CONTACT" reads at a glance which slot the
 		// user is editing; sunset orange flags the screen as "live
 		// edit" so it visually pops above the otherwise calm cyan
 		// caption the rest of the SYSTEM-cluster screens use.
 		char buf[32];
 		snprintf(buf, sizeof(buf), "SLOT %u - PICK CONTACT",
+				 (unsigned) editingDigit);
+		lv_label_set_text(captionLabel, buf);
+		lv_obj_set_style_text_color(captionLabel, MP_ACCENT, 0);
+	} else {
+		// Confirm mode (S202 overwrite guard). Caption stays sunset
+		// orange so the user perceives the prompt as a continuation
+		// of the live-edit flow rather than a brand-new screen, but
+		// the verb flips to "CONFIRM" so they know the next ENTER
+		// keystroke is the destructive one.
+		char buf[32];
+		snprintf(buf, sizeof(buf), "SLOT %u - CONFIRM",
 				 (unsigned) editingDigit);
 		lv_label_set_text(captionLabel, buf);
 		lv_obj_set_style_text_color(captionLabel, MP_ACCENT, 0);
@@ -439,20 +577,29 @@ void PhoneSpeedDialScreen::refreshSoftKeys() {
 	if(mode == Mode::List) {
 		softKeys->setLeft("EDIT");
 		softKeys->setRight("BACK");
-	} else {
+	} else if(mode == Mode::Pick) {
 		softKeys->setLeft("PICK");
 		softKeys->setRight("BACK");
+	} else {
+		// Confirm mode (S202): left key flips to the destructive verb
+		// so the user can read the action they are about to commit
+		// straight off the soft-key bar. "CLEAR" reads better than
+		// "REPLACE" when the new pick is the "(Clear)" sentinel.
+		softKeys->setLeft((pendingUid == 0) ? "CLEAR" : "REPLACE");
+		softKeys->setRight("CANCEL");
 	}
 }
 
 // ----- mode + cursor ---------------------------------------------------
 
 void PhoneSpeedDialScreen::enterListMode() {
-	mode   = Mode::List;
-	cursor = (cursor < SlotCount) ? cursor : 0;
+	mode       = Mode::List;
+	cursor     = (cursor < SlotCount) ? cursor : 0;
+	pendingUid = 0;
 
-	if(digitContainer != nullptr) lv_obj_clear_flag(digitContainer, LV_OBJ_FLAG_HIDDEN);
-	if(pickContainer  != nullptr) lv_obj_add_flag(pickContainer, LV_OBJ_FLAG_HIDDEN);
+	if(digitContainer    != nullptr) lv_obj_clear_flag(digitContainer, LV_OBJ_FLAG_HIDDEN);
+	if(pickContainer     != nullptr) lv_obj_add_flag(pickContainer, LV_OBJ_FLAG_HIDDEN);
+	if(confirmContainer  != nullptr) lv_obj_add_flag(confirmContainer, LV_OBJ_FLAG_HIDDEN);
 
 	// Refresh the rows in case the user came back from a commit -- the
 	// just-edited slot needs to show its new name immediately.
@@ -466,9 +613,11 @@ void PhoneSpeedDialScreen::enterPickMode(uint8_t digit) {
 	if(digit < 1 || digit > SlotCount) return;
 	editingDigit = digit;
 	mode         = Mode::Pick;
+	pendingUid   = 0;
 
-	if(digitContainer != nullptr) lv_obj_add_flag(digitContainer, LV_OBJ_FLAG_HIDDEN);
-	if(pickContainer  != nullptr) lv_obj_clear_flag(pickContainer, LV_OBJ_FLAG_HIDDEN);
+	if(digitContainer    != nullptr) lv_obj_add_flag(digitContainer, LV_OBJ_FLAG_HIDDEN);
+	if(pickContainer     != nullptr) lv_obj_clear_flag(pickContainer, LV_OBJ_FLAG_HIDDEN);
+	if(confirmContainer  != nullptr) lv_obj_add_flag(confirmContainer, LV_OBJ_FLAG_HIDDEN);
 
 	rebuildPickEntries();
 	refreshPickRows();
@@ -477,7 +626,33 @@ void PhoneSpeedDialScreen::enterPickMode(uint8_t digit) {
 	refreshSoftKeys();
 }
 
+void PhoneSpeedDialScreen::enterConfirmMode(UID_t newUid) {
+	// Snapshot the pick-mode cursor + uid so a CANCEL from confirm
+	// mode lands the user back on the same focused contact rather
+	// than rebuilding the pick window from scratch.
+	pickReturnCursor = cursor;
+	pendingUid       = newUid;
+	mode             = Mode::Confirm;
+
+	// Keep the pick container mounted underneath so cancel can simply
+	// re-show it without rebuilding the pick entries -- the screen
+	// state is already cached and the user lands back on the same row.
+	if(digitContainer    != nullptr) lv_obj_add_flag(digitContainer, LV_OBJ_FLAG_HIDDEN);
+	if(pickContainer     != nullptr) lv_obj_add_flag(pickContainer, LV_OBJ_FLAG_HIDDEN);
+	if(confirmContainer  != nullptr) lv_obj_clear_flag(confirmContainer, LV_OBJ_FLAG_HIDDEN);
+
+	refreshConfirmText();
+	refreshCaption();
+	refreshSoftKeys();
+}
+
 void PhoneSpeedDialScreen::moveCursorBy(int8_t delta) {
+	// Confirm mode is a binary YES/NO prompt -- arrows would imply
+	// scrolling through options that aren't there. Swallow the input
+	// rather than risk visually drifting the cursor while the panel
+	// has the focus.
+	if(mode == Mode::Confirm) return;
+
 	const uint8_t total = (mode == Mode::List)
 		? SlotCount
 		: (uint8_t) pickEntries.size();
@@ -520,11 +695,27 @@ void PhoneSpeedDialScreen::commitPickedSlot() {
 		: (uint8_t) (pickEntries.size() - 1);
 	const PickEntry& e = pickEntries[safeCursor];
 
+	const UID_t curUid = Settings.get().speedDial[editingDigit];
+
+	// S202 overwrite guard. The prompt is destructive only when the
+	// slot is currently bound to a *different* contact -- the three
+	// trivial cases (slot empty, picking the same contact already
+	// bound, or clearing an already-empty slot) all collapse into a
+	// silent direct apply because there is no data to lose.
+	if(curUid != 0 && curUid != e.uid) {
+		enterConfirmMode(e.uid);
+		return;
+	}
+
+	applyPickedSlot(e.uid);
+}
+
+void PhoneSpeedDialScreen::applyPickedSlot(UID_t newUid) {
 	// Mutate Settings + persist in one shot. The S151 gesture half on
 	// PhoneHomeScreen reads Settings.speedDial[digit] live on every
 	// long-press, so the new assignment is in effect from the next
 	// homescreen press without any extra wiring.
-	Settings.get().speedDial[editingDigit] = e.uid;
+	Settings.get().speedDial[editingDigit] = newUid;
 	Settings.store();
 
 	// Land back in list mode focused on the slot we just edited so
@@ -555,9 +746,17 @@ void PhoneSpeedDialScreen::buttonPressed(uint i) {
 				// to slot 1, so we add 1 here to map cursor to the
 				// editable slot range.
 				enterPickMode(cursor + 1);
-			} else {
+			} else if(mode == Mode::Pick) {
 				if(softKeys) softKeys->flashLeft();
 				commitPickedSlot();
+			} else {
+				// Confirm mode (S202) -- ENTER is the destructive
+				// keystroke that finally writes the slot. Capture the
+				// pending uid first because applyPickedSlot()'s call
+				// chain ends in enterListMode() which clears it.
+				if(softKeys) softKeys->flashLeft();
+				const UID_t toCommit = pendingUid;
+				applyPickedSlot(toCommit);
 			}
 			return;
 
@@ -569,6 +768,22 @@ void PhoneSpeedDialScreen::buttonPressed(uint i) {
 				if(softKeys) softKeys->flashRight();
 				cursor = editingDigit - 1;
 				enterListMode();
+			} else if(mode == Mode::Confirm) {
+				// S202 overwrite guard cancel: drop the pending uid
+				// and re-show the pick container with the cursor still
+				// on the contact the user was about to commit. The
+				// pick entries are still cached so this is a pure
+				// visibility flip -- no rebuild, no flicker.
+				if(softKeys) softKeys->flashRight();
+				pendingUid = 0;
+				cursor     = pickReturnCursor;
+				mode       = Mode::Pick;
+				if(digitContainer    != nullptr) lv_obj_add_flag(digitContainer, LV_OBJ_FLAG_HIDDEN);
+				if(confirmContainer  != nullptr) lv_obj_add_flag(confirmContainer, LV_OBJ_FLAG_HIDDEN);
+				if(pickContainer     != nullptr) lv_obj_clear_flag(pickContainer, LV_OBJ_FLAG_HIDDEN);
+				refreshPickHighlight();
+				refreshCaption();
+				refreshSoftKeys();
 			} else {
 				// List mode -- pop back to PhoneSettingsScreen. The
 				// settings screen restores its own cursor so the user
