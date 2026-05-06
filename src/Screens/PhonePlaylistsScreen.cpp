@@ -10,6 +10,7 @@
 #include "../Interface/PhoneTransitions.h"
 #include "../Services/PhoneMusicPlaylists.h"
 #include "PhoneMusicPlayer.h"
+#include "PhoneRadio.h"
 
 // MAKERphone retro palette - inlined per the established pattern in this
 // codebase (see PhoneSoftKeyToneScreen.cpp / PhoneMusicPlayer.cpp). Cyan
@@ -69,6 +70,17 @@ PhonePlaylistsScreen::PhonePlaylistsScreen()
 
 	softKeys = new PhoneSoftKeyBar(obj);
 	softKeys->set("PLAY", "BACK");
+
+	// S195 — discoverability hint for the FM radio shortcut. The "5"
+	// numpad key launches PhoneRadio (eight pre-canned looping melody
+	// stations). Picked BTN_5 because it is the natural "extras" key on
+	// a feature-phone numpad and is already free on this screen.
+	lv_obj_t* radioHint = lv_label_create(obj);
+	lv_obj_set_style_text_font(radioHint, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(radioHint, MP_LABEL_DIM, 0);
+	lv_label_set_text(radioHint, "5: FM RADIO");
+	lv_obj_set_align(radioHint, LV_ALIGN_TOP_MID);
+	lv_obj_set_y(radioHint, 110);
 
 	refreshHighlight();
 	refreshFocusedHint();
@@ -267,6 +279,17 @@ void PhonePlaylistsScreen::buttonPressed(uint i) {
 		case BTN_ENTER:
 			launchSelection();
 			break;
+
+		// S195 — bumper-style shortcut to PhoneRadio. The fake FM dial
+		// is a sibling to the playlist player rather than a child of
+		// any one playlist, so we expose it from the picker rather
+		// than from inside PhoneMusicPlayer (which already owns L/R).
+		case BTN_5: {
+			auto* radio = new PhoneRadio();
+			if(softKeys) softKeys->flashLeft();
+			PhoneTransitions::push(this, radio, PhoneTransition::Drill);
+			break;
+		}
 
 		case BTN_BACK:
 			if(softKeys) softKeys->flashRight();
