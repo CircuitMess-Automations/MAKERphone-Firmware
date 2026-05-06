@@ -6,6 +6,7 @@
 #include <Input/InputListener.h>
 #include "../Interface/LVScreen.h"
 #include "../Elements/UnlockSlide.h"
+#include "../Elements/PhoneClockFace.h"
 #include "../Elements/PhoneLockHint.h"
 #include "../Elements/PhoneNotificationPreview.h"
 #include "../Elements/PhoneChargingOverlay.h"
@@ -86,11 +87,36 @@ private:
 	// settings edit -> pop-back-to-lock cycle picks up the new layout
 	// without rebuilding the whole screen.
 	void layoutForOwner();
+	// S184 - read Settings.get().lockWidgetMode and apply it to the
+	// LockScreen widget tree. ClockDate (0): the classic layout, both
+	// date rows visible, no event label. ClockOnly (1): hide the date
+	// rows, no event label. ClockEvent (2): hide the date rows and
+	// paint the next armed PhoneAlarmService alarm in their place
+	// ("NEXT ALARM 07:00", or "NO ALARMS SET" when none is enabled).
+	// Safe to call repeatedly; idempotent across mode changes so a
+	// settings-edit -> back-to-lock cycle picks up the new mode on
+	// the next push without a screen rebuild.
+	void applyLockWidgetMode();
 	// Cached pointer to the clock face's lvgl object; we set its Y in
 	// layoutForOwner() rather than reaching through PhoneClockFace's
 	// public API for a setY (which the widget does not expose today).
 	// nullptr until the constructor finishes building the clock.
 	lv_obj_t* clockFaceObj = nullptr;
+	// S184 - cached pointer to the PhoneClockFace widget so
+	// applyLockWidgetMode() can flip its date rows on / off when the
+	// user re-picks a different widget composition without rebuilding
+	// the LockScreen. nullptr until the constructor finishes building
+	// the face.
+	PhoneClockFace* clockFace = nullptr;
+	// S184 - "NEXT ALARM HH:MM" preview line painted in place of the
+	// hidden weekday + month rows when the user picks the
+	// PhoneLockWidgetScreen "CLOCK + EVT" mode. Mounted lazily by
+	// applyLockWidgetMode() the first time the picker selects mode 2,
+	// then kept around (just text-updated + show/hidden) for the rest
+	// of the screen's lifetime so a later mode flip can re-use it.
+	// Stays nullptr (and the layout stays in its pre-S184 form) when
+	// the persisted mode is ClockOnly / ClockDate.
+	lv_obj_t* nextEventLabel = nullptr;
 	// Mirror of the clock face's natural top edge (y=11 today). Cached
 	// so layoutForOwner() can return to it when the owner label hides.
 	static constexpr lv_coord_t kClockBaseY = 11;

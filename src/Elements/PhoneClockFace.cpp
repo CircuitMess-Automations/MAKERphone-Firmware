@@ -173,3 +173,18 @@ void PhoneClockFace::refresh(){
 	updateClock();
 	updateDate();
 }
+
+// S184 - lock-widget picker hide/show for the secondary date rows. Toggles
+// LV_OBJ_FLAG_HIDDEN on dowLabel + monthLabel so the LockScreen can render
+// a clock-only watch face without rebuilding the widget tree. No-op when
+// the labels were never built.
+void PhoneClockFace::setDateVisible(bool show){
+	if(dowLabel != nullptr){
+		if(show)  lv_obj_clear_flag(dowLabel,   LV_OBJ_FLAG_HIDDEN);
+		else      lv_obj_add_flag  (dowLabel,   LV_OBJ_FLAG_HIDDEN);
+	}
+	if(monthLabel != nullptr){
+		if(show)  lv_obj_clear_flag(monthLabel, LV_OBJ_FLAG_HIDDEN);
+		else      lv_obj_add_flag  (monthLabel, LV_OBJ_FLAG_HIDDEN);
+	}
+}

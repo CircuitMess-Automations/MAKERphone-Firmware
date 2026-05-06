@@ -59,6 +59,11 @@ const Section kLayout[] = {
 	// because the two settings co-modulate: a non-default theme
 	// overrides the wallpaperStyle byte for as long as it is selected.
 	{ false, "Theme",              "THEME",       PhoneSettingsScreen::Item::Theme      },
+	// S184 - lock-screen widget composition picker. Sits at the bottom of
+	// the DISPLAY group so all three "what does my lock screen look like"
+	// rows (Wallpaper / Theme / Lock widget) cluster together inside the
+	// DISPLAY section, with SOUND staying anchored as the next group below.
+	{ false, "Lock widget",        "LOCK WIDGET", PhoneSettingsScreen::Item::LockWidget },
 	{ true,  "SOUND",              nullptr,       PhoneSettingsScreen::Item::Sound      },
 	// S159 - replaced the S52 "Sound & Vibration" three-state picker with
 	// the classic Sony-Ericsson "Profile" five-state selector

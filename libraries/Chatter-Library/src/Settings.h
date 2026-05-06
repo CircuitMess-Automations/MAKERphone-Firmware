@@ -306,6 +306,42 @@ struct SettingsData {
 	// read so a NVS-resize wipe that lands the new byte at 0xFF degrades
 	// gracefully to the documented factory default.
 	uint8_t softKeyTone = 0;
+	// S184 - lock-screen widget composition picker. Lets the user
+	// pick which secondary line(s) the LockScreen renders below the
+	// big clock face, so the same hardware can present three distinct
+	// "lock-screen vibes" without rebuilding any widget tree:
+	//
+	//   0 = ClockDate  - the factory default. Clock face renders
+	//                    the weekday + day-of-month + month+year
+	//                    rows exactly the way every prior firmware
+	//                    shipped, so a freshly-flashed device looks
+	//                    byte-identical out of the box.
+	//   1 = ClockOnly  - hides the weekday + month rows entirely so
+	//                    the lock screen reads as a minimalist
+	//                    HH:MM-only watch face.
+	//   2 = ClockEvent - hides the weekday + month rows and instead
+	//                    paints the next armed PhoneAlarmService
+	//                    alarm ("NEXT ALARM 07:00") in their place,
+	//                    so the lock screen previews the user's
+	//                    closest pending event the way a Sony-
+	//                    Ericsson agenda widget would. When no
+	//                    alarm is armed the line falls back to
+	//                    "NO ALARMS SET" in the dim caption colour
+	//                    rather than going blank, so the layout
+	//                    stays balanced.
+	//
+	// Edited from PhoneLockWidgetScreen, reachable from the DISPLAY
+	// section of PhoneSettingsScreen ("Lock widget" row). Persisted
+	// values outside [0..2] clamp to ClockDate at the LockScreen
+	// layer, the same defensive pattern soundProfile / wallpaperStyle
+	// / themeId / keyTicks already use against NVS-resize wipes that
+	// read the new byte as uninitialised garbage. Sits next to
+	// softKeyTone so the personalisation-related settings stay
+	// clustered in the SettingsData blob; the existing NVS-resize
+	// pattern reads the new field as zero-initialised on a first
+	// boot after the firmware grows, which maps to ClockDate -- the
+	// correct factory default.
+	uint8_t lockWidgetMode = 0;
 };
 
 class SettingsImpl {

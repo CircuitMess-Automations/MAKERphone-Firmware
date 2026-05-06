@@ -31,6 +31,7 @@
 #include "../Screens/PhoneDateTimeScreen.h"
 #include "../Screens/PhoneAboutScreen.h"
 #include "../Screens/PhoneThemeScreen.h"
+#include "../Screens/PhoneLockWidgetScreen.h"
 #include "../Screens/PhoneOwnerNameScreen.h"
 #include "../Screens/PhonePowerOffMessageScreen.h"
 #include "../Screens/PhoneOperatorScreen.h"
@@ -353,6 +354,24 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// flashed device sounds byte-identical to every prior
 						// firmware on its soft-keys.
 						self->push(new PhoneSoftKeyToneScreen());
+						break;
+					case PhoneSettingsScreen::Item::LockWidget:
+						// S184: lock-screen widget composition picker. Drills
+						// into PhoneLockWidgetScreen, a single-list picker
+						// patterned after PhoneHapticsScreen / PhoneSoundScreen
+						// that lets the user pick whether the LockScreen
+						// renders the classic clock + weekday + date
+						// (ClockDate, factory default), a HH:MM-only watch
+						// face (ClockOnly), or a clock + next-armed-alarm
+						// preview line (ClockEvent). On SAVE the screen
+						// writes Settings.lockWidgetMode and flushes via
+						// Settings.store(); the LockScreen picks the chosen
+						// mode up on the next push without any extra wiring.
+						// ClockDate (id 0, the factory default) keeps the
+						// legacy weekday + date layout so a freshly-flashed
+						// device looks byte-identical to every prior firmware
+						// on its lock screen.
+						self->push(new PhoneLockWidgetScreen());
 						break;
 					default:
 						// Defensive: any future row that is added to

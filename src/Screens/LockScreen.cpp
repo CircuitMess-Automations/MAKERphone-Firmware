@@ -15,6 +15,7 @@
 #include "../Elements/PhoneChargeBars.h"
 #include "../Elements/PhoneMissedCallFlash.h"
 #include "../Services/MissedCallLog.h"
+#include "../Services/PhoneAlarmService.h"
 #include <Input/Input.h>
 #include <Pins.hpp>
 
@@ -48,8 +49,9 @@ LockScreen::LockScreen() : LVScreen(){
 	// the screen so S144's layoutForOwner() can re-anchor it when the
 	// user sets / clears Settings.ownerName without rebuilding the
 	// whole screen.
-	auto* clockFace = new PhoneClockFace(obj);
-	clockFaceObj = clockFace->getLvObj();
+	auto* face = new PhoneClockFace(obj);
+	clockFaceObj = face->getLvObj();
+	clockFace    = face;
 
 	// S49 lock-screen notifications preview: a compact two-row summary
 	// of unread messages + missed calls. Anchored just under the clock
@@ -156,6 +158,12 @@ LockScreen::LockScreen() : LVScreen(){
 	// shared MissedCallLog has a pending wake-flash queued up.
 	missedFlash = new PhoneMissedCallFlash(obj);
 
+	// S184 - apply the persisted lock-widget composition (ClockDate /
+	// ClockOnly / ClockEvent). Done after every widget is built so
+	// applyLockWidgetMode() can hide the clock face's date rows and
+	// optionally mount the "NEXT ALARM" preview line on top of them.
+	applyLockWidgetMode();
+
 	instance = this;
 }
 
@@ -185,6 +193,10 @@ void LockScreen::onStarting(){
 	// onStarting() pass without requiring a screen rebuild.
 	refreshOwnerLabel();
 	layoutForOwner();
+	// S184 - re-apply the persisted lock-widget mode so a
+	// PhoneLockWidgetScreen edit -> pop-back-to-lock cycle picks up
+	// the new composition without rebuilding the whole screen.
+	applyLockWidgetMode();
 	loadUnread();
 	if(preview) preview->refresh();
 	slide->reset();
@@ -433,5 +445,100 @@ void LockScreen::layoutForOwner(){
 				+ ownerStripH,
 			0
 		);
+	}
+}
+
+
+// ----- S184: lock-widget composition picker --------------------------------
+
+void LockScreen::applyLockWidgetMode(){
+	// Defensive read: persisted bytes outside [0..2] clamp to ClockDate,
+	// the factory default. Same defensive pattern soundProfile /
+	// wallpaperStyle / themeId / keyTicks already use against NVS-resize
+	// wipes that read the new byte as uninitialised garbage.
+	uint8_t mode = Settings.get().lockWidgetMode;
+	if(mode > 2) mode = 0;
+
+	// 1) Date rows on the PhoneClockFace - visible only in ClockDate.
+	if(clockFace != nullptr){
+		clockFace->setDateVisible(mode == 0);
+	}
+
+	// 2) Next-alarm preview line - mounted lazily on first use and
+	//    kept around for the rest of the screen's lifetime. Aligned
+	//    just under the clock digits so it lands roughly where the
+	//    weekday row would otherwise sit; a no-op when ClockOnly /
+	//    ClockDate are selected.
+	if(mode == 2){
+		if(nextEventLabel == nullptr){
+			nextEventLabel = lv_label_create(obj);
+			lv_obj_add_flag(nextEventLabel, LV_OBJ_FLAG_IGNORE_LAYOUT);
+			lv_obj_set_style_text_font(nextEventLabel, &pixelbasic7, 0);
+			lv_label_set_long_mode(nextEventLabel, LV_LABEL_LONG_DOT);
+			lv_obj_set_width(nextEventLabel, 156);
+			lv_obj_set_style_text_align(nextEventLabel,
+				LV_TEXT_ALIGN_CENTER, 0);
+			lv_obj_set_align(nextEventLabel, LV_ALIGN_TOP_MID);
+		}
+
+		// Walk the global PhoneAlarmService alarm table and find the
+		// next armed alarm by minutes-from-now in [0..1440). The
+		// resulting "NEXT ALARM HH:MM" line previews the user's
+		// closest pending event the way a Sony-Ericsson agenda widget
+		// would. When no alarm is enabled we fall back to
+		// "NO ALARMS SET" in the dim caption colour rather than going
+		// blank, so the layout stays balanced.
+		int32_t bestDelta = -1;
+		uint8_t bestHH = 0;
+		uint8_t bestMM = 0;
+
+		uint32_t secs   = millis() / 1000UL;
+		uint16_t nowTot = (secs / 60UL) % (24UL * 60UL);
+
+		for(uint8_t i = 0; i < PhoneAlarmService::MaxAlarms; ++i){
+			PhoneAlarmService::Alarm a = Alarms.getAlarm(i);
+			if(!a.enabled) continue;
+			int32_t alarmTot = (int32_t)a.hour * 60 + a.minute;
+			int32_t delta = alarmTot - (int32_t)nowTot;
+			if(delta < 0) delta += 24 * 60;
+			if(bestDelta < 0 || delta < bestDelta){
+				bestDelta = delta;
+				bestHH    = a.hour;
+				bestMM    = a.minute;
+			}
+		}
+
+		if(bestDelta >= 0){
+			char buf[24];
+			snprintf(buf, sizeof(buf), "NEXT ALARM %02u:%02u",
+				(unsigned)bestHH, (unsigned)bestMM);
+			lv_label_set_text(nextEventLabel, buf);
+			lv_obj_set_style_text_color(nextEventLabel,
+				lv_color_make(255, 140, 30), 0);  // sunset orange (MP_ACCENT)
+		}else{
+			lv_label_set_text(nextEventLabel, "NO ALARMS SET");
+			lv_obj_set_style_text_color(nextEventLabel,
+				lv_color_make(170, 140, 200), 0); // dim caption (MP_LABEL_DIM)
+		}
+
+		// Anchor right under the clock face's HH:MM digits, where the
+		// hidden dowLabel would otherwise sit. clockFaceObj's Y was
+		// already shifted by ownerStripH in layoutForOwner(), so the
+		// preview tracks the owner-name strip too.
+		lv_coord_t baseY = (clockFaceObj != nullptr)
+			? lv_obj_get_y(clockFaceObj)
+			: kClockBaseY + ownerStripH;
+		lv_obj_set_y(nextEventLabel, baseY + 18);
+		lv_obj_clear_flag(nextEventLabel, LV_OBJ_FLAG_HIDDEN);
+		// Make sure the freshly-mounted preview lands above the synthwave
+		// wallpaper / clock face but below the missed-call flash.
+		lv_obj_move_foreground(nextEventLabel);
+		if(missedFlash != nullptr){
+			lv_obj_move_foreground(missedFlash->getLvObj());
+		}
+	}else{
+		if(nextEventLabel != nullptr){
+			lv_obj_add_flag(nextEventLabel, LV_OBJ_FLAG_HIDDEN);
+		}
 	}
 }

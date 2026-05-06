@@ -147,6 +147,19 @@ public:
 		// the chosen tone up on the next BTN_LEFT / BTN_RIGHT press
 		// without any extra wiring.
 		SoftKeyTone     = 12,  // S183
+		// S184 - lock-screen widget composition picker. Drills into
+		// PhoneLockWidgetScreen, which lets the user pick whether the
+		// LockScreen renders the classic clock + weekday + date
+		// (ClockDate, factory default), a HH:MM-only watch face
+		// (ClockOnly), or a clock + next-armed-alarm preview line
+		// (ClockEvent). Lives in the DISPLAY group right under "Theme"
+		// so all three "what does my lock screen look like" rows
+		// (Wallpaper / Theme / Lock widget) cluster together inside
+		// the DISPLAY section. Persistence is via Settings.lockWidgetMode
+		// (a single byte slot grown alongside the existing SettingsData
+		// NVS-resize pattern); LockScreen picks the chosen mode up on
+		// the next push without any extra wiring.
+		LockWidget      = 13,  // S184
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);
@@ -196,7 +209,7 @@ public:
 	void flashRightSoftKey();
 
 	/** Number of selectable rows (excludes group headers). */
-	static constexpr uint8_t ItemCount = 12;
+	static constexpr uint8_t ItemCount = 14;
 
 	// --- Geometry, exposed for unit-test friendliness. -----------------
 

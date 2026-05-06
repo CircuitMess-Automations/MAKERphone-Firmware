@@ -44,6 +44,18 @@ public:
 	/** Force an immediate redraw (useful on screen entry). */
 	void refresh();
 
+	/**
+	 * S184 - toggle the secondary date rows (weekday/day + month/year).
+	 * Hides both labels with LV_OBJ_FLAG_HIDDEN when `show == false` so
+	 * the LockScreen lock-widget picker can present a HH:MM-only watch
+	 * face without rebuilding the widget tree, and brings them back the
+	 * next time the user re-selects the ClockDate widget mode. Safe to
+	 * call before / after refresh(); does not interfere with the colon-
+	 * blink LoopListener path. No-op when the labels were never created
+	 * (defensive).
+	 */
+	void setDateVisible(bool show);
+
 	static constexpr uint16_t FaceWidth  = 160;
 	static constexpr uint16_t FaceHeight = 32;
 
