@@ -18,6 +18,7 @@
 #include "PhoneFortuneCookie.h"
 #include "PhoneDrumKitScreen.h"
 #include "PhoneBeatMaker.h"
+#include "PhoneMemoryAudit.h"
 
 // S173 - "S-N-A-K-E" Easter egg launches the Snake game directly from
 // the dialer when the user types 76253 (S=7, N=6, A=2, K=5, E=3 on a
@@ -329,6 +330,29 @@ void PhoneDialerScreen::appendGlyph(char c) {
 		clearBuffer();
 		auto* beat = new PhoneBeatMaker();
 		this->push(beat);
+	}
+
+	// S197 - Memory-leak audit Easter egg. The classic Sony-Ericsson
+	// service codes use `*#XXXX#` for hidden diagnostics screens, so
+	// the matching dev-only code unlocks the heap audit: typing
+	// `*#1971#` (seven glyphs, exact match -- 1971 was the year of
+	// the first commercial microprocessor, the Intel 4004) clears
+	// the buffer and pushes PhoneMemoryAudit, which cycles a
+	// representative set of Phone* widget compositions through 1000
+	// construct/destruct iterations and reports the resulting heap
+	// delta on screen and over Serial. Detection is on EXACT match
+	// for the same reason the other unlock codes above are strict --
+	// a buffer that contains the code as a suffix mid-edit (e.g.
+	// before a backspace) shouldn't fire prematurely. clearBuffer()
+	// runs before the push so the user lands on a clean dialer when
+	// the audit pops back here on exit.
+	if(bufferLen == 7 && buffer[0] == '*' && buffer[1] == '#'
+			&& buffer[2] == '1' && buffer[3] == '9'
+			&& buffer[4] == '7' && buffer[5] == '1'
+			&& buffer[6] == '#') {
+		clearBuffer();
+		auto* audit = new PhoneMemoryAudit();
+		this->push(audit);
 	}
 }
 
