@@ -17,6 +17,7 @@
 #include "PhoneFlashlight.h"
 #include "PhoneFortuneCookie.h"
 #include "PhoneDrumKitScreen.h"
+#include "PhoneBeatMaker.h"
 
 // S173 - "S-N-A-K-E" Easter egg launches the Snake game directly from
 // the dialer when the user types 76253 (S=7, N=6, A=2, K=5, E=3 on a
@@ -309,6 +310,25 @@ void PhoneDialerScreen::appendGlyph(char c) {
 		clearBuffer();
 		auto* drum = new PhoneDrumKitScreen();
 		this->push(drum);
+	}
+
+	// S194 - Beat-maker Easter egg. The Roland TR-808 (the older,
+	// rounder cousin of the TR-909 we already wire on *#909#) lent
+	// its hip-hop kick and cowbell to several decades of pop music,
+	// so the matching service code unlocks the 16-step sequencer:
+	// typing `*#808#` (six glyphs, exact match) clears the buffer
+	// and pushes PhoneBeatMaker. Detection is on EXACT match for the
+	// same reason the other unlock codes above are strict — a buffer
+	// that contains the code as a suffix mid-edit (e.g. before a
+	// backspace) shouldn't fire prematurely. clearBuffer() runs
+	// before the push so the user lands on a clean dialer when the
+	// beat-maker pops back here on exit.
+	if(bufferLen == 6 && buffer[0] == '*' && buffer[1] == '#'
+			&& buffer[2] == '8' && buffer[3] == '0' && buffer[4] == '8'
+			&& buffer[5] == '#') {
+		clearBuffer();
+		auto* beat = new PhoneBeatMaker();
+		this->push(beat);
 	}
 }
 
