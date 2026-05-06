@@ -259,7 +259,7 @@ The kind of thing customers post about when they discover it.
 ## Phase T — Personalisation Deep Dive (S179–S188)
 Beyond themes — let users actually make the phone *theirs*.
 
-- [ ] **S179** — Theme picker — live preview while scrolling.
+- [x] **S179** — Theme picker — live preview while scrolling.
 - [ ] **S180** — Custom contact ringtone (per friend, depends on S123).
 - [ ] **S181** — Custom contact wallpaper (per friend).
 - [ ] **S182** — Avatar editor — pixel-paint mini editor (32×32, replaces the S38 picker).

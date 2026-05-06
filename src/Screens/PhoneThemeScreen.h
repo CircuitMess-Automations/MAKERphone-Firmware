@@ -116,6 +116,34 @@ private:
 	/** Refresh the name + pager labels for the current cursor. */
 	void refreshPager();
 
+	/**
+	 * S179 -- live theme preview while scrolling. Tear down the
+	 * current `wallpaper` LVObject and rebuild it using the wallpaper
+	 * Style that matches whichever Theme is currently focused, so the
+	 * picker's own backdrop snaps to the focused theme as soon as the
+	 * user nudges the pager. The previous screen's saved theme is
+	 * never touched until SAVE - cancelling just pop()s the picker
+	 * and the prior screen renders against its own (still pristine)
+	 * wallpaper underneath.
+	 *
+	 * The new wallpaper is moved to the bottom of obj's child list so
+	 * status bar / swatch frame / soft-keys keep their z-order.
+	 */
+	void rebuildWallpaper();
+
+	/**
+	 * Map a focused Theme to the wallpaper Style its full-screen
+	 * builder uses. For Default + Rainbow we fall through to the
+	 * user's persisted Synthwave wallpaperStyle so the live preview
+	 * mirrors what they would actually see after SAVE - matching
+	 * `PhoneSynthwaveBg::resolveStyleFromSettings()` exactly.
+	 *
+	 * Returns the Style as a uint8_t to keep this header free of a
+	 * PhoneSynthwaveBg.h include; the .cpp casts back to
+	 * PhoneSynthwaveBg::Style at the call site.
+	 */
+	uint8_t styleForTheme(Theme t) const;
+
 	void stepBy(int8_t delta);
 
 	/**

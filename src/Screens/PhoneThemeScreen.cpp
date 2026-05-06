@@ -69,12 +69,18 @@ PhoneThemeScreen::PhoneThemeScreen()
 	lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
 	lv_obj_set_style_pad_all(obj, 0, 0);
 
-	// The picker's own backdrop honours the *currently saved* theme,
-	// not the focused one - so the user gets visual feedback that the
-	// theme they had selected before opening the picker is still
-	// active until they SAVE. The default `new PhoneSynthwaveBg(obj)`
-	// constructor consults Settings.themeId via resolveStyleFromSettings.
-	wallpaper = new PhoneSynthwaveBg(obj);
+	// S179 - live preview: build the picker's own backdrop using the
+	// focused theme right from the first paint, via the same helper
+	// stepBy() uses. On open the cursor is already snapped to the
+	// persisted theme (or Default if the NVS byte is corrupted), so
+	// this still shows the user the look they had saved - but it now
+	// stays in lockstep with the cursor as soon as they nudge the
+	// pager.
+	{
+		const Theme t = MakerphoneTheme::themeFromByte(cursor);
+		const auto style = static_cast<PhoneSynthwaveBg::Style>(styleForTheme(t));
+		wallpaper = new PhoneSynthwaveBg(obj, style);
+	}
 
 	// Status bar at the top so the user always sees signal / clock /
 	// battery while drilling through the picker.
@@ -1086,6 +1092,57 @@ void PhoneThemeScreen::drawChristmasSwatch() {
 	}
 }
 
+// ----- live wallpaper preview (S179) ----------------------------------
+
+uint8_t PhoneThemeScreen::styleForTheme(Theme t) const {
+	// Mirrors PhoneSynthwaveBg::resolveStyleFromSettings() exactly:
+	// each themed wallpaper has a 1:1 Style override, while Default +
+	// Rainbow fall through to the user's persisted Synthwave
+	// wallpaperStyle so flipping back to either of those previews the
+	// look the user would actually get after SAVE.
+	using S = PhoneSynthwaveBg::Style;
+	switch(t) {
+		case Theme::Nokia3310:         return static_cast<uint8_t>(S::Nokia3310);
+		case Theme::GameBoyDMG:        return static_cast<uint8_t>(S::GameBoyDMG);
+		case Theme::AmberCRT:          return static_cast<uint8_t>(S::AmberCRT);
+		case Theme::SonyEricssonAqua:  return static_cast<uint8_t>(S::SonyEricssonAqua);
+		case Theme::RazrHotPink:       return static_cast<uint8_t>(S::RazrHotPink);
+		case Theme::StealthBlack:      return static_cast<uint8_t>(S::StealthBlack);
+		case Theme::Y2KSilver:         return static_cast<uint8_t>(S::Y2KSilver);
+		case Theme::CyberpunkRed:      return static_cast<uint8_t>(S::CyberpunkRed);
+		case Theme::Christmas:         return static_cast<uint8_t>(S::Christmas);
+		case Theme::SurpriseDailyCycle:return static_cast<uint8_t>(S::SurpriseDailyCycle);
+		case Theme::Default:
+		case Theme::Rainbow:
+		default:
+			return static_cast<uint8_t>(
+				PhoneSynthwaveBg::styleFromByte(Settings.get().wallpaperStyle));
+	}
+}
+
+void PhoneThemeScreen::rebuildWallpaper() {
+	// Tear down the previous wallpaper LVObject. LVObject's
+	// LV_EVENT_DELETE hook auto-frees the C++ wrapper when the
+	// underlying lv_obj is destroyed, so a single `delete` is enough -
+	// no need to also lv_obj_del() the inner obj.
+	if(wallpaper != nullptr){
+		delete wallpaper;
+		wallpaper = nullptr;
+	}
+
+	const Theme t = MakerphoneTheme::themeFromByte(cursor);
+	const auto style = static_cast<PhoneSynthwaveBg::Style>(styleForTheme(t));
+	wallpaper = new PhoneSynthwaveBg(obj, style);
+
+	// Newly created LVGL children land at the end of the parent's
+	// child list (i.e. on top). Push the wallpaper to the back so
+	// the status bar / swatch / soft-keys keep their z-order and
+	// stay readable over the preview.
+	if(wallpaper != nullptr){
+		lv_obj_move_background(wallpaper->getLvObj());
+	}
+}
+
 // ----- input + commit --------------------------------------------------
 
 void PhoneThemeScreen::refreshSoftKeys() {
@@ -1101,6 +1158,12 @@ void PhoneThemeScreen::stepBy(int8_t delta) {
 	while(next >= static_cast<int16_t>(ThemeCount))  next -= ThemeCount;
 	if(static_cast<uint8_t>(next) == cursor) return;
 	cursor = static_cast<uint8_t>(next);
+	// S179 - live preview: snap the picker's own backdrop to the
+	// focused theme alongside the swatch + pager so the user sees the
+	// full-screen look of every theme as they cycle. The persisted
+	// theme is still untouched until SAVE - this is purely a visual
+	// preview that disappears the moment the screen is pop()ed.
+	rebuildWallpaper();
 	rebuildSwatch();
 	refreshPager();
 	refreshSoftKeys();
