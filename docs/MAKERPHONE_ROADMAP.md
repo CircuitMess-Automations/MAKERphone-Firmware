@@ -276,7 +276,7 @@ Buzzer is what we have, so we lean into it.
 - [x] **S189** — Music player — playlist support.
 - [x] **S190** — Music player — shuffle / repeat / continuous.
 - [x] **S191** — Equalizer visualiser — bars dance to active melody.
-- [ ] **S192** — Richer system-tone library — 15+ chimes for every action.
+- [x] **S192** — Richer system-tone library — 15+ chimes for every action.
 - [ ] **S193** — Custom buzzer alarm tone (composer-fed).
 - [ ] **S194** — `PhoneBeatMaker` — 16-step drum sequencer.
 - [ ] **S195** — `PhoneRadio` — fake FM dial with eight stations of pre-canned melody loops.
