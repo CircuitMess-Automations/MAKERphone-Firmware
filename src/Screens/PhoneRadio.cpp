@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <Input/Input.h>
 #include <Pins.hpp>
+#include <Settings.h>
 
 #include "../Elements/PhoneSynthwaveBg.h"
 #include "../Elements/PhoneStatusBar.h"
@@ -216,6 +217,18 @@ uint16_t PhoneRadio::stationFreqDeci(uint8_t index) {
 
 const PhoneRingtoneEngine::Melody* PhoneRadio::stationMelody(uint8_t index) {
 	return kStations[index % StationCount].melody;
+}
+
+// S205 — gate the dial against the SILENT / MEETING phone profiles. The
+// underlying truth is `Settings.get().sound`: `PhoneProfileScreen`
+// (S159) writes `sound = false` for both Silent and Meeting and
+// `sound = true` for General / Outdoor / Headset, so reading the legacy
+// bool covers every "should the radio drive the piezo right now" case
+// without dragging the five-state enum into this screen. Static so the
+// engine-skip checks in startPlayback() / tuneTo() can call it without
+// indirecting through a live PhoneRadio instance.
+bool PhoneRadio::isSilenced() {
+	return !Settings.get().sound;
 }
 
 // =====================================================================
@@ -461,12 +474,25 @@ void PhoneRadio::refreshCursor() {
 
 void PhoneRadio::refreshStatus() {
 	if(statusPill == nullptr || statusLabel == nullptr) return;
+	// S205 — three-state pill: ON AIR (bright sunset orange when the
+	// engine is actually being driven), MUTED (muted-purple cyan-edged
+	// pill when the screen wants to play but the active phone profile
+	// is SILENT/MEETING and we have short-circuited the engine call),
+	// TUNED (default dim styling when the user has not pressed PLAY).
 	if(playing){
-		lv_label_set_text(statusLabel, "ON AIR");
-		lv_obj_set_style_bg_color(statusPill, MP_ACCENT, 0);
-		lv_obj_set_style_bg_opa(statusPill, LV_OPA_70, 0);
-		lv_obj_set_style_border_color(statusPill, MP_HIGHLIGHT, 0);
-		lv_obj_set_style_text_color(statusLabel, MP_BG_DARK, 0);
+		if(isSilenced()){
+			lv_label_set_text(statusLabel, "MUTED");
+			lv_obj_set_style_bg_color(statusPill, MP_DIM, 0);
+			lv_obj_set_style_bg_opa(statusPill, LV_OPA_70, 0);
+			lv_obj_set_style_border_color(statusPill, MP_HIGHLIGHT, 0);
+			lv_obj_set_style_text_color(statusLabel, MP_HIGHLIGHT, 0);
+		}else{
+			lv_label_set_text(statusLabel, "ON AIR");
+			lv_obj_set_style_bg_color(statusPill, MP_ACCENT, 0);
+			lv_obj_set_style_bg_opa(statusPill, LV_OPA_70, 0);
+			lv_obj_set_style_border_color(statusPill, MP_HIGHLIGHT, 0);
+			lv_obj_set_style_text_color(statusLabel, MP_BG_DARK, 0);
+		}
 	} else {
 		lv_label_set_text(statusLabel, "TUNED");
 		lv_obj_set_style_bg_color(statusPill, MP_DIM, 0);
@@ -492,6 +518,16 @@ void PhoneRadio::tuneTo(uint8_t index) {
 	refreshStation();
 	refreshCursor();
 	if(playing){
+		if(isSilenced()){
+			// S205 — silent profile: the screen stays in "playing"
+			// state visually (pill reads MUTED, soft-key reads STOP)
+			// but the engine is never asked to drive the piezo.
+			// Defensive Ringtone.stop() in case a stale engine
+			// playhead is still ticking from a profile flip mid-run.
+			Ringtone.stop();
+			refreshStatus();
+			return;
+		}
 		// Re-engage the engine on the new station immediately.
 		const PhoneRingtoneEngine::Melody* m = stationMelody(stationIndex);
 		if(m != nullptr){
@@ -533,6 +569,21 @@ void PhoneRadio::prev() {
 void PhoneRadio::startPlayback() {
 	const PhoneRingtoneEngine::Melody* m = stationMelody(stationIndex);
 	if(m == nullptr) return;
+	if(isSilenced()){
+		// S205 — SILENT / MEETING profile is active: do NOT call
+		// Ringtone.play(). The engine self-mutes per-loop via
+		// `Settings.get().sound`, but skipping the call entirely keeps
+		// the loop listener off the LoopManager queue and prevents
+		// even the micro-interval of audible piezo that can leak in
+		// between play() and the engine's first mute tick. The screen
+		// still flips to "playing" so the soft-key reads STOP and the
+		// pill reads MUTED -- the user can still flip stations and
+		// press STOP -- but the dial cannot drive the piezo until the
+		// user changes profile from PhoneProfileScreen.
+		playing = true;
+		refreshStatus();
+		return;
+	}
 	Ringtone.play(*m);
 	playing = true;
 	refreshStatus();

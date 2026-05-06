@@ -351,6 +351,25 @@ lowest-numbered `[ ]`.
   to "1 host + 1 canvas". Resolves the matching v2.1 polish item
   in `KNOWN_ISSUES.md`.
 
+- [x] **S205** — `PhoneRadio` SILENT-profile gate — adds a static
+  `PhoneRadio::isSilenced()` helper (reads `!Settings.get().sound`,
+  the legacy bool that `PhoneProfileScreen` (S159) writes to `false`
+  for the SILENT and MEETING profiles and `true` for GENERAL /
+  OUTDOOR / HEADSET) and rewires `startPlayback()` and the
+  retune branch of `tuneTo()` to short-circuit the
+  `PhoneRingtoneEngine::play()` call when silenced. The screen
+  still flips to its "playing" state visually so the soft-key
+  reads `STOP` and L/R tuning still feels live, but the engine is
+  never asked to drive the piezo, so the dial cannot leak even
+  the micro-interval of audible noise that could slip in between
+  `Ringtone.play()` and the engine's first per-loop
+  `Settings.get().sound` mute tick. `refreshStatus()` grows a
+  third pill state -- `MUTED` (muted-purple body, cyan border,
+  cyan text) sitting between the existing `ON AIR` (sunset
+  orange) and `TUNED` (dim purple) so the user can read at a
+  glance why the radio is silent. Resolves the matching v2.1
+  polish item in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file

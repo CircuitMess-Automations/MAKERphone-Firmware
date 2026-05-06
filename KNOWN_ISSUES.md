@@ -218,12 +218,22 @@ polish for v2.1.
   behaviour, but should be documented or explicitly paired with a
   "Reset pet" action.
 
-- [ ] **`PhoneRadio` (S195) does not gate against the Silent profile.**
-  Selecting a station while the device is set to Silent still plays
-  the melody loop because the radio routes through `BuzzerService`
-  directly rather than through `PhoneRingtoneEngine`'s profile-aware
-  wrapper. Low priority: the profile UI explicitly calls out that the
-  music app is exempt from Silent.
+- [x] **`PhoneRadio` (S195) does not gate against the Silent profile**
+  -- fixed in S205. `PhoneRadio` now exposes a static
+  `isSilenced()` helper (reads `!Settings.get().sound`, the legacy
+  bool that `PhoneProfileScreen` (S159) writes to `false` for the
+  SILENT and MEETING profiles and `true` for GENERAL / OUTDOOR /
+  HEADSET) and `startPlayback()` plus the retune branch of
+  `tuneTo()` short-circuit the `PhoneRingtoneEngine::play()` call
+  when silenced. The screen still flips to "playing" state
+  visually -- so the soft-key reads STOP, L/R tuning still feels
+  live, and `PhoneProfileScreen` taking the device back to
+  GENERAL re-arms the dial via the existing PLAY soft-key -- but
+  the dial never asks the engine to drive the piezo. The pill
+  also grows a third state (`MUTED`, muted-purple body with cyan
+  border / cyan text) so the user can read at a glance that the
+  radio is alive but silenced rather than wondering whether the
+  station "Static 108" is just naturally quiet.
 
 - [ ] **`PhoneBeatMaker` (S194) save slots are limited to 4 by the
   current `Settings.beatPatterns[4]` array.** Real users will quickly

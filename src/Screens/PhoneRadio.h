@@ -114,6 +114,21 @@ public:
 	/** Looping melody for a station. Pointer is into static storage. */
 	static const PhoneRingtoneEngine::Melody* stationMelody(uint8_t index);
 
+	/**
+	 * S205 — true when the active phone profile silences ringer
+	 * audio (`Settings.get().sound == false`, i.e. SILENT or
+	 * MEETING from `PhoneProfileScreen`'s five-state vocabulary).
+	 *
+	 * Used by `startPlayback()` and `tuneTo()` to short-circuit the
+	 * `PhoneRingtoneEngine::play()` call so the radio cannot drive
+	 * the piezo at all under a silent profile -- not even for the
+	 * micro-interval before the engine's per-loop mute kicks in --
+	 * and by `refreshStatus()` to render a "MUTED" pill instead of
+	 * the bright sunset-orange "ON AIR" pill so the user knows
+	 * exactly why the dial is silent.
+	 */
+	static bool isSilenced();
+
 private:
 	PhoneSynthwaveBg* wallpaper;
 	PhoneStatusBar*   statusBar;
