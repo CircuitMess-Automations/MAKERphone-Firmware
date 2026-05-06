@@ -267,7 +267,7 @@ Beyond themes — let users actually make the phone *theirs*.
 - [x] **S184** — Lock screen widget picker (clock-only / clock+date / clock+next-event).
 - [x] **S185** — Home screen layout switcher.
 - [x] **S186** — Wallpaper of the day — daily auto-rotate from a curated list.
-- [ ] **S187** — Custom RGB picker for accent color (real-time preview).
+- [x] **S187** — Custom RGB picker for accent color (real-time preview).
 - [ ] **S188** — Owner emoji / avatar selection (used on lock + status bar).
 
 ## Phase U — Audio / Music (S189–S196)

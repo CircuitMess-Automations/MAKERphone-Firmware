@@ -174,6 +174,19 @@ public:
 		// NVS-resize pattern); PhoneHomeScreen picks the chosen mode
 		// up on the next push without any extra wiring.
 		HomeLayout      = 14,  // S185
+		// S187 - custom RGB accent picker. Drills into PhoneAccentScreen,
+		// a three-channel RGB slider screen patterned after
+		// PhoneBrightnessScreen but with a live preview slab that repaints
+		// in the chosen RGB so the user can dial in any 24-bit accent and
+		// see what it looks like before SAVE. Lives in the DISPLAY group
+		// directly below "Theme" so the personalisation-related rows
+		// (Wallpaper / Theme / Accent / Lock widget / Home layout)
+		// cluster together inside the DISPLAY section. Persistence is
+		// via Settings.customAccentEnabled / customAccentR / G / B (a
+		// four-byte slice grown alongside the existing SettingsData
+		// NVS-resize pattern); MakerphoneTheme::accent() picks the chosen
+		// override up on the next screen build without any extra wiring.
+		Accent          = 15,  // S187
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);
@@ -223,7 +236,7 @@ public:
 	void flashRightSoftKey();
 
 	/** Number of selectable rows (excludes group headers). */
-	static constexpr uint8_t ItemCount = 15;
+	static constexpr uint8_t ItemCount = 16;
 
 	// --- Geometry, exposed for unit-test friendliness. -----------------
 

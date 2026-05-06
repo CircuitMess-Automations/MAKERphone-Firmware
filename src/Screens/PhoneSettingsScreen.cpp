@@ -59,6 +59,19 @@ const Section kLayout[] = {
 	// because the two settings co-modulate: a non-default theme
 	// overrides the wallpaperStyle byte for as long as it is selected.
 	{ false, "Theme",              "THEME",       PhoneSettingsScreen::Item::Theme      },
+	// S187 - custom RGB accent-colour picker. Sits directly below Theme
+	// so the personalisation-related DISPLAY rows (Wallpaper / Theme /
+	// Accent / Lock widget / Home layout) cluster together inside the
+	// DISPLAY section. Drills into PhoneAccentScreen, a three-channel
+	// R/G/B slider screen with a live preview slab that repaints in the
+	// chosen RGB. On SAVE the screen writes Settings.customAccentEnabled
+	// + customAccentR / G / B and flushes via Settings.store();
+	// MakerphoneTheme::accent() picks the chosen override up on the
+	// next screen build. With customAccentEnabled left at the factory
+	// default 0 the resolver falls back to the per-theme accent map
+	// exactly the way every prior firmware shipped, so a freshly-flashed
+	// device looks byte-identical until the user dials in a custom hue.
+	{ false, "Accent",             "ACCENT",      PhoneSettingsScreen::Item::Accent     },
 	// S184 - lock-screen widget composition picker. Sits at the bottom of
 	// the DISPLAY group so all three "what does my lock screen look like"
 	// rows (Wallpaper / Theme / Lock widget) cluster together inside the

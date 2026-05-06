@@ -33,6 +33,7 @@
 #include "../Screens/PhoneThemeScreen.h"
 #include "../Screens/PhoneLockWidgetScreen.h"
 #include "../Screens/PhoneHomeLayoutScreen.h"
+#include "../Screens/PhoneAccentScreen.h"
 #include "../Screens/PhoneOwnerNameScreen.h"
 #include "../Screens/PhonePowerOffMessageScreen.h"
 #include "../Screens/PhoneOperatorScreen.h"
@@ -394,6 +395,33 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						// homescreen so a freshly-flashed device looks
 						// byte-identical to every prior firmware.
 						self->push(new PhoneHomeLayoutScreen());
+						break;
+					case PhoneSettingsScreen::Item::Accent:
+						// S187: custom RGB accent picker. Drills
+						// into PhoneAccentScreen, a three-channel
+						// R/G/B slider screen patterned after
+						// PhoneBrightnessScreen but with a live
+						// preview slab that repaints in the chosen
+						// RGB so the user can dial in any 24-bit
+						// accent and see what it looks like before
+						// SAVE. On SAVE the screen writes
+						// Settings.customAccentEnabled and the
+						// three RGB byte slots and flushes via
+						// Settings.store(); MakerphoneTheme::accent()
+						// picks the chosen override up on the next
+						// screen build, so every Phone* widget that
+						// already calls the central resolver
+						// (PhoneIconTile halo, PhoneSoftKeyBar arrow
+						// tint, PhoneChatBubble Sent fill, ...)
+						// repaints with the new colour without any
+						// per-widget plumbing. With the override
+						// left at factory default 0 the resolver
+						// falls back to the per-theme accent map
+						// exactly the way every prior firmware
+						// shipped, so a freshly-flashed device
+						// looks byte-identical until the user
+						// dials in a custom hue.
+						self->push(new PhoneAccentScreen());
 						break;
 					default:
 						// Defensive: any future row that is added to

@@ -416,6 +416,55 @@ struct SettingsData {
 	// initialised on a first boot after the firmware grows -- which
 	// maps to OFF, the correct factory default.
 	uint8_t wallpaperOfDay = 0;
+	// S187 - custom RGB accent override. When customAccentEnabled is
+	// non-zero the MakerphoneTheme::accent() resolver bypasses the
+	// per-theme accent map and instead returns lv_color_make(R, G, B)
+	// from the three byte slots below, so the user can dial in any
+	// 24-bit accent and have every Phone* widget that already calls
+	// MakerphoneTheme::accent() (PhoneIconTile halo, PhoneSoftKeyBar
+	// label tint, PhoneChatBubble Sent fill, PhoneTipBanner rule,
+	// PhoneIdleHint underline, PhoneLockHint shimmer ...) pick the
+	// new colour up on the next screen build. Edited from the new
+	// PhoneAccentScreen, reachable from the DISPLAY section of
+	// PhoneSettingsScreen ("Accent" row, directly below "Theme") so
+	// the personalisation-related DISPLAY rows cluster together.
+	//
+	// Encoding:
+	//   customAccentEnabled = 0 (factory default; resolver falls
+	//                            back to the per-theme accent map
+	//                            exactly the way every prior firmware
+	//                            shipped, so first-boot is byte-
+	//                            identical).
+	//   customAccentEnabled = 1 (resolver returns lv_color_make(
+	//                            customAccentR, customAccentG,
+	//                            customAccentB) regardless of the
+	//                            currently selected theme).
+	//
+	// Defaults for the three RGB bytes are seeded with MP_ACCENT
+	// (255, 140, 30 -- the canonical synthwave sunset orange) so a
+	// freshly-flashed device that toggles the override on without
+	// touching the sliders sees no visible difference, the same
+	// "initial state == saved state" pattern PhoneBrightnessScreen
+	// uses to keep first-touch UX predictable. Persisted values
+	// outside [0..1] for customAccentEnabled clamp to 0 at the
+	// resolver layer to be defensive against NVS-resize wipes that
+	// read the new byte as uninitialised garbage; the three RGB
+	// bytes are uint8_t so any 0..255 value is legal by
+	// construction.
+	//
+	// Sits at the end of the blob next to wallpaperOfDay so the
+	// existing NVS-resize pattern (that grew this struct via
+	// soundProfile / wallpaperStyle / themeId / keyTicks / ownerName
+	// / powerOffMessage / operatorText / operatorLogo / phoneProfile
+	// / profileRingtones / speedDial / rainbowUnlocked / softKeyTone
+	// / lockWidgetMode / homeLayoutMode / wallpaperOfDay) reads the
+	// new four-byte slice as zero-initialised on a first boot after
+	// the firmware grows -- which maps to override-OFF (the correct
+	// factory default) with the RGB bytes meaningless until enabled.
+	uint8_t customAccentEnabled = 0;
+	uint8_t customAccentR = 255;
+	uint8_t customAccentG = 140;
+	uint8_t customAccentB = 30;
 };
 
 class SettingsImpl {

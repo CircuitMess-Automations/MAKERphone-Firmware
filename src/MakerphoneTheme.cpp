@@ -226,6 +226,25 @@ lv_color_t MakerphoneTheme::bgDark(){
 }
 
 lv_color_t MakerphoneTheme::accent(){
+	// S187 -- custom RGB accent override. When the user has dialled
+	// in a custom 24-bit accent via PhoneAccentScreen and toggled the
+	// override on, return lv_color_make(R, G, B) directly so every
+	// Phone* widget that already calls MakerphoneTheme::accent()
+	// (PhoneIconTile halo, PhoneSoftKeyBar label, PhoneChatBubble Sent
+	// fill, PhoneTipBanner rule, PhoneIdleHint underline,
+	// PhoneLockHint shimmer ...) picks up the user's chosen colour on
+	// the next screen build, regardless of the currently selected
+	// theme. customAccentEnabled is treated as a strict bool: any
+	// non-zero byte enables the override (defensive against NVS-resize
+	// wipes that land 0xFF in the slot). When the override is off the
+	// switch below falls through to the per-theme accent map exactly
+	// the way every prior firmware shipped, so first-boot is byte-
+	// identical for users who never touched the picker.
+	if(Settings.get().customAccentEnabled != 0){
+		return lv_color_make(Settings.get().customAccentR,
+		                     Settings.get().customAccentG,
+		                     Settings.get().customAccentB);
+	}
 	switch(getCurrent()){
 		case Theme::Nokia3310:  return N3310_FRAME;
 		case Theme::GameBoyDMG: return GBDMG_INK;
