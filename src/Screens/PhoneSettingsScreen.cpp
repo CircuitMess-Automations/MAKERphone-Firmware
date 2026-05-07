@@ -49,7 +49,7 @@ struct Section {
 // Logical layout: 3 group headers + 5 rows. The order tracks the Item
 // enum 1:1 inside each group (Brightness/Wallpaper under DISPLAY, etc.)
 // so a host that introspects via getSelectedItem() reads naturally.
-const Section kLayout[] = {
+constexpr Section kLayout[] = {
 	{ true,  "DISPLAY",            nullptr,       PhoneSettingsScreen::Item::Brightness },
 	{ false, "Brightness",         "BRIGHTNESS",  PhoneSettingsScreen::Item::Brightness },
 	{ false, "Wallpaper",          "WALLPAPER",   PhoneSettingsScreen::Item::Wallpaper  },
