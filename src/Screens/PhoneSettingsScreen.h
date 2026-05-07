@@ -242,6 +242,22 @@ public:
 		// the demo deck, which keeps the SYSTEM cluster (About anchored
 		// at the bottom) untouched.
 		DemoSpeed       = 19,  // S206
+
+		// S211 - sentinel. Not a real selectable row; reads as the
+		// total number of Item enumerators above it. Drives the
+		// derivation of `ItemCount` (see below) and the
+		// exhaustiveness `static_assert`s in
+		// `src/Screens/PhoneSettingsScreen.cpp` and
+		// `src/Elements/IntroScreen.cpp`. When a future row is
+		// inserted above this sentinel it must be (a) added to the
+		// `kLayout` table in `PhoneSettingsScreen.cpp` and (b) given
+		// a `case` in the `IntroScreen.cpp` settings dispatch -- the
+		// static_asserts fire at compile time when either step is
+		// skipped, replacing the pre-S211 soft `default:` runtime
+		// fallback to `PhoneAppStubScreen("SETTINGS")` documented as
+		// the matching v1.0 polish item in `KNOWN_ISSUES.md`. Must
+		// remain the last enumerator.
+		Count           = 20,
 	};
 
 	using ActivateHandler = void (*)(PhoneSettingsScreen* self, Item item);
@@ -290,8 +306,19 @@ public:
 	void flashLeftSoftKey();
 	void flashRightSoftKey();
 
-	/** Number of selectable rows (excludes group headers). */
-	static constexpr uint8_t ItemCount = 19;
+	/**
+	 * Number of selectable rows (excludes group headers). Derived from
+	 * `Item::Count` (S211) so adding a new enumerator automatically
+	 * grows the `rows[]` array, the cursor wrap, and every iteration
+	 * site without a manual bump. Pre-S211 the constant was hand-rolled
+	 * at 19, which silently drifted out of sync when S206 added
+	 * `DemoSpeed = 19` -- buildList() walked 20 selectable rows in
+	 * `kLayout` and wrote one past the end of `rows[]`, while the
+	 * cursor wrap clamped at 18 so the final `Demo mode` row was
+	 * unreachable from the keypad. Both bugs are fixed by deriving
+	 * the count from the enum.
+	 */
+	static constexpr uint8_t ItemCount = static_cast<uint8_t>(Item::Count);
 
 	// --- Geometry, exposed for unit-test friendliness. -----------------
 

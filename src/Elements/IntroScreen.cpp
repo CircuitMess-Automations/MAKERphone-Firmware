@@ -195,6 +195,25 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 			settings->setOnActivate([](PhoneSettingsScreen* self,
 									   PhoneSettingsScreen::Item item){
 				if(self == nullptr) return;
+				// S211 - exhaustiveness static_assert. The pre-S211
+				// `default:` branch was a soft runtime fallback to
+				// PhoneAppStubScreen("SETTINGS") for any future
+				// Item enum row that landed without being wired here
+				// -- the matching v1.0 polish item in
+				// `KNOWN_ISSUES.md` asked for a compile-time guard
+				// instead. The assert below catches the drift at
+				// compile time: when a developer adds a new
+				// enumerator above `Item::Count` they must (a) add a
+				// `case` to the switch below, (b) add the matching
+				// row to `kLayout` in `PhoneSettingsScreen.cpp`, and
+				// (c) bump the literal 20 below. Skipping any of the
+				// three breaks the build instead of silently routing
+				// the user to a generic stub.
+				static_assert(
+					static_cast<uint8_t>(PhoneSettingsScreen::Item::Count) == 20,
+					"PhoneSettingsScreen::Item grew without updating the IntroScreen "
+					"settings dispatch. Add the missing case(s) above, then bump the "
+					"literal in this static_assert to match Item::Count.");
 				switch(item){
 					case PhoneSettingsScreen::Item::Brightness:
 						self->push(new PhoneBrightnessScreen());
@@ -491,9 +510,14 @@ static void launchPhoneMainMenuIcon(PhoneMainMenu* self){
 						self->push(new PhoneDemoModeScreen());
 						break;
 					default:
-						// Defensive: any future row that is added to
-						// the Item enum without being wired here lands
-						// on a generic stub rather than crashing.
+						// S211 belt-and-braces fallback: the
+						// static_assert above the switch turns a
+						// forgotten `case` into a build error, but if a
+						// future enumerator is given an out-of-range
+						// numeric value (e.g. for an alias) the runtime
+						// stub still keeps the user from crashing into
+						// a no-op press. Should remain unreachable in
+						// normal operation post-S211.
 						self->push(new PhoneAppStubScreen("SETTINGS"));
 						break;
 				}

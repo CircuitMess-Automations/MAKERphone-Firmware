@@ -39,12 +39,28 @@ on a usable home screen on a fresh device.
   power-on — but worth flipping the order in a follow-up so the
   ringtone engine is initialised before the call subscription is active.
 
-- [ ] **`PhoneAppStubScreen` reachable from the Settings default-case.**
+- [x] **`PhoneAppStubScreen` reachable from the Settings default-case.**
   Today the stub's appName is "SETTINGS" (post-fix above), but the code
   path itself only fires if a future `PhoneSettingsScreen::Item` enum
   value is added without being wired in `IntroScreen.cpp`. Worth
   converting into a compile-time `static_assert` over the enum size so
   the branch becomes unreachable instead of a soft runtime fallback.
+  -- fixed in S211. `PhoneSettingsScreen::Item` now ends in a
+  `Count = 20` sentinel, `ItemCount` derives from it, and two
+  `static_assert`s pin both the kLayout row count
+  (`PhoneSettingsScreen.cpp`) and the IntroScreen dispatch case
+  count (`IntroScreen.cpp`) against `Item::Count` -- so adding a
+  new enumerator without (a) adding a kLayout row and (b) adding
+  a dispatch `case` is now a build error. The pre-S211 soft
+  `default:` branch is kept as a belt-and-braces fallback for the
+  out-of-range-alias edge case but is unreachable in normal
+  operation. The audit also caught the matching `ItemCount = 19`
+  vs `kLayout` 20-row drift introduced by S206 -- buildList()
+  was writing `rows[19]` one past the `rows[ItemCount]` array
+  end (overlapping the `cursor` field on the current struct
+  layout), and the cursor wrap clamped at 18 so the `Demo mode`
+  ADVANCED row was unreachable from the keypad. Both fall out
+  of the new derivation.
 
 - [ ] **Sample-row contacts (uid==0) silently no-op CALL / MESSAGE / EDIT.**
   Intentional (S37/S38) but the user gets no visual cue. Add a
@@ -184,9 +200,17 @@ polish for v2.1.
   the message pipeline. A `CALL_REQUEST` payload that lands during the
   splash window now rings cleanly.
 - **`PhoneAppStubScreen` reachable from the Settings default-case** —
-  carried forward. Still a soft runtime fallback rather than a
-  `static_assert`. Worth converting in v2.1 once the Item enum has
-  stabilised through the v2.0 release.
+  fixed in S211. `PhoneSettingsScreen::Item` now ends in a
+  `Count = 20` sentinel, `ItemCount` derives from it, and two
+  `static_assert`s pin the kLayout row count and the IntroScreen
+  dispatch case count against `Item::Count`, so a future Item
+  row that lands without being wired in either site is a build
+  error rather than a soft runtime fallback. The pre-S211
+  `default:` branch survives as a belt-and-braces guard for the
+  out-of-range-alias edge case but is unreachable in normal
+  operation post-S211. Side benefit: the audit caught the
+  `ItemCount = 19` vs `kLayout` 20-row drift S206 had introduced
+  -- both bugs fall out of the new enum-derived count.
 - **Sample-row contacts (uid==0) silently no-op** — fixed. S171 wires
   a `PhoneNotificationToast("Sample contact — add a real one")` when
   the user fires CALL/MESSAGE/EDIT on a placeholder row.

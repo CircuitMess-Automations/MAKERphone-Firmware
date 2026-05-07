@@ -487,6 +487,58 @@ lowest-numbered `[ ]`.
   surface changes. Resolves the matching v2.1 polish item in
   `KNOWN_ISSUES.md`.
 
+- [x] **S211** — `PhoneSettingsScreen::Item` exhaustiveness
+  `static_assert` + `ItemCount` derivation fix -- the v1.0
+  polish item in `KNOWN_ISSUES.md` asked for the
+  `IntroScreen.cpp` settings dispatch's `default:` branch
+  (a soft runtime fallback to `PhoneAppStubScreen("SETTINGS")`
+  whenever a future `PhoneSettingsScreen::Item` row was added
+  without being wired up) to be converted into a compile-time
+  `static_assert` over the enum size so the branch becomes
+  unreachable rather than a soft fallback. While drafting the
+  guard the audit caught a real drift bug: `S206` had grown the
+  `Item` enum to 20 enumerators (last `DemoSpeed = 19`) and the
+  `kLayout` table in `PhoneSettingsScreen.cpp` to 20 selectable
+  rows, but the hand-rolled `static constexpr uint8_t ItemCount
+  = 19;` in `PhoneSettingsScreen.h` had not been bumped. Two
+  silent consequences: (a) `buildList()` walked all 20 layout
+  rows and wrote `rows[19]` one past the end of `Row
+  rows[ItemCount]`, which on the current struct layout overlaps
+  the immediately-following `uint8_t cursor` member -- the
+  initial cursor position was effectively garbage every push
+  until the first key press normalised it; (b) `moveCursorBy()`
+  clamped the wrap to `ItemCount = 19`, so the final `Demo
+  mode` row in the ADVANCED group was unreachable from the
+  keypad even though it was painted. Both bugs are fixed by
+  deriving the count from the enum.
+
+  Concretely S211: (i) appends a sentinel `Count = 20` enumerator
+  to `PhoneSettingsScreen::Item` (must remain the last
+  enumerator, documented as not a real selectable row), (ii)
+  rewrites `ItemCount` as `static_cast<uint8_t>(Item::Count)`
+  so adding a new enumerator automatically grows the `rows[]`
+  array, the cursor wrap, and every `for(...; i < ItemCount;
+  ...)` iteration site without a manual bump, (iii) lands a
+  `constexpr countSelectableRows()` recursive helper next to
+  `kLayout` in `PhoneSettingsScreen.cpp` plus a `static_assert`
+  that pins `kLayoutRowCount == PhoneSettingsScreen::ItemCount`
+  -- so kLayout drifting out of sync with the enum is now a
+  build error, and (iv) lands a second `static_assert(
+  static_cast<uint8_t>(PhoneSettingsScreen::Item::Count) == 20,
+  ...)` at the top of the settings-tile lambda in
+  `IntroScreen.cpp` -- so adding a new Item enumerator without
+  also adding a `case` in the dispatch (and bumping the
+  literal) is also a build error. The pre-S211 soft `default:`
+  branch is kept as a belt-and-braces fallback for the
+  out-of-range-alias edge case, but the static_assert above
+  guarantees it is unreachable in normal operation. Visible
+  output is byte-identical for every existing path; the only
+  behavioural delta is that the `Demo mode` row is now
+  reachable via the keypad's down-arrow wrap, which is the
+  intended behaviour for an ADVANCED row that has shipped
+  since S200. Resolves the matching v1.0 polish item in
+  `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file

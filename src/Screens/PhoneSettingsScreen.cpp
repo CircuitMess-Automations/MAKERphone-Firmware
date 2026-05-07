@@ -175,7 +175,29 @@ const Section kLayout[] = {
 	{ false, "Demo mode",           "DEMO MODE",   PhoneSettingsScreen::Item::DemoMode    },
 };
 constexpr uint8_t kLayoutLen = sizeof(kLayout) / sizeof(kLayout[0]);
+
+// S211 - count the selectable (`isHeader == false`) entries in the hand-
+// authored `kLayout` table at compile time so we can pin it against the
+// `Item::Count` sentinel. Pre-S211 the per-section row counts had to be
+// kept in sync with `ItemCount` by hand, and S206 had silently drifted
+// the table to 20 rows while `ItemCount` stayed at 19 -- buildList()
+// then walked 20 rows in the loop below and wrote one past the end of
+// `rows[ItemCount]`, while the cursor wrap clamped at 18 so the final
+// `Demo mode` row was unreachable from the keypad. The static_assert
+// below catches that drift at compile time.
+constexpr uint8_t countSelectableRows(uint8_t i = 0, uint8_t acc = 0) {
+	return (i >= kLayoutLen)
+			? acc
+			: countSelectableRows(static_cast<uint8_t>(i + 1),
+								  static_cast<uint8_t>(acc + (kLayout[i].isHeader ? 0 : 1)));
+}
+constexpr uint8_t kLayoutRowCount = countSelectableRows();
 } // namespace
+
+static_assert(kLayoutRowCount == PhoneSettingsScreen::ItemCount,
+			  "kLayout selectable-row count must match PhoneSettingsScreen::ItemCount "
+			  "(derived from Item::Count). When adding or removing a row, update kLayout, "
+			  "the Item enum, and the IntroScreen settings dispatch in lock-step.");
 
 PhoneSettingsScreen::PhoneSettingsScreen()
 		: LVScreen(),
