@@ -4,6 +4,7 @@
 #include <Input/Input.h>
 #include <Pins.hpp>
 #include <Notes.h>
+#include <Settings.h>
 
 #include "../Elements/PhoneSynthwaveBg.h"
 #include "../Elements/PhoneStatusBar.h"
@@ -455,6 +456,16 @@ void PhoneCameraScreen::refreshFrameLabel() {
 }
 
 void PhoneCameraScreen::playShutterSound() {
+	// S225 -- SILENT / MEETING profile is active: do NOT call
+	// Ringtone.play(). The engine self-mutes per-loop via
+	// `Settings.get().sound`, but skipping the call entirely keeps the
+	// loop listener off the LoopManager queue and prevents even the
+	// micro-interval of audible piezo that can leak in between play()
+	// and the engine's first mute tick. The visible flash overlay,
+	// frame-counter increment and "SAVED" caption flick still fire so
+	// the capture still feels acknowledged -- just silently.
+	if(isSilenced()) return;
+
 	// Hand the static const Melody to the global engine. The engine
 	// retains the pointer until playback finishes (or is stopped); the
 	// Melody lives in .rodata so the lifetime is the whole firmware.
@@ -464,11 +475,29 @@ void PhoneCameraScreen::playShutterSound() {
 }
 
 void PhoneCameraScreen::playModeTickSound() {
+	// S225 -- SILENT / MEETING profile is active: skip the engine call
+	// entirely so the bumper press cannot leak even a micro-interval of
+	// audible piezo before the engine's first mute tick. The mode label
+	// recolour and the REC dot retint still fire (they are pure UI), so
+	// the bumper press still has visible feedback even on a muted device.
+	if(isSilenced()) return;
+
 	// One-shot bumper tick. Same delivery path as the shutter sound -
 	// drop the static const Melody on the engine and return. Sound is
 	// gated by Settings.sound at the engine layer so a muted device
 	// stays silent on bumper presses too.
 	Ringtone.play(kModeTickMelody);
+}
+
+// S225 -- SILENT / MEETING profile gate. PhoneProfileScreen (S159) writes
+// `Settings.get().sound = false` for both Silent and Meeting profiles and
+// `true` for General / Outdoor / Headset, so reading the legacy bool
+// covers every "should the camera drive the piezo right now" case
+// without dragging the five-state enum into this screen. Mirrors the
+// S205 gate on PhoneRadio::isSilenced() and the S219-S223 gates on the
+// composer / music player / ringtone-picker family.
+bool PhoneCameraScreen::isSilenced() {
+	return !Settings.get().sound;
 }
 
 void PhoneCameraScreen::onFlashAnim(void* var, int32_t v) {

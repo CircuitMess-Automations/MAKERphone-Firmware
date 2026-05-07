@@ -1163,6 +1163,37 @@ lowest-numbered `[ ]`.
   engine it could have started before handing off to the next
   screen.
 
+- [x] **S225** -- `PhoneCameraScreen` SILENT-profile shutter / mode-tick
+  gate -- the shutter "click" (S44) and the mode-cycle bumper "tick"
+  (S45) both call `Ringtone.play()` directly with no profile guard, so
+  on a SILENT / MEETING-profile device every BTN_ENTER capture and
+  every BTN_L / BTN_R mode cycle leaks the same micro-interval of
+  audible piezo that the S205 sweep removed from `PhoneRadio` and the
+  S219-S223 sweep removed from the composer / music-player /
+  ringtone-picker family: the engine self-mutes per loop tick via
+  `Settings.get().sound`, but the few microseconds between
+  `Ringtone.play()` and the engine's first mute pass are enough for
+  some Chatter units to emit an audible blip before falling silent.
+  S225 mirrors the established gate pattern: `PhoneCameraScreen` gains
+  a `static bool isSilenced()` helper that reads `!Settings.get().sound`
+  (so SILENT and MEETING -- the two five-state profiles that
+  `PhoneProfileScreen` (S159) maps to `sound = false` -- both gate
+  identically), and `playShutterSound()` / `playModeTickSound()` now
+  early-return when `isSilenced()` is true so the engine call is
+  skipped entirely and the LoopManager listener is never registered.
+  The visible flash overlay, frame-counter increment and "SAVED"
+  caption flick still fire on capture, and the mode label / REC dot
+  retint still fire on bumper press, so the user still gets visible
+  feedback even on a muted device -- only the piezo path is short-
+  circuited. No header surface changes beyond the public `static bool
+  isSilenced()`. The Loud (General / Outdoor / Headset) path is
+  byte-identical: `Settings.get().sound == true` skips the early
+  return and the `Ringtone.play(kShutterMelody)` /
+  `Ringtone.play(kModeTickMelody)` calls fire as before. Closes the
+  v2.1-fresh polish item that the S205 / S219-S223 sweep had left
+  open: `PhoneCameraScreen` was the last Phone* screen still calling
+  `Ringtone.play()` directly without a SILENT-profile gate.
+
 ---
 
 ## How the agent reads this file

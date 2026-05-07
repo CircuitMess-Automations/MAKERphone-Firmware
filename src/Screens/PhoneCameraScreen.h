@@ -166,6 +166,20 @@ private:
 	// bumper press has audible feedback alongside the label change.
 	void playModeTickSound();
 
+	// S225 -- gate the shutter / mode-tick sounds against the SILENT /
+	// MEETING phone profiles. The underlying truth is `Settings.get().sound`:
+	// `PhoneProfileScreen` (S159) writes `sound = false` for both Silent
+	// and Meeting and `sound = true` for General / Outdoor / Headset, so
+	// reading the legacy bool covers every "should the camera drive the
+	// piezo right now" case without dragging the five-state enum into this
+	// screen. Used by `playShutterSound()` and `playModeTickSound()` to
+	// short-circuit the `PhoneRingtoneEngine::play()` call so the camera
+	// cannot drive the piezo at all under a silent profile -- not even
+	// for the micro-interval before the engine's per-loop mute kicks in.
+	// Static so the engine-skip checks can call it without indirecting
+	// through a live PhoneCameraScreen instance.
+	static bool isSilenced();
+
 	// S45: per-mode accent colour. Cyan for Photo, sunset orange for
 	// Effect, warm cream for Selfie. Used by setMode to retint the
 	// mode label and the REC dot together.
