@@ -1072,6 +1072,70 @@ lowest-numbered `[ ]`.
   the private `void setMutedCaption(bool)` helper. Resolves the
   v2.1-fresh polish item now logged in `KNOWN_ISSUES.md`.
 
+- [x] **S223** -- `PhoneProfileRingtoneScreen` SILENT-profile preview
+  gate -- the v2.1 sweep finishes its picker pass for real this
+  time. After S205 closed `PhoneRadio`, S219 closed `PhoneComposer`,
+  S220 closed `PhoneMusicPlayer`, S221 closed `PhoneAlarmTonePicker`
+  and S222 closed `PhoneContactRingtonePicker`, the only screen that
+  still drove the engine unconditionally on a BTN_ENTER preview was
+  `PhoneProfileRingtoneScreen` (S160) -- the per-profile ringtone
+  picker reached from `PhoneSettingsScreen`'s SOUND group. S222's
+  prose flagged this screen as the next candidate; S223 delivers it.
+  The engine self-mutes per-loop via `Settings.get().sound`, but the
+  loop listener still attaches to LoopManager for the millisecond
+  between `play()` and the engine's first mute tick (audible click
+  on some Chatter units), and under SILENT / MEETING the screen
+  left the user staring at a "previewing" cursor with no audio and
+  no visible explanation -- exactly the failure mode S205 fixed for
+  the FM dial and S221 / S222 fixed for the alarm-tone and contact
+  ringtone pickers.
+
+  S223 closes the gap with the same minimal pattern: (i) lifts a
+  static `PhoneProfileRingtoneScreen::isSilenced()` helper into
+  `src/Screens/PhoneProfileRingtoneScreen.{h,cpp}` that reads
+  `!Settings.get().sound` (the legacy bool that
+  `PhoneProfileScreen` (S159) writes to `false` for SILENT and
+  MEETING and `true` for GENERAL / OUTDOOR / HEADSET, so the helper
+  covers every silenced profile in one read without dragging the
+  five-state enum into this screen); (ii) inserts an early-return
+  into `startPreview()` that runs a defensive `Ringtone.stop()` (in
+  case a stale engine playhead is still ticking from a profile flip
+  mid-preview), still flips `previewing = true` so a second
+  BTN_ENTER tap stops cleanly through the regular `stopPreview()`
+  path, still flashes the soft-key for gesture acknowledgement, and
+  skips the `Ringtone.play()` call entirely; (iii) adds a private
+  `setMutedCaption(bool)` helper that repurposes the per-mode
+  caption strip (`PROFILE RING` in list mode, `PROFILE - <NAME>`
+  in pick mode) as a `MUTED -- SOUND OFF` badge while a silenced
+  preview is "live", painted in the existing MP_HIGHLIGHT cyan so
+  the badge reads as a deliberate state change rather than a stuck
+  label, and delegates to `refreshCaption()` on the un-mute path so
+  the regular per-mode caption (including the sunset-orange pick-
+  mode color and live profile name) is restored verbatim; (iv)
+  reverts the badge on `stopPreview()` and on every non-silenced
+  `startPreview()` path so a profile flip from SILENT -> GENERAL
+  between previews is picked up without a stale caption dragging
+  the next preview into silent-mode appearance.
+  `confirmPick()` and `invokeBack()` already route through
+  `stopPreview()`, and the mode transitions (`enterListMode()` /
+  `enterPickMode()`) call `stopPreview()` first, so the badge
+  never survives screen-pop or a list <-> pick flip.
+
+  Visible output is byte-identical for non-silenced profiles --
+  the existing list-mode profile rows, the pick-mode ringtone
+  rows, the saved-dot markers, the cursor highlight, the soft-key
+  flash, and the `PROFILE RING` / `PROFILE - <NAME>` captions are
+  all unchanged. The only behavioural delta lands when the user
+  has flipped to SILENT or MEETING via `PhoneProfileScreen`:
+  BTN_ENTER in pick mode still flips the row to "previewing",
+  BTN_ENTER again still stops it, the soft-key still flashes,
+  but the caption reads `MUTED -- SOUND OFF` and the engine never
+  drives the piezo until the user changes profile back. The
+  legacy include `<Settings.h>` is already in the .cpp; no header
+  surface changes beyond the public `static bool isSilenced()` and
+  the private `void setMutedCaption(bool)` helper. Resolves the
+  v2.1-fresh polish item now logged in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file

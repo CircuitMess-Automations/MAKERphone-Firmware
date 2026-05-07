@@ -432,13 +432,65 @@ void PhoneProfileRingtoneScreen::movePickCursor(int8_t dir) {
 
 // ---------- preview ----------
 
+// S223 -- SILENT-profile preview gate. The engine self-mutes per-loop
+// via Settings.get().sound, but the loop listener still attaches to
+// LoopManager for the millisecond between play() and the engine's
+// first mute tick (audible click on some Chatter units). Reading the
+// legacy bool covers every "should the picker drive the piezo right
+// now" case without dragging the five-state PhoneProfileScreen enum
+// into this screen. Static so the engine-skip check in startPreview()
+// can call it without indirecting through a live picker instance.
+// PhoneProfileScreen (S159) writes Settings.get().sound = false for
+// SILENT and MEETING and true for GENERAL / OUTDOOR / HEADSET, so the
+// helper covers every silenced profile in one read.
+bool PhoneProfileRingtoneScreen::isSilenced() {
+	return !Settings.get().sound;
+}
+
+void PhoneProfileRingtoneScreen::setMutedCaption(bool muted) {
+	if(captionLabel == nullptr) return;
+	// S223 -- repurpose the per-mode caption strip ("PROFILE RING" in
+	// list mode, "PROFILE - <NAME>" in pick mode) as a "MUTED --
+	// SOUND OFF" badge while a silenced preview is "live", painted in
+	// the same MP_HIGHLIGHT cyan the list-mode caption already uses
+	// so the badge reads as a deliberate state change rather than a
+	// stuck label. Delegates to refreshCaption() on the un-mute path
+	// so the regular per-mode caption (with its sunset-orange pick-
+	// mode color and live profile name) is restored verbatim, and a
+	// profile flip mid-preview cannot leave the badge dragging onto
+	// the next preview attempt.
+	if(muted) {
+		lv_obj_set_style_text_color(captionLabel, MP_HIGHLIGHT, 0);
+		lv_label_set_text(captionLabel, "MUTED -- SOUND OFF");
+	} else {
+		refreshCaption();
+	}
+}
+
 void PhoneProfileRingtoneScreen::startPreview() {
 	if(pickCursor >= pickEntryCount) return;
 	const uint8_t id = pickIds[pickCursor];
 	const PhoneRingtoneEngine::Melody* m = PhoneContactRingtone::resolve(id);
 	if(m == nullptr) return;
+	if(isSilenced()) {
+		// S223 -- SILENT / MEETING profile is active: do NOT call
+		// Ringtone.play(). Skipping the call entirely keeps the loop
+		// listener off the LoopManager queue and prevents even the
+		// micro-interval of audible piezo that can leak in between
+		// play() and the engine's first mute tick. Defensive
+		// Ringtone.stop() in case a stale engine playhead is still
+		// ticking from a profile flip mid-preview. The cursor still
+		// flips to "previewing" so a second BTN_ENTER tap stops
+		// cleanly through the regular stopPreview() path.
+		Ringtone.stop();
+		previewing = true;
+		setMutedCaption(true);
+		if(softKeys) softKeys->flashLeft();
+		return;
+	}
 	Ringtone.play(*m);
 	previewing = true;
+	setMutedCaption(false);
 	if(softKeys) softKeys->flashLeft();
 }
 
@@ -446,6 +498,7 @@ void PhoneProfileRingtoneScreen::stopPreview() {
 	if(!previewing) return;
 	previewing = false;
 	Ringtone.stop();
+	setMutedCaption(false);
 }
 
 // ---------- pick / back ----------

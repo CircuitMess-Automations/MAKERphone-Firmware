@@ -128,6 +128,17 @@ public:
 	/** Profile currently focused (in either mode). 0..ProfileCount-1. */
 	uint8_t getFocusedProfile() const { return profileCursor; }
 
+	/** S223 -- returns true when the active sound profile (SILENT or
+	 *  MEETING) has muted Settings.get().sound. Static so the
+	 *  engine-skip check in startPreview() can call it without
+	 *  indirecting through a live screen instance, and so unit tests
+	 *  can stamp Settings.get().sound directly and observe the same
+	 *  decision the screen would. Mirrors the helper landed in S205
+	 *  (PhoneRadio), S219 (PhoneComposer), S220 (PhoneMusicPlayer),
+	 *  S221 (PhoneAlarmTonePicker), and S222
+	 *  (PhoneContactRingtonePicker). */
+	static bool isSilenced();
+
 private:
 	PhoneSynthwaveBg* wallpaper      = nullptr;
 	PhoneStatusBar*   statusBar      = nullptr;
@@ -175,6 +186,15 @@ private:
 	void refreshPickRows();
 	void refreshPickHighlight();
 	void refreshPickSavedMarks();
+
+	/** S223 -- repurposes captionLabel as a "MUTED -- SOUND OFF"
+	 *  badge while a silenced preview is "live" so the user reads
+	 *  the silence as deliberate rather than wondering whether the
+	 *  picked tone happens to be near-silent. When `muted` is false
+	 *  the helper delegates to refreshCaption() so the per-mode
+	 *  caption ("PROFILE RING" in list mode, "PROFILE - <NAME>" in
+	 *  pick mode) is restored verbatim. */
+	void setMutedCaption(bool muted);
 
 	void moveProfileCursor(int8_t dir);
 	void movePickCursor(int8_t dir);
