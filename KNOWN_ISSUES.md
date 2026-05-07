@@ -261,6 +261,41 @@ on a usable home screen on a fresh device.
   screen-pop. Visible output is byte-identical for non-silenced
   profiles.
 
+- [x] **`PhoneContactRingtonePicker` (S153) does not gate
+  its preview path against the SILENT / MEETING phone
+  profiles.** With the S205 (PhoneRadio), S219
+  (PhoneComposer), S220 (PhoneMusicPlayer) and S221
+  (PhoneAlarmTonePicker) gates in place, the per-contact
+  ringtone picker was the next picker / sound surface in
+  line with an un-gated `Ringtone.play()` call.
+  `startPreview()` drove the engine on every BTN_ENTER
+  press regardless of profile -- the engine self-mutes
+  per-loop via `Settings.get().sound`, but the loop listener
+  still attaches to LoopManager for the millisecond between
+  `play()` and the engine's first mute tick (audible click
+  on some Chatter units), and under SILENT / MEETING the
+  screen left the user staring at a "previewing" highlight
+  with no audio and no visible explanation. -- fixed in
+  S222. A static `PhoneContactRingtonePicker::isSilenced()`
+  helper (reads `!Settings.get().sound`, the same legacy
+  bool S205 / S219 / S220 / S221 read) is added to the
+  screen, and `startPreview()` short-circuits the play-call
+  under a silent profile (defensive `Ringtone.stop()` for
+  stale engine playheads, `previewing = true` so a second
+  BTN_ENTER still stops cleanly, soft-key flash for gesture
+  acknowledgement) instead of asking the engine to drive
+  the piezo. The existing "RINGTONE" caption strip is
+  repurposed as a `MUTED -- SOUND OFF` badge (MP_HIGHLIGHT
+  cyan) while a silenced preview is "live", reverted on
+  `stopPreview()` and on every non-silenced path so a
+  profile flip mid-preview is picked up without a stale
+  caption dragging the next preview into silent-mode
+  appearance. `confirmPick()` and `invokeBack()` already
+  route through `stopPreview()` so the badge never survives
+  screen-pop. Visible output is byte-identical for
+  non-silenced profiles. `PhoneProfileRingtoneScreen` is
+  the next candidate in the same sweep.
+
 ## Hardware-only (cannot reproduce in CI)
 
 - [ ] **Battery-low modal trigger threshold (S58, ≤15 %)** has not been

@@ -95,6 +95,19 @@ public:
 	void flashLeftSoftKey();
 	void flashRightSoftKey();
 
+	/** S222 -- true when the active phone profile mutes audio
+	 *  (`Settings.get().sound == false`, i.e. SILENT or MEETING).
+	 *  `startPreview()` reads this to short-circuit the
+	 *  `Ringtone.play()` call entirely so the loop listener never
+	 *  even attaches to LoopManager under a silenced profile, and
+	 *  the caption strip flips to a "MUTED -- SOUND OFF" badge so
+	 *  the user reads the silence as deliberate. Same minimal
+	 *  pattern S205 (PhoneRadio), S219 (PhoneComposer), S220
+	 *  (PhoneMusicPlayer) and S221 (PhoneAlarmTonePicker) use.
+	 *  Static so unit tests can probe the same gate without
+	 *  instantiating the screen. */
+	static bool isSilenced();
+
 	/** Maximum entries the picker can render before the list scrolls.
 	 *  Library (5) + composer slots (4) = 9 absolute max. */
 	static constexpr uint8_t MaxEntries     = 9;
@@ -139,6 +152,7 @@ private:
 
 	void startPreview();
 	void stopPreview();
+	void setMutedCaption(bool muted);
 
 	void confirmPick();
 	void invokeBack();
