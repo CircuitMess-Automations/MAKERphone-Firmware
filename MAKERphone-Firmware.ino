@@ -364,19 +364,36 @@ void setup(){
 		for(;;);
 	}
 
-	// MAKERphone prototype: keep sound muted and disable auto-sleep / auto-shutdown
-	// regardless of any previously stored Settings values. The Settings.h struct
-	// defaults already match these for fresh devices, but production Chatters that
-	// were running the original firmware have stored sound=true, sleepTime=1,
-	// shutdownTime=1 in NVS - this override + store migrates them once.
-	// If you ever want these user-tunable again from the Settings menu, remove
-	// this block (the on-disk defaults will then determine startup behaviour).
+	// MAKERphone v2.1 (S216) -- one-shot legacy clamp, gated on
+	// SettingsData::soundOverrideMigrated. The pre-S216 prototype
+	// fired the clamp unconditionally on every boot (sound -> false,
+	// sleepTime -> 0, shutdownTime -> 0) so production Chatters
+	// carrying values from the original (non-MAKERphone) firmware
+	// would migrate to MAKERphone defaults the first time they
+	// booted v1.0+. The fix worked for the migration but had a
+	// long-tail bug: a user who legitimately turned sound on via
+	// PhoneSoundScreen / PhoneHapticsScreen / PhoneProfileScreen
+	// (or auto-sleep / auto-shutdown via PhoneSleepScreen /
+	// PhoneShutdownScreen) had their preference silently wiped on
+	// the next power-cycle. S216 keeps the migration semantic but
+	// runs it exactly once: the new soundOverrideMigrated flag
+	// reads zero on a first boot of v2.1 (the existing NVS-resize
+	// pattern reads new fields as zero-initialised), the block
+	// clamps + stores + flips the flag to true, and every
+	// subsequent boot finds the flag set and respects whatever the
+	// user has chosen. Removing the block outright would have
+	// surprised any device that had not yet seen the migration
+	// (legacy NVS may still hold sound=true / sleepTime=1 /
+	// shutdownTime=1 from the original firmware), so the gated
+	// form preserves the migration intent without breaking the
+	// user-facing toggle.
 	{
 		auto& cfg = Settings.get();
-		if(cfg.sound || cfg.sleepTime != 0 || cfg.shutdownTime != 0){
-			cfg.sound        = false;
-			cfg.sleepTime    = 0;  // SleepSeconds index 0 == "OFF" (never sleep)
-			cfg.shutdownTime = 0;  // ShutdownSeconds index 0 == "OFF" (never shutdown)
+		if(!cfg.soundOverrideMigrated){
+			cfg.sound                  = false;
+			cfg.sleepTime              = 0;  // SleepSeconds index 0 == "OFF" (never sleep)
+			cfg.shutdownTime           = 0;  // ShutdownSeconds index 0 == "OFF" (never shutdown)
+			cfg.soundOverrideMigrated  = true;
 			Settings.store();
 		}
 	}

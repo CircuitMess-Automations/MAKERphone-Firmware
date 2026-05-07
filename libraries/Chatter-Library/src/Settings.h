@@ -626,6 +626,39 @@ struct SettingsData {
 	// grows -- which maps to Medium, the byte-identical pre-S206
 	// 3 s default.
 	uint8_t demoSpeed = 0;
+	// S216 - one-shot migration flag for the legacy boot-time
+	// Settings clamp that the v1.0 prototype installed in
+	// MAKERphone-Firmware.ino. The pre-S216 setup() block read
+	// the in-memory Settings.get() and unconditionally clamped
+	// sound -> false, sleepTime -> 0, shutdownTime -> 0 whenever
+	// any of the three diverged from the MAKERphone factory
+	// defaults, with the documented intent of migrating
+	// production Chatters that had carried sound=true /
+	// sleepTime=1 / shutdownTime=1 over from the original (non-
+	// MAKERphone) firmware. The block worked for the one-shot
+	// migration but had a long tail bug: it also fired on every
+	// subsequent boot, so a user who had legitimately enabled
+	// sound through PhoneSoundScreen / PhoneHapticsScreen /
+	// PhoneProfileScreen had their preference silently wiped on
+	// the next power-cycle. The v1.0 KNOWN_ISSUES file flagged
+	// this as the open Settings.sound override polish item, the
+	// v2.0 sweep carried it forward to v2.1 with the explicit
+	// guidance "remove the override block in v2.1 once we are
+	// confident every shipped device has migrated". S216 closes
+	// the gap with a defensive one-shot migration: the new
+	// boolean defaults to , so a freshly-flashed device
+	// or a legacy device that has never seen the v2.1 firmware
+	// reads it as zero on first boot (the existing NVS-resize
+	// pattern that grew this struct via soundProfile / ... /
+	// demoSpeed reads each new field as zero-initialised) and
+	// runs the legacy clamp exactly once, then persists the
+	// flag = true on the same Settings.store() call. Every
+	// subsequent boot reads the flag as true and skips the
+	// clamp, so the user-facing sound / sleep / shutdown
+	// toggles become authoritative for the rest of the device's
+	// life. Sits at the end of the blob next to demoSpeed so
+	// the existing NVS-resize pattern keeps working unchanged.
+	bool soundOverrideMigrated = false;
 };
 
 class SettingsImpl {

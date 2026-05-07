@@ -695,6 +695,50 @@ lowest-numbered `[ ]`.
   `PhoneNotificationToast::show()` overlap behaviour. Resolves
   the matching v1.0 polish item in `KNOWN_ISSUES.md`.
 
+- [x] **S216** -- Boot-time `Settings.sound` clamp converted to a
+  one-shot migration -- the v1.0 polish item in `KNOWN_ISSUES.md`
+  flagged that `MAKERphone-Firmware.ino` ran an unconditional
+  "`if(cfg.sound || cfg.sleepTime != 0 || cfg.shutdownTime != 0)
+  -> clamp + Settings.store()`" block on every boot to migrate
+  production Chatters that had carried over `sound=true` /
+  `sleepTime=1` / `shutdownTime=1` from the original (non-MAKER-
+  phone) firmware. The block worked for the migration but had a
+  long-tail bug: it also fired on every subsequent boot, so a
+  user who had legitimately enabled sound through PhoneSoundScreen
+  / PhoneHapticsScreen / PhoneProfileScreen (or non-OFF sleep /
+  shutdown via PhoneSleepScreen / PhoneShutdownScreen) had their
+  preference silently wiped on the next power-cycle. The v2.0
+  sweep at the bottom of `KNOWN_ISSUES.md` carried the item
+  forward to v2.1 with the explicit "remove the override block
+  in v2.1 once we are confident every shipped device has
+  migrated" guidance. S216 closes the gap with a defensive one-
+  shot migration: a new `bool soundOverrideMigrated = false`
+  byte is appended to `SettingsData` (next to `demoSpeed`, so
+  the existing NVS-resize pattern that grew the struct via
+  `soundProfile` / `wallpaperStyle` / `themeId` / `keyTicks` /
+  `ownerName` / `powerOffMessage` / `operatorText` /
+  `operatorLogo` / `phoneProfile` / `profileRingtones` /
+  `speedDial` / `rainbowUnlocked` / `softKeyTone` /
+  `lockWidgetMode` / `homeLayoutMode` / `wallpaperOfDay` /
+  `customAccentEnabled` / `customAccentR` / `G` / `B` /
+  `ownerEmoji` / `musicPlayMode` / `alarmTone` /
+  `demoSlideStart` / `demoSpeed` reads the new field as zero-
+  initialised on a first boot after the firmware grows). The
+  `.ino` setup() block is rewritten from
+  `if(cfg.sound || cfg.sleepTime != 0 || cfg.shutdownTime != 0)`
+  to `if(!cfg.soundOverrideMigrated)`, runs the legacy clamp
+  exactly once, flips the flag to `true` on the same
+  `Settings.store()` call, and then is skipped forever after.
+  Net effect: a freshly-flashed device migrates byte-identically
+  to the pre-S216 path on first boot, but every subsequent boot
+  respects whatever the user has chosen on PhoneSoundScreen /
+  PhoneHapticsScreen / PhoneProfileScreen / PhoneSleepScreen /
+  PhoneShutdownScreen. Removing the block outright would have
+  surprised any production Chatter that had not yet seen the
+  v2.1 firmware, so the gated form preserves the migration
+  intent without breaking the user-facing toggles. Resolves
+  the matching v1.0 polish item in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file

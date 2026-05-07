@@ -108,13 +108,25 @@ on a usable home screen on a fresh device.
   `-DMAKERPHONE_LOAD_MOCK_DATA=1` in arduino-cli, removing the need to
   edit the .ino just to seed dev data.
 
-- [ ] **`Settings.sound = false` override on every boot.** `setup()`
-  forcibly mutes the device on boot for the prototype, which means the
-  user-facing sound toggle in `PhoneSoundScreen` (S52) writes Settings
-  but is overridden on the next reboot. The block is tagged with a
-  comment explaining the migration; Phase J was supposed to make the
-  toggle real. Remove the override block once we are ready to commit
-  to "Sound setting is authoritative".
+- [x] **`Settings.sound = false` override on every boot.** `setup()`
+  forcibly muted the device on boot for the prototype, which meant
+  the user-facing sound toggle in `PhoneSoundScreen` (S52) wrote
+  Settings but was overridden on the next reboot. -- fixed in
+  S216. `SettingsData` grows a `bool soundOverrideMigrated = false`
+  byte at the end of the blob (next to `demoSpeed`, so the existing
+  NVS-resize pattern reads it as zero on a first boot of v2.1) and
+  the `.ino` setup() block is rewritten from the unconditional
+  `if(cfg.sound || cfg.sleepTime != 0 || cfg.shutdownTime != 0)`
+  clamp to a one-shot `if(!cfg.soundOverrideMigrated)` migration
+  that runs the legacy clamp exactly once, flips the flag to
+  `true` on the same `Settings.store()` call, and is skipped
+  forever after. Net effect: a freshly-flashed device migrates
+  byte-identically to the pre-S216 path on first boot, but every
+  subsequent boot respects whatever the user has chosen on
+  PhoneSoundScreen / PhoneHapticsScreen / PhoneProfileScreen /
+  PhoneSleepScreen / PhoneShutdownScreen. Phase J's
+  `PhoneProfileScreen` (S159) -- and the legacy sound /
+  sleepTime / shutdownTime knobs -- are now authoritative.
 
 - [x] **`InboxScreen` still compiles the legacy `MainMenu`-style row
   layout** alongside the new `PhoneMessageRow` (S31). The new row is
@@ -273,11 +285,17 @@ polish for v2.1.
   `src/MAKERphoneConfig.h`; the helpers and the `Chatters[]` table
   compile out unless a developer flips the flag via
   `-DMAKERPHONE_LOAD_MOCK_DATA=1` in arduino-cli.
-- **`Settings.sound = false` boot override** — carried forward. The
-  override block in `setup()` still mutes a fresh production Chatter
-  on boot. Phase J's `PhoneProfileScreen` (S159) is the new
-  authoritative knob; remove the override block in v2.1 once we are
-  confident every shipped device has migrated.
+- **`Settings.sound = false` boot override** — fixed in S216.
+  Rather than removing the override block outright (which would have
+  surprised any production Chatter still carrying `sound=true` /
+  `sleepTime=1` / `shutdownTime=1` from the original non-MAKERphone
+  firmware), S216 keeps the migration semantic but gates it on a new
+  `SettingsData::soundOverrideMigrated` byte so the clamp runs
+  exactly once -- on the first boot of v2.1 firmware on each device
+  -- and is skipped forever after. The user-facing sound / sleep /
+  shutdown toggles (PhoneSoundScreen / PhoneHapticsScreen /
+  PhoneProfileScreen / PhoneSleepScreen / PhoneShutdownScreen) are
+  now authoritative for the rest of the device's life.
 - **`InboxScreen` legacy `MainMenu`-style row layout** — fixed in
   S213. Every populated inbox path already used `PhoneMessageRow`;
   only the empty-state "Add friend" CTA still routed through the
