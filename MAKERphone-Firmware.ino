@@ -142,11 +142,6 @@ void boot(){
 	LoRa.begin();
 	Profiles.begin();
 
-	// S28: register the call service with MessageService so a magic
-	// CALL_REQUEST text from a paired peer raises PhoneIncomingCall on
-	// top of the current screen. Must come after Messages.begin() so the
-	// listener subscription is active before LoRa starts delivering.
-	Phone.begin();
 
 #if MAKERPHONE_LOAD_MOCK_DATA
 	// Dev-only seed: populate Storage.Friends / Convos / Messages with the
@@ -219,6 +214,32 @@ void boot(){
 	// screen takes over.
 	Vibrate.begin();
 
+	// S212: BuzzerService now begins BEFORE PhoneCallService so the
+	// keypress-tone Input listener and the message-received chime are
+	// both alive when Phone.begin() subscribes to the message pipeline.
+	// Previously Buzz.begin() lived inside the IntroScreen dismiss
+	// callback (~3 s into boot) which left a window where a CALL_REQUEST
+	// or any inbound text landing during the splash + intro could push
+	// PhoneIncomingCall / fan out to listeners while the audio stack
+	// was still half-up. begin() is a thin listener subscription
+	// (Input + MessageService fan-out, no LoopManager attachment until
+	// a tone is actually requested) so promoting it is side-effect
+	// free for the rest of the boot flow. The IntroScreen dismiss
+	// callback below no longer calls Buzz.begin() -- it would be a
+	// double-subscribe.
+	Buzz.begin();
+
+	// S212 (cont): Phone.begin() relocated from its original early
+	// position (right after Profiles.begin()) to here so every audio
+	// engine -- Ringtone (S148), Vibrate (S161), Buzz (S212) -- is
+	// alive before the CALL_REQUEST listener is registered. The
+	// contract documented in PhoneCallService.h still holds: the
+	// subscription must come after Messages.begin(), which it does.
+	// Moving it past the audio stack closes the silent-ringtone /
+	// silent-chime window that S148 + S161 only partially closed.
+	// Resolves the matching v1.0 polish item in KNOWN_ISSUES.md.
+	Phone.begin();
+
 	// S56 + S162: the very first screen on boot is now PhoneBootSplash
 	// - the MAKERphone-branded sunset wordmark splash. It holds for 3 s
 	// (or any-key skip) and on dismiss runs the next stage of the boot
@@ -236,7 +257,8 @@ void boot(){
 	auto startIntro = [](){
 		auto intro = new IntroScreen([](){
 			Shutdown.begin();
-			Buzz.begin();
+			// S212: Buzz.begin() promoted to boot()'s top-level audio stack
+			// so the keypress / message chime is alive during the splash + intro.
 			Alarms.begin();
 			Pet.begin();
 			ChargeChime.begin();
@@ -254,7 +276,8 @@ void boot(){
 		auto* pin = new PhoneSimPinScreen([](){
 			auto intro = new IntroScreen([](){
 				Shutdown.begin();
-				Buzz.begin();
+				// S212: Buzz.begin() promoted to boot()'s top-level audio stack
+				// so the keypress / message chime is alive during the splash + intro.
 				Alarms.begin();
 				Pet.begin();
 				ChargeChime.begin();

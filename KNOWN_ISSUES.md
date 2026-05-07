@@ -29,7 +29,7 @@ on a usable home screen on a fresh device.
   default-case fallthrough. Only user-visible if a future enum row is
   added without an explicit handler. Fixed in this commit.
 
-- [ ] **Boot-service init order has a small race window for ringtones.**
+- [x] **Boot-service init order has a small race window for ringtones.**
   `Phone.begin()` (PhoneCallService) subscribes to the message pipeline
   before `Buzz.begin()` / `Ringtone.begin()` have fired (those run
   after the `IntroScreen` callback completes, ~3 s into boot). A
@@ -38,6 +38,27 @@ on a usable home screen on a fresh device.
   rare — a paired peer would have to ring within the first ~3 s of
   power-on — but worth flipping the order in a follow-up so the
   ringtone engine is initialised before the call subscription is active.
+  -- fixed in S212. S148 had already promoted `Ringtone.begin()` and
+  S161 promoted `Vibrate.begin()` out of the IntroScreen dismiss
+  callback into the top-level `boot()` flow, but `Buzz.begin()` and
+  `Phone.begin()` were still mis-ordered: `Phone.begin()` ran right
+  after `Profiles.begin()` (the call subscription was the third audio
+  consumer to register), while `Buzz.begin()` was the slowest -- it
+  only fired ~3 s into boot when the IntroScreen dismiss callback
+  ran. S212 closes the window by (a) relocating `Phone.begin()` past
+  the audio stack so it is the LAST audio-adjacent service to
+  subscribe to messages, and (b) promoting `Buzz.begin()` from the
+  IntroScreen dismiss callback into the top-level `boot()` flow,
+  next to `Ringtone.begin()` / `Vibrate.begin()`. Both intro-callback
+  bodies (the SIM-PIN and direct paths) drop their `Buzz.begin()`
+  line and gain a comment marker pointing to the new home. The
+  `BuzzerService::begin()` body is a thin listener subscription
+  (Input + MessageService fan-out, no LoopManager attachment until a
+  tone is requested) so promoting it is side-effect free. Result:
+  by the first `LoopManager::loop()` tick after `setup()` returns,
+  every audio engine is alive, so a `CALL_REQUEST` arriving during
+  the splash / SIM-PIN / IntroScreen window now rings audibly and
+  any inbound text chimes through Buzz as designed.
 
 - [x] **`PhoneAppStubScreen` reachable from the Settings default-case.**
   Today the stub's appName is "SETTINGS" (post-fix above), but the code

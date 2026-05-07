@@ -539,6 +539,57 @@ lowest-numbered `[ ]`.
   since S200. Resolves the matching v1.0 polish item in
   `KNOWN_ISSUES.md`.
 
+
+- [x] **S212** — boot-service init order ringtone race fix --
+  the v1.0 KNOWN_ISSUES item flagged that `Phone.begin()` (the
+  `PhoneCallService` -> `MessageService` listener subscription that
+  raises `PhoneIncomingCall` on a `CALL_REQUEST` magic body) ran
+  early in `boot()` while the audio stack was still half-initialised.
+  S148 had promoted `Ringtone.begin()` and S161 promoted
+  `Vibrate.begin()` out of the IntroScreen dismiss callback to the
+  top-level `boot()` flow, but `Buzz.begin()` was still tucked inside
+  the IntroScreen dismiss callback (~3 s into boot, right at the end
+  of the CircuitMess intro animation) and `Phone.begin()` itself was
+  positioned between `Profiles.begin()` and `Sleep.begin()` -- so the
+  call-request listener subscribed BEFORE every audio engine. A
+  `CALL_REQUEST` that arrived during the boot splash / decorative
+  SIM-PIN / IntroScreen window (the first ~3 s of `LoopManager`
+  ticking after `setup()` returns) would push `PhoneIncomingCall`
+  on top of the splash and find `Ringtone` / `Vibrate` initialised
+  but `Buzz` still silent -- meaning the per-key tone heard during
+  the answer / reject confirmation, plus any concurrent inbound
+  text chime fan-out through `BuzzerService::msgReceived`, would
+  drop on the floor. S212 reorders `boot()` so the call subscription
+  is the LAST audio-adjacent service to subscribe: (a) the early
+  `Phone.begin();` block (S28 comment + the call) is removed from
+  its position right after `Profiles.begin()`; (b) `Buzz.begin();`
+  is promoted from inside both IntroScreen dismiss callbacks (the
+  `MAKERPHONE_SHOW_SIM_PIN` SIM-PIN path and the direct splash
+  path) into the top-level `boot()` flow, immediately after
+  `Vibrate.begin();`; (c) `Phone.begin();` is re-inserted right
+  after `Buzz.begin();` so by the first `LoopManager::loop()` tick
+  after `setup()` returns every audio engine -- Ringtone (S148),
+  Vibrate (S161), Buzz (S212) -- is alive before the
+  `CALL_REQUEST` listener can fire. Both intro-callback bodies
+  drop their `Buzz.begin()` line and gain a `// S212:` comment
+  marker pointing to the new home so a future reader does not
+  resurrect the duplicate. `BuzzerService::begin()` is a thin
+  listener subscription (Input + MessageService fan-out, no
+  `LoopManager` attachment until a tone is requested) so
+  promoting it is side-effect free; the contract documented in
+  `PhoneCallService.h` (subscription must come after
+  `Messages.begin()`) still holds because we strictly delayed
+  the call -- not advanced it. Visible output is byte-identical
+  on every existing path with `Settings.sound = false` (the
+  prototype mute override still suppresses key tones until the
+  user opts in via the Sound screen); the only behavioural
+  delta is that with `Settings.sound = true`, keypresses on the
+  splash / SIM-PIN / IntroScreen now produce the same per-key
+  musical tone they produce on every other screen, and an
+  inbound text or `CALL_REQUEST` arriving during the boot
+  window now chimes / rings audibly as designed. Resolves the
+  matching v1.0 polish item in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file
