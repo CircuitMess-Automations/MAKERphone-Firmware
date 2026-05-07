@@ -1136,6 +1136,33 @@ lowest-numbered `[ ]`.
   the private `void setMutedCaption(bool)` helper. Resolves the
   v2.1-fresh polish item now logged in `KNOWN_ISSUES.md`.
 
+- [x] **S224** -- `PhoneIncomingCall` early-stop vibration symmetry --
+  fireAnswer() / fireReject() now also call `stopVibration()` so a
+  MEETING-profile call screen does not leak its buzz cycle into the
+  next screen on accept / reject. Pre-S224 the early-stop path only
+  silenced the ringtone (S41 wiring), but S161 had since split the
+  alert path into ringtone (Loud profiles) vs vibration (Meeting):
+  the destructor and `onStop()` already call BOTH stops symmetrically
+  (`stopRingtone()` + `stopVibration()` at the top of `~PhoneIncomingCall`
+  and again in `onStop()`), but `fireAnswer()` / `fireReject()` were
+  still single-stops -- so a MEETING-profile answer or reject left
+  `Vibrate.*` ticking on LoopManager for the millisecond the next
+  screen takes to push, audible as a brief residual buzz on some
+  Chatter units before the screen-pop's `onStop()` finally tore it
+  down. S224 brings the early-stop path in line with the destructor /
+  onStop() convention by adding a `stopVibration()` call directly
+  after the existing `stopRingtone()` in both action dispatchers.
+  `stopVibration()` is a no-op when `vibrationActive == false`, so
+  the only behavioural delta lands in MEETING profile -- the Loud /
+  Silent paths are byte-identical. No header surface changes; both
+  helpers were already members of the screen and already wired.
+  Visible output (the soft-key flash, the answer / reject callback,
+  the screen pop) is identical for non-MEETING profiles. Resolves a
+  v2.1-fresh polish item adjacent to the S205 / S219-S223 sweep:
+  every Phone* screen with multi-engine audio now stops every
+  engine it could have started before handing off to the next
+  screen.
+
 ---
 
 ## How the agent reads this file

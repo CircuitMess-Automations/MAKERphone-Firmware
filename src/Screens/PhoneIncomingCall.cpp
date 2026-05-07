@@ -511,7 +511,18 @@ void PhoneIncomingCall::fireAnswer() {
 	// S41: stop the ringer before we hand off — the next screen
 	// (PhoneActiveCall, or whatever the host pushes) should never
 	// inherit a still-playing melody.
+	// S224: also stop the vibration cycle. S161 split the alert path
+	// into ringtone (Loud profiles) vs vibration (Meeting), but the
+	// hand-off only stopped the ringer here -- so a MEETING-profile
+	// answer still left Vibrate.* ticking on LoopManager for the
+	// millisecond the next screen takes to push, audible as a brief
+	// buzz on some Chatter units. The destructor and onStop() already
+	// call BOTH stops symmetrically (lines 130-131 / 159-160); this
+	// brings the early-stop path in line with that convention. Both
+	// stops are no-ops if their respective active flag is false, so
+	// calling both unconditionally on the Loud-profile path is free.
 	stopRingtone();
+	stopVibration();
 	if(softKeys) softKeys->flashLeft();
 	if(answerCb) {
 		answerCb(this);
@@ -526,7 +537,14 @@ void PhoneIncomingCall::fireReject() {
 	// visual gets sensible behaviour from BTN_BACK alone.
 	// S41: stop the ringer before we hand off / pop, so the
 	// piezo never lingers into whatever screen comes next.
+	// S224: also stop the vibration cycle, mirroring fireAnswer().
+	// stopVibration() is a no-op when vibration was never started
+	// (Loud / Silent profiles), so the only behavioural delta lands
+	// in MEETING profile -- where the per-call buzz pulses now stop
+	// the moment the user dismisses the call instead of riding the
+	// LoopManager into onStop()'s catch-all stop.
 	stopRingtone();
+	stopVibration();
 	if(softKeys) softKeys->flashRight();
 	if(rejectCb) {
 		rejectCb(this);
