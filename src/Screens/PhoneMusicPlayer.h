@@ -144,6 +144,19 @@ public:
 	/** Cycle to the next playback mode (wraps). */
 	void cyclePlayMode();
 
+	/**
+	 * S220 - true when the active phone profile is SILENT or MEETING
+	 * (i.e. `Settings.get().sound == false`). The play() / onTick paths
+	 * read this to short-circuit the `Ringtone.play()` call entirely
+	 * (the engine self-mutes per-loop, but skipping the call keeps the
+	 * loop listener off the LoopManager queue and prevents the micro-
+	 * interval of audible piezo that can leak between play() and the
+	 * engine's first mute tick -- same rationale as S205 PhoneRadio /
+	 * S219 PhoneComposer). Static so callers do not have to indirect
+	 * through a live PhoneMusicPlayer instance.
+	 */
+	static bool isSilenced();
+
 	/** Public so a host can pre-load a track + auto-play after push(). */
 	void play();
 	void pause();
@@ -181,6 +194,20 @@ private:
 	uint8_t trackCount;
 	uint8_t trackIndex;
 	bool    playing;
+
+	// S220 - true while the current play() session is running under
+	// the SILENT / MEETING profile (`Settings.get().sound == false`).
+	// `play()` short-circuits the `Ringtone.play()` call when this is
+	// set, and `onTick()` falls back to clock-time end-of-track
+	// detection (currentElapsedMs() >= trackTotalMs) instead of the
+	// `Ringtone.isPlaying() == false` check that would fire on the
+	// first tick when the engine was never started. Cleared back to
+	// false on every pause / setTracks / stop path so a profile flip
+	// from SILENT -> GENERAL between tracks is picked up on the next
+	// play() without a stale flag dragging the next session into
+	// silent-mode behaviour.
+	bool    silentPlayback;
+
 
 	// S190 - playback mode (Continuous / RepeatAll / RepeatOne / Shuffle).
 	// Loaded from Settings.musicPlayMode in the ctor and persisted via

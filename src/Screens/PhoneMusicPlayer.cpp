@@ -64,6 +64,7 @@ PhoneMusicPlayer::PhoneMusicPlayer()
 		  trackCount(PhoneMusicLibrary::Count),
 		  trackIndex(0),
 		  playing(false),
+		  silentPlayback(false),
 		  // S190 - read persisted PlayMode; clamp out-of-range NVS to Continuous.
 		  playMode(Settings.get().musicPlayMode < ModeCount
 				   ? Settings.get().musicPlayMode : (uint8_t) Continuous),
@@ -125,6 +126,7 @@ PhoneMusicPlayer::~PhoneMusicPlayer() {
 		Ringtone.stop();
 		playing = false;
 	}
+	silentPlayback = false;  // S220
 	// Children (wallpaper, statusBar, softKeys, labels, icons) are all
 	// parented to obj - LVGL frees them recursively when the screen's obj
 	// is destroyed by the LVScreen base destructor. Nothing manual.
@@ -152,6 +154,7 @@ void PhoneMusicPlayer::onStop() {
 		Ringtone.stop();
 		playing = false;
 	}
+	silentPlayback = false;  // S220
 	if(equalizer != nullptr) equalizer->setActive(false);
 	if(tickTimer != nullptr){
 		lv_timer_del(tickTimer);
@@ -338,6 +341,19 @@ const char* PhoneMusicPlayer::modeLabelOf(uint8_t mode) {
 
 void PhoneMusicPlayer::refreshMode() {
 	if(modeLabel == nullptr) return;
+	// S220 -- when the screen is in silent-playback mode (the user has
+	// pressed PLAY but the active phone profile is SILENT / MEETING)
+	// the mode caption is repurposed as a "MUTED" status badge so the
+	// user has an at-a-glance explanation for why no audio is coming
+	// out of the piezo. Same MP_HIGHLIGHT cyan as the active-mode
+	// states above so the badge reads as a deliberate state, not a
+	// stuck label. Restored to the regular MODE: caption on the next
+	// pause / track-end / profile flip.
+	if(silentPlayback && playing){
+		lv_label_set_text(modeLabel, "MUTED -- SOUND OFF");
+		lv_obj_set_style_text_color(modeLabel, MP_HIGHLIGHT, 0);
+		return;
+	}
 	lv_label_set_text(modeLabel, modeLabelOf(playMode));
 	// Highlight non-default modes in cyan so the user spots a mode
 	// change immediately. Continuous keeps the dim purple body so the
@@ -403,10 +419,12 @@ void PhoneMusicPlayer::advanceForEndOfTrack() {
 				// End of playlist - leave the player paused on the last
 				// track so the user can re-press play if they want to
 				// hear it again.
-				playing    = false;
-				pausedAtMs = trackTotalMs;
+				playing        = false;
+				silentPlayback = false;  // S220 - clear the badge on stop
+				pausedAtMs     = trackTotalMs;
 				refreshPlayIcon();
 				refreshProgress();
+				refreshMode();
 			}
 			break;
 	}
@@ -579,6 +597,7 @@ void PhoneMusicPlayer::setTracks(const PhoneRingtoneEngine::Melody* const* t,
 		Ringtone.stop();
 		playing = false;
 	}
+	silentPlayback = false;  // S220
 	pausedAtMs = 0;
 
 	// Recompute the duration for the (possibly different) track 0.
@@ -606,10 +625,57 @@ void PhoneMusicPlayer::selectTrack(uint8_t index) {
 	play();
 }
 
+// S220 - mirror of PhoneRadio::isSilenced() / PhoneComposer::isSilenced().
+// Reads the legacy `Settings.get().sound` bool that PhoneProfileScreen
+// (S159) writes to `false` for SILENT and MEETING and `true` for
+// GENERAL / OUTDOOR / HEADSET, so the helper covers every "should the
+// music player drive the piezo right now" case without dragging the
+// five-state profile enum into this screen. Static so the engine-skip
+// checks in play() / onTick() can call it without indirecting through a
+// live PhoneMusicPlayer instance.
+bool PhoneMusicPlayer::isSilenced() {
+	return !Settings.get().sound;
+}
+
 void PhoneMusicPlayer::play() {
 	if(trackCount == 0 || tracks == nullptr || tracks[trackIndex] == nullptr) return;
 
 	const PhoneRingtoneEngine::Melody* m = tracks[trackIndex];
+
+	// S220 - SILENT / MEETING profile is active: do NOT call
+	// Ringtone.play(). The engine self-mutes per-loop via
+	// `Settings.get().sound`, but skipping the call entirely keeps the
+	// loop listener off the LoopManager queue and prevents the micro-
+	// interval of audible piezo that can leak in between play() and the
+	// engine's first mute tick (same rationale as S205 PhoneRadio /
+	// S219 PhoneComposer). Defensive Ringtone.stop() guards against a
+	// stale engine playhead still ticking from a profile flip mid-
+	// track. The screen still flips to "playing" so the play-icon
+	// shows pause-bars, the soft-key reads PAUSE, the progress bar
+	// ticks via `currentElapsedMs()` and the mode label surfaces a
+	// "MUTED" pill -- the user can still skip / pause / cycle modes,
+	// but the engine never drives the piezo until the user changes
+	// profile from PhoneProfileScreen.
+	if(isSilenced()){
+		Ringtone.stop();
+		silentPlayback = true;
+		playing        = true;
+		playStartMs    = millis();
+		pausedAtMs     = 0;
+		trackTotalMs   = computeTotalMs(m);
+		// Equalizer kept silent in MUTED state so the dancing bars
+		// never imply "audio is happening" when it is not. The user
+		// reads the MUTED token in the mode caption + the static
+		// equalizer + the still-progressing bar as "playing visually,
+		// not driving the piezo".
+		if(equalizer != nullptr) equalizer->setActive(false);
+		refreshPlayIcon();
+		refreshProgress();
+		refreshMode();
+		return;
+	}
+
+	silentPlayback = false;
 	Ringtone.play(*m);
 
 	// The S39 engine always restarts a melody from note 0 on play(), so
@@ -623,16 +689,23 @@ void PhoneMusicPlayer::play() {
 	if(equalizer != nullptr) equalizer->setActive(true);
 	refreshPlayIcon();
 	refreshProgress();
+	refreshMode();
 }
 
 void PhoneMusicPlayer::pause() {
 	if(!playing) return;
 	pausedAtMs = currentElapsedMs();
+	// S220 -- always call Ringtone.stop() defensively even in the
+	// silent-playback path: a profile flip from SILENT -> GENERAL
+	// mid-track could have armed the engine in the interim, and the
+	// extra stop() on an idle engine is a cheap idempotent no-op.
 	Ringtone.stop();
-	playing = false;
+	playing        = false;
+	silentPlayback = false;
 	if(equalizer != nullptr) equalizer->setActive(false);
 	refreshPlayIcon();
 	refreshProgress();
+	refreshMode();
 }
 
 void PhoneMusicPlayer::togglePlay() {
@@ -676,15 +749,32 @@ void PhoneMusicPlayer::onTick(lv_timer_t* t) {
 	// already stopped, so we reflect that in our own state and route
 	// through the S190 advanceForEndOfTrack() gate so the playback mode
 	// (Continuous / RepeatAll / RepeatOne / Shuffle) governs what
-	// happens next.
-	if(self->playing && !Ringtone.isPlaying()){
-		self->playing    = false;
-		self->pausedAtMs = self->trackTotalMs;
-		if(self->trackCount > 1 ||
-		   self->playMode == PhoneMusicPlayer::RepeatOne){
-			self->advanceForEndOfTrack();
+	// happens next. S220 -- under a SILENT / MEETING profile we never
+	// asked the engine to play, so `Ringtone.isPlaying()` is `false`
+	// from the very first tick; fall back to clock-time end-of-track
+	// detection (`currentElapsedMs() >= trackTotalMs`) so the silent
+	// playback session lasts the same wall-clock duration as the
+	// audible one and advanceForEndOfTrack() runs at the same point in
+	// the timeline.
+	if(self->playing){
+		bool atEnd = false;
+		if(self->silentPlayback){
+			atEnd = (self->trackTotalMs > 0 &&
+					 self->currentElapsedMs() >= self->trackTotalMs);
 		}else{
-			self->refreshPlayIcon();
+			atEnd = !Ringtone.isPlaying();
+		}
+		if(atEnd){
+			self->playing    = false;
+			self->pausedAtMs = self->trackTotalMs;
+			if(self->trackCount > 1 ||
+			   self->playMode == PhoneMusicPlayer::RepeatOne){
+				self->advanceForEndOfTrack();
+			}else{
+				self->silentPlayback = false;
+				self->refreshPlayIcon();
+				self->refreshMode();
+			}
 		}
 	}
 
@@ -738,6 +828,7 @@ void PhoneMusicPlayer::buttonPressed(uint i) {
 				Ringtone.stop();
 				playing = false;
 			}
+			silentPlayback = false;  // S220
 			if(softKeys) softKeys->flashRight();
 			pop();
 			break;

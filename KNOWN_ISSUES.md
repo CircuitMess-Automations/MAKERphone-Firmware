@@ -490,6 +490,38 @@ polish for v2.1.
   row width with margin to spare, and visible output is byte-
   identical for non-silenced profiles.
 
+- [x] **`PhoneMusicPlayer` (S42 / S43 / S189-S191) does not gate its
+  PLAY path against the SILENT / MEETING phone profiles.** With the
+  S205 (PhoneRadio) and S219 (PhoneComposer) gates in place, the
+  music player was the last in-app screen with an un-gated
+  `Ringtone.play()` call. `play()` drove the engine on every PLAY
+  press, and the end-of-track auto-advance hook in `onTick()`
+  polled `Ringtone.isPlaying()` -- the engine self-mutes per-loop
+  via `Settings.get().sound`, but the loop listener still attaches
+  to LoopManager for the millisecond between `play()` and the
+  engine's first mute tick (audible click on some Chatter units),
+  and under SILENT / MEETING the screen left the user staring at a
+  ticking progress bar with no audio and no visible explanation --
+  exactly the failure mode S205 fixed for the FM dial. -- fixed in
+  S220. A static `PhoneMusicPlayer::isSilenced()` helper (reads
+  `!Settings.get().sound`, the same legacy bool S205 / S219 read)
+  is added to the screen, and `play()` short-circuits the play-call
+  under a silent profile (defensive `Ringtone.stop()` for stale
+  engine playheads, `silentPlayback = true`, equalizer held quiet,
+  progress primed exactly like the audible path) instead of asking
+  the engine to drive the piezo. `onTick()` falls back to clock-
+  time end-of-track detection (`currentElapsedMs() >= trackTotalMs`)
+  when `silentPlayback` is set so the silent session lasts the
+  same wall-clock duration and `advanceForEndOfTrack()` runs at
+  the same point in the timeline as an audible run. The S190
+  `MODE: ...` mode-caption is repurposed as a `MUTED -- SOUND
+  OFF` badge in the existing MP_HIGHLIGHT cyan while
+  `silentPlayback && playing`, restored to the regular caption on
+  pause / track-end / profile flip. Flag is cleared on every
+  pause / setTracks / final-track / onStop / dtor / BTN_BACK exit
+  so a profile flip between tracks is picked up cleanly on the
+  next `play()`.
+
 ## Hardware-only (cannot reproduce in CI)
 
 - [ ] All v1.0 hardware-only items above still apply to v2.0 hardware.

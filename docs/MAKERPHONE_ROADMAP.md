@@ -903,6 +903,71 @@ lowest-numbered `[ ]`.
   static helper. Resolves the v2.1-fresh polish item now logged
   in `KNOWN_ISSUES.md`.
 
+- [x] **S220** -- `PhoneMusicPlayer` SILENT-profile gate -- the v2.1
+  sweep logged in `KNOWN_ISSUES.md` flagged that the music player
+  (S42 / S43 / S189-S191) was the last in-app screen with an
+  un-gated `Ringtone.play()` call after S205 closed `PhoneRadio`
+  and S219 closed `PhoneComposer`. `PhoneMusicPlayer::play()`
+  drove the engine unconditionally on every PLAY press, and the
+  end-of-track auto-advance hook in `onTick()` polled
+  `Ringtone.isPlaying()` -- which, since S39's `PhoneRingtoneEngine`
+  self-mutes per-loop when `Settings.get().sound == false`, still
+  attached the loop listener to `LoopManager` for the millisecond
+  between play() and the engine's first mute tick (audible click
+  on some Chatter units) and then -- under the SILENT / MEETING
+  profile -- left the screen visually playing while the user heard
+  nothing and saw no explanation. S220 closes the gap with the
+  same minimal pattern S205 / S219 use.
+
+  Concretely S220: (i) lifts a static
+  `PhoneMusicPlayer::isSilenced()` helper into
+  `src/Screens/PhoneMusicPlayer.{h,cpp}` that reads
+  `!Settings.get().sound` (the legacy bool that
+  `PhoneProfileScreen` (S159) writes to `false` for SILENT and
+  MEETING and `true` for GENERAL / OUTDOOR / HEADSET, so the
+  helper covers every "should the music player drive the piezo
+  right now" case without dragging the five-state enum into this
+  screen); (ii) inserts an early-return into `play()` that runs a
+  defensive `Ringtone.stop()` (in case a stale engine playhead is
+  still ticking from a profile flip mid-track), sets a new
+  private `silentPlayback = true` flag, flips `playing = true`
+  and primes `playStartMs` / `pausedAtMs` / `trackTotalMs`
+  exactly as the audible path does so the progress bar still
+  ticks across the wall-clock duration of the track; (iii) holds
+  the equalizer (S191) at `setActive(false)` in the silenced path
+  so the dancing bars never imply audio is happening when it is
+  not; (iv) rewires `onTick()` to bypass the
+  `!Ringtone.isPlaying()` end-of-track check when `silentPlayback`
+  is set and instead detect end-of-track from
+  `currentElapsedMs() >= trackTotalMs` -- so a silent session
+  hands off to the same `advanceForEndOfTrack()` mode-gate
+  (Continuous / RepeatAll / RepeatOne / Shuffle) at the same
+  point in the timeline an audible session would; (v) repurposes
+  the S190 `MODE: ...` mode-caption strip into a `MUTED -- SOUND
+  OFF` badge while `silentPlayback && playing`, painted in the
+  existing MP_HIGHLIGHT cyan so the badge reads as a deliberate
+  state rather than a stuck label; (vi) clears the flag on every
+  pause / setTracks / Continuous-final-track / onStop / dtor /
+  BTN_BACK exit so a profile flip from SILENT -> GENERAL between
+  tracks is picked up on the next `play()` without a stale flag
+  dragging the next session into silent-mode behaviour.
+
+  Visible output is byte-identical for non-silenced profiles --
+  the existing PLAY / PAUSE icon, the progress bar, the
+  equalizer dancing, the soft-key labels, and the `MODE: ...`
+  caption are all unchanged. The only behavioural delta lands
+  when the user has flipped to SILENT or MEETING via
+  `PhoneProfileScreen`: the player still flips to "playing"
+  visually (play icon shows pause-bars, soft-key reads PAUSE,
+  progress bar advances, BTN_LEFT / BTN_RIGHT skip tracks, the
+  S190 mode toggle still cycles), the badge reads `MUTED --
+  SOUND OFF`, the equalizer stays still, and the engine never
+  drives the piezo until the user changes profile back. The
+  legacy include `<Settings.h>` is already in the .cpp; no new
+  surface area beyond the public `static bool isSilenced()` and
+  the private `bool silentPlayback` member. Resolves the
+  v2.1-fresh polish item now logged in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file
