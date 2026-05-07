@@ -2,6 +2,7 @@
 
 #include <Battery/BatteryService.h>
 #include <Notes.h>
+#include <Settings.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -199,12 +200,21 @@ void PhoneBatteryLowModal::onStart() {
 	lv_group_set_editing(inputGroup, true);
 
 	// Audio chirp via the global ringtone engine. The engine respects
-	// Settings.sound internally, so a muted device stays silent without
-	// us having to ask. Replacing whatever was playing is fine - the
-	// battery warning is, by definition, urgent enough to interrupt a
-	// background ringtone preview, and the engine restarts cleanly on
-	// the next call after we stop().
-	Ringtone.play(ChirpMelody);
+	// Settings.sound internally per loop tick, but S226 short-circuits
+	// the call entirely on a SILENT / MEETING profile so the engine's
+	// LoopManager listener is never registered — that closes the few-
+	// microsecond window between Ringtone.play() and the engine's first
+	// mute pass that some Chatter units could still emit as an audible
+	// blip on the piezo. The visual cue (slab + pulsing battery icon +
+	// percent + caption) still fires, so a muted device still sees the
+	// warning, just silently. Mirrors the S205 / S219–S223 / S225 sweep
+	// across the Phone* family. Replacing whatever was playing is fine
+	// in the loud path — the battery warning is, by definition, urgent
+	// enough to interrupt a background ringtone preview, and the engine
+	// restarts cleanly on the next call after we stop().
+	if(!isSilenced()){
+		Ringtone.play(ChirpMelody);
+	}
 
 	startDismissTimer();
 }
@@ -283,4 +293,17 @@ void PhoneBatteryLowModal::onKeyEvent(lv_event_t* event) {
 	auto* self = static_cast<PhoneBatteryLowModal*>(lv_event_get_user_data(event));
 	if(self == nullptr || !self->isActive()) return;
 	self->fireDismiss();
+}
+
+
+// S226 — SILENT / MEETING profile gate. PhoneProfileScreen (S159) writes
+// `Settings.get().sound = false` for both Silent and Meeting profiles and
+// `true` for General / Outdoor / Headset, so reading the legacy bool
+// covers every "should the battery-low chirp drive the piezo right now"
+// case without dragging the five-state enum into this modal. Mirrors the
+// S205 gate on PhoneRadio::isSilenced(), the S219–S223 gates on the
+// composer / music-player / ringtone-picker family, and the S225 gate on
+// PhoneCameraScreen.
+bool PhoneBatteryLowModal::isSilenced() {
+	return !Settings.get().sound;
 }

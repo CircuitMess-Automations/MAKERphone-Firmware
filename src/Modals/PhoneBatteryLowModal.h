@@ -136,6 +136,19 @@ private:
 	static void onDismissTimer(lv_timer_t* timer);
 	static void onSelfDestroyTimer(lv_timer_t* timer);
 	static void onKeyEvent(lv_event_t* event);
+
+	/**
+	 * S226 — SILENT / MEETING profile gate. PhoneProfileScreen (S159)
+	 * writes `Settings.get().sound = false` for both Silent and Meeting
+	 * and `true` for General / Outdoor / Headset, so reading the legacy
+	 * bool covers every "should the modal drive the piezo right now"
+	 * case without dragging the five-state enum into this widget.
+	 * Mirrors the S205 / S219–S223 / S225 family of static helpers on
+	 * PhoneRadio / PhoneComposer / PhoneMusicPlayer / PhoneAlarmTonePicker /
+	 * PhoneContactRingtonePicker / PhoneProfileRingtoneScreen /
+	 * PhoneCameraScreen.
+	 */
+	static bool isSilenced();
 };
 
 #endif // MAKERPHONE_PHONEBATTERYLOWMODAL_H

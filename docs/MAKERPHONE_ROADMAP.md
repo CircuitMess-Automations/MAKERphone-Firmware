@@ -1194,6 +1194,39 @@ lowest-numbered `[ ]`.
   open: `PhoneCameraScreen` was the last Phone* screen still calling
   `Ringtone.play()` directly without a SILENT-profile gate.
 
+- [x] **S226** -- `PhoneBatteryLowModal` SILENT-profile chirp gate --
+  the low-battery nag chirp (S58) calls `Ringtone.play(ChirpMelody)`
+  directly inside `onStart()` with no profile guard, so on a SILENT /
+  MEETING-profile device the modal still leaks the same micro-interval
+  of audible piezo that the S205 sweep removed from `PhoneRadio` and
+  the S219-S223 / S225 sweep removed from the composer / music-player /
+  ringtone-picker / camera family: the engine self-mutes per loop tick
+  via `Settings.get().sound`, but the few microseconds between
+  `Ringtone.play()` and the engine's first mute pass are enough for
+  some Chatter units to emit an audible blip before falling silent.
+  S226 mirrors the established gate pattern: `PhoneBatteryLowModal`
+  gains a `static bool isSilenced()` helper that reads
+  `!Settings.get().sound` (so SILENT and MEETING -- the two five-state
+  profiles that `PhoneProfileScreen` (S159) maps to `sound = false` --
+  both gate identically), and the chirp call in `onStart()` is now
+  wrapped in `if(!isSilenced())` so the engine call is skipped entirely
+  and the LoopManager listener is never registered. The slab fade-in,
+  the pulsing `PhoneBatteryIcon`, the percent readout, the
+  `BATTERY LOW` caption + `Charge soon` hint, the auto-dismiss timer
+  and the any-key dismiss path still fire on a muted device, so the
+  warning is still delivered visually -- only the piezo path is short-
+  circuited. The Loud (General / Outdoor / Headset) path is byte-
+  identical: `Settings.get().sound == true` enters the
+  `if(!isSilenced())` block and the
+  `Ringtone.play(ChirpMelody)` call fires exactly as before. The
+  destructor / `onStop()` already call `Ringtone.stop()` symmetrically
+  whether or not the chirp ever started, so the muted path is clean
+  on dismiss too. No header surface changes beyond the new private
+  `static bool isSilenced()`. Closes the v2.1-fresh polish item the
+  S225 commit message had left open: every Phone* widget AND modal
+  in the firmware now gates `Ringtone.play()` on the active profile
+  before handing the melody to the engine.
+
 ---
 
 ## How the agent reads this file
