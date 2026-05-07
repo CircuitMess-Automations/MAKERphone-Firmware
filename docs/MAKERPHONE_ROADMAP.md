@@ -853,6 +853,56 @@ lowest-numbered `[ ]`.
   the same family as S217, with a single auto-saved slot rather
   than a four-slot picker UI).
 
+- [x] **S219** -- `PhoneComposer` SILENT-profile preview gate -- the
+  v2.1 sweep noted that the composer's BTN_9 preview path
+  (`PhoneComposer::togglePreview()`) calls
+  `PhoneComposerPlayback::play()` (which in turn calls
+  `Ringtone.play()`) without first consulting the active phone
+  profile. The `PhoneRingtoneEngine` does mute itself per-loop when
+  `Settings.get().sound == false` (`PhoneRingtoneEngine.cpp` lines
+  60-83), but the engine still subscribes as a `LoopManager`
+  listener and the screen still flips its hint to "STP" -- so under
+  SILENT / MEETING the user sees a stopwatch start with no audio
+  and no visible explanation, exactly the failure mode S205 fixed
+  for `PhoneRadio` (the FM dial). S219 closes the gap with the
+  same minimal pattern.
+
+  Concretely S219: (i) lifts a static
+  `PhoneComposer::isSilenced()` helper into
+  `src/Screens/PhoneComposer.{h,cpp}` that reads
+  `!Settings.get().sound` (the legacy bool that
+  `PhoneProfileScreen` (S159) writes to `false` for SILENT and
+  MEETING and `true` for GENERAL / OUTDOOR / HEADSET, so the
+  helper covers every "should the composer drive the piezo right
+  now" case without dragging the five-state enum into this
+  screen); (ii) inserts an early-return into
+  `togglePreview()` immediately after the empty-buffer guard so
+  the silent path runs `PhoneComposerPlayback::stop()` (defensive,
+  in case a stale engine playhead is still ticking from a profile
+  flip mid-preview), flashes the LEFT softkey (matching the
+  existing empty-buffer / play-rejected feedback so the gesture
+  still feels acknowledged), and hands off to `refreshHints()`
+  without ever asking the engine to drive the piezo; (iii)
+  rewires `refreshHints()` to surface a "MUT" token in the bottom
+  hint line in place of the usual "PLY" when `isSilenced()` is
+  true and no preview is in flight, so the no-op flash from
+  `togglePreview()` is self-explanatory. The token width stays
+  at 3 glyphs so the existing `S%u%s 9=%s 0=SV A=LD` hint string
+  still fits inside the 148 px row width with margin to spare.
+
+  Visible output is byte-identical for non-silenced profiles --
+  the hint reads `PLY` -> `STP` -> `PLY` exactly as before, and
+  every other gesture (SAVE / LOAD / slot-cycle / clear / stamp
+  edit) is untouched. The only behavioural delta lands when the
+  user has flipped to SILENT or MEETING via `PhoneProfileScreen`:
+  the hint reads `MUT`, BTN_9 produces the expected soft-key
+  flash without any piezo interaction, and a flip back to
+  GENERAL / OUTDOOR / HEADSET re-arms the preview on the next
+  press without a screen rebuild. The new include is
+  `<Settings.h>`; no header surface changes beyond the public
+  static helper. Resolves the v2.1-fresh polish item now logged
+  in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file

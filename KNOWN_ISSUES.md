@@ -467,6 +467,29 @@ polish for v2.1.
   identical; the LVGL object count for the banner drops from
   "1 host + up to 80 cells" to "1 host + 1 canvas".
 
+- [x] **`PhoneComposer` (S121-S123) does not gate its preview path
+  against the SILENT / MEETING phone profiles.** The screen's BTN_9
+  preview path (`PhoneComposer::togglePreview`) calls
+  `PhoneComposerPlayback::play()` -> `Ringtone.play()` regardless of
+  the active profile. `PhoneRingtoneEngine` does mute itself per-loop
+  when `Settings.get().sound == false` (PhoneRingtoneEngine.cpp lines
+  60-83), but the engine still subscribes as a `LoopManager` listener
+  and the screen still flips its hint to `STP` -- so under SILENT or
+  MEETING the user sees a stopwatch start with no audio and no
+  visible explanation, exactly the failure mode S205 fixed for
+  `PhoneRadio`. -- fixed in S219. A static
+  `PhoneComposer::isSilenced()` helper (reads `!Settings.get().sound`,
+  the same legacy bool S205 reads) is added to the screen, and
+  `togglePreview()` short-circuits the play-call under a silent
+  profile (defensive `PhoneComposerPlayback::stop()` for stale engine
+  playheads, soft-key flash for gesture acknowledgement, hint
+  refresh) instead of asking the engine to drive the piezo.
+  `refreshHints()` surfaces a 3-glyph "MUT" token in place of the
+  usual "PLY" when silenced and not playing so the no-op flash is
+  self-explanatory. The hint string still fits inside the 148 px
+  row width with margin to spare, and visible output is byte-
+  identical for non-silenced profiles.
+
 ## Hardware-only (cannot reproduce in CI)
 
 - [ ] All v1.0 hardware-only items above still apply to v2.0 hardware.

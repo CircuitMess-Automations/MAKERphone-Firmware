@@ -176,6 +176,23 @@ public:
 	void          togglePreview();
 	bool          isPreviewing() const;
 
+	/**
+	 * S219 — true when the active phone profile silences ringer
+	 * audio (`Settings.get().sound == false`, i.e. SILENT or
+	 * MEETING from `PhoneProfileScreen`'s five-state vocabulary).
+	 *
+	 * Used by `togglePreview()` to short-circuit the
+	 * `PhoneComposerPlayback::play()` call so the composer cannot
+	 * drive the piezo at all under a silent profile -- not even
+	 * for the micro-interval before the engine's per-loop mute
+	 * kicks in -- and by `refreshHints()` to render a "MUT"
+	 * token in the bottom hint line in place of the usual "PLY"
+	 * so the user knows exactly why a press of the preview key
+	 * just flashes the soft-key without any audio. Mirrors the
+	 * `PhoneRadio::isSilenced()` helper added in S205.
+	 */
+	static bool   isSilenced();
+
 	/** Returns the canonical 1-char tone label for `tone`:
 	 *    'C' 'D' 'E' 'F' 'G' 'A' 'B' -> the same character
 	 *    'P'                          -> '-'

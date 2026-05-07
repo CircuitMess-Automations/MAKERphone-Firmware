@@ -2,6 +2,7 @@
 
 #include <Input/Input.h>
 #include <Pins.hpp>
+#include <Settings.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -751,6 +752,26 @@ void PhoneComposer::refreshHints() {
 	// screen.
 	const bool occupied = PhoneComposerStorage::hasSlot(activeSlot);
 	const bool playing  = isPreviewing();
+	// S219 -- when the active phone profile silences ringer audio
+	// (`Settings.get().sound == false`, i.e. SILENT or MEETING from
+	// PhoneProfileScreen's five-state vocabulary) the screen short-
+	// circuits the `PhoneComposerPlayback::play()` call instead of
+	// driving the piezo, so the usual "PLY" hint would lie to the
+	// user about what a press of BTN_9 will do. Surface a "MUT"
+	// token in the hint line instead so the no-op flash from
+	// `togglePreview()` is self-explanatory. The token width stays
+	// at 3 glyphs so the hint string still fits inside the 148 px
+	// row width with margin to spare.
+	const bool silenced = isSilenced();
+
+	const char* playToken;
+	if(playing){
+		playToken = "STP";
+	} else if(silenced){
+		playToken = "MUT";
+	} else {
+		playToken = "PLY";
+	}
 
 	char buf[40] = {};
 	// 21-ish glyphs at pixelbasic7 6 px stride keeps us inside the
@@ -760,12 +781,26 @@ void PhoneComposer::refreshHints() {
 			 "S%u%s 9=%s 0=SV A=LD",
 			 (unsigned)activeSlot,
 			 occupied ? "*" : " ",
-			 playing  ? "STP" : "PLY");
+			 playToken);
 	lv_label_set_text(hintLine2, buf);
 }
 
 bool PhoneComposer::isPreviewing() const {
 	return PhoneComposerPlayback::isPlaying();
+}
+
+// S219 -- gate the composer preview against the SILENT / MEETING
+// phone profiles. The underlying truth is `Settings.get().sound`:
+// `PhoneProfileScreen` (S159) writes `sound = false` for both
+// SILENT and MEETING and `sound = true` for GENERAL / OUTDOOR /
+// HEADSET, so reading the legacy bool covers every "should the
+// composer drive the piezo right now" case without dragging the
+// five-state enum into this screen. Static so callers can short-
+// circuit through the helper without indirecting through a live
+// PhoneComposer instance, mirroring `PhoneRadio::isSilenced()`
+// added in S205.
+bool PhoneComposer::isSilenced() {
+	return !Settings.get().sound;
 }
 
 void PhoneComposer::togglePreview() {
@@ -778,6 +813,24 @@ void PhoneComposer::togglePreview() {
 		// Nothing to preview -- give the user a visible cue rather
 		// than a silent buzzer-no-op.
 		if(softKeys) softKeys->flashLeft();
+		return;
+	}
+	if(isSilenced()) {
+		// S219 -- SILENT / MEETING profile: do not even ask the
+		// engine to drive the piezo, so the dial cannot leak even
+		// the micro-interval of audible noise that could slip in
+		// between `Ringtone.play()` and the engine's first per-loop
+		// `Settings.get().sound` mute tick (PhoneRingtoneEngine.cpp).
+		// Defensive `PhoneComposerPlayback::stop()` in case a stale
+		// engine playhead is still ticking from a profile flip
+		// mid-preview, then refresh the hint so the bottom row
+		// reads "MUT" instead of "PLY" and the user knows the
+		// no-op is intentional. The soft-key flash matches the
+		// existing empty-buffer / play-rejected feedback so the
+		// gesture still feels acknowledged.
+		PhoneComposerPlayback::stop();
+		if(softKeys) softKeys->flashLeft();
+		refreshHints();
 		return;
 	}
 	const bool ok = PhoneComposerPlayback::play(buffer, noteCount,
