@@ -433,10 +433,26 @@ polish for v2.1.
   radio is alive but silenced rather than wondering whether the
   station "Static 108" is just naturally quiet.
 
-- [ ] **`PhoneBeatMaker` (S194) save slots are limited to 4 by the
-  current `Settings.beatPatterns[4]` array.** Real users will quickly
-  fill all four; bump to 8 in v2.1 once the NVS-resize migration plan
-  is in place.
+- [x] **`PhoneBeatMaker` (S194) pattern + BPM are not persisted.**
+  The earlier draft of this entry assumed the screen already wrote
+  through to `Settings.beatPatterns[4]`, but a `git grep` audit
+  showed no such field on `SettingsData` -- the BeatMaker had been
+  shipping as a transient toy: pattern + BPM lived on the screen
+  object, so popping `*#808#` (or a power-cycle) wiped the groove
+  without a trace. -- fixed in S218. A free-standing storage
+  service `PhoneBeatMakerStorage` (`src/Services/`) persists a
+  single auto-saved slot as a 16-byte NVS blob keyed `pat` under
+  namespace `mpbeat` (4-byte header + 1-byte bpm + 3 reserved
+  bytes + 8-byte track-major packed pattern bitfield). The
+  PhoneBeatMaker constructor now reads "try load, fall back to
+  the boom-tss-bap-tss seed only if NVS is empty"; toggleCell /
+  clearPattern / a value-actually-changed nudgeBpm flip a `dirty`
+  flag; onStop persists once on pop (not once per keypress) so
+  the NVS wear-leveller stays happy. The four-slot picker UI
+  the original entry hinted at is intentionally omitted -- the
+  same one-pattern auto-save that the Composer rejected gives
+  the screen the persistence the user actually noticed missing,
+  without growing the soft-key / cursor surface area.
 
 - [x] **`PhoneOperatorBanner` (S147) renders the user-pixelable logo
   every frame** — fixed in S204. The pre-S204 banner spawned up to 80

@@ -142,6 +142,13 @@ private:
 	uint8_t     playStep      = 0;
 	lv_timer_t* stepTimer     = nullptr;
 
+	// ---- persistence (S218) ----------------------------------
+	// True once any user mutation lands during this push: a cell
+	// toggle, a clear-pattern, or a BPM nudge. Drives the onStop()
+	// save so we never re-write NVS for a visit that only played
+	// the demo back.
+	bool dirty = false;
+
 	// ---- envelope (mirrors PhoneDrumKitScreen) ---------------
 	const PhoneDrumKitScreen::Drum* activeDrum    = nullptr;
 	uint8_t                         activeFrameIx = 0;
@@ -166,6 +173,17 @@ private:
 
 	void clearPattern();
 	void nudgeBpm(int8_t delta);
+
+	/** S218 -- try to populate `pattern` and `bpm` from
+	 *  PhoneBeatMakerStorage. Returns true on success; on failure
+	 *  the caller is expected to fall back to seedDefaultPattern()
+	 *  with the byte-identical pre-S218 starting groove. */
+	bool loadFromStorage();
+
+	/** S218 -- persist the current `pattern` + `bpm` to NVS. Called
+	 *  from onStop() only when `dirty` is set, so a visit that just
+	 *  plays the demo back never writes to NVS. */
+	void saveToStorage();
 
 	void startTransport();
 	void stopTransport();

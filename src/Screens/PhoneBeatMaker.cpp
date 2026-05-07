@@ -1,4 +1,5 @@
 #include "PhoneBeatMaker.h"
+#include "../Services/PhoneBeatMakerStorage.h"
 
 #include <Audio/Piezo.h>
 #include <Input/Input.h>
@@ -112,7 +113,14 @@ PhoneBeatMaker::PhoneBeatMaker()
 	buildHeader();
 	buildGrid();
 	buildHint();
-	seedDefaultPattern();
+	// S218: try to restore the user's last persisted pattern + BPM
+	// before seeding the default groove. The screen falls back to
+	// the byte-identical pre-S218 boom-tss-bap-tss seed (and the
+	// DefaultBpm) on a freshly-flashed device or after a deliberate
+	// PhoneBeatMakerStorage::clear() wipe.
+	if(!loadFromStorage()) {
+		seedDefaultPattern();
+	}
 	refreshAllCells();
 	refreshBpmLabel();
 	refreshStepLabel();
@@ -155,6 +163,13 @@ void PhoneBeatMaker::onStop() {
 	Input::getInstance()->removeListener(this);
 	stopTransport();
 	stopEnvelope();
+	// S218: persist the in-memory pattern + BPM before the screen
+	// is destroyed. Gated on `dirty` so a visit that only played
+	// the demo back never burns NVS write budget.
+	if(dirty) {
+		saveToStorage();
+		dirty = false;
+	}
 }
 
 // =====================================================================
@@ -383,6 +398,7 @@ void PhoneBeatMaker::moveCursor(int8_t deltaTrack, int8_t deltaStep) {
 
 void PhoneBeatMaker::toggleCell() {
 	pattern[cursorTrack][cursorStep] = !pattern[cursorTrack][cursorStep];
+	dirty = true; // S218 -- persist on next onStop()
 	refreshCell(cursorTrack, cursorStep);
 	// Audible confirmation: fire the drum voice for the toggled
 	// track immediately so the user hears what they just armed.
@@ -401,6 +417,7 @@ void PhoneBeatMaker::clearPattern() {
 			pattern[t][s] = false;
 		}
 	}
+	dirty = true; // S218 -- persist on next onStop()
 	refreshAllCells();
 }
 
@@ -410,6 +427,7 @@ void PhoneBeatMaker::nudgeBpm(int8_t delta) {
 	if(newBpm > (int16_t) MaxBpm) newBpm = MaxBpm;
 	if((uint8_t) newBpm == bpm) return;
 	bpm = (uint8_t) newBpm;
+	dirty = true; // S218 -- persist on next onStop()
 	refreshBpmLabel();
 	if(playing) rearmStepTimer();
 }
@@ -612,4 +630,29 @@ void PhoneBeatMaker::buttonPressed(uint i) {
 		default:
 			break;
 	}
+}
+
+
+// =====================================================================
+// Persistence (S218) -- thin shims over PhoneBeatMakerStorage so the
+// screen body stays focused on UI / transport. The storage service
+// owns the on-disk format, the magic byte, the version byte and the
+// pattern bit-packing; this layer is only responsible for sequencing
+// the calls and clamping the BPM into the screen's MinBpm..MaxBpm
+// envelope on the way back from NVS.
+// =====================================================================
+
+bool PhoneBeatMaker::loadFromStorage() {
+	uint8_t loadedBpm = bpm;
+	if(!PhoneBeatMakerStorage::loadInto(pattern, &loadedBpm)) {
+		return false;
+	}
+	if(loadedBpm < MinBpm) loadedBpm = MinBpm;
+	if(loadedBpm > MaxBpm) loadedBpm = MaxBpm;
+	bpm = loadedBpm;
+	return true;
+}
+
+void PhoneBeatMaker::saveToStorage() {
+	(void) PhoneBeatMakerStorage::save(pattern, bpm);
 }

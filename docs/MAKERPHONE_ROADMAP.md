@@ -794,6 +794,65 @@ lowest-numbered `[ ]`.
   `loadFromStorage()` and skips the demo set entirely. Resolves
   the matching v1.0 polish item in `KNOWN_ISSUES.md`.
 
+- [x] **S218** -- `PhoneBeatMaker` NVS-backed pattern + BPM
+  persistence -- the v2.0 sweep in `KNOWN_ISSUES.md` flagged that
+  the BeatMaker (S194) is currently a transient toy: the
+  `pattern[NumTracks][NumSteps]` grid and the `bpm` byte live
+  only on the screen object, so popping the screen (or
+  power-cycling the device) wipes the user's groove without a
+  trace. S218 closes that gap with the same lightweight NVS
+  pattern that already backs `PhoneComposerStorage` (S123) and
+  `PhoneCallHistoryStorage` (S217): a tiny new service
+  `PhoneBeatMakerStorage` (`src/Services/PhoneBeatMakerStorage.h`
+  / `.cpp`) holding a single 16-byte blob keyed `pat` under
+  namespace `mpbeat`, with a 4-byte header (magic 'M','B',
+  version=1, reserved), a 1-byte `bpm`, three reserved bytes
+  for forward compatibility, and an 8-byte track-major packed
+  pattern bitfield (4 tracks x 16 steps = 64 bits). The byte
+  stride and the grid geometry are pinned by `static_assert`s
+  against `PhoneBeatMaker::NumTracks` / `NumSteps` / the derived
+  `kPatternBytes` so a future tweak to the grid trips a build
+  error rather than a silent on-disk format drift.
+
+  Concretely S218: (i) ships `PhoneBeatMakerStorage` with the
+  static `begin() / hasSaved() / loadInto() / save() / clear()`
+  surface and a single shared NVS handle opened lazily on first
+  touch (matching the Highscore / PhoneComposerStorage /
+  PhoneCallHistoryStorage pattern); (ii) grows `PhoneBeatMaker`
+  one private bool flag (`dirty`, default false) and two private
+  helpers (`loadFromStorage()`, `saveToStorage()`); (iii) rewires
+  the constructor body from an unconditional `seedDefaultPattern()`
+  to "try `loadFromStorage()`, fall back to `seedDefaultPattern()`
+  only when the persisted blob is empty" -- the byte-identical
+  pre-S218 boom-tss-bap-tss seed and the DefaultBpm still light
+  the grid on a freshly-flashed device because `loadInto()`
+  returns false against an empty `mpbeat/pat` blob; (iv) wires
+  `toggleCell()`, `clearPattern()` and the value-actually-changed
+  branch of `nudgeBpm()` to flip `dirty = true` so a visit that
+  only played the demo back never burns NVS write budget; (v)
+  has `onStop()` call `saveToStorage()` (and reset `dirty`)
+  immediately after the existing transport / envelope teardown,
+  so the user's edits land in NVS exactly when the screen pops
+  to BACK -- a single write per pop, not one per keypress, which
+  is what the NVS wear-leveller is happiest with.
+
+  Visible output is byte-identical on a freshly-flashed device:
+  the grid still paints with the canonical four-on-the-floor
+  groove on first push, and the BPM still reads 120. The only
+  behavioural delta is that once the user toggles a cell, nudges
+  the tempo or hits BTN_5 to clear, those edits now survive a
+  power-cycle: the next push of `*#808#` from the dialer reads
+  the persisted blob back into `pattern` + `bpm` via
+  `loadFromStorage()` and skips the seed groove entirely. The
+  on-disk envelope is the legacy clamp range (60..240 BPM) so a
+  corrupt blob can never park an out-of-range value the screen
+  would then have to defend against. Resolves the v2.0-fresh
+  polish item in `KNOWN_ISSUES.md` (the `Settings.beatPatterns[4]`
+  description there assumed the screen already persisted to
+  Settings; the actual fix is a free-standing storage service in
+  the same family as S217, with a single auto-saved slot rather
+  than a four-slot picker UI).
+
 ---
 
 ## How the agent reads this file
