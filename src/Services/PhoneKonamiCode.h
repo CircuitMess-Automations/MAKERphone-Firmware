@@ -92,6 +92,54 @@ public:
 	 *  correctly press-by-press. */
 	uint8_t progress() const { return idx; }
 
+	/**
+	 * S229 - SILENT / MEETING profile gate. PhoneProfileScreen
+	 * (S159) writes `Settings.get().sound = false` for both Silent
+	 * and Meeting profiles and `true` for General / Outdoor /
+	 * Headset, so reading the legacy bool is the cheapest one-read
+	 * cover for every "should the Konami unlock chime drive the
+	 * piezo right now" case without dragging the five-state enum
+	 * into this service. Mirrors the S228 gate on
+	 * PhoneChargeChime::isSilenced(), the S227 gate on
+	 * PhoneDeliveredChime, the S226 gate on PhoneBatteryLowModal,
+	 * the S225 gate on PhoneCameraScreen, the S219-S223 gates on
+	 * the composer / music-player / ringtone-picker family, and
+	 * the S205 gate on PhoneRadio.
+	 *
+	 * `applyUnlock()` consults this helper after running its
+	 * sticky `Settings.rainbowUnlocked` / `Settings.themeId` writes
+	 * (and the conditional `Settings.store()` flush) but before
+	 * handing the ascending arpeggio to the engine. The
+	 * PhoneRingtoneEngine already self-mutes per loop tick when
+	 * `Settings.sound == false`, but the micro-window between
+	 * `Ringtone.play()` and the engine's first mute pass is enough
+	 * for some Chatter units to emit an audible blip before falling
+	 * silent - exactly the failure mode the S205 / S219-S228 sweep
+	 * removed from every screen, modal and chime service that
+	 * drives the piezo. The S228 commit body had claimed the sweep
+	 * was complete for every non-alarm `Ringtone.play()` call site
+	 * in the firmware; that was wrong -
+	 * `PhoneKonamiCode::applyUnlock()` was the last surviving
+	 * service-layer call site that bypassed the gate. Closing it
+	 * here brings the Easter-egg unlock chime into the same
+	 * convention.
+	 *
+	 * The visual unlock side-effects (`rainbowUnlocked = true`,
+	 * `themeId = Rainbow`, persisted via `Settings.store()`) still
+	 * land regardless of the silenced state - only the audible
+	 * confirmation is suppressed. This matches the semantics every
+	 * other gated cue uses (the underlying state transition or
+	 * one-shot bookkeeping always runs, only the piezo melody is
+	 * skipped) so a SILENT-profile user re-entering the code on a
+	 * later GENERAL boot still gets the chime, and a GENERAL-profile
+	 * user gets the byte-identical pre-S229 behaviour.
+	 *
+	 * Public so a future themes / unlock debug surface can present
+	 * the resolved silenced state without having to re-derive it
+	 * from Settings.
+	 */
+	static bool isSilenced();
+
 private:
 	void buttonPressed(uint i) override;
 

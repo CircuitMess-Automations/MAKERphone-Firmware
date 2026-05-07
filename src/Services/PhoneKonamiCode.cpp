@@ -164,13 +164,51 @@ void PhoneKonamiCode::applyUnlock() {
 		Settings.store();
 	}
 
+	// S229 - SILENT / MEETING profile gate. PhoneRingtoneEngine
+	// internally short-circuits the piezo when Settings.sound is
+	// false, BUT the engine self-mutes per-loop, so the micro-window
+	// between `Ringtone.play()` and the engine's first mute pass is
+	// enough for some Chatter units to emit an audible blip before
+	// falling silent. Closing the window here mirrors the S205 /
+	// S219-S223 / S225 / S226 / S227 / S228 sweep convention: skip
+	// the engine call entirely under a silenced profile so the
+	// LoopManager listener is never registered. The visual unlock
+	// side-effects above (`rainbowUnlocked`, `themeId`,
+	// `Settings.store()`) have already landed by this point, so the
+	// rainbow theme still flips on for the next screen draw - only
+	// the audible confirmation is suppressed.
+	if(isSilenced()) return;
+
 	// Audible confirmation. Routed through the global ringtone engine
-	// so Settings.sound mute is honoured automatically (silent
-	// profiles still get the visual unlock without an audible cue).
-	// The S148 boot chime, S149 power-off arpeggio, and S150
-	// charge-complete chime all share the engine, so a Konami unlock
-	// fired during one of those overlapping cues will smoothly
-	// pre-empt the in-progress melody - the ringtone engine takes
-	// the most recent play() request as the authoritative one.
+	// so a fresh GENERAL / OUTDOOR / HEADSET-profile device still
+	// hears the chime. The S148 boot chime, S149 power-off arpeggio,
+	// and S150 charge-complete chime all share the engine, so a
+	// Konami unlock fired during one of those overlapping cues will
+	// smoothly pre-empt the in-progress melody - the ringtone engine
+	// takes the most recent play() request as the authoritative one.
 	Ringtone.play(kUnlockMelody);
+}
+
+// S229 - SILENT / MEETING profile gate. PhoneProfileScreen (S159)
+// writes `Settings.get().sound = false` for both Silent and Meeting
+// profiles and `true` for General / Outdoor / Headset, so reading
+// the legacy bool is the cheapest one-read cover for every "should
+// the Konami unlock chime drive the piezo right now" case without
+// dragging the five-state enum into this service. Same pattern S205 /
+// S219-S223 / S225 / S226 / S227 / S228 use for their per-screen /
+// per-modal / per-service helpers; PhoneKonamiCode was the last
+// surviving service-layer non-alarm `Ringtone.play()` call site that
+// the S228 commit message claimed was already covered. The
+// PhoneBootSplash boot chime (S148) and PhonePowerDown power-off
+// arpeggio (S149) intentionally stay un-gated: the boot chime fires
+// before Settings has reliably been hydrated from NVS in some
+// failure-recovery boot paths, and the power-off arpeggio is a
+// deliberate user-confirmation cue for a destructive action.
+// PhoneSystemTones (S192) routes through the engine via a single
+// `play(uint8_t id)` entry point and is the next non-alarm surface
+// the sweep can revisit; gating that one centrally is a separate
+// session because it touches every UI cue at once and wants a slower
+// rollout.
+bool PhoneKonamiCode::isSilenced(){
+	return !Settings.get().sound;
 }

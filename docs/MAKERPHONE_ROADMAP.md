@@ -1311,6 +1311,53 @@ lowest-numbered `[ ]`.
   the engine -- finally fulfilling the closing claim S227's commit
   message had made one session early.
 
+- [x] **S229** -- `PhoneKonamiCode` SILENT-profile unlock-chime gate --
+  the Konami-code Easter-egg unlock (S166) calls
+  `Ringtone.play(kUnlockMelody)` directly inside `applyUnlock()` with
+  no profile guard, so on a SILENT / MEETING-profile device every
+  successful 10-press completion still leaks the same micro-interval
+  of audible piezo that the S205 sweep removed from `PhoneRadio`, the
+  S219-S223 sweep removed from the composer / music-player /
+  ringtone-picker family, the S225 sweep removed from
+  `PhoneCameraScreen`, the S226 sweep removed from
+  `PhoneBatteryLowModal`, the S227 sweep removed from
+  `PhoneDeliveredChime`, and the S228 sweep removed from
+  `PhoneChargeChime`: the engine self-mutes per loop tick via
+  `Settings.get().sound`, but the few microseconds between
+  `Ringtone.play()` and the engine's first mute pass are enough for
+  some Chatter units to emit an audible blip before falling silent.
+  S228's commit message had claimed every screen, modal, and chime
+  service in the firmware that reached `Ringtone.play()` for non-alarm
+  audio was now gated -- this was wrong:
+  `PhoneKonamiCode::applyUnlock()` was the last surviving service-
+  layer call site that bypassed the gate. S229 gives `PhoneKonamiCode`
+  a public `static bool isSilenced()` helper that reads
+  `!Settings.get().sound` (so SILENT and MEETING -- the two five-state
+  profiles that `PhoneProfileScreen` (S159) maps to `sound = false` --
+  both gate identically), and `applyUnlock()` is rewired to consult
+  the helper AFTER its existing sticky `Settings.rainbowUnlocked` and
+  `Settings.themeId = Rainbow` writes (and the conditional
+  `Settings.store()` flush) but BEFORE handing the ascending arpeggio
+  to the engine. When silenced the engine call is skipped entirely so
+  the LoopManager listener is never registered; the visual unlock
+  side-effects still land so the rainbow theme still flips on for the
+  next screen draw and a SILENT-profile user re-entering the code on
+  a later GENERAL boot still hears the chime. The Loud (General /
+  Outdoor / Headset) path is byte-identical: `Settings.get().sound ==
+  true` skips the early return and the
+  `Ringtone.play(kUnlockMelody)` call fires exactly as before. No
+  header surface changes beyond the new public
+  `static bool isSilenced()`. With S229 every Phone* screen, modal,
+  AND service in the firmware that reaches `Ringtone.play()` for
+  non-alarm audio now gates on the active profile before handing the
+  melody to the engine -- finally fulfilling the closing claim S228's
+  commit message had made one session early. The `PhoneSystemTones`
+  (S192) library is the last remaining non-alarm engine call site;
+  gating its central `play(uint8_t id)` entry point is a deliberate
+  next-session task because it touches every UI cue at once and wants
+  a slower rollout than the per-surface sweep convention this run
+  follows.
+
 ---
 
 ## How the agent reads this file
