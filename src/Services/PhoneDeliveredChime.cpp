@@ -4,6 +4,7 @@
 
 #include <Arduino.h>
 #include <Notes.h>
+#include <Settings.h>
 
 // =====================================================================
 // S157 — PhoneDeliveredChime
@@ -104,9 +105,33 @@ void PhoneDeliveredChime::notifyDelivered(){
 
 	lastChimeAt = now;
 
-	// PhoneRingtoneEngine internally short-circuits the piezo when
-	// Settings.sound is false, so a muted device still observes the
-	// state transition but produces no audible chime — same contract
-	// the rest of the chime family relies on.
+	// S227 — SILENT / MEETING profile gate. PhoneRingtoneEngine
+	// internally short-circuits the piezo when Settings.sound is
+	// false, BUT the engine self-mutes per-loop, so the micro-window
+	// between `Ringtone.play()` and the engine's first mute pass is
+	// enough for some Chatter units to emit an audible blip before
+	// falling silent. Closing the window here mirrors the S205 /
+	// S219–S223 / S225 / S226 sweep convention: skip the engine call
+	// entirely under a silenced profile so the LoopManager listener
+	// is never registered. The cooldown / boot-guard bookkeeping
+	// above still runs, so a mid-session profile flip from SILENT
+	// back to GENERAL is picked up on the next ACK without resetting
+	// the cooldown clock from a stale audible chirp.
+	if(isSilenced()) return;
+
 	Ringtone.play(kDeliveredMelody);
+}
+
+// S227 — SILENT / MEETING profile gate. PhoneProfileScreen (S159)
+// writes `Settings.get().sound = false` for both Silent and Meeting
+// profiles and `true` for General / Outdoor / Headset, so reading the
+// legacy bool covers every "should the delivered chirp drive the
+// piezo right now" case in one read without dragging the five-state
+// enum into this service. Same pattern S205 / S219–S223 / S225 / S226
+// use for their per-screen / per-modal helpers; the chime family
+// finally joins the convention so EVERY surface that reaches
+// `Ringtone.play()` for non-alarm audio gates on the active profile
+// before handing the melody to the engine.
+bool PhoneDeliveredChime::isSilenced(){
+	return !Settings.get().sound;
 }

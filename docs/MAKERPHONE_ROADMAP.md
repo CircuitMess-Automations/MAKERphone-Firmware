@@ -1227,6 +1227,44 @@ lowest-numbered `[ ]`.
   in the firmware now gates `Ringtone.play()` on the active profile
   before handing the melody to the engine.
 
+- [x] **S227** -- `PhoneDeliveredChime` SILENT-profile gate -- the
+  message-delivered double-tick chime (S157) calls
+  `Ringtone.play(kDeliveredMelody)` directly inside `notifyDelivered()`
+  with no profile guard, so on a SILENT / MEETING-profile device every
+  inbound `Sent -> Delivered` ACK still leaks the same micro-interval
+  of audible piezo that the S205 sweep removed from `PhoneRadio`, the
+  S219-S223 sweep removed from the composer / music-player /
+  ringtone-picker family, the S225 sweep removed from
+  `PhoneCameraScreen`, and the S226 sweep removed from
+  `PhoneBatteryLowModal`: the engine self-mutes per loop tick via
+  `Settings.get().sound`, but the few microseconds between
+  `Ringtone.play()` and the engine's first mute pass are enough for
+  some Chatter units to emit an audible blip before falling silent.
+  S226's commit message had claimed the sweep was complete for
+  Phone* widgets AND modals; S227 finishes the job for the chime
+  family of services. `PhoneDeliveredChime` gains a public
+  `static bool isSilenced()` helper that reads `!Settings.get().sound`
+  (so SILENT and MEETING -- the two five-state profiles that
+  `PhoneProfileScreen` (S159) maps to `sound = false` -- both gate
+  identically), and `notifyDelivered()` is rewired to consult the
+  helper after running its existing boot-guard / cooldown bookkeeping
+  but before handing the melody to the engine. When silenced the
+  engine call is skipped entirely so the LoopManager listener is
+  never registered; the cooldown / `lastChimeAt` update still runs
+  so a mid-session profile flip from SILENT back to GENERAL is
+  picked up on the next ACK without resetting the cooldown clock
+  from a stale audible chirp. The Loud (General / Outdoor /
+  Headset) path is byte-identical: `Settings.get().sound == true`
+  skips the early return and the
+  `Ringtone.play(kDeliveredMelody)` call fires exactly as before.
+  No header surface changes beyond the new public
+  `static bool isSilenced()`. Closes a v2.1-fresh polish item the
+  S205 / S219-S226 sweep had not yet covered: the chime-service
+  layer now matches the screen / modal layer, so every surface
+  that reaches `Ringtone.play()` for non-alarm audio in the
+  firmware gates on the active profile before handing the melody
+  to the engine.
+
 ---
 
 ## How the agent reads this file
