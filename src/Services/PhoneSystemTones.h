@@ -144,6 +144,49 @@ public:
 	 * lifetimes.
 	 */
 	static const PhoneRingtoneEngine::Melody* melody(uint8_t id);
+
+	/**
+	 * S231 - introspective wrapper around `play(uint8_t id)`. Same
+	 * gate / valid-id semantics as `play()` (skip on out-of-range id,
+	 * skip on `isSilenced()`, otherwise hand the catalogued Melody to
+	 * the engine via `Ringtone.play()`), but reports back to the
+	 * caller whether the engine call actually fired. Returns:
+	 *
+	 *   - `false` if `id` is out of range (>= Count). Nothing plays.
+	 *   - `false` if a SILENT / MEETING profile silenced the catalogue
+	 *     (i.e. `isSilenced()` returned true). Nothing plays.
+	 *   - `true`  if the engine call fired and the LoopManager listener
+	 *     was registered. Caller can assume the cue is now in flight.
+	 *
+	 * Foreshadowed by the S192 / S230 commit bodies' "future Settings
+	 * -> Sounds -> System chimes picker" design notes (mirroring the
+	 * existing S183 PhoneSoftKeyToneScreen pattern): a preview row in
+	 * that picker wants to know whether a tap actually produced audio
+	 * so it can fall back to a "(silenced)" caption when the active
+	 * profile gates the engine call out -- without re-deriving the
+	 * gate from `Settings.get().sound` at the picker level. A future
+	 * diag screen (e.g. a "Sound test" entry in PhoneDiagScreen that
+	 * walks every chime in turn) wants the same answer for the same
+	 * reason.
+	 *
+	 * `play(uint8_t id)` continues to exist as the cheap fire-and-
+	 * forget entry point and is rewired in S231 to `(void)tryPlay(id)`
+	 * so the gate / valid-id checks live in exactly one place. The
+	 * engine call boundary is byte-identical to the pre-S231 path:
+	 * same `valid()` early-return, same `isSilenced()` early-return,
+	 * same `Ringtone.play(kMelodies[id])` invocation, same lack of
+	 * persisted state. Every existing `PhoneSystemTones::play()` call
+	 * site in the firmware (S110 PhoneCallEnded, S134 PhoneSimon,
+	 * S141 PhoneAlarmClock, S157 etc.) keeps the same observable
+	 * behaviour without any per-site changes.
+	 *
+	 * `tryPlay()` does NOT subsume `melody(uint8_t id)`: any caller
+	 * that PRE-LOADS a melody pointer to fire later (notably
+	 * PhoneIncomingCall) still wants the const Melody* directly, not
+	 * a "did the engine fire" answer for the catalogue's central
+	 * entry point. The two helpers stay deliberately distinct.
+	 */
+	static bool tryPlay(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H

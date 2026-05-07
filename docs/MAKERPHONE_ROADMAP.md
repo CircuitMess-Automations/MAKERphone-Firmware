@@ -1410,6 +1410,54 @@ lowest-numbered `[ ]`.
   finally gates on the active profile before handing the melody to
   the engine, and the S205 sweep convention is fully closed.
 
+- [x] **S231** -- `PhoneSystemTones::tryPlay(uint8_t id)` introspective
+  gate-aware wrapper -- the S192 / S230 commit bodies had explicitly
+  foreshadowed a "future Settings -> Sounds -> System chimes picker"
+  (mirroring the existing S183 PhoneSoftKeyToneScreen pattern) whose
+  preview row would want a "did the cue actually fire" answer so it
+  can fall back to a "(silenced)" caption when the active profile
+  gates the engine call out -- without re-deriving the gate from
+  `Settings.get().sound` at the picker level. The pre-S231 surface
+  exposed the gate (`static bool isSilenced()`) and the fire-and-
+  forget entry point (`static void play(uint8_t id)`) but no helper
+  that combined the two in a single transactional call. S231 grows
+  the catalogue header by exactly one public symbol --
+  `static bool tryPlay(uint8_t id)` -- whose semantics are identical
+  to the pre-S231 `play(uint8_t id)` body (skip on out-of-range id,
+  skip on `isSilenced()`, otherwise hand the catalogued Melody to
+  the engine via `Ringtone.play(kMelodies[id])`) but which returns
+  the boolean answer the foreshadowed picker (and a future diag
+  screen that walks every chime in turn) wants: `false` for an
+  invalid id, `false` for a silenced profile, `true` if the engine
+  call actually fired and the LoopManager listener was registered.
+  `play(uint8_t id)` is rewired to `(void) tryPlay(id)` so the gate
+  / valid-id checks live in exactly one place and cannot drift; the
+  engine call boundary is byte-identical to the pre-S231 path
+  (same `valid()` early-return, same `isSilenced()` early-return,
+  same `Ringtone.play(kMelodies[id])` invocation, no persisted
+  state) so every existing `PhoneSystemTones::play()` call site in
+  the firmware (S110 PhoneCallEnded, S134 PhoneSimon, S141
+  PhoneAlarmClock, S157 etc.) keeps the same observable behaviour
+  without any per-site change. The `melody(uint8_t id)` accessor is
+  intentionally NOT subsumed by `tryPlay`: any caller that PRE-
+  LOADS a melody pointer to fire later (notably PhoneIncomingCall,
+  which grabs the structure ahead of time) still wants the const
+  `PhoneRingtoneEngine::Melody*` directly, not a "did the engine
+  fire" answer for the catalogue's central entry point. `play()`
+  and `tryPlay()` stay deliberately distinct so the cheap fire-
+  and-forget entry point keeps its `void` signature for the
+  hundred-plus existing call sites and the new gate-aware wrapper
+  is opt-in for the foreshadowed picker / diag work. The Loud
+  (General / Outdoor / Headset) path is byte-identical: a Settings
+  with `sound == true` returns `true` from `tryPlay` after firing
+  the engine; the Silent / Meeting path returns `false` after
+  short-circuiting before `Ringtone.play`. Header surface grows by
+  exactly one public symbol (`static bool tryPlay(uint8_t id)`);
+  the cpp moves the existing valid + isSilenced + engine-handoff
+  three-line body out of `play` and into the new `tryPlay` and
+  reduces `play` to a single `(void) tryPlay(id)` call. No new
+  includes, no new const data, no new SPIFFS asset cost.
+
 ---
 
 ## How the agent reads this file

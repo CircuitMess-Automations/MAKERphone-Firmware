@@ -208,7 +208,22 @@ const PhoneRingtoneEngine::Melody* PhoneSystemTones::melody(uint8_t id){
 }
 
 void PhoneSystemTones::play(uint8_t id){
-	if(!valid(id)) return;
+	// S231 - the gate / valid-id checks (and the engine handoff) live
+	// inside `tryPlay(id)` so this fire-and-forget entry point and
+	// the new bool-returning `tryPlay` cannot drift out of sync. The
+	// pre-S231 body inlined `valid` + `isSilenced` + `Ringtone.play`
+	// here; calling tryPlay(id) is byte-identical at the engine call
+	// boundary (same valid() early-return, same isSilenced() early-
+	// return, same Ringtone.play(kMelodies[id]) invocation, no
+	// persisted state) so every existing `PhoneSystemTones::play()`
+	// call site in the firmware (S110 PhoneCallEnded, S134 PhoneSimon,
+	// S141 PhoneAlarmClock, etc.) keeps the same observable behaviour
+	// without any per-site change.
+	(void) tryPlay(id);
+}
+
+bool PhoneSystemTones::tryPlay(uint8_t id){
+	if(!valid(id)) return false;
 	// S230 - SILENT / MEETING profile gate. PhoneRingtoneEngine
 	// internally short-circuits the piezo when Settings.sound is
 	// false (see emitTone()), BUT the engine self-mutes per-loop, so
@@ -223,14 +238,25 @@ void PhoneSystemTones::play(uint8_t id){
 	// returns the same const Melody* regardless of profile state, so
 	// any PRE-LOAD call site that grabs the structure (notably
 	// PhoneIncomingCall) is untouched - only the central
-	// `play(uint8_t id)` entry point gates.
-	if(isSilenced()) return;
+	// `play(uint8_t id)` / `tryPlay(uint8_t id)` entry points gate.
+	if(isSilenced()) return false;
 	// Routing through the engine means a Settings.sound mute is
 	// ALSO honoured by the engine itself as a defence-in-depth (see
 	// PhoneRingtoneEngine::emitTone), and any active melody (call
 	// ringer, music player) replaces this one-shot so latched
 	// higher-priority audio always wins.
 	Ringtone.play(kMelodies[id]);
+	// S231 - report back to the caller that the engine call fired.
+	// Foreshadowed by the S192 / S230 commit bodies' "future Settings
+	// -> Sounds -> System chimes picker" design notes: a preview row
+	// in that picker wants to fall back to a "(silenced)" caption
+	// when the active profile gates the cue out, and a future diag
+	// screen that walks every chime in turn wants the same answer
+	// for the same reason. Distinct from `play()` so the existing
+	// fire-and-forget entry point keeps its void signature -- every
+	// pre-S231 PhoneSystemTones::play() call site in the firmware
+	// stays compile-clean without per-site adaptation.
+	return true;
 }
 
 // S230 - SILENT / MEETING profile gate. PhoneProfileScreen (S159)
