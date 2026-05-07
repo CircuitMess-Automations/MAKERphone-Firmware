@@ -90,14 +90,25 @@ static PhoneHomeScreen* s_pendingHomeForWelcome = nullptr;
 static void contactDetailCall(PhoneContactDetail* self){
 	if(self == nullptr) return;
 	const UID_t uid = self->getUid();
-	if(uid == 0) return;
+	if(uid == 0){
+		// S215: surface a "Sample contact - add a real one"
+		// toast so the user gets explicit feedback on the
+		// uid==0 placeholder no-op (the soft-key flash alone
+		// was easy to miss).
+		self->showSampleContactToast();
+		return;
+	}
 	Phone.placeCall(uid);
 }
 
 static void contactDetailMessage(PhoneContactDetail* self){
 	if(self == nullptr) return;
 	const UID_t uid = self->getUid();
-	if(uid == 0) return;
+	if(uid == 0){
+		// S215: same explicit toast feedback for MESSAGE.
+		self->showSampleContactToast();
+		return;
+	}
 	self->push(new ConvoScreen(uid));
 }
 
@@ -108,7 +119,11 @@ static void contactDetailMessage(PhoneContactDetail* self){
 static void contactDetailEdit(PhoneContactDetail* self){
 	if(self == nullptr) return;
 	const UID_t uid = self->getUid();
-	if(uid == 0) return;
+	if(uid == 0){
+		// S215: same explicit toast feedback for EDIT.
+		self->showSampleContactToast();
+		return;
+	}
 	auto* editor = new PhoneContactEdit(uid,
 										self->getName(),
 										self->getAvatarSeed());

@@ -653,6 +653,48 @@ lowest-numbered `[ ]`.
   contacts. Resolves the matching v2.1 polish item in
   `KNOWN_ISSUES.md`.
 
+- [x] **S215** -- Sample-contact toast on uid==0 CALL / MESSAGE / EDIT --
+  the v1.0 polish item in `KNOWN_ISSUES.md` flagged that
+  `PhoneContactsScreen` (S36) seeds a small fallback list of
+  placeholder rows (uid==0) so a freshly-flashed device still
+  reads as a real phone-book before any peers are paired, and
+  that pressing CALL / MESSAGE / EDIT on those rows
+  intentionally no-ops per the S37 / S38 contract -- but with
+  no visual cue beyond the soft-key press flash, a user
+  hammering the placeholder row was easy to leave wondering
+  whether the firmware had hung. The v2.0 sweep at the bottom
+  of `KNOWN_ISSUES.md` claimed S171 had wired the missing
+  `PhoneNotificationToast`, but a `git log` audit shows S171
+  actually shipped the `PhoneStressReliever` fidget toy and
+  never touched the contact-detail no-op path -- so the toast
+  was still missing in production. S215 closes the gap by
+  growing `PhoneContactDetail` (`src/Screens/PhoneContactDetail.h`
+  / `.cpp`) a public `showSampleContactToast()` helper backed
+  by a lazily-built `PhoneNotificationToast` member parented
+  to the screen's own `obj`, so the LV_EVENT_DELETE cascade in
+  `LVObject` auto-frees the toast when the screen tears down
+  (no destructor work needed -- same pattern
+  `PhoneHomeScreen::birthdayToast` already uses for the S199
+  birthday confetti toast). The toast slides in from above the
+  status bar, holds for 2 s with the variant-Generic cyan badge,
+  the warm-cream pixelbasic7 title "Sample contact" and the
+  muted-cream preview "Add a real one", then slides back out
+  with the existing 220 ms easing -- byte-identical animation
+  cadence to every other Phone* toast caller. The three
+  static handlers in `src/Elements/IntroScreen.cpp`
+  (`contactDetailCall`, `contactDetailMessage`,
+  `contactDetailEdit`) replace their bare `if(uid == 0) return;`
+  guards with `if(uid == 0){ self->showSampleContactToast();
+  return; }`, so the soft-key still flashes (per the legacy
+  S37/S38 contract) but the user now also sees a "Sample
+  contact / Add a real one" toast slide in from above the
+  status bar. Reusing one toast instance across the three
+  callers means a vigorous mash on the placeholder row spawns
+  no stacked toasts -- the second `show()` cancels the first
+  and replaces its content in place, the documented
+  `PhoneNotificationToast::show()` overlap behaviour. Resolves
+  the matching v1.0 polish item in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file

@@ -83,10 +83,23 @@ on a usable home screen on a fresh device.
   ADVANCED row was unreachable from the keypad. Both fall out
   of the new derivation.
 
-- [ ] **Sample-row contacts (uid==0) silently no-op CALL / MESSAGE / EDIT.**
+- [x] **Sample-row contacts (uid==0) silently no-op CALL / MESSAGE / EDIT.**
   Intentional (S37/S38) but the user gets no visual cue. Add a
   `PhoneNotificationToast` "Sample contact — add a real one" so the
-  feedback is explicit.
+  feedback is explicit. -- fixed in S215. The v2.0 sweep below
+  claimed S171 had wired this toast, but a `git log` audit shows
+  S171 actually shipped the `PhoneStressReliever` fidget toy and
+  never touched the contact-detail no-op path -- so the toast was
+  still missing in production. S215 closes the gap by growing
+  `PhoneContactDetail` a public `showSampleContactToast()` helper
+  backed by a lazily-built `PhoneNotificationToast` member parented
+  to the screen's `obj` (LV_EVENT_DELETE cascade auto-frees on
+  pop). The three IntroScreen handlers (`contactDetailCall`,
+  `contactDetailMessage`, `contactDetailEdit`) call the helper
+  before their existing early-return on `uid == 0`, so a press on
+  a placeholder row now flashes the soft-key (legacy behaviour)
+  *and* slides a "Sample contact / Add a real one" toast in from
+  above the status bar for ~2 s.
 
 - [x] **`loadMock()` is dead code** in `MAKERphone-Firmware.ino` — fixed
   in S201. The `MAKERPHONE_LOAD_MOCK_DATA` build flag (default 0) now
@@ -248,9 +261,13 @@ polish for v2.1.
   operation post-S211. Side benefit: the audit caught the
   `ItemCount = 19` vs `kLayout` 20-row drift S206 had introduced
   -- both bugs fall out of the new enum-derived count.
-- **Sample-row contacts (uid==0) silently no-op** — fixed. S171 wires
-  a `PhoneNotificationToast("Sample contact — add a real one")` when
-  the user fires CALL/MESSAGE/EDIT on a placeholder row.
+- **Sample-row contacts (uid==0) silently no-op** — fixed in S215.
+  An earlier draft of this entry attributed the fix to S171, but
+  S171 actually shipped the `PhoneStressReliever` fidget toy and
+  never touched the contact-detail no-op path. S215 wires the
+  missing `PhoneNotificationToast("Sample contact / Add a real
+  one")` through a new `PhoneContactDetail::showSampleContactToast()`
+  helper, called from the three uid==0 guards in `IntroScreen.cpp`.
 - **`loadMock()` is dead code** — fixed in S201. The
   `MAKERPHONE_LOAD_MOCK_DATA` build flag (default 0) now lives in
   `src/MAKERphoneConfig.h`; the helpers and the `Chatters[]` table

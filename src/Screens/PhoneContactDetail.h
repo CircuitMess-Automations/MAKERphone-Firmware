@@ -10,6 +10,7 @@ class PhoneSynthwaveBg;
 class PhoneStatusBar;
 class PhoneSoftKeyBar;
 class PhonePixelAvatar;
+class PhoneNotificationToast;
 
 /**
  * PhoneContactDetail
@@ -143,6 +144,20 @@ public:
 	void flashLeftSoftKey();
 	void flashRightSoftKey();
 
+	/**
+	 * Slide a transient "Sample contact - add a real one"
+	 * notification toast in from the top of the screen. S215
+	 * uses this to give the user explicit visual feedback when
+	 * CALL / MESSAGE / EDIT fires on a uid==0 placeholder row
+	 * from the S36 fallback list (those actions still no-op
+	 * intentionally per S37/S38, but the prior "soft-key flash
+	 * only" feedback was easy to miss). The toast is created
+	 * lazily on first use and reused on every subsequent press
+	 * so a rapid mash on the placeholder row does not spawn
+	 * stacking toasts.
+	 */
+	void showSampleContactToast();
+
 	static constexpr uint8_t MaxNameLen = 24;
 
 private:
@@ -152,6 +167,10 @@ private:
 	PhoneStatusBar*   statusBar;
 	PhoneSoftKeyBar*  softKeys;
 	PhonePixelAvatar* avatar;
+	// S215 - lazily-built toast for the uid==0 sample-contact
+	// path. Parented to obj so the LV_EVENT_DELETE cascade in
+	// LVObject auto-frees it when the screen tears down.
+	PhoneNotificationToast* sampleToast = nullptr;
 
 	lv_obj_t* captionLabel;
 	lv_obj_t* nameLabel;

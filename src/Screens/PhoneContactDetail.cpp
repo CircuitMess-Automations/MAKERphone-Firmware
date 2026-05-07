@@ -9,6 +9,7 @@
 #include "../Elements/PhoneStatusBar.h"
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Elements/PhonePixelAvatar.h"
+#include "../Elements/PhoneNotificationToast.h"
 #include "../Fonts/font.h"
 #include "../Storage/PhoneContacts.h"
 #include "PhoneContactRingtonePicker.h"
@@ -288,6 +289,36 @@ void PhoneContactDetail::flashLeftSoftKey() {
 
 void PhoneContactDetail::flashRightSoftKey() {
 	if(softKeys) softKeys->flashRight();
+}
+
+// S215 - explicit visual feedback for the uid==0 sample-contact
+// no-op path. The S36 fallback list seeds a small set of
+// placeholder rows (uid==0) so a freshly-flashed device still
+// reads as a real phone-book before any real peers are paired.
+// Pressing CALL / MESSAGE / EDIT on those rows used to flash
+// the corresponding soft-key but otherwise silently return,
+// leaving a user who tapped vigorously wondering whether the
+// firmware had hung. This helper drops a transient
+// PhoneNotificationToast over the screen so the no-op is
+// audible (visually). The toast is parented to the screen's
+// own obj, so the LV_EVENT_DELETE cascade in LVObject auto-
+// frees it on pop -- no explicit destructor work needed.
+void PhoneContactDetail::showSampleContactToast() {
+	if(obj == nullptr) return;
+	if(sampleToast == nullptr) {
+		sampleToast = new PhoneNotificationToast(obj);
+	}
+	// Keep the message short and unambiguous: "Sample contact"
+	// names the row state, "Add a real one" tells the user the
+	// fix without preaching. ~2 s hold matches the rest of the
+	// MAKERphone toast cadence (PhoneHomeScreen birthday toast
+	// uses the default 2.5 s; we shave a touch here because
+	// the user has already pressed a button and a long toast
+	// would block follow-up presses on adjacent rows).
+	sampleToast->show(PhoneNotificationToast::Variant::Generic,
+	                  "Sample contact",
+	                  "Add a real one",
+	                  2000);
 }
 
 // ----- helpers -----
