@@ -331,11 +331,25 @@ polish for v2.1.
   Trivial cases (empty slot, picking the same contact, clearing an
   already-empty slot) still apply directly without a prompt.
 
-- [ ] **`PhoneVirtualPet` save data lives in NVS but never garbage-
+- [x] **`PhoneVirtualPet` save data lives in NVS but never garbage-
   collects on a wipe.** A user who factory-resets through the Settings
   → System submenu keeps their pet level/name; arguably the right
   behaviour, but should be documented or explicitly paired with a
-  "Reset pet" action.
+  "Reset pet" action. -- fixed in S214. The `Settings → Factory reset`
+  prompt-YES handler in `src/Screens/SettingsScreen.cpp` now calls
+  `Pet.reset()` immediately after the `Storage.*` clears and before
+  `nvs_flash_erase()` -- which (a) rewrites the `mppet/p` blob to its
+  default `{age=0, hunger=happy=energy=100, awake}` state through the
+  still-valid NVS handle so the wipe has a deterministic baseline to
+  re-erase, (b) drops the cached in-memory `PhoneVirtualPetService::st`
+  so any tail-end consumer that touches `Pet.*` between the prompt
+  callback and `ESP.restart()` sees a fresh pet rather than the
+  pre-wipe stats, and (c) makes the intent visible in the code so a
+  future reader does not have to infer "the pet is wiped because
+  `nvs_flash_erase()` blows away every namespace including `mppet`."
+  No new UI surface; the existing `PhoneVirtualPet` screen still
+  exposes the per-pet `BTN_4` long-press reset for users who want to
+  wipe just the pet without nuking their friends/messages/contacts.
 
 - [x] **`PhoneRadio` (S195) does not gate against the Silent profile**
   -- fixed in S205. `PhoneRadio` now exposes a static

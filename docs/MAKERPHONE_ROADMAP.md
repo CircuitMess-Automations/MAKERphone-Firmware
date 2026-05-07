@@ -619,6 +619,40 @@ lowest-numbered `[ ]`.
   matching phone-style replacements are in place. Resolves the
   matching v1.0 polish item in `KNOWN_ISSUES.md`.
 
+- [x] **S214** -- Factory-reset `Pet.reset()` pairing --
+  the v2.1 polish item in `KNOWN_ISSUES.md` flagged that the
+  Settings -> Factory reset path in `src/Screens/SettingsScreen.cpp`
+  cleared `Storage.Friends`, `Storage.Convos`, `Storage.Messages`
+  and `Storage.PhoneContacts`, then called `nvs_flash_erase()` and
+  `Settings.reset()` before rebooting -- but the `PhoneVirtualPet`
+  service that S129 had introduced was never explicitly torn down.
+  In practice the `nvs_flash_erase()` call wipes every NVS
+  namespace, the `mppet/p` blob included, so the next boot did read
+  the pet as a fresh default; but (a) the in-memory
+  `PhoneVirtualPetService::st` cache (hunger/happy/energy/age) was
+  not touched, so any tail-end consumer that asked `Pet.*` between
+  the prompt callback and `ESP.restart()` saw the pre-wipe stats
+  for ~80 ms; and (b) the cached `s_handle` inside
+  `PhoneVirtualPet.cpp` would have been left dangling against an
+  erased partition if a subsequent write had landed before the
+  restart. S214 closes both gaps by inserting a single `Pet.reset();`
+  call into the existing `EV_PROMPT_YES` lambda, immediately after
+  the `Storage.*` clears and immediately before `nvs_flash_erase()`.
+  `Pet.reset()` (from `src/Services/PhoneVirtualPet.cpp`) rewrites
+  the on-NVS blob to `{age=0, hunger=happy=energy=100, awake}` via
+  the still-valid handle and zeros `sleepHungerTick`, so the wipe
+  has a deterministic baseline to re-erase, and the in-memory
+  `st` is reset alongside. The matching
+  `#include "../Services/PhoneVirtualPet.h"` is added next to the
+  existing `SleepService.h` include so the global `Pet` symbol is
+  in scope. No new UI surface; the existing `PhoneVirtualPet`
+  screen still exposes the per-pet `BTN_4` long-press reset (the
+  wipe-just-the-pet path documented in
+  `src/Screens/PhoneVirtualPet.h`) for users who want to start the
+  Tamagotchi over without nuking their friends / messages /
+  contacts. Resolves the matching v2.1 polish item in
+  `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file

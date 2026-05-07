@@ -7,6 +7,7 @@
 #include <Pins.hpp>
 #include <Chatter.h>
 #include "../Services/SleepService.h"
+#include "../Services/PhoneVirtualPet.h"
 #include "../Storage/Storage.h"
 #include "../Modals/Prompt.h"
 #include <Audio/Piezo.h>
@@ -438,6 +439,15 @@ SettingsScreen::SettingsScreen() : LVScreen(){
 			Storage.Convos.clear();
 			Storage.Messages.clear();
 			Storage.PhoneContacts.clear();
+			// S214: explicit pairing of the factory reset with a Pet wipe.
+			// Pet.reset() rewrites the pet NVS blob to its default {age=0,
+			// all stats 100, awake} state through the still-valid handle
+			// before nvs_flash_erase() invalidates the partition, and also
+			// drops the in-memory cache so any tail-end consumer that reads
+			// Pet.* between here and ESP.restart() sees a fresh pet rather
+			// than the pre-wipe stats. Resolves the matching v2.1 polish
+			// item in KNOWN_ISSUES.md.
+			Pet.reset();
 			nvs_flash_erase();
 			Settings.reset();
 			Chatter.fadeOut();
