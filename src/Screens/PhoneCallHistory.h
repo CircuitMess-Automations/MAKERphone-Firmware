@@ -221,6 +221,22 @@ private:
 	uint8_t            cursor    = 0;
 	uint8_t            windowTop = 0;
 
+	// S217 -- "the in-memory ring is currently the un-persisted demo
+	// set". Flipped to true on construction whenever PhoneCallHistoryStorage
+	// reports an empty log and we fall back to seedSampleEntries(); flipped
+	// back to false on the first real addEntry() so we know to clear the
+	// demo data before persisting the first live call. Also flipped to
+	// false on a successful loadFromStorage() since loaded data IS the
+	// persisted truth.
+	bool               demoOnly = false;
+
+	// S217 -- in-flight flag that seedSampleEntries() raises around its
+	// run of placeholder addEntry() calls. While true, addEntry()
+	// short-circuits its "wipe demoOnly + persist" branch so the demo
+	// set lands cleanly in `entries` without leaking into NVS or
+	// pre-emptively flipping the demoOnly flag.
+	bool               duringSeed = false;
+
 	EntryHandler callCb = nullptr;
 	BackHandler  backCb = nullptr;
 
@@ -230,6 +246,24 @@ private:
 	void buildEmptyLabel();
 
 	void seedSampleEntries();
+
+	/**
+	 * S217 -- pull the persisted log (if any) into `entries`. Returns
+	 * the number of entries loaded. The caller treats 0 as "fall back
+	 * to seedSampleEntries()" so a freshly-flashed device still reads
+	 * as a real call log on first boot.
+	 */
+	uint8_t loadFromStorage();
+
+	/**
+	 * S217 -- write the current `entries` ring back to NVS through
+	 * PhoneCallHistoryStorage. Called after every mutating addEntry /
+	 * clearEntries so the on-disk log is always in sync with the live
+	 * one. No-op (returns false) when the in-memory ring still holds
+	 * the un-persisted demo set, so the seed entries never leak into
+	 * NVS.
+	 */
+	bool saveToStorage();
 
 	/**
 	 * Re-render the visible row strip from entries[windowTop..]. Hides

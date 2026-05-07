@@ -8,6 +8,7 @@
 #include "../Elements/PhoneStatusBar.h"
 #include "../Elements/PhoneSoftKeyBar.h"
 #include "../Fonts/font.h"
+#include "../Services/PhoneCallHistoryStorage.h"
 
 // MAKERphone retro palette - inlined per the established pattern in this
 // codebase (see PhoneCallEnded.cpp / PhoneActiveCall.cpp /
@@ -86,11 +87,21 @@ PhoneCallHistory::PhoneCallHistory()
 	buildRows();
 	buildEmptyLabel();
 
-	// Seed the visible log with a small set of representative entries
-	// covering all three Type values, so the screen reads as a real
-	// call log out of the box. S28 will swap these for live LoRa data
-	// via clearEntries() + addEntry().
-	seedSampleEntries();
+	// S217: try the persisted log first. PhoneCallHistoryStorage
+	// reads back the same Entry struct we serialise on every
+	// addEntry / clearEntries, so a power-cycle no longer wipes the
+	// log. If the persisted log is empty we still seed the visible
+	// list with a small set of representative entries so a freshly-
+	// flashed (or factory-reset) device reads as a real call log
+	// out of the box; those samples sit in `entries` with
+	// `demoOnly = true` and are NOT persisted, so they evaporate
+	// the moment a real call lands and saveToStorage() takes over.
+	if(loadFromStorage() == 0) {
+		seedSampleEntries();
+		demoOnly = true;
+	} else {
+		demoOnly = false;
+	}
 
 	// Bottom: feature-phone soft-keys. CALL on the left (BTN_LEFT/ENTER)
 	// and BACK on the right (BTN_RIGHT/BACK), matching the rest of the
@@ -235,6 +246,13 @@ void PhoneCallHistory::seedSampleEntries() {
 	// the list visually exercises every column-truncation case at
 	// design-time. Order is freshest -> oldest, the same way every
 	// feature-phone call log reads.
+	//
+	// S217: the duringSeed flag tells addEntry "this is a placeholder
+	// entry, do NOT clear the existing list and do NOT persist to
+	// NVS". The flag is cleared at the end so subsequent addEntry()
+	// calls (real LoRa traffic from a future S28-style host) take
+	// the persisting branch.
+	duringSeed = true;
 	addEntry(Type::Incoming, "ALEX KIM",     "12:42", 42, 1);
 	addEntry(Type::Outgoing, "MOM",          "11:30", 318, 2);
 	addEntry(Type::Missed,   "JOHN DOE",     "09:15",   0, 3);
@@ -243,6 +261,7 @@ void PhoneCallHistory::seedSampleEntries() {
 	addEntry(Type::Missed,   "PIZZA SHOP",   "MON",     0, 5);
 	addEntry(Type::Outgoing, "DAD",          "SUN",   620, 6);
 	addEntry(Type::Incoming, "WORK",         "SUN",   190, 7);
+	duringSeed = false;
 }
 
 // ----- public API -----
@@ -267,6 +286,24 @@ uint8_t PhoneCallHistory::addEntry(Type        type,
 								   const char* timestamp,
 								   uint32_t    durationSeconds,
 								   uint8_t     avatarSeed) {
+	// S217: addEntry has two callers today -- the constructor's
+	// seedSampleEntries() (which populates the demo log on a freshly-
+	// flashed device) and any future LoRa-driven host (S28-style
+	// wiring) that pushes a real call. We tell them apart through
+	// `demoOnly`: it is set to true while seedSampleEntries() is
+	// running and back to false the moment a real entry lands, so the
+	// first runtime addEntry() that arrives over the demo set wipes
+	// the placeholder list before the new entry is appended. Without
+	// this, demo data + real data would coexist for one extra tick
+	// before the storage layer caught up.
+	const bool isSeeding = duringSeed;
+	if(!isSeeding && demoOnly) {
+		entries.clear();
+		cursor    = 0;
+		windowTop = 0;
+		demoOnly  = false;
+	}
+
 	// Ring-buffer behaviour: drop the oldest entry once we'd exceed
 	// MaxEntries so a long-running session can't exhaust the
 	// per-screen heap. The cursor stays put when this happens (the
@@ -293,6 +330,15 @@ uint8_t PhoneCallHistory::addEntry(Type        type,
 	refreshHighlight();
 	refreshEmptyState();
 
+	// S217: persist the new ring (skipped while still seeding the demo
+	// set so the placeholder entries never leak into NVS). saveToStorage
+	// is itself a no-op when demoOnly is still true, so the gating is
+	// belt-and-braces: even a future caller that forgets to flip the
+	// flag cannot accidentally write the demo log.
+	if(!isSeeding) {
+		(void)saveToStorage();
+	}
+
 	return (uint8_t)(entries.size() - 1);
 }
 
@@ -300,6 +346,13 @@ void PhoneCallHistory::clearEntries() {
 	entries.clear();
 	cursor    = 0;
 	windowTop = 0;
+	// S217: clearing the visible list is always a "real" intent (no
+	// caller calls clearEntries() to wipe demo data -- the constructor
+	// owns that gesture internally). So we drop the demoOnly flag and
+	// also wipe the persisted log so a subsequent power-cycle reads
+	// the same empty list.
+	demoOnly = false;
+	(void)PhoneCallHistoryStorage::clearLog();
 	refreshVisibleRows();
 	refreshHighlight();
 	refreshEmptyState();
@@ -442,6 +495,44 @@ void PhoneCallHistory::moveCursorBy(int8_t delta) {
 
 	cursor = (uint8_t) next;
 	refreshHighlight();
+}
+
+// ----- S217: persistence helpers -----
+
+uint8_t PhoneCallHistory::loadFromStorage() {
+	// Pull up to MaxEntries entries off NVS. PhoneCallHistoryStorage
+	// returns 0 on a fresh / corrupt / version-mismatched blob, so a
+	// 0 return here is the canonical "fall back to demo data" signal.
+	// Stack-friendly: the scratch buffer is sized to the in-memory
+	// ring cap, which is also the worst case persisted blob.
+	Entry scratch[MaxEntries];
+	uint8_t loaded = PhoneCallHistoryStorage::loadAll(scratch, MaxEntries);
+	if(loaded == 0) return 0;
+
+	entries.clear();
+	for(uint8_t i = 0; i < loaded; ++i) {
+		entries.push_back(scratch[i]);
+	}
+	cursor    = 0;
+	windowTop = 0;
+	return loaded;
+}
+
+bool PhoneCallHistory::saveToStorage() {
+	// Defensive: never persist the placeholder demo set. addEntry
+	// already clears demoOnly before reaching this path on a real
+	// call, but a future direct caller (e.g. a debug fixture pushing
+	// a synthetic entry) would otherwise leak the demo log into NVS.
+	if(demoOnly) return false;
+
+	// Vector storage is contiguous (C++11), so &entries[0] is the
+	// canonical pointer to the underlying ring. Empty-vector guard
+	// keeps us from indexing into a nullptr backing array.
+	const Entry* base = entries.empty() ? nullptr : &entries[0];
+	const uint8_t count = (uint8_t)(entries.size() > MaxEntries
+	                                  ? MaxEntries
+	                                  : entries.size());
+	return PhoneCallHistoryStorage::saveAll(base, count);
 }
 
 // ----- input -----

@@ -149,10 +149,30 @@ on a usable home screen on a fresh device.
   session can migrate them once the matching phone-style
   replacements are in place.
 
-- [ ] **No persisted "owner name" / call-history limit.** S55's About
+- [x] **No persisted "owner name" / call-history limit.** S55's About
   screen lists the peer count, but `PhoneCallHistory` (S27) keeps an
   in-memory ring buffer that is wiped on every reboot. Phase R session
   S144 (owner name) and a Storage-backed history move are tracked there.
+  -- fixed in S217. The owner-name half had already shipped in S144;
+  the call-history half lands here. A new `PhoneCallHistoryStorage`
+  service (`src/Services/PhoneCallHistoryStorage.h` / `.cpp`,
+  modelled on `PhoneComposerStorage`) persists the ring as a single
+  NVS blob keyed `log` under namespace `mpcalls`, holding a 4-byte
+  header (magic 'M','H', version=1, count) followed by up to
+  `PhoneCallHistory::MaxEntries` x 40-byte fixed-stride entries. The
+  per-entry stride is pinned by a `static_assert` against
+  `MaxNameLen` / `MaxTsLen` so a future tweak to the entry geometry
+  trips a build error rather than a silent on-disk format drift.
+  `PhoneCallHistory` grows two private flags (`demoOnly`,
+  `duringSeed`) and two helpers (`loadFromStorage()`,
+  `saveToStorage()`); the constructor reads "load -> fall back to
+  the demo set only when the persisted log is empty", `addEntry()`
+  persists after every real mutation (skipped while seeding so the
+  placeholder set never leaks into NVS), and `clearEntries()` wipes
+  the persisted blob alongside the in-memory ring. Visible output
+  on a freshly-flashed device is byte-identical (the demo set still
+  paints the screen on first push); the only behavioural delta is
+  that a real call lands in NVS and survives a power-cycle.
 
 ## Cosmetic
 
@@ -307,9 +327,19 @@ polish for v2.1.
   routes to `PairScreen` exactly as before. `ListItem` itself is
   left intact for the remaining v1.0 hosts (`FriendsScreen`,
   `GamesScreen`); those migrate in a later session.
-- **No persisted owner name / call-history limit** — partially fixed.
-  S144 ships the persisted owner name; the call history is still an
-  in-memory ring buffer.
+- **No persisted owner name / call-history limit** — fixed in S217.
+  S144 shipped the persisted owner name. S217 closes the call-
+  history half: a new `PhoneCallHistoryStorage` service persists
+  the ring buffer as a single NVS blob keyed `log` under namespace
+  `mpcalls`, modelled on `PhoneComposerStorage`. `PhoneCallHistory`
+  loads the persisted log in its constructor and falls back to the
+  demo set only when NVS is empty; `addEntry` writes through after
+  every real mutation (gated by `duringSeed` / `demoOnly` so the
+  placeholder set never leaks into NVS), and `clearEntries` wipes
+  the persisted blob alongside the in-memory ring. The 40-byte
+  per-entry stride is pinned by a `static_assert` so a future
+  tweak to the entry geometry trips a build error rather than a
+  silent on-disk format drift.
 - **`PhoneSoftKeyBar` flash duration** — fixed during the S199 final
   QA pass.
 - **Battery-low modal threshold tuning** — carried forward

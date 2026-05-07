@@ -739,6 +739,61 @@ lowest-numbered `[ ]`.
   intent without breaking the user-facing toggles. Resolves
   the matching v1.0 polish item in `KNOWN_ISSUES.md`.
 
+- [x] **S217** -- `PhoneCallHistory` NVS-backed persistence --
+  the v1.0 polish item in `KNOWN_ISSUES.md` flagged that S55's
+  About screen lists the peer count, but `PhoneCallHistory` (S27)
+  kept its log only as an `std::vector<Entry>` member of the
+  screen object -- so the moment the screen popped, the log
+  evaporated, and a power-cycle wiped it without a trace. S217
+  closes the gap with a tiny new service `PhoneCallHistoryStorage`
+  (`src/Services/PhoneCallHistoryStorage.h` / `.cpp`) modelled on
+  `PhoneComposerStorage` (S123): a single NVS blob keyed `log`
+  under namespace `mpcalls`, holding a 4-byte header (magic 'M',
+  'H', version=1, count) followed by up to `MaxEntries` x 40-byte
+  fixed-stride entries packing `type`, the 25-byte name buffer,
+  the 9-byte timestamp buffer, the 4-byte little-endian
+  `durationSeconds` and the 1-byte `avatarSeed`. The 40-byte
+  per-entry stride is pinned by a `static_assert` against
+  `PhoneCallHistory::MaxNameLen` and `MaxTsLen`, so a future
+  tweak to the entry geometry trips a build error rather than
+  a silent on-disk format drift. Worst-case blob size is
+  `4 + 32*40 = 1284` bytes which fits comfortably alongside the
+  existing `Settings`, `Highscore`, `mpcomp` and `mppet`
+  namespaces.
+
+  Concretely S217: (i) ships `PhoneCallHistoryStorage` with the
+  static `begin() / hasLog() / loadAll() / saveAll() / clearLog()`
+  surface and a single shared NVS handle opened lazily on first
+  touch (matching the Highscore / PhoneComposerStorage pattern);
+  (ii) grows `PhoneCallHistory` two private flags
+  (`demoOnly`, `duringSeed`) and two private helpers
+  (`loadFromStorage()`, `saveToStorage()`) so the screen's
+  constructor reads "try `loadFromStorage()`, fall back to
+  `seedSampleEntries()` only when the persisted log is empty";
+  the demo set still populates the visible list on a freshly-
+  flashed device but is never written to NVS, and the first
+  real `addEntry()` after the demo set lands wipes the
+  placeholder list (`demoOnly = true` -> `false`) before the
+  new entry is appended; (iii) wires `addEntry()` to call
+  `saveToStorage()` after each mutation (gated by `duringSeed`
+  / `demoOnly` so the seed run never persists), and
+  `clearEntries()` to call `PhoneCallHistoryStorage::clearLog()`
+  so a deliberate wipe propagates to NVS. Stack budget on the
+  load path is the worst-case blob size (~1.3 KiB scratch
+  buffer in `loadFromStorage()`), well inside the ESP32 main-
+  task headroom.
+
+  Visible output is byte-identical on a freshly-flashed device:
+  the screen still seeds with the same eight demo entries on
+  first push (because `loadAll()` returns 0 against an empty
+  `mpcalls/log` blob and the constructor falls back to
+  `seedSampleEntries()`). The only behavioural delta is that
+  once a future S28-style host pushes a real entry through
+  `addEntry()` the log now survives a power-cycle: the next
+  boot reads the persisted ring back into `entries` via
+  `loadFromStorage()` and skips the demo set entirely. Resolves
+  the matching v1.0 polish item in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file
