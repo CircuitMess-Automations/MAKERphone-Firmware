@@ -103,10 +103,26 @@ on a usable home screen on a fresh device.
   toggle real. Remove the override block once we are ready to commit
   to "Sound setting is authoritative".
 
-- [ ] **`InboxScreen` still compiles the legacy `MainMenu`-style row
+- [x] **`InboxScreen` still compiles the legacy `MainMenu`-style row
   layout** alongside the new `PhoneMessageRow` (S31). The new row is
   the path the rest of the firmware uses; delete the old class after
-  one more verification pass.
+  one more verification pass. -- fixed in S213. Every populated
+  inbox path already used `PhoneMessageRow`; only the empty-state
+  "Add friend" CTA still routed through the legacy
+  `src/Elements/ListItem.h` widget. S213 swaps that for a phone-
+  style focusable button painted with the MP_* palette
+  (transparent body, 1 px MP_DIM idle frame, 2 px MP_ACCENT
+  focused frame matching the `PhoneMenuGrid` cursor halo, warm-
+  cream pixelbasic7 "+ ADD FRIEND" label centred inside it) and
+  drops the `#include "../Elements/ListItem.h"` from
+  `InboxScreen.cpp`. The CTA is parented to `listContainer` so the
+  existing `clearList()` teardown sweeps it up on every rebuild
+  without any extra wrapper plumbing; ENTER still routes to
+  `PairScreen` exactly as before. The `ListItem` class itself is
+  left intact for the remaining v1.0 hosts (`FriendsScreen`,
+  `GamesScreen`) -- those are tracked separately and a future
+  session can migrate them once the matching phone-style
+  replacements are in place.
 
 - [ ] **No persisted "owner name" / call-history limit.** S55's About
   screen lists the peer count, but `PhoneCallHistory` (S27) keeps an
@@ -245,10 +261,17 @@ polish for v2.1.
   on boot. Phase J's `PhoneProfileScreen` (S159) is the new
   authoritative knob; remove the override block in v2.1 once we are
   confident every shipped device has migrated.
-- **`InboxScreen` legacy `MainMenu`-style row layout** — carried
-  forward. The new `PhoneMessageRow` (S31) is the path used by the
-  rest of the firmware; the legacy class survives behind a build flag
-  and can be deleted in v2.1.
+- **`InboxScreen` legacy `MainMenu`-style row layout** — fixed in
+  S213. Every populated inbox path already used `PhoneMessageRow`;
+  only the empty-state "Add friend" CTA still routed through the
+  legacy `src/Elements/ListItem.h` widget. S213 swaps that one
+  remaining caller for a phone-style focusable "+ ADD FRIEND"
+  button painted with the MP_* palette (MP_DIM idle border,
+  MP_ACCENT focused border, warm-cream pixelbasic7 label) and
+  drops the legacy include from `InboxScreen.cpp`. ENTER still
+  routes to `PairScreen` exactly as before. `ListItem` itself is
+  left intact for the remaining v1.0 hosts (`FriendsScreen`,
+  `GamesScreen`); those migrate in a later session.
 - **No persisted owner name / call-history limit** — partially fixed.
   S144 ships the persisted owner name; the call history is still an
   in-memory ring buffer.

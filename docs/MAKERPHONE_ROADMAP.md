@@ -590,6 +590,35 @@ lowest-numbered `[ ]`.
   window now chimes / rings audibly as designed. Resolves the
   matching v1.0 polish item in `KNOWN_ISSUES.md`.
 
+- [x] **S213** — `InboxScreen` empty-state legacy `ListItem` cleanup --
+  the v1.0 polish item in `KNOWN_ISSUES.md` flagged that the inbox
+  screen still compiled the `MainMenu`-style row layout
+  (`src/Elements/ListItem.h`, white-on-white pixelbasic7 border, the
+  legacy theme that pre-dated the MAKERphone reskin) alongside the
+  new `PhoneMessageRow` (S31) -- specifically the empty-state
+  "Add friend" CTA that fires when `Storage.Friends.all()` returns
+  only the device's own efuse MAC. Every populated path already
+  used `PhoneMessageRow`; only the no-contacts boot path leaked
+  the legacy widget. S213 swaps the legacy `ListItem` for a
+  phone-style focusable button painted with the MP_* palette --
+  transparent body, 1 px MP_DIM idle frame, 2 px MP_ACCENT focused
+  frame (matching the `PhoneMenuGrid` cursor halo), centred warm-
+  cream pixelbasic7 "+ ADD FRIEND" label -- and drops the
+  `#include "../Elements/ListItem.h"` from `InboxScreen.cpp`. The
+  CTA's lv_obj_t and label are parented to `listContainer`, so the
+  existing `clearList()` teardown (`lv_obj_clean(listContainer)`)
+  sweeps them up on every rebuild with no extra wrapper plumbing.
+  Behaviour is byte-identical: the button is still added to
+  `inputGroup` with `lv_group_add_obj`, ENTER (`LV_EVENT_PRESSED`)
+  still routes to `PairScreen`, and the `MP_LABEL_DIM` "You don't
+  have any friends yet. / Press ENTER to pair." hint label below
+  is unchanged. The `ListItem` widget itself is left intact for
+  the remaining hosts (`FriendsScreen`, `GamesScreen`) that the
+  v1.0 firmware still ships -- those screens are tracked
+  separately and a future session can migrate them once the
+  matching phone-style replacements are in place. Resolves the
+  matching v1.0 polish item in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file
