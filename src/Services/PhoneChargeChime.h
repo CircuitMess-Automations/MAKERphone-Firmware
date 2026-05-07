@@ -91,6 +91,37 @@ public:
 	State currentState() const { return state; }
 	bool  hasFired()     const { return firedThisCycle; }
 
+	/**
+	 * S228 — SILENT / MEETING profile gate. PhoneProfileScreen
+	 * (S159) writes `Settings.get().sound = false` for both Silent
+	 * and Meeting profiles and `true` for General / Outdoor /
+	 * Headset, so reading the legacy bool is the cheapest one-read
+	 * cover for every "should the charge-complete chime drive the
+	 * piezo right now" case without dragging the five-state enum
+	 * into this service. Mirrors the S227 gate on
+	 * PhoneDeliveredChime::isSilenced(), the S226 gate on
+	 * PhoneBatteryLowModal, the S225 gate on PhoneCameraScreen, the
+	 * S219–S223 gates on the composer / music-player / ringtone-
+	 * picker family, and the S205 gate on PhoneRadio.
+	 *
+	 * `fireChimeOnce()` consults this helper after running its
+	 * one-shot bookkeeping (`firedThisCycle`, `postChimeUntil`) but
+	 * before handing the melody to the engine. The
+	 * PhoneRingtoneEngine already self-mutes per loop tick when
+	 * `Settings.sound == false`, but the micro-window between
+	 * `Ringtone.play()` and the engine's first mute pass is enough
+	 * for some Chatter units to emit an audible blip before falling
+	 * silent — exactly the failure mode the S205 / S219–S227 sweep
+	 * removed from every screen, modal and chime service that drives
+	 * the piezo. Closing it here brings the charge-complete chime
+	 * service into the same convention.
+	 *
+	 * Public so a future power / battery debug surface can present
+	 * the resolved silenced state without having to re-derive it
+	 * from Settings.
+	 */
+	static bool isSilenced();
+
 	// ---- tunables ---------------------------------------------------
 
 	/** Voltage trend cadence (ms). Mirrors PhoneChargingOverlay so the

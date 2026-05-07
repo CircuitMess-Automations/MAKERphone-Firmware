@@ -1265,6 +1265,52 @@ lowest-numbered `[ ]`.
   firmware gates on the active profile before handing the melody
   to the engine.
 
+- [x] **S228** -- `PhoneChargeChime` SILENT-profile chime gate --
+  the charge-complete chime (S150) calls
+  `Ringtone.play(kChargeCompleteMelody)` directly inside
+  `fireChimeOnce()` with no profile guard, so on a SILENT /
+  MEETING-profile device every Charging -> Complete edge still leaks
+  the same micro-interval of audible piezo that the S205 sweep removed
+  from `PhoneRadio`, the S219-S223 sweep removed from the composer /
+  music-player / ringtone-picker family, the S225 sweep removed from
+  `PhoneCameraScreen`, the S226 sweep removed from
+  `PhoneBatteryLowModal`, and the S227 sweep removed from
+  `PhoneDeliveredChime`: the engine self-mutes per loop tick via
+  `Settings.get().sound`, but the few microseconds between
+  `Ringtone.play()` and the engine's first mute pass are enough for
+  some Chatter units to emit an audible blip before falling silent.
+  S227's commit message had claimed the chime-family sweep was
+  complete; this was wrong -- `PhoneChargeChime::fireChimeOnce()` was
+  the last surviving non-alarm `Ringtone.play()` call site that still
+  bypassed the gate. S228 gives `PhoneChargeChime` a public
+  `static bool isSilenced()` helper that reads `!Settings.get().sound`
+  (so SILENT and MEETING -- the two five-state profiles that
+  `PhoneProfileScreen` (S159) maps to `sound = false` -- both gate
+  identically), and `fireChimeOnce()` is rewired to consult the helper
+  AFTER its existing one-shot bookkeeping (`firedThisCycle = true`,
+  `postChimeUntil = millis() + PostChimeGuardMs`) but BEFORE handing
+  the melody to the engine. When silenced the engine call is skipped
+  entirely so the LoopManager listener is never registered; the
+  `firedThisCycle` flag still flips so the natural Charging -> Complete
+  edge stays one-shot per cycle and a mid-session profile flip from
+  SILENT back to GENERAL is picked up on the *next* charge cycle
+  without re-firing the chime for the same top-out. The Loud (General
+  / Outdoor / Headset) path is byte-identical: `Settings.get().sound
+  == true` skips the early return and the
+  `Ringtone.play(kChargeCompleteMelody)` call fires exactly as before.
+  No header surface changes beyond the new public
+  `static bool isSilenced()`. The `PhoneBootSplash` boot chime (S148)
+  and `PhonePowerDown` power-off arpeggio (S149) intentionally stay
+  un-gated: the boot chime fires before `Settings` has reliably been
+  hydrated from NVS in some failure-recovery boot paths (a future
+  session can revisit), and the power-off arpeggio is a deliberate
+  user-confirmation cue for a destructive action that the user just
+  asked for explicitly. With S228 every screen, modal, and chime
+  service in the firmware that reaches `Ringtone.play()` for non-alarm
+  audio now gates on the active profile before handing the melody to
+  the engine -- finally fulfilling the closing claim S227's commit
+  message had made one session early.
+
 ---
 
 ## How the agent reads this file

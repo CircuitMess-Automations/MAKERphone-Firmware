@@ -6,6 +6,7 @@
 #include <Chatter.h>
 #include <Loop/LoopManager.h>
 #include <Notes.h>
+#include <Settings.h>
 
 // =====================================================================
 // S150 — PhoneChargeChime
@@ -236,8 +237,43 @@ void PhoneChargeChime::fireChimeOnce() {
 	firedThisCycle = true;
 	postChimeUntil = millis() + PostChimeGuardMs;
 
-	// Ringtone engine internally short-circuits the piezo when
-	// Settings.sound is false, so a muted device still observes the
-	// state transition but produces no audible chime.
+	// S228 — SILENT / MEETING profile gate. PhoneRingtoneEngine
+	// internally short-circuits the piezo when Settings.sound is
+	// false, BUT the engine self-mutes per-loop, so the micro-window
+	// between `Ringtone.play()` and the engine's first mute pass is
+	// enough for some Chatter units to emit an audible blip before
+	// falling silent. Closing the window here mirrors the S205 /
+	// S219–S223 / S225 / S226 / S227 sweep convention: skip the
+	// engine call entirely under a silenced profile so the
+	// LoopManager listener is never registered. The state-machine
+	// bookkeeping above (`firedThisCycle`, `postChimeUntil`) still
+	// runs, so the natural Charging -> Complete edge is still
+	// recorded one-shot per cycle and a mid-session profile flip
+	// from SILENT back to GENERAL is picked up on the next charge
+	// cycle without re-firing the chime for the same top-out.
+	if(isSilenced()) return;
+
 	Ringtone.play(kChargeCompleteMelody);
+}
+
+// S228 — SILENT / MEETING profile gate. PhoneProfileScreen (S159)
+// writes `Settings.get().sound = false` for both Silent and Meeting
+// profiles and `true` for General / Outdoor / Headset, so reading
+// the legacy bool is the cheapest one-read cover for every "should
+// the charge-complete chime drive the piezo right now" case without
+// dragging the five-state enum into this service. Same pattern
+// S205 / S219–S223 / S225 / S226 / S227 use for their per-screen /
+// per-modal / per-service helpers; the chime-family sweep is now
+// truly complete -- PhoneChargeChime was the last surviving
+// non-alarm `Ringtone.play()` call site that S227's commit message
+// claimed was already covered. The PhoneBootSplash boot chime
+// (S148) and PhonePowerDown power-off arpeggio (S149) intentionally
+// stay un-gated: the boot chime fires before Settings has reliably
+// been hydrated from NVS in some failure-recovery boot paths, and
+// the power-off arpeggio is a deliberate user-confirmation cue for
+// a destructive action. Public so a future power / battery debug
+// surface can present the resolved silenced state without having
+// to re-derive it from Settings.
+bool PhoneChargeChime::isSilenced(){
+	return !Settings.get().sound;
 }
