@@ -1358,6 +1358,58 @@ lowest-numbered `[ ]`.
   a slower rollout than the per-surface sweep convention this run
   follows.
 
+- [x] **S230** -- `PhoneSystemTones` (S192) SILENT-profile catalogue
+  gate -- the eighteen-cue system-chime library was the last
+  remaining non-alarm `Ringtone.play()` call site in the firmware
+  after the S205 / S219-S229 sweep, and S229's commit body had
+  flagged it as a deliberate next-session task because the central
+  `play(uint8_t id)` entry point is the SHARED door every system cue
+  in the firmware (Notify, Success, Error, Alert, Unlock, Lock,
+  SmsReceived, CallEnd, MenuOpen, MenuClose, Save, DeleteItem,
+  TimerDone, AlarmDismiss, LevelUp, NetworkOk, NetworkFail,
+  LowBattery) goes through. Like every other gated surface the cue
+  was already nominally protected by the engine's per-loop
+  `Settings.get().sound` mute pass inside
+  `PhoneRingtoneEngine::emitTone`, but the same micro-window between
+  `Ringtone.play()` and the engine's first mute pass that the
+  S205 / S219-S229 surfaces had been leaking was leaking here too --
+  and a SILENT / MEETING-profile MAKERphone walking through any UI
+  flow that fires a system tone (saving a contact, deleting a
+  message, opening a menu, hearing a network drop, getting a low-
+  battery warning) still got an audible blip before the engine
+  caught up. S230 gives `PhoneSystemTones` a public
+  `static bool isSilenced()` helper that reads `!Settings.get().sound`
+  (so SILENT and MEETING -- the two five-state profiles that
+  `PhoneProfileScreen` (S159) maps to `sound = false` -- both gate
+  identically), and rewires `play(uint8_t id)` to short-circuit on a
+  silenced profile BEFORE the existing `Ringtone.play(kMelodies[id])`
+  call. When silenced the engine call is skipped entirely so the
+  LoopManager listener is never registered for any of the eighteen
+  cues. The `melody(uint8_t id)` accessor is intentionally NOT gated:
+  any caller that PRE-LOADS a melody pointer to fire later (notably
+  `PhoneIncomingCall`, which grabs the structure ahead of time) still
+  sees the same const `PhoneRingtoneEngine::Melody*` pointers
+  regardless of profile state -- only the central `play(uint8_t id)`
+  entry point gates, so a screen that pre-loads a melody on a
+  silenced boot and hits `Ringtone.play()` directly later (after the
+  user toggles back to GENERAL) still hears the chime, and a screen
+  that fires through `PhoneSystemTones::play()` itself is correctly
+  gated. The Loud (General / Outdoor / Headset) path is byte-
+  identical: `Settings.get().sound == true` skips the early return
+  and the `Ringtone.play(kMelodies[id])` call fires exactly as before.
+  Header surface grows by exactly one public symbol
+  (`static bool isSilenced()`); the cpp adds a
+  `#include <Settings.h>` next to `<Notes.h>` and the new gate /
+  helper. The PhoneAlarmService alarm engine intentionally stays
+  un-gated by design: alarm audio MUST fire even on a Silent or
+  Meeting profile so the user can still wake up. Likewise the S148
+  PhoneBootSplash boot chime and S149 PhonePowerDown power-off
+  arpeggio stay un-gated for their existing reasons. With S230 every
+  non-alarm `Ringtone.play()` call site in the firmware -- screens,
+  modals, services AND the eighteen-cue system catalogue itself --
+  finally gates on the active profile before handing the melody to
+  the engine, and the S205 sweep convention is fully closed.
+
 ---
 
 ## How the agent reads this file

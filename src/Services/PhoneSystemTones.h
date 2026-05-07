@@ -104,6 +104,38 @@ public:
 	static void play(uint8_t id);
 
 	/**
+	 * S230 - SILENT / MEETING profile gate. PhoneProfileScreen (S159)
+	 * writes `Settings.get().sound = false` for both Silent and Meeting
+	 * profiles and `true` for General / Outdoor / Headset, so reading
+	 * the legacy bool is the cheapest one-read cover for every "should
+	 * a system chime drive the piezo right now" question without
+	 * dragging the five-state `ProfileService::Profile` enum into this
+	 * library. Mirrors the S205 (PhoneRadio), S219 (PhoneComposer),
+	 * S220 (PhoneMusicPlayer), S221 (PhoneAlarmTonePicker), S222
+	 * (PhoneContactRingtonePicker), S223 (PhoneProfileRingtoneScreen),
+	 * S225 (PhoneCameraScreen), S226 (PhoneBatteryLowModal), S227
+	 * (PhoneDeliveredChime), S228 (PhoneChargeChime) and S229
+	 * (PhoneKonamiCode) gates - one shared idiom across every non-
+	 * alarm ringtone-engine call site in the firmware.
+	 *
+	 * `play()` consults this helper as its first action. When silenced
+	 * the `Ringtone.play()` call (and therefore the LoopManager
+	 * listener registration) is skipped entirely, closing the micro-
+	 * window between the engine handoff and the engine's first per-
+	 * loop mute pass that some Chatter units render as an audible blip
+	 * before the engine catches up. The catalogue itself stays loud
+	 * (the `melody()` accessor still returns the same const Melody*
+	 * pointers regardless of profile state, so call sites that PRE-
+	 * LOAD a melody before firing it - notably PhoneIncomingCall - are
+	 * untouched), only the `play(uint8_t id)` entry point gates.
+	 *
+	 * Public so a future "Settings -> Sounds -> System chimes" picker
+	 * can show the resolved silenced state without re-deriving it from
+	 * Settings, exactly as S205 / S219-S229 expose theirs.
+	 */
+	static bool isSilenced();
+
+	/**
 	 * Pointer to the underlying Melody so sites like
 	 * `PhoneIncomingCall` (which want to PRE-LOAD a melody before
 	 * actually firing it) can grab the structure without going

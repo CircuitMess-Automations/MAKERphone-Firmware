@@ -1,6 +1,7 @@
 #include "PhoneSystemTones.h"
 
 #include <Notes.h>
+#include <Settings.h>
 
 // =====================================================================
 // S192 — PhoneSystemTonesLib
@@ -208,9 +209,49 @@ const PhoneRingtoneEngine::Melody* PhoneSystemTones::melody(uint8_t id){
 
 void PhoneSystemTones::play(uint8_t id){
 	if(!valid(id)) return;
+	// S230 - SILENT / MEETING profile gate. PhoneRingtoneEngine
+	// internally short-circuits the piezo when Settings.sound is
+	// false (see emitTone()), BUT the engine self-mutes per-loop, so
+	// the micro-window between `Ringtone.play()` and the engine's
+	// first mute pass is enough for some Chatter units to emit an
+	// audible blip before falling silent. Closing the window here
+	// brings the eighteen-cue catalogue into the same convention the
+	// S205 / S219-S229 sweep used for every other non-alarm
+	// `Ringtone.play()` call site - skip the engine call entirely
+	// under a silenced profile so the LoopManager listener is never
+	// registered. The catalogue itself stays loud: `melody(id)` still
+	// returns the same const Melody* regardless of profile state, so
+	// any PRE-LOAD call site that grabs the structure (notably
+	// PhoneIncomingCall) is untouched - only the central
+	// `play(uint8_t id)` entry point gates.
+	if(isSilenced()) return;
 	// Routing through the engine means a Settings.sound mute is
-	// honoured automatically (see PhoneRingtoneEngine::emitTone) and
-	// any active melody (call ringer, music player) replaces this
-	// one-shot so latched higher-priority audio always wins.
+	// ALSO honoured by the engine itself as a defence-in-depth (see
+	// PhoneRingtoneEngine::emitTone), and any active melody (call
+	// ringer, music player) replaces this one-shot so latched
+	// higher-priority audio always wins.
 	Ringtone.play(kMelodies[id]);
+}
+
+// S230 - SILENT / MEETING profile gate. PhoneProfileScreen (S159)
+// writes `Settings.get().sound = false` for both Silent and Meeting
+// profiles and `true` for General / Outdoor / Headset, so reading
+// the legacy bool is the cheapest one-read cover for "should the
+// system-tones catalogue drive the piezo right now" without
+// dragging the five-state ProfileService::Profile enum into this
+// library. Same pattern S205 / S219-S229 use for their per-screen /
+// per-modal / per-service helpers; PhoneSystemTones was the last
+// remaining non-alarm `Ringtone.play()` call site that S229's
+// commit body had explicitly deferred to its own slower-rollout
+// session because the central `play(uint8_t id)` entry point
+// touches every UI cue in the firmware at once. The
+// PhoneAlarmService alarm engine intentionally stays un-gated by
+// design: alarm audio MUST fire even on a Silent or Meeting
+// profile so the user can still wake up. Likewise the S148 boot
+// chime and S149 power-off arpeggio stay un-gated for their usual
+// reasons (boot-chime can fire before Settings has been hydrated
+// from NVS, power-off arpeggio is a deliberate user-confirmation
+// cue for a destructive action).
+bool PhoneSystemTones::isSilenced(){
+	return !Settings.get().sound;
 }
