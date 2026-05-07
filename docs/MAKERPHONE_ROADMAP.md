@@ -968,6 +968,56 @@ lowest-numbered `[ ]`.
   the private `bool silentPlayback` member. Resolves the
   v2.1-fresh polish item now logged in `KNOWN_ISSUES.md`.
 
+- [x] **S221** -- `PhoneAlarmTonePicker` SILENT-profile preview
+  gate -- the v2.1 sweep continues across every in-app screen with
+  an un-gated `Ringtone.play()` call. After S205 closed `PhoneRadio`,
+  S219 closed `PhoneComposer` and S220 closed `PhoneMusicPlayer`,
+  `PhoneAlarmTonePicker::startPreview()` was the last picker / sound
+  surface that drove the engine unconditionally on BTN_ENTER. The
+  engine self-mutes per-loop via `Settings.get().sound`, but the
+  loop listener still attaches to LoopManager for the millisecond
+  between `play()` and the engine's first mute tick (audible click
+  on some Chatter units), and under SILENT / MEETING the screen
+  left the user staring at a "previewing" highlight with no audio
+  and no visible explanation -- exactly the failure mode S205 fixed
+  for the FM dial and S220 fixed for the music player.
+
+  S221 closes the gap with the same minimal pattern: (i) lifts a
+  static `PhoneAlarmTonePicker::isSilenced()` helper into
+  `src/Screens/PhoneAlarmTonePicker.{h,cpp}` that reads
+  `!Settings.get().sound`; (ii) inserts an early-return into
+  `startPreview()` that runs a defensive `Ringtone.stop()` (in case
+  a stale engine playhead is still ticking from a profile flip
+  mid-preview), still flips `previewing = true` so a second
+  BTN_ENTER tap stops cleanly through the regular `stopPreview()`
+  path, still flashes the soft-key for gesture acknowledgement,
+  and skips the `Ringtone.play()` call entirely; (iii) repurposes
+  the existing `ALARM TONE` caption strip into a `MUTED -- SOUND
+  OFF` badge while a silenced preview is "live", painted in the
+  same MP_HIGHLIGHT cyan the regular caption uses so the badge
+  reads as a deliberate state change rather than a stuck label;
+  (iv) reverts the badge on `stopPreview()` and on every
+  non-silenced `startPreview()` path so a profile flip from
+  SILENT -> GENERAL between previews is picked up without a stale
+  caption dragging the next preview into silent-mode appearance.
+  `confirmPick()` and `invokeBack()` already route through
+  `stopPreview()` so the badge never survives screen-pop, and the
+  caption width stays inside the 160 px screen with margin to
+  spare (pixelbasic7 at 18 chars ~= 90 px).
+
+  Visible output is byte-identical for non-silenced profiles --
+  the existing cursor highlight, saved-dot markers, soft-key
+  flash, and "ALARM TONE" caption are all unchanged. The only
+  behavioural delta lands when the user has flipped to SILENT or
+  MEETING via `PhoneProfileScreen`: BTN_ENTER still flips the row
+  to "previewing", BTN_ENTER again still stops it, the soft-key
+  still flashes, but the caption reads `MUTED -- SOUND OFF` and
+  the engine never drives the piezo until the user changes
+  profile back. The new include is `<Settings.h>`; no header
+  surface changes beyond the public `static bool isSilenced()` and
+  the private `void setMutedCaption(bool)` helper. Resolves the
+  v2.1-fresh polish item now logged in `KNOWN_ISSUES.md`.
+
 ---
 
 ## How the agent reads this file

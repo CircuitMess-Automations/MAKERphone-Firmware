@@ -11,6 +11,7 @@
 #include "../Fonts/font.h"
 #include "../Services/PhoneAlarmTone.h"
 #include "../Services/PhoneRingtoneEngine.h"
+#include <Settings.h>
 
 // MAKERphone retro palette - kept identical to every other Phone* widget
 // so the picker reads visually as part of the same family. Inlined here
@@ -249,13 +250,55 @@ uint8_t PhoneAlarmTonePicker::getFocusedId() const {
 
 // ----- preview ---------------------------------------------------------
 
+// S221 -- gate the alarm-tone preview against the SILENT / MEETING
+// phone profiles. The underlying truth is `Settings.get().sound`:
+// `PhoneProfileScreen` (S159) writes `sound = false` for both Silent
+// and Meeting and `sound = true` for General / Outdoor / Headset, so
+// reading the legacy bool covers every "should the picker drive the
+// piezo right now" case without dragging the five-state enum into
+// this screen. Static so the engine-skip check in startPreview()
+// can call it without indirecting through a live picker instance.
+bool PhoneAlarmTonePicker::isSilenced() {
+	return !Settings.get().sound;
+}
+
+void PhoneAlarmTonePicker::setMutedCaption(bool muted) {
+	if(captionLabel == nullptr) return;
+	// S221 -- repurpose the "ALARM TONE" caption strip as a
+	// "MUTED -- SOUND OFF" badge while a silenced preview is "live"
+	// so the user reads the silence as deliberate rather than
+	// wondering whether the picked tone happens to be near-silent.
+	// Restored to the regular caption on stopPreview() / on every
+	// non-silenced path so a profile flip mid-preview does not leave
+	// the badge stuck.
+	lv_label_set_text(captionLabel, muted ? "MUTED -- SOUND OFF" : "ALARM TONE");
+}
+
 void PhoneAlarmTonePicker::startPreview() {
 	if(cursor >= entryCount) return;
 	const uint8_t id = ids[cursor];
 	const PhoneRingtoneEngine::Melody* m = PhoneAlarmTone::resolve(id);
 	if(m == nullptr) return;
+	if(isSilenced()){
+		// S221 -- SILENT / MEETING profile is active: do NOT call
+		// Ringtone.play(). The engine self-mutes per-loop via
+		// `Settings.get().sound`, but skipping the call entirely keeps
+		// the loop listener off the LoopManager queue and prevents
+		// even the micro-interval of audible piezo that can leak in
+		// between play() and the engine's first mute tick. Defensive
+		// Ringtone.stop() in case a stale engine playhead is still
+		// ticking from a profile flip mid-preview. The cursor still
+		// flips to "previewing" so a second BTN_ENTER tap stops
+		// cleanly through the regular stopPreview() path.
+		Ringtone.stop();
+		previewing = true;
+		setMutedCaption(true);
+		if(softKeys) softKeys->flashLeft();
+		return;
+	}
 	Ringtone.play(*m);
 	previewing = true;
+	setMutedCaption(false);
 	if(softKeys) softKeys->flashLeft();
 }
 
@@ -263,6 +306,7 @@ void PhoneAlarmTonePicker::stopPreview() {
 	if(!previewing) return;
 	previewing = false;
 	Ringtone.stop();
+	setMutedCaption(false);
 }
 
 // ----- pick / back -----------------------------------------------------

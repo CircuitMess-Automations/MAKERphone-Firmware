@@ -229,6 +229,38 @@ on a usable home screen on a fresh device.
   PhoneContactEdit) is byte-identical -- this is a defensive layout
   hardening, not a visible redesign.
 
+- [x] **`PhoneAlarmTonePicker` (S193) does not gate its preview
+  path against the SILENT / MEETING phone profiles.** With the
+  S205 (PhoneRadio), S219 (PhoneComposer) and S220
+  (PhoneMusicPlayer) gates in place, the alarm-tone picker was
+  the last in-app screen with an un-gated `Ringtone.play()`
+  call. `startPreview()` drove the engine on every BTN_ENTER
+  press regardless of profile -- the engine self-mutes per-loop
+  via `Settings.get().sound`, but the loop listener still
+  attaches to LoopManager for the millisecond between `play()`
+  and the engine's first mute tick (audible click on some
+  Chatter units), and under SILENT / MEETING the screen left
+  the user staring at a "previewing" highlight with no audio
+  and no visible explanation -- exactly the failure mode S205
+  fixed for the FM dial. -- fixed in S221. A static
+  `PhoneAlarmTonePicker::isSilenced()` helper (reads
+  `!Settings.get().sound`, the same legacy bool S205 / S219 /
+  S220 read) is added to the screen, and `startPreview()`
+  short-circuits the play-call under a silent profile
+  (defensive `Ringtone.stop()` for stale engine playheads,
+  `previewing = true` so a second BTN_ENTER still stops
+  cleanly, soft-key flash for gesture acknowledgement) instead
+  of asking the engine to drive the piezo. The existing "ALARM
+  TONE" caption strip is repurposed as a `MUTED -- SOUND OFF`
+  badge (MP_HIGHLIGHT cyan) while a silenced preview is "live",
+  reverted on `stopPreview()` and on every non-silenced path so
+  a profile flip mid-preview is picked up without a stale
+  caption dragging the next preview into silent-mode
+  appearance. `confirmPick()` and `invokeBack()` already route
+  through `stopPreview()` so the badge never survives
+  screen-pop. Visible output is byte-identical for non-silenced
+  profiles.
+
 ## Hardware-only (cannot reproduce in CI)
 
 - [ ] **Battery-low modal trigger threshold (S58, ≤15 %)** has not been
@@ -521,6 +553,38 @@ polish for v2.1.
   pause / setTracks / final-track / onStop / dtor / BTN_BACK exit
   so a profile flip between tracks is picked up cleanly on the
   next `play()`.
+
+- [x] **`PhoneAlarmTonePicker` (S193) does not gate its preview
+  path against the SILENT / MEETING phone profiles.** With the
+  S205 (PhoneRadio), S219 (PhoneComposer) and S220
+  (PhoneMusicPlayer) gates in place, the alarm-tone picker was
+  the last in-app screen with an un-gated `Ringtone.play()`
+  call. `startPreview()` drove the engine on every BTN_ENTER
+  press regardless of profile -- the engine self-mutes per-loop
+  via `Settings.get().sound`, but the loop listener still
+  attaches to LoopManager for the millisecond between `play()`
+  and the engine's first mute tick (audible click on some
+  Chatter units), and under SILENT / MEETING the screen left
+  the user staring at a "previewing" highlight with no audio
+  and no visible explanation -- exactly the failure mode S205
+  fixed for the FM dial. -- fixed in S221. A static
+  `PhoneAlarmTonePicker::isSilenced()` helper (reads
+  `!Settings.get().sound`, the same legacy bool S205 / S219 /
+  S220 read) is added to the screen, and `startPreview()`
+  short-circuits the play-call under a silent profile
+  (defensive `Ringtone.stop()` for stale engine playheads,
+  `previewing = true` so a second BTN_ENTER still stops
+  cleanly, soft-key flash for gesture acknowledgement) instead
+  of asking the engine to drive the piezo. The existing "ALARM
+  TONE" caption strip is repurposed as a `MUTED -- SOUND OFF`
+  badge (MP_HIGHLIGHT cyan) while a silenced preview is "live",
+  reverted on `stopPreview()` and on every non-silenced path so
+  a profile flip mid-preview is picked up without a stale
+  caption dragging the next preview into silent-mode
+  appearance. `confirmPick()` and `invokeBack()` already route
+  through `stopPreview()` so the badge never survives
+  screen-pop. Visible output is byte-identical for non-silenced
+  profiles.
 
 ## Hardware-only (cannot reproduce in CI)
 
