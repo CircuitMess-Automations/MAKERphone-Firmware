@@ -2215,6 +2215,51 @@ lowest-numbered `[ ]`.
   keeps byte-identical behaviour -- the new helper is purely
   additive.
 
+- [x] **S244** -- `PhoneSystemTones::restNoteCount(uint8_t id)`
+  derived structural rest-step accessor -- returns the number of
+  catalogued `PhoneRingtoneEngine::Note` entries in the underlying
+  Melody whose `freq == 0` (i.e. the count of REST steps that the
+  engine encounters but does NOT drive the piezo for). Exact
+  complement of `audibleNoteCount(id)` (S243): for every catalogued
+  chime `restNoteCount(id) + audibleNoteCount(id) == noteCount(id)`,
+  so a caller that wants both halves of the split (e.g. a picker row
+  caption like "(3 notes, 1 rest, 240 ms)") can read the dedicated
+  accessor instead of computing the difference
+  `noteCount(id) - audibleNoteCount(id)` at the call site that S243's
+  commit body explicitly foreshadowed. Returns 0 for an out-of-range
+  id, for the (currently impossible) empty-melody case, and for every
+  v1 catalogue entry today (no v1 chime uses rests) -- the accessor
+  only diverges from a constant zero when a future v2+ entry
+  interleaves a rest. Where `noteCount(id)` (S233) reports the
+  catalogued TOTAL step count and `audibleNoteCount(id)` (S243)
+  reports the catalogued AUDIBLE step count, `restNoteCount(id)`
+  reports the catalogued REST step count -- the third leg of the
+  same partition, rounding out the structural-count cluster
+  (TOTAL / AUDIBLE / REST) the same way S239-S242 rounded out the
+  structural-pitch cluster (SPAN / PEAK / TROUGH / MEAN) on top of
+  the S234 / S235 endpoint pair. Distinct from `noteCount(id)`
+  (S233 -- catalogued TOTAL step count, includes rests), distinct
+  from `audibleNoteCount(id)` (S243 -- catalogued non-rest step
+  count), distinct from `firstFreqHz` / `lastFreqHz` (catalogued
+  endpoints), distinct from `peakFreqHz` / `troughFreqHz` /
+  `meanFreqHz` (catalogued ceiling / floor / centre), and distinct
+  from `PhoneRingtoneEngine::currentFreq()` (the S191 live-piezo
+  accessor). Profile-state INDEPENDENT: the catalogued rest-step
+  count is the same on SILENT / MEETING profiles as on GENERAL /
+  OUTDOOR / HEADSET (the S231 `tryPlay(id)` gate already reports the
+  silenced answer separately for any caller that wants to fade the
+  row caption into a "(silenced)" form). Cheap O(notes) linear scan
+  with a uint16_t counter; no arithmetic, no rounding, no per-call
+  allocation. Header surface grows by exactly one public symbol; the
+  cpp adds a single function next to the existing `count` / `valid`
+  / `name` / `melody` / `play` / `tryPlay` / `isSilenced` /
+  `durationMs` / `noteCount` / `firstFreqHz` / `lastFreqHz` /
+  `gapMs` / `loops` / `silhouette` / `pitchSpanHz` / `peakFreqHz` /
+  `troughFreqHz` / `meanFreqHz` / `audibleNoteCount` cluster. No
+  new includes, no new const data, no new SPIFFS asset cost. Every
+  existing call site of the catalogue keeps byte-identical
+  behaviour -- the new helper is purely additive.
+
 
 ---
 

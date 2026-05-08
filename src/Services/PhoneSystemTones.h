@@ -1124,6 +1124,67 @@ public:
 	 * identical behaviour -- the new helper is purely additive.
 	 */
 	static uint16_t audibleNoteCount(uint8_t id);
+
+	/**
+	 * S244 - derived structural rest-step accessor for chime `id`.
+	 * Returns the number of catalogued `PhoneRingtoneEngine::Note`
+	 * entries in the underlying Melody whose `freq == 0` -- i.e. the
+	 * count of REST steps that the engine encounters but does NOT
+	 * drive the piezo for. Exact complement of `audibleNoteCount(id)`
+	 * (S243): for every catalogued chime
+	 *     restNoteCount(id) + audibleNoteCount(id) == noteCount(id)
+	 * so a caller that wants both halves of the split (e.g. a picker
+	 * row caption like "(3 notes, 1 rest, 240 ms)") can read the
+	 * dedicated accessor instead of computing the difference
+	 * `noteCount(id) - audibleNoteCount(id)` at the call site that
+	 * S243's commit body explicitly foreshadowed. Returns 0 for an
+	 * out-of-range id and for the (currently impossible) empty-melody
+	 * case; returns 0 for every v1 catalogue entry today (no v1 chime
+	 * uses rests), so the picker / diag walk gets byte-identical
+	 * behaviour today and only starts diverging from a constant zero
+	 * when a future v2+ entry interleaves a rest.
+	 *
+	 * Where `noteCount(id)` (S233) reports the catalogued TOTAL step
+	 * count and `audibleNoteCount(id)` (S243) reports the catalogued
+	 * AUDIBLE step count, `restNoteCount(id)` reports the catalogued
+	 * REST step count -- the third leg of the same partition, so the
+	 * picker can render the full caption directly without subtraction
+	 * arithmetic at the call site. This rounds out the structural-
+	 * count cluster (TOTAL / AUDIBLE / REST) the same way S239-S242
+	 * rounded out the structural-pitch cluster (SPAN / PEAK / TROUGH
+	 * / MEAN) on top of the S234 / S235 endpoint pair.
+	 *
+	 * Distinct from `noteCount(id)` (S233 -- catalogued TOTAL step
+	 * count, includes rests), distinct from `audibleNoteCount(id)`
+	 * (S243 -- catalogued non-rest step count), distinct from
+	 * `firstFreqHz` / `lastFreqHz` (catalogued endpoints), distinct
+	 * from `peakFreqHz` / `troughFreqHz` / `meanFreqHz` (catalogued
+	 * ceiling / floor / centre), and distinct from
+	 * `PhoneRingtoneEngine::currentFreq()` (the S191 live-piezo
+	 * accessor). Profile-state INDEPENDENT: the catalogued rest-step
+	 * count is the same on SILENT / MEETING profiles as on GENERAL /
+	 * OUTDOOR / HEADSET (the S231 `tryPlay(id)` gate already reports
+	 * the silenced answer separately for any caller that wants to
+	 * fade the row caption into a "(silenced)" form).
+	 *
+	 * Cheap O(notes) linear scan with a uint16_t counter (saturates
+	 * well below the uint16_t ceiling for any plausible v1+v2 melody
+	 * length); no arithmetic, no rounding, no per-call allocation.
+	 * Header surface grows by exactly one public symbol (`static
+	 * uint16_t restNoteCount`); the cpp adds a single function next
+	 * to the existing `count` / `valid` / `name` / `melody` / `play`
+	 * / `tryPlay` / `isSilenced` / `durationMs` / `noteCount` /
+	 * `firstFreqHz` / `lastFreqHz` / `gapMs` / `loops` / `silhouette`
+	 * / `pitchSpanHz` / `peakFreqHz` / `troughFreqHz` / `meanFreqHz`
+	 * / `audibleNoteCount` cluster. No new includes (the `Melody`
+	 * and `Note` types live behind the existing `PhoneRingtoneEngine.h`
+	 * include and the `kMelodies` table already lives in this
+	 * translation unit's anonymous namespace), no new const data, no
+	 * new SPIFFS asset cost. Every existing call site of the
+	 * catalogue keeps byte-identical behaviour -- the new helper is
+	 * purely additive.
+	 */
+	static uint16_t restNoteCount(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H
