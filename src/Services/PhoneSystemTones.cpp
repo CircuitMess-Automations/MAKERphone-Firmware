@@ -371,3 +371,50 @@ uint16_t PhoneSystemTones::firstFreqHz(uint8_t id){
 	if(m.notes == nullptr || m.count == 0) return 0;
 	return m.notes[0].freq;
 }
+
+// S235 - structural last-note pitch accessor for chime `id`. Returns
+// the catalogued frequency in Hz of the LAST PhoneRingtoneEngine::Note
+// entry in the underlying Melody (kMelodies[id].notes[count - 1].freq).
+// Returns 0 for an out-of-range id, for the (currently impossible)
+// empty-melody case, and -- transparently -- for the (currently
+// impossible) trailing-rest case (a Note with freq == 0 is the
+// catalogue's encoding for a silent step; no v1 chime closes on a
+// rest, so the answer collapses to "the catalogued last audible
+// note's pitch" for every entry that ships today, while staying
+// unambiguous if a future chime ever closes on a rest -- 0 is the
+// same value the engine itself uses to mean "no tone is being driven
+// right now"). Foreshadowed by the S234 commit body's "rising /
+// falling silhouette" framing -- where firstFreqHz(id) reports the
+// leading pitch (the only catalogued differentiator between equal-
+// shape pip pairs like Notify [NOTE_E6, NOTE_E6] vs SmsReceived
+// [NOTE_G6, NOTE_G6]), lastFreqHz(id) reports the trailing pitch so
+// the foreshadowed picker can render an up / down / level direction
+// arrow by comparing the two answers without walking the catalogued
+// Note array at the call site: first<last for ascending cues
+// (Success, Unlock, Save, NetworkOk, LevelUp, AlarmDismiss),
+// first>last for descending cues (Error, Lock, CallEnd, DeleteItem,
+// NetworkFail, LowBattery), first==last for level cues (Notify,
+// Alert, SmsReceived, MenuOpen, MenuClose, TimerDone). That trio
+// matches the silhouette grouping the cpp comment block at the top
+// of this file documents -- "positive cues ascend / negative cues
+// descend / equal-pitch pip pairs cue something arrived without
+// picking a direction". Profile-state INDEPENDENT: the catalogued
+// last-note frequency is the same on SILENT / MEETING profiles as
+// on GENERAL / OUTDOOR / HEADSET, so a picker can render its
+// direction arrow at construction time and leave it unchanged when
+// the user toggles profiles. Cheap O(1) array-tail field read; no
+// engine interaction, no persisted state, no per-call allocation;
+// mirrors the existing count / valid / name / melody / play /
+// tryPlay / isSilenced / durationMs / noteCount / firstFreqHz
+// cluster. Distinct from PhoneRingtoneEngine::currentFreq() (the
+// S191 live-piezo accessor) -- that helper reports the LIVE
+// frequency the engine is driving right now, the catalogue answer
+// reports the LAST catalogued note regardless of whether the engine
+// is playing. Both are useful and live at different layers --
+// neither subsumes the other.
+uint16_t PhoneSystemTones::lastFreqHz(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	return m.notes[m.count - 1].freq;
+}

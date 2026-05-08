@@ -1605,6 +1605,77 @@ lowest-numbered `[ ]`.
   data, no new SPIFFS asset cost. Every existing call site of the
   catalogue keeps byte-identical behaviour -- the new helper is
   purely additive.
+- [x] **S235** -- `PhoneSystemTones::lastFreqHz(uint8_t id)` structural
+  last-note pitch accessor -- the S234 commit body had explicitly
+  framed `firstFreqHz(id)` as the catalogue's leading-pitch indicator
+  for equal-shape pip pairs (Notify [NOTE_E6, NOTE_E6] vs.
+  SmsReceived [NOTE_G6, NOTE_G6] are both two-pip pairs at equal
+  duration / note count -- only the FIRST note's frequency
+  differentiates them). S235 closes the natural loop: pairing
+  `firstFreqHz(id)` with a sibling `lastFreqHz(id)` accessor lets
+  the foreshadowed "Settings -> Sounds -> System chimes" picker
+  (mirroring the S183 PhoneSoftKeyToneScreen pattern) render a per-
+  row direction arrow -- ascending / descending / level -- without
+  walking the catalogued Note array at the call site. The pre-S235
+  surface exposed `count()`, `valid(id)`, `name(id)`, `melody(id)`,
+  `play(id)`, `tryPlay(id)`, `isSilenced()`, `durationMs(id)`,
+  `noteCount(id)` and `firstFreqHz(id)` but no helper that reported
+  the catalogued last-note pitch (it lived behind
+  `melody(id)->notes[count - 1].freq`, requiring the caller to walk
+  the nullptr / empty-melody / trailing-rest paths itself). S235
+  grows the header by exactly one public symbol --
+  `static uint16_t lastFreqHz(uint8_t id)` -- whose semantics are
+  the cheapest possible: returns `kMelodies[id].notes[count - 1].freq`
+  for a valid id with at least one note, returns 0 for an out-of-
+  range id, for the (currently impossible) empty-melody case and --
+  transparently -- for the (currently impossible) trailing-rest
+  case (a Note with `freq == 0` is the catalogue's encoding for a
+  silent step; no v1 chime closes on a rest, so the answer collapses
+  to "the catalogued last audible note's pitch" for every entry that
+  ships today, while staying unambiguous if a future chime ever
+  closes on a rest -- 0 is the same value the engine itself uses to
+  mean "no tone is being driven right now"). The
+  `firstFreqHz(id)` + `lastFreqHz(id)` pair maps cleanly onto the
+  silhouette grouping the cpp comment block at the top of
+  PhoneSystemTones.cpp documents at length: ascending cues (Success
+  C6->E6, Unlock C5->G5, Save C6->E6->G6, NetworkOk C6->F6, LevelUp
+  C5->E5->G5->C6, AlarmDismiss E5->G5) report first<last; descending
+  cues (Error F5->D5, Lock G5->C5, CallEnd E6->C6->A5, DeleteItem
+  E6->A5, NetworkFail F6->C6, LowBattery E5->D5->C5) report
+  first>last; level cues (Notify E6=E6, Alert A6, SmsReceived G6=G6,
+  MenuOpen E6, MenuClose C6, TimerDone C6=C6 with E6 tail -- the
+  picker's first-vs-last comparison still says equal-or-rising at
+  the trailing-pitch axis, the silhouette is "ends higher than it
+  started" exactly as the cpp comment block characterises) report
+  first<=last. A future `PhoneDiagScreen` "Sound test" entry that
+  walks every chime in turn (foreshadowed in S231 / S232 / S233 /
+  S234 commit bodies) wants the same answer for the same reason --
+  it can show a per-chime "first 1318 Hz -> last 1568 Hz" caption
+  beside the row to confirm the engine handoff landed on the
+  catalogued endpoints. Distinct from
+  `PhoneRingtoneEngine::currentFreq()` (the S191 live-piezo
+  accessor): that helper reports the LIVE frequency the engine is
+  driving right now (0 during rests, gaps and idle), the catalogue
+  answer reports the LAST catalogued note regardless of whether the
+  engine is playing. Both are useful and live at different layers
+  -- neither subsumes the other. Profile-state INDEPENDENT: the
+  catalogued last-note frequency is the same on SILENT / MEETING
+  profiles as on GENERAL / OUTDOOR / HEADSET, so the foreshadowed
+  picker can render its direction arrow at construction time and
+  leave it unchanged when the user toggles profiles (the S231
+  `tryPlay(id)` gate already reports the silenced answer separately
+  for any caller that wants to fade the arrow into a "(silenced)"
+  caption). Cheap O(1) array-tail field read; no engine interaction,
+  no persisted state, no per-call allocation. Header surface grows
+  by exactly one public symbol; the cpp adds a single function next
+  to the existing `count` / `valid` / `name` / `melody` / `play` /
+  `tryPlay` / `isSilenced` / `durationMs` / `noteCount` /
+  `firstFreqHz` cluster. No new includes (the `Melody` and `Note`
+  types live behind the existing `PhoneRingtoneEngine.h` include
+  and the `kMelodies` table already lives in this translation
+  unit's anonymous namespace), no new const data, no new SPIFFS
+  asset cost. Every existing call site of the catalogue keeps
+  byte-identical behaviour -- the new helper is purely additive.
 
 ---
 
