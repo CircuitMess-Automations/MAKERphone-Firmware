@@ -766,3 +766,51 @@ uint16_t PhoneSystemTones::meanFreqHz(uint8_t id){
 	if(rounded > 0xFFFFu) return 0xFFFFu;
 	return (uint16_t)rounded;
 }
+
+// S243 - derived structural audible-step accessor for chime `id`.
+// Returns the number of catalogued PhoneRingtoneEngine::Note entries
+// in the underlying Melody whose freq != 0 -- i.e. the count of
+// NON-rest steps that the engine will actually drive the piezo for.
+// Rest-encoded freq == 0 entries are skipped so a future leading /
+// trailing / interior rest does not inflate the answer past the
+// audible step count, exactly mirroring the rest-skipping rule S240
+// (peakFreqHz), S241 (troughFreqHz) and S242 (meanFreqHz) already use
+// for the catalogued ceiling, floor and centre scans. Returns 0 for
+// an out-of-range id and for the (currently impossible) empty-melody
+// case. Where noteCount(id) (S233) reports the catalogued TOTAL step
+// count (audible notes + any future rests), audibleNoteCount(id)
+// reports the catalogued AUDIBLE step count -- the number of
+// catalogued steps that will actually drive the piezo when the engine
+// plays back the cue. For every v1 catalogue entry today the two
+// accessors agree (no v1 chime currently uses rests), so the picker /
+// diag walk gets byte-identical behaviour today; they diverge only
+// when a future entry interleaves a rest, at which point the picker
+// can render captions like "(3 notes, 1 rest, 240 ms)" using the
+// difference noteCount(id) - audibleNoteCount(id) without re-walking
+// the const Melody* pointer at the call site. Foreshadowed by the
+// S242 commit body's "uint16_t non-rest counter" framing: the divisor
+// S242 already computes internally for meanFreqHz is exactly
+// audibleNoteCount(id). Distinct from noteCount(id) (catalogued TOTAL
+// step count), distinct from firstFreqHz / lastFreqHz (catalogued
+// endpoints), distinct from peakFreqHz / troughFreqHz / meanFreqHz
+// (catalogued ceiling / floor / centre), and distinct from
+// PhoneRingtoneEngine::currentFreq() (live-piezo accessor S191).
+// Profile-state INDEPENDENT: the catalogued audible-step count is the
+// same on SILENT / MEETING profiles as on GENERAL / OUTDOOR /
+// HEADSET. Cheap O(notes) linear scan with a uint16_t counter; no
+// arithmetic, no rounding, no per-call allocation; mirrors the
+// existing count / valid / name / melody / play / tryPlay /
+// isSilenced / durationMs / noteCount / firstFreqHz / lastFreqHz /
+// gapMs / loops / silhouette / pitchSpanHz / peakFreqHz /
+// troughFreqHz / meanFreqHz cluster.
+uint16_t PhoneSystemTones::audibleNoteCount(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	uint16_t audible = 0;
+	for(uint16_t i = 0; i < m.count; ++i){
+		if(m.notes[i].freq == 0) continue;
+		++audible;
+	}
+	return audible;
+}
