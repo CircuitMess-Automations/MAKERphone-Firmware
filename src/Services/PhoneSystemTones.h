@@ -681,6 +681,98 @@ public:
 	 * the new helper is purely additive.
 	 */
 	static int8_t silhouette(uint8_t id);
+
+	/**
+	 * S239 - derived pitch-span accessor for chime `id`. Returns the
+	 * absolute frequency interval, in Hz, between the catalogued first
+	 * note and the catalogued last note of the underlying
+	 * `PhoneRingtoneEngine::Melody` -- i.e. `|firstFreqHz(id) -
+	 * lastFreqHz(id)|`. Returns 0 for an out-of-range id, for the
+	 * (currently impossible) empty-melody case, and for every level
+	 * silhouette in the catalogue (Notify, Alert, SmsReceived,
+	 * MenuOpen, MenuClose -- where `firstFreqHz(id) == lastFreqHz(id)`
+	 * by construction). Returns the unsigned magnitude of the catalogued
+	 * interval for every ascending or descending silhouette regardless
+	 * of direction (Unlock and Lock both report ~131 Hz -- a perfect
+	 * fifth from NOTE_C5 to NOTE_G5; NetworkOk and NetworkFail both
+	 * report ~350 Hz -- a perfect fourth from NOTE_C6 to NOTE_F6;
+	 * Success and Error report different magnitudes because they use
+	 * different intervals).
+	 *
+	 * Foreshadowed by the S238 commit body's "direction is one half of
+	 * the silhouette, magnitude is the other" framing. Where S238
+	 * returns the SIGN of the catalogued first / last comparison
+	 * (+1 ascending / 0 level / -1 descending), S239 returns the
+	 * MAGNITUDE of the same comparison. The two derived accessors
+	 * together describe the catalogued silhouette completely without
+	 * either subsuming the other: a caller that wants only the
+	 * direction (e.g. picking a colour or an arrow glyph for a row)
+	 * stays on `silhouette(id)`, a caller that wants only the
+	 * magnitude (e.g. driving the height of a per-row pitch-bar
+	 * indicator or the curve sharpness of a per-row sparkline) stays
+	 * on `pitchSpanHz(id)`, and a caller that wants both reads them
+	 * separately rather than re-deriving one from the other. Mirrors
+	 * the S232 `durationMs(id)` precedent of exposing a derived answer
+	 * (the sum over the catalogued Note array plus interleaved gaps)
+	 * rather than a raw struct field where the derived form is the
+	 * one the caller actually wants -- here the picker / diag walk
+	 * wants the catalogued interval magnitude, not two raw frequencies
+	 * plus the absolute-difference arithmetic.
+	 *
+	 * Concretely the foreshadowed "Settings -> Sounds -> System chimes"
+	 * picker can use `pitchSpanHz(id)` to render a per-row pitch-bar
+	 * indicator whose width / height tracks the catalogued span:
+	 * single-note pulses (Alert, MenuOpen, MenuClose) and equal-pip
+	 * pairs (Notify, SmsReceived) collapse to a flat tick (span 0 Hz),
+	 * narrow intervals render as small rises / falls, dramatic
+	 * intervals (LevelUp's full octave from NOTE_C5 to NOTE_C6 is
+	 * ~262 Hz between first and last, NetworkOk's perfect fourth at
+	 * ~350 Hz, Save's major sixth at ~523 Hz between NOTE_C6 and
+	 * NOTE_G6) render as tall rises / falls. The picker pairs the
+	 * bar's TILT (from S238 `silhouette(id)`) with its HEIGHT (from
+	 * this accessor) to give the user a glanceable visual abstraction
+	 * of the catalogued cue without registering a LoopManager listener
+	 * of its own. The foreshadowed `PhoneDiagScreen` "Sound test"
+	 * entry can use the same accessor to add a per-row
+	 * "span: 350 Hz" caption beside the row to confirm the engine
+	 * handoff landed on the catalogued endpoints (the absolute
+	 * difference is the smallest single number that summarises the
+	 * catalogued first / last pair).
+	 *
+	 * Distinct from `firstFreqHz(id)` / `lastFreqHz(id)` themselves:
+	 * those helpers stay on the header so a caller that wants the
+	 * absolute pitch values (e.g. a per-row "1318 Hz -> 1568 Hz"
+	 * caption) can still read them directly. Distinct from
+	 * `silhouette(id)` (S238): that helper reports the direction of
+	 * the catalogued span, this helper reports the magnitude. The
+	 * three accessors coexist by design -- structural pair exposes
+	 * the raw catalogued endpoints, derived sign helper exposes the
+	 * direction of the comparison, derived magnitude helper exposes
+	 * the size of the comparison.
+	 *
+	 * Profile-state INDEPENDENT: the catalogued pitch span is the
+	 * same on SILENT / MEETING profiles as on GENERAL / OUTDOOR /
+	 * HEADSET, so the foreshadowed picker can lay out its pitch-bar
+	 * height at construction time and leave it unchanged when the
+	 * user toggles profiles (the S231 `tryPlay(id)` gate already
+	 * reports the silenced answer separately for any caller that
+	 * wants to fade the bar into a "(silenced)" caption).
+	 *
+	 * Cheap O(1) two-field absolute-difference; no engine
+	 * interaction, no persisted state, no per-call allocation. Header
+	 * surface grows by exactly one public symbol (`static uint16_t
+	 * pitchSpanHz`); the cpp adds a single function next to the
+	 * existing `count` / `valid` / `name` / `melody` / `play` /
+	 * `tryPlay` / `isSilenced` / `durationMs` / `noteCount` /
+	 * `firstFreqHz` / `lastFreqHz` / `gapMs` / `loops` /
+	 * `silhouette` cluster. No new includes (the `Melody` and `Note`
+	 * types live behind the existing `PhoneRingtoneEngine.h` include
+	 * and the `kMelodies` table already lives in this translation
+	 * unit's anonymous namespace), no new const data, no new SPIFFS
+	 * asset cost. Every existing call site of the catalogue keeps
+	 * byte-identical behaviour -- the new helper is purely additive.
+	 */
+	static uint16_t pitchSpanHz(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H

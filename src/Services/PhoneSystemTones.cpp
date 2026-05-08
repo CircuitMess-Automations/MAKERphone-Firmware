@@ -548,3 +548,53 @@ int8_t PhoneSystemTones::silhouette(uint8_t id){
 	if(first > last) return -1;
 	return 0;
 }
+
+// S239 - derived pitch-span accessor for chime `id`. Returns the
+// absolute frequency interval, in Hz, between the catalogued first
+// note and the catalogued last note of the underlying
+// PhoneRingtoneEngine::Melody (|firstFreqHz(id) - lastFreqHz(id)|).
+// Returns 0 for an out-of-range id, for the (currently impossible)
+// empty-melody case, and for every level silhouette in the catalogue
+// (Notify, Alert, SmsReceived, MenuOpen, MenuClose -- where
+// firstFreqHz(id) == lastFreqHz(id) by construction). Returns the
+// unsigned magnitude of the catalogued interval for every ascending
+// or descending silhouette regardless of direction (Unlock and Lock
+// both report the same ~131 Hz magnitude -- a perfect fifth between
+// NOTE_C5 and NOTE_G5; NetworkOk and NetworkFail both report the
+// same ~350 Hz magnitude -- a perfect fourth between NOTE_C6 and
+// NOTE_F6). Foreshadowed by the S238 commit body's "direction is
+// one half of the silhouette, magnitude is the other" framing -- where
+// S238 silhouette(id) returns the SIGN of the catalogued first /
+// last comparison (+1 ascending / 0 level / -1 descending), S239
+// pitchSpanHz(id) returns the MAGNITUDE of the same comparison. The
+// two derived accessors together describe the catalogued silhouette
+// completely without either subsuming the other: a caller that wants
+// only the direction stays on silhouette(id), a caller that wants
+// only the magnitude stays on pitchSpanHz(id), and a caller that
+// wants both reads them separately rather than re-deriving one from
+// the other. Mirrors the S232 durationMs(id) precedent of exposing a
+// derived answer where the derived form is the one the caller
+// actually wants. The foreshadowed "Settings -> Sounds -> System
+// chimes" picker can pair the bar's TILT (silhouette) with its
+// HEIGHT (pitchSpanHz) to give the user a glanceable visual
+// abstraction of the catalogued cue without registering a
+// LoopManager listener of its own. Distinct from firstFreqHz(id) /
+// lastFreqHz(id) themselves: those helpers stay so a caller that
+// wants the absolute pitch values can still read them directly.
+// Distinct from silhouette(id) (S238): that helper reports the
+// direction of the catalogued span, this helper reports the
+// magnitude. Profile-state INDEPENDENT: the catalogued pitch span is
+// the same on SILENT / MEETING profiles as on GENERAL / OUTDOOR /
+// HEADSET. Cheap O(1) two-field absolute difference via
+// firstFreqHz(id) / lastFreqHz(id) so the rest-aware semantics those
+// accessors already implement (a leading or trailing rest is encoded
+// as freq == 0 in the catalogue) feed straight into the magnitude
+// answer without re-deriving them here -- if a future entry ever
+// opens or closes on a rest the magnitude collapses transparently to
+// the catalogued audible note's pitch.
+uint16_t PhoneSystemTones::pitchSpanHz(uint8_t id){
+	if(!valid(id)) return 0;
+	const uint16_t first = firstFreqHz(id);
+	const uint16_t last  = lastFreqHz(id);
+	return (first > last) ? (uint16_t)(first - last) : (uint16_t)(last - first);
+}
