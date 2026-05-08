@@ -2087,6 +2087,83 @@ lowest-numbered `[ ]`.
   the catalogue keeps byte-identical behaviour -- the new helper is
   purely additive.
 
+- [x] **S242** -- `PhoneSystemTones::meanFreqHz(uint8_t id)` derived
+  catalogue-wide arithmetic-mean pitch accessor -- returns the
+  integer-rounded average of every audible (non-rest) catalogued
+  frequency in the underlying Melody, in Hz (`round(sum(notes[i].freq
+  for non-rest i) / count_of_non_rest_notes)`). Rest-encoded
+  `freq == 0` entries are skipped so a future leading or trailing or
+  interior rest does not pull the mean toward zero by accident --
+  exactly mirroring the rest-skipping rule S240 (peakFreqHz) and
+  S241 (troughFreqHz) already use for the catalogued ceiling and
+  floor scans. Returns 0 for an out-of-range id, for the (currently
+  impossible) empty-melody case, and for the (currently impossible)
+  all-rests-melody case -- the same three "no answer" cases S240 /
+  S241 already collapse to 0, so the picker / diag walk does not
+  have to special-case "no answer" three different ways across the
+  catalogued-pitch trio. Where `peakFreqHz(id)` (S240) reports the
+  catalogued CEILING across every step and `troughFreqHz(id)`
+  (S241) reports the catalogued FLOOR across every step, S242
+  reports the catalogued CENTRE -- the arithmetic mean of every
+  audible step. The trio (CEILING, FLOOR, CENTRE) describes the
+  catalogued pitch envelope's vertical anchors completely without
+  any helper subsuming the others -- a caller that wants only the
+  ceiling stays on `peakFreqHz(id)`, a caller that wants only the
+  floor stays on `troughFreqHz(id)`, and a caller that wants only
+  the centre stays on `meanFreqHz(id)` rather than re-deriving any
+  of the three from a const Melody* pointer at the call site. For a
+  strictly monotonic melody with `n` evenly-spaced steps the mean
+  lands halfway between the catalogued first and last; for non-
+  monotonic future entries (a fall-then-rise valley, an up-down-up
+  "wave", a peak-and-return cue, etc.) the mean weights every step
+  equally and so does NOT in general agree with the midpoint
+  between `peakFreqHz(id)` and `troughFreqHz(id)`. That makes the
+  mean a third independent answer -- the catalogued "average pitch
+  the cue spends time near" -- complementing the pair of extremes
+  already shipped. The pitch-bar abstraction the foreshadowed
+  "Settings -> Sounds -> System chimes" picker renders -- TILT
+  (S238 silhouette), HEIGHT (S239 pitchSpanHz), CEILING (S240
+  peakFreqHz), FLOOR (S241 troughFreqHz), CENTRE (S242 meanFreqHz)
+  -- now has all five catalogued anchor points exposed at the API
+  layer, so the picker can paint a third tick mark (the catalogued
+  mean) inside the bar between the floor and the ceiling at
+  construction time without re-walking the const Melody* pointer at
+  the call site. The foreshadowed `PhoneDiagScreen` "Sound test"
+  entry can show a per-chime "mean: 1175 Hz" caption beside the
+  existing "trough: 1047 Hz" / "peak: 1319 Hz" captions to confirm
+  the engine handoff is honouring the catalogued centre as well as
+  the catalogued extremes. A future "loudness curve" calibration
+  helper that wants a single representative pitch per chime
+  (rather than the pair of extremes) reads `meanFreqHz(id)` once at
+  boot and feeds the result into its A-weighting table without ever
+  opening the catalogue's const data table. Distinct from
+  `firstFreqHz(id)` / `lastFreqHz(id)` (catalogued endpoints),
+  distinct from `pitchSpanHz(id)` (S239 -- absolute difference
+  between catalogued endpoints), distinct from `peakFreqHz(id)`
+  (S240 -- catalogued ceiling), distinct from `troughFreqHz(id)`
+  (S241 -- catalogued floor), and distinct from
+  `PhoneRingtoneEngine::currentFreq()` (the S191 live-piezo
+  accessor). Profile-state INDEPENDENT: the catalogued mean is the
+  same on SILENT / MEETING profiles as on GENERAL / OUTDOOR /
+  HEADSET, so the picker can lay out its centre tick at construction
+  time and leave it unchanged when the user toggles profiles (the
+  S231 `tryPlay(id)` gate already reports the silenced answer
+  separately for any caller that wants to fade the bar into a
+  "(silenced)" caption). Cheap O(notes) linear scan with a
+  uint32_t accumulator (so the running sum cannot overflow even on
+  a hypothetical 65535 x ~13000 Hz worst case) and a uint16_t non-
+  rest counter; the final integer-rounded division uses the standard
+  +half-divisor trick to avoid pulling in `<math.h>`. No engine
+  interaction, no persisted state, no per-call allocation. Header
+  surface grows by exactly one public symbol; the cpp adds a single
+  function next to the existing `count` / `valid` / `name` /
+  `melody` / `play` / `tryPlay` / `isSilenced` / `durationMs` /
+  `noteCount` / `firstFreqHz` / `lastFreqHz` / `gapMs` / `loops` /
+  `silhouette` / `pitchSpanHz` / `peakFreqHz` / `troughFreqHz`
+  cluster. No new includes, no new const data, no new SPIFFS asset
+  cost. Every existing call site of the catalogue keeps byte-
+  identical behaviour -- the new helper is purely additive.
+
 
 ---
 

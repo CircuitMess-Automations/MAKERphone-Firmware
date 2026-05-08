@@ -710,3 +710,59 @@ uint16_t PhoneSystemTones::troughFreqHz(uint8_t id){
 	}
 	return found ? trough : 0;
 }
+
+// S242 - derived catalogue-wide arithmetic-mean pitch accessor for
+// chime `id`. Returns the integer-rounded average of every audible
+// (non-rest) catalogued frequency in the underlying Melody, in Hz
+// (sum(notes[i].freq for non-rest i) / count_of_non_rest_notes).
+// Rest-encoded freq == 0 entries are skipped so a future leading /
+// trailing / interior rest does not pull the mean toward zero by
+// accident, exactly mirroring the rest-skipping rule S240 / S241
+// already use for the catalogued ceiling / floor scans. Returns 0
+// for an out-of-range id, for the (currently impossible) empty-
+// melody case, and for the (currently impossible) all-rests-melody
+// case -- the same three "no answer" cases S240 / S241 already
+// collapse to 0. Where peakFreqHz(id) (S240) reports the catalogued
+// CEILING and troughFreqHz(id) (S241) reports the catalogued FLOOR,
+// S242 reports the catalogued CENTRE -- the trio (CEILING, FLOOR,
+// CENTRE) describes the catalogued pitch envelope's vertical
+// anchors completely without any helper subsuming the others. For a
+// strictly monotonic melody with `n` evenly-spaced steps the mean
+// lands halfway between the catalogued first and last; for non-
+// monotonic future entries (a fall-then-rise valley, an up-down-up
+// "wave", a peak-and-return cue, etc.) the mean weights every step
+// equally and so does NOT in general agree with the midpoint
+// between peakFreqHz(id) and troughFreqHz(id). Distinct from
+// firstFreqHz / lastFreqHz (catalogued endpoints), distinct from
+// pitchSpanHz (absolute difference between endpoints), distinct
+// from peakFreqHz (catalogued ceiling), distinct from troughFreqHz
+// (catalogued floor), and distinct from
+// PhoneRingtoneEngine::currentFreq() (live-piezo accessor S191).
+// Profile-state INDEPENDENT: the catalogued mean is the same on
+// SILENT / MEETING profiles as on GENERAL / OUTDOOR / HEADSET. Cheap
+// O(notes) linear scan with a uint32_t accumulator (so the running
+// sum cannot overflow even on a hypothetical 65535 x ~13000 Hz
+// worst case) and a uint16_t non-rest counter; the final integer-
+// rounded division uses the standard +half-divisor trick to avoid
+// pulling in <math.h>. No engine interaction, no persisted state,
+// no per-call allocation; mirrors the existing count / valid / name
+// / melody / play / tryPlay / isSilenced / durationMs / noteCount /
+// firstFreqHz / lastFreqHz / gapMs / loops / silhouette /
+// pitchSpanHz / peakFreqHz / troughFreqHz cluster.
+uint16_t PhoneSystemTones::meanFreqHz(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	uint32_t sum = 0;
+	uint16_t audible = 0;
+	for(uint16_t i = 0; i < m.count; ++i){
+		const uint16_t f = m.notes[i].freq;
+		if(f == 0) continue;
+		sum += f;
+		++audible;
+	}
+	if(audible == 0) return 0;
+	const uint32_t rounded = (sum + (audible / 2)) / audible;
+	if(rounded > 0xFFFFu) return 0xFFFFu;
+	return (uint16_t)rounded;
+}
