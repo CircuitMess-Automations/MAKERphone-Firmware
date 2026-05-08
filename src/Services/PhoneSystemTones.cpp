@@ -646,3 +646,67 @@ uint16_t PhoneSystemTones::peakFreqHz(uint8_t id){
 	}
 	return peak;
 }
+
+// S241 - derived catalogue-wide minimum-pitch accessor for chime
+// `id`. Returns the lowest catalogued audible frequency, in Hz,
+// across every PhoneRingtoneEngine::Note entry in the underlying
+// Melody (min(kMelodies[id].notes[i].freq) for i in [0..count-1],
+// ignoring rest-encoded freq == 0 entries so a future leading /
+// trailing / interior rest does not collapse the answer to zero by
+// accident -- exactly mirroring the rest-skipping rule S240's
+// peakFreqHz already uses for the catalogued CEILING). Returns 0
+// for an out-of-range id, for the (currently impossible) empty-
+// melody case, and for the (currently impossible) all-rests-melody
+// case. Foreshadowed by the S240 commit body's "S240 exposes the
+// GLOBAL maximum the cue reaches at any step" framing: where
+// peakFreqHz(id) (S240) reports the catalogued CEILING across every
+// step, S241 reports the catalogued FLOOR across every step. The
+// two derived accessors together describe the catalogued pitch
+// envelope completely without either subsuming the other -- a
+// caller that wants only the ceiling stays on peakFreqHz(id), a
+// caller that wants only the floor stays on troughFreqHz(id), and
+// a caller that wants both reads them separately rather than
+// re-deriving one from the other. Mirrors the S238 / S239
+// (silhouette / pitchSpanHz) precedent of shipping the two halves
+// of a catalogued shape as separate accessors. For every monotonic
+// melody in the v1 catalogue the trough agrees with whichever
+// endpoint sits below the other (the opposite endpoint of S240's
+// peak); for non-monotonic future entries the answer reports the
+// catalogued floor regardless of which step it lands on, which is
+// the visually-meaningful one for the picker / diag walk. The
+// pitch-bar abstraction the foreshadowed "Settings -> Sounds ->
+// System chimes" picker renders -- TILT (silhouette), HEIGHT
+// (pitchSpanHz), CEILING (peakFreqHz), FLOOR (troughFreqHz) -- now
+// has all four catalogued anchor points exposed at the API layer,
+// so the picker can lay out the bar's bottom edge at construction
+// time without re-deriving the catalogued floor from the const
+// Melody* pointer at the call site. Distinct from firstFreqHz /
+// lastFreqHz (catalogued endpoints), distinct from pitchSpanHz
+// (absolute difference between endpoints), distinct from peakFreqHz
+// (catalogued ceiling), and distinct from
+// PhoneRingtoneEngine::currentFreq() (live-piezo accessor S191).
+// Profile-state INDEPENDENT: the catalogued trough is the same on
+// SILENT / MEETING profiles as on GENERAL / OUTDOOR / HEADSET. The
+// implementation mirrors S240 exactly with `<` substituted for `>`
+// and a `found` sentinel because there is no natural starting value
+// for a min-search across uint16_t -- starting at UINT16_MAX would
+// work but the explicit sentinel makes the all-rests fallback
+// (return 0) match S240's empty-melody fallback by construction.
+// No engine interaction, no persisted state, no per-call allocation;
+// next to the existing count / valid / name / melody / play /
+// tryPlay / isSilenced / durationMs / noteCount / firstFreqHz /
+// lastFreqHz / gapMs / loops / silhouette / pitchSpanHz / peakFreqHz
+// cluster.
+uint16_t PhoneSystemTones::troughFreqHz(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	uint16_t trough = 0;
+	bool found = false;
+	for(uint16_t i = 0; i < m.count; ++i){
+		const uint16_t f = m.notes[i].freq;
+		if(f == 0) continue;
+		if(!found || f < trough){ trough = f; found = true; }
+	}
+	return found ? trough : 0;
+}

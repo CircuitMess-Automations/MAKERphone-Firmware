@@ -2009,6 +2009,84 @@ lowest-numbered `[ ]`.
   of the catalogue keeps byte-identical behaviour -- the new
   helper is purely additive.
 
+- [x] **S241** -- `PhoneSystemTones::troughFreqHz(uint8_t id)` derived
+  catalogue-wide minimum-pitch accessor -- returns the lowest
+  catalogued audible frequency, in Hz, across every Note in the
+  underlying Melody (i.e. `min(kMelodies[id].notes[i].freq)` for `i`
+  in `[0..count-1]`, ignoring rest-encoded `freq == 0` entries so a
+  future leading or trailing or interior rest does not collapse the
+  answer to zero by accident -- exactly mirroring the rest-skipping
+  rule S240 already uses for the catalogued CEILING). Returns 0 for
+  an out-of-range id, for the (currently impossible) empty-melody
+  case, and for the (currently impossible) all-rests-melody case --
+  the same three "no answer" cases S240 already collapses to 0.
+  Foreshadowed by the S240 commit body's "S240 exposes the GLOBAL
+  maximum the cue reaches at any step" framing: where
+  `peakFreqHz(id)` (S240) reports the catalogued CEILING across
+  every step, S241 reports the catalogued FLOOR across every step.
+  The two derived accessors together describe the catalogued pitch
+  envelope completely without either subsuming the other -- a
+  caller that wants only the ceiling stays on `peakFreqHz(id)`, a
+  caller that wants only the floor stays on `troughFreqHz(id)`, and
+  a caller that wants both reads them separately rather than
+  re-deriving one from the other. Mirrors the S238 / S239
+  (silhouette / pitchSpanHz) precedent of shipping the two halves
+  of a catalogued shape as separate accessors so each call site can
+  pick exactly the half it wants without paying for the other. For
+  every monotonic melody in the v1 catalogue (Success ascends from
+  NOTE_C6, Save ascends from NOTE_C6, Unlock ascends from NOTE_C5,
+  Error descends to NOTE_D5, Lock descends to NOTE_C5, LowBattery
+  descends to NOTE_C5, etc.) the trough answer agrees with whichever
+  endpoint sits BELOW the other -- the opposite endpoint of
+  `peakFreqHz(id)` for monotonic shapes. For non-monotonic future
+  entries (a fall-then-rise valley, a "u-turn" with an interior low,
+  etc.) the answer reports the catalogued floor regardless of which
+  step it lands on, which is the visually-meaningful one for the
+  picker / diag walk. The pitch-bar abstraction the foreshadowed
+  "Settings -> Sounds -> System chimes" picker renders -- TILT
+  (silhouette), HEIGHT (pitchSpanHz), CEILING (peakFreqHz), FLOOR
+  (troughFreqHz) -- now has all four catalogued anchor points
+  exposed at the API layer, so the picker can lay out the bar's
+  bottom edge at construction time without re-deriving the
+  catalogued floor from the const Melody* pointer at the call site.
+  The pair `peakFreqHz(id) - troughFreqHz(id)` answers a question
+  neither helper alone can -- the GLOBAL pitch span across every
+  step in the melody (as opposed to S239 `pitchSpanHz(id)` which
+  answers the ENDPOINT pitch span between the catalogued first and
+  last). For monotonic melodies the two questions agree; for
+  non-monotonic future entries they diverge -- TimerDone's level
+  silhouette has endpoint span 0 Hz but global span ~262 Hz (the
+  NOTE_E6 peak above the NOTE_C6 endpoints), and a future
+  fall-then-rise siren would have its endpoint span and global span
+  agree only at the trough. The foreshadowed `PhoneDiagScreen`
+  "Sound test" entry can show a per-chime "trough: 1047 Hz" caption
+  beside the row to confirm the engine handoff is honouring the
+  catalogued floor. Distinct from `firstFreqHz(id)` /
+  `lastFreqHz(id)` (catalogued endpoints), distinct from
+  `pitchSpanHz(id)` (S239 -- absolute difference between catalogued
+  endpoints), distinct from `peakFreqHz(id)` (S240 -- catalogued
+  ceiling), and distinct from `PhoneRingtoneEngine::currentFreq()`
+  (the S191 live-piezo accessor). Profile-state INDEPENDENT: the
+  catalogued trough is the same on SILENT / MEETING profiles as on
+  GENERAL / OUTDOOR / HEADSET, so the picker can lay out its bar
+  floor at construction time and leave it unchanged when the user
+  toggles profiles (the S231 `tryPlay(id)` gate already reports the
+  silenced answer separately for any caller that wants to fade the
+  bar into a "(silenced)" caption). Cheap O(notes) linear scan
+  with a uint16_t accumulator and a `found` sentinel (the mirror of
+  S240's loop with `<` substituted for `>` and an explicit
+  uninitialised-yet flag because there is no natural starting value
+  for a min-search across uint16_t). No engine interaction, no
+  persisted state, no per-call allocation. Header surface grows by
+  exactly one public symbol; the cpp adds a single function next to
+  the existing `count` / `valid` / `name` / `melody` / `play` /
+  `tryPlay` / `isSilenced` / `durationMs` / `noteCount` /
+  `firstFreqHz` / `lastFreqHz` / `gapMs` / `loops` / `silhouette` /
+  `pitchSpanHz` / `peakFreqHz` cluster. No new includes, no new
+  const data, no new SPIFFS asset cost. Every existing call site of
+  the catalogue keeps byte-identical behaviour -- the new helper is
+  purely additive.
+
 
 ---
 
