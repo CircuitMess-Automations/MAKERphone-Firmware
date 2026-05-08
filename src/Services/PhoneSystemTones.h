@@ -600,6 +600,87 @@ public:
 	 * purely additive.
 	 */
 	static bool loops(uint8_t id);
+
+	/**
+	 * S238 - derived ascending / level / descending pitch-direction
+	 * accessor for chime `id`. Returns the catalogued silhouette of
+	 * the underlying `PhoneRingtoneEngine::Melody` as an `int8_t`:
+	 *
+	 *   - `+1` if the catalogued first note's pitch is LOWER than the
+	 *     catalogued last note's pitch (ascending silhouette --
+	 *     Success, Unlock, Save, NetworkOk, LevelUp, AlarmDismiss,
+	 *     TimerDone today);
+	 *   - `-1` if the catalogued first note's pitch is HIGHER than the
+	 *     catalogued last note's pitch (descending silhouette -- Error,
+	 *     Lock, CallEnd, DeleteItem, NetworkFail, LowBattery today);
+	 *   - `0` otherwise (level silhouette: same first / last pitch --
+	 *     Notify, Alert, SmsReceived, MenuOpen, MenuClose today;
+	 *     also the answer for an out-of-range id, which collapses
+	 *     cleanly to the level case so a non-existent chime is
+	 *     indistinguishable from a level entry at the call site and
+	 *     a picker rendering a direction arrow does not need to
+	 *     special-case the invalid id path).
+	 *
+	 * Foreshadowed by the S234 / S235 commit bodies' "rising / falling
+	 * silhouette" framing -- where `firstFreqHz(id)` (S234) reports the
+	 * leading pitch and `lastFreqHz(id)` (S235) reports the trailing
+	 * pitch, the foreshadowed "Settings -> Sounds -> System chimes"
+	 * picker uses the comparison `firstFreqHz(id)` vs `lastFreqHz(id)`
+	 * to render an up / down / level direction arrow beside each row.
+	 * S238 promotes that caller-side arithmetic step ("every picker /
+	 * diag-walk caller would have to spell out `firstFreqHz(id) <
+	 * lastFreqHz(id) ? 1 : firstFreqHz(id) > lastFreqHz(id) ? -1 : 0`")
+	 * to a dedicated derived accessor that returns the catalogued
+	 * direction in one call. Mirrors the S232 `durationMs(id)`
+	 * precedent of exposing a derived answer (a sum over the catalogued
+	 * Note array) rather than a raw struct field where the derived
+	 * form is the one the caller actually wants -- here the picker /
+	 * diag walk wants the silhouette, not two raw frequencies plus
+	 * the comparison arithmetic.
+	 *
+	 * The trio of categorisations matches the silhouette grouping
+	 * `PhoneSystemTones.cpp` already documents at the top of its file:
+	 * "Positive cues ascend / Negative cues descend / Equal-pitch pip
+	 * pairs cue something arrived without picking a direction". The
+	 * accessor reproduces that grouping at the API layer so a picker
+	 * can colour-code its row labels by silhouette (green for
+	 * ascending positives, red for descending negatives, amber for
+	 * level pips) without re-deriving the answer from the catalogued
+	 * Note array, and a future `PhoneDiagScreen` "Sound test" entry
+	 * that walks every chime in turn can do the same colouring at the
+	 * diag layer.
+	 *
+	 * Distinct from `firstFreqHz(id)` / `lastFreqHz(id)` themselves:
+	 * those helpers stay on the header so a caller that wants the
+	 * absolute pitch values (e.g. a per-row "1318 Hz -> 1568 Hz"
+	 * caption) can still read them directly. The two layers coexist
+	 * by design -- the structural accessors expose the raw catalogued
+	 * field values, the derived accessor exposes the semantic
+	 * relationship between them.
+	 *
+	 * Profile-state INDEPENDENT: the catalogued silhouette is the
+	 * same on SILENT / MEETING profiles as on GENERAL / OUTDOOR /
+	 * HEADSET, so the foreshadowed picker can lay out its direction
+	 * arrow at construction time and leave it unchanged when the user
+	 * toggles profiles (the S231 `tryPlay(id)` gate already reports
+	 * the silenced answer separately for any caller that wants to
+	 * fade the arrow into a "(silenced)" caption).
+	 *
+	 * Cheap O(1) two-field comparison; no engine interaction, no
+	 * persisted state, no per-call allocation. Header surface grows
+	 * by exactly one public symbol (`static int8_t silhouette`); the
+	 * cpp adds a single function next to the existing `count` /
+	 * `valid` / `name` / `melody` / `play` / `tryPlay` /
+	 * `isSilenced` / `durationMs` / `noteCount` / `firstFreqHz` /
+	 * `lastFreqHz` / `gapMs` / `loops` cluster. No new includes (the
+	 * `Melody` and `Note` types live behind the existing
+	 * `PhoneRingtoneEngine.h` include and the `kMelodies` table
+	 * already lives in this translation unit's anonymous namespace),
+	 * no new const data, no new SPIFFS asset cost. Every existing
+	 * call site of the catalogue keeps byte-identical behaviour --
+	 * the new helper is purely additive.
+	 */
+	static int8_t silhouette(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H

@@ -503,3 +503,48 @@ bool PhoneSystemTones::loops(uint8_t id){
 	if(!valid(id)) return false;
 	return kMelodies[id].loop;
 }
+
+// S238 - derived ascending / level / descending pitch-direction
+// accessor for chime `id`. Returns +1 if firstFreqHz(id) < lastFreqHz(id)
+// (ascending silhouette: Success, Unlock, Save, NetworkOk, LevelUp,
+// AlarmDismiss, TimerDone today), -1 if firstFreqHz(id) >
+// lastFreqHz(id) (descending silhouette: Error, Lock, CallEnd,
+// DeleteItem, NetworkFail, LowBattery today), 0 otherwise (level
+// silhouette: Notify, Alert, SmsReceived, MenuOpen, MenuClose today;
+// also the answer for an out-of-range id, which collapses cleanly to
+// the level case so a non-existent chime is indistinguishable from a
+// level entry at the call site and a picker rendering the direction
+// arrow does not need to special-case the invalid id path).
+// Foreshadowed by the S234 / S235 commit bodies' "rising / falling
+// silhouette" framing -- where firstFreqHz(id) reports the leading
+// pitch and lastFreqHz(id) reports the trailing pitch, the
+// foreshadowed picker / diag walk uses the comparison to render a
+// direction arrow / colour-code by silhouette. S238 promotes that
+// caller-side arithmetic step to a dedicated derived accessor that
+// returns the catalogued direction in one call, mirroring the S232
+// durationMs(id) precedent of exposing a derived answer rather than
+// a raw struct field where the derived form is the one the caller
+// actually wants. The trio of categorisations matches the silhouette
+// grouping the cpp comment block at the top of this file documents
+// ("Positive cues ascend / Negative cues descend / Equal-pitch pip
+// pairs cue something arrived without picking a direction"), so the
+// accessor reproduces that grouping at the API layer. Distinct from
+// firstFreqHz(id) / lastFreqHz(id) themselves: those helpers stay so
+// a caller that wants the absolute pitch values can still read them
+// directly. Profile-state INDEPENDENT: the catalogued silhouette is
+// the same on SILENT / MEETING profiles as on GENERAL / OUTDOOR /
+// HEADSET. Cheap O(1) two-field comparison via firstFreqHz(id) /
+// lastFreqHz(id) so the rest-aware semantics those accessors already
+// implement (a leading or trailing rest is encoded as freq == 0 in
+// the catalogue) feed straight into the silhouette answer without
+// re-deriving them here -- if a future entry ever opens or closes on
+// a rest the silhouette collapses transparently to whichever side
+// the catalogued audible note dominates.
+int8_t PhoneSystemTones::silhouette(uint8_t id){
+	if(!valid(id)) return 0;
+	const uint16_t first = firstFreqHz(id);
+	const uint16_t last  = lastFreqHz(id);
+	if(first < last) return 1;
+	if(first > last) return -1;
+	return 0;
+}
