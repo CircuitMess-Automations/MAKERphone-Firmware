@@ -1503,6 +1503,54 @@ lowest-numbered `[ ]`.
   asset cost. Every existing call site of the catalogue keeps
   byte-identical behaviour -- the new helper is purely additive.
 
+- [x] **S233** -- `PhoneSystemTones::noteCount(uint8_t id)` structural
+  note-count accessor -- the S192 / S230 / S231 / S232 commit bodies
+  had foreshadowed a "future Settings -> Sounds -> System chimes
+  picker" (mirroring the existing S183 PhoneSoftKeyToneScreen
+  pattern) and a future "Sound test" entry in PhoneDiagScreen that
+  walks every chime in turn. Both wanted to introspect the
+  catalogued Melody's structural shape -- specifically the number of
+  catalogued `PhoneRingtoneEngine::Note` entries -- so a row caption
+  could render "(N notes, M ms)" beside each chime, a per-note
+  pulse indicator could pulse once per catalogued note while the
+  engine fires (driven LovyanGFX-side by dividing
+  `durationMs(id)` evenly across `noteCount(id)` animation frames,
+  no engine listener needed), and a future "preview" row could show
+  a tiny dotted timeline with one dot per catalogued note (visual
+  differentiation between equal-length cues like Notify and
+  SmsReceived, which share a two-pip silhouette but differ in
+  pitch). All without touching the const `PhoneRingtoneEngine::
+  Melody*` pointer at the call site or duplicating the
+  catalogue's structural knowledge in the picker / diag screen.
+  The pre-S233 surface exposed `count()`, `valid(id)`, `name(id)`,
+  `melody(id)`, `play(id)`, `tryPlay(id)`, `isSilenced()` and
+  `durationMs(id)` but no helper that reported the catalogued
+  note count (it lived behind `melody(id)->count`, requiring the
+  caller to handle the nullptr-on-invalid-id path itself). S233
+  grows the header by exactly one public symbol --
+  `static uint16_t noteCount(uint8_t id)` -- whose semantics are
+  the cheapest possible: returns `kMelodies[id].count` for a valid
+  id, returns 0 for an out-of-range id and for the (currently
+  impossible) empty-melody case, mirrors the early-return contract
+  the rest of the catalogue helpers follow. Profile-state
+  INDEPENDENT: the catalogued shape is the same on SILENT /
+  MEETING profiles as on GENERAL / OUTDOOR / HEADSET, so a picker
+  can lay out its row labels at construction time and leave them
+  unchanged when the user toggles profiles (the S231 `tryPlay(id)`
+  gate already reports the silenced answer separately for any
+  caller that wants to fade in a "(silenced)" caption). Cheap
+  O(1) struct field read; no engine interaction, no persisted
+  state, no per-call allocation. Header surface grows by exactly
+  one public symbol; the cpp adds a single function next to the
+  existing `count` / `valid` / `name` / `melody` / `play` /
+  `tryPlay` / `isSilenced` / `durationMs` cluster. No new
+  includes (the `Melody` and `Note` types live behind the
+  existing `PhoneRingtoneEngine.h` include and the `kMelodies`
+  table already lives in this translation unit's anonymous
+  namespace), no new const data, no new SPIFFS asset cost. Every
+  existing call site of the catalogue keeps byte-identical
+  behaviour -- the new helper is purely additive.
+
 ---
 
 ## How the agent reads this file

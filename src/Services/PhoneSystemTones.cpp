@@ -311,3 +311,25 @@ uint16_t PhoneSystemTones::durationMs(uint8_t id){
 	if(total > 0xFFFFU) return 0xFFFFU;
 	return (uint16_t) total;
 }
+
+// S233 - structural note-count accessor for chime `id`. Returns the
+// number of catalogued PhoneRingtoneEngine::Note entries in the
+// underlying Melody (kMelodies[id].count). Returns 0 for an
+// out-of-range id and for the (currently impossible) empty-melody
+// case. Foreshadowed by the S192 / S230 / S231 / S232 commit
+// bodies' "future Settings -> Sounds -> System chimes picker" and
+// "future PhoneDiagScreen Sound test entry that walks every chime"
+// design notes -- a row caption that wants to render
+// "(N notes, M ms)" can pair `noteCount(id)` with `durationMs(id)`
+// without touching the const Melody* pointer at the call site.
+// Profile-state INDEPENDENT: the catalogued shape is the same on
+// SILENT / MEETING profiles as on GENERAL / OUTDOOR / HEADSET, so
+// a picker can lay out row labels at construction time and leave
+// them unchanged when the user toggles profiles. Cheap O(1) struct
+// field read; no engine interaction, no persisted state, no per-
+// call allocation; mirrors the existing `count`/`valid`/`name`/
+// `melody`/`play`/`tryPlay`/`isSilenced`/`durationMs` cluster.
+uint16_t PhoneSystemTones::noteCount(uint8_t id){
+	if(!valid(id)) return 0;
+	return kMelodies[id].count;
+}

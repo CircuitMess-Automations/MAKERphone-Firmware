@@ -232,6 +232,59 @@ public:
 	 * meaningful answer for a picker preview / diag walk.
 	 */
 	static uint16_t durationMs(uint8_t id);
+
+	/**
+	 * S233 - structural note-count accessor for chime `id`. Returns
+	 * the number of catalogued `PhoneRingtoneEngine::Note` entries in
+	 * the underlying Melody (i.e. `kMelodies[id].count`). Returns 0
+	 * for an out-of-range id and for the (currently impossible)
+	 * empty-melody case.
+	 *
+	 * Foreshadowed by the S192 / S230 / S231 / S232 commit bodies'
+	 * "future Settings -> Sounds -> System chimes picker" and "future
+	 * `PhoneDiagScreen` Sound test entry that walks every chime in
+	 * turn" design notes. Both want to introspect the catalogued
+	 * Melody's structural shape without touching the const Melody*
+	 * pointer at the call site:
+	 *
+	 *   - the picker can render a "(N notes, M ms)" caption beside
+	 *     each row using `noteCount(id)` + `durationMs(id)` together;
+	 *   - the diag walk can drive a per-note pulse indicator (one
+	 *     pulse per catalogued note while the engine is firing) by
+	 *     dividing `durationMs(id)` evenly across `noteCount(id)`
+	 *     animation frames -- LovyanGFX-side, no engine listener
+	 *     needed;
+	 *   - a future "preview" row can show a tiny dotted timeline
+	 *     with one dot per catalogued note for visual differentiation
+	 *     between equal-length cues (e.g. Notify and SmsReceived are
+	 *     both two-pip pairs but at different pitches; the dot count
+	 *     agrees, the diag duration is similar, the pitch is the
+	 *     only differentiator -- the foreshadowed picker uses
+	 *     `noteCount(id)` for the dot row and a future
+	 *     `firstFreqHz(id)` accessor for the pitch indicator).
+	 *
+	 * Profile-state INDEPENDENT: the catalogued shape is the same on
+	 * SILENT / MEETING profiles as on GENERAL / OUTDOOR / HEADSET, so
+	 * a picker can lay out its row labels at construction time and
+	 * leave them unchanged when the user toggles profiles. The S231
+	 * `tryPlay(id)` gate already reports the silenced answer
+	 * separately for any caller that needs to fade in a
+	 * "(silenced)" caption.
+	 *
+	 * Cheap O(1) struct field read; no engine interaction, no
+	 * persisted state, no per-call allocation. Header surface grows
+	 * by exactly one public symbol (`static uint16_t noteCount`);
+	 * the cpp adds a single function next to the existing `count` /
+	 * `valid` / `name` / `melody` / `play` / `tryPlay` /
+	 * `isSilenced` / `durationMs` cluster. No new includes (the
+	 * `Melody` and `Note` types live behind the existing
+	 * `PhoneRingtoneEngine.h` include and the `kMelodies` table
+	 * already lives in this translation unit's anonymous namespace),
+	 * no new const data, no new SPIFFS asset cost. Every existing
+	 * call site of the catalogue keeps byte-identical behaviour --
+	 * the new helper is purely additive.
+	 */
+	static uint16_t noteCount(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H
