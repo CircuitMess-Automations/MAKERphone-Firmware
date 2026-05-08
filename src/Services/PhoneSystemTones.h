@@ -437,6 +437,83 @@ public:
 	 * is purely additive.
 	 */
 	static uint16_t lastFreqHz(uint8_t id);
+
+	/**
+	 * S236 - structural inter-note gap accessor for chime `id`.
+	 * Returns the catalogued `gapMs` field of the underlying
+	 * `PhoneRingtoneEngine::Melody` (i.e. `kMelodies[id].gapMs`),
+	 * which is the wait the engine's `loop()` interleaves between
+	 * consecutive notes when stepping through the melody. Returns 0
+	 * for an out-of-range id (which happens to be the same value the
+	 * engine itself uses to mean "no inter-note silence" -- the
+	 * Alert / MenuOpen / MenuClose entries already ship with
+	 * `gapMs = 0` because they are single-note pulses, so a 0 answer
+	 * for an invalid id is indistinguishable from the catalogued
+	 * single-pulse entries and the caller's code path collapses
+	 * cleanly).
+	 *
+	 * Foreshadowed by the S232 / S233 / S234 / S235 commit bodies'
+	 * "future Settings -> Sounds -> System chimes picker" and
+	 * "future `PhoneDiagScreen` Sound test entry that walks every
+	 * chime in turn" design notes. The picker's preview row already
+	 * pairs `noteCount(id)` (S233) with `durationMs(id)` (S232) for
+	 * the "(N notes, M ms)" caption and `firstFreqHz(id)` (S234)
+	 * with `lastFreqHz(id)` (S235) for the rising / falling / level
+	 * direction arrow; `gapMs(id)` closes the structural-field set
+	 * by exposing the third and final catalogued field on the Melody
+	 * struct that had not yet surfaced at the accessor layer
+	 * (`notes` is exposed via `firstFreqHz` / `lastFreqHz`, `count`
+	 * is exposed via `noteCount`, the `loop` flag is moot for the
+	 * v1 catalogue -- no system chime loops, looping is reserved
+	 * for the call ringer family -- `name` is exposed via `name`,
+	 * and `gapMs` was the remaining invisible field). The picker's
+	 * preview row can use `gapMs(id)` to render a per-row "tempo"
+	 * indicator -- e.g. a tiny dotted timeline whose dots are
+	 * spaced by the catalogued gap value rather than evenly --
+	 * giving cues like Notify (35 ms gap), SmsReceived (50 ms gap)
+	 * and TimerDone (60 ms gap) a third axis of visual
+	 * differentiation beyond name + duration + note count + pitch
+	 * silhouette. The diag screen's "Sound test" entry can show a
+	 * per-chime "gap: 35 ms" caption beside the row to confirm
+	 * the engine handoff is honouring the catalogued spacing.
+	 *
+	 * Distinct from `durationMs(id)` (S232): that helper reports
+	 * the TOTAL playback duration including the catalogued gaps
+	 * (sum of per-Note `durationMs` plus `count * gapMs` when
+	 * `gapMs > 0`), while `gapMs(id)` reports the per-step gap
+	 * value as a structural field. A caller that wants to walk
+	 * the catalogued cue with its own LovyanGFX-side per-note
+	 * pulse animation can pair `noteCount(id)` + `firstFreqHz(id)`
+	 * / `lastFreqHz(id)` + `gapMs(id)` to reproduce the engine's
+	 * note-by-note rhythm without registering a LoopManager
+	 * listener of its own (the S232 `durationMs(id)` helper still
+	 * answers the simpler "schedule the next row press this many
+	 * ms from now" question for the picker's debounce).
+	 *
+	 * Profile-state INDEPENDENT: the catalogued gap is the same
+	 * on SILENT / MEETING profiles as on GENERAL / OUTDOOR /
+	 * HEADSET, so a picker can lay out its tempo indicator at
+	 * construction time and leave it unchanged when the user
+	 * toggles profiles. The S231 `tryPlay(id)` gate already
+	 * reports the silenced answer separately for any caller that
+	 * wants to fade the tempo indicator into a "(silenced)"
+	 * caption.
+	 *
+	 * Cheap O(1) struct field read; no engine interaction, no
+	 * persisted state, no per-call allocation. Header surface
+	 * grows by exactly one public symbol
+	 * (`static uint16_t gapMs`); the cpp adds a single function
+	 * next to the existing `count` / `valid` / `name` / `melody`
+	 * / `play` / `tryPlay` / `isSilenced` / `durationMs` /
+	 * `noteCount` / `firstFreqHz` / `lastFreqHz` cluster. No new
+	 * includes (the `Melody` type lives behind the existing
+	 * `PhoneRingtoneEngine.h` include and the `kMelodies` table
+	 * already lives in this translation unit's anonymous
+	 * namespace), no new const data, no new SPIFFS asset cost.
+	 * Every existing call site of the catalogue keeps byte-
+	 * identical behaviour -- the new helper is purely additive.
+	 */
+	static uint16_t gapMs(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H

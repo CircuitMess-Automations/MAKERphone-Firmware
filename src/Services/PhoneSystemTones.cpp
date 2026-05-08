@@ -418,3 +418,47 @@ uint16_t PhoneSystemTones::lastFreqHz(uint8_t id){
 	if(m.notes == nullptr || m.count == 0) return 0;
 	return m.notes[m.count - 1].freq;
 }
+
+// S236 - structural inter-note gap accessor for chime `id`. Returns
+// the catalogued `gapMs` field of the underlying
+// PhoneRingtoneEngine::Melody (kMelodies[id].gapMs), the wait the
+// engine's loop() interleaves between consecutive notes when stepping
+// through the melody. Returns 0 for an out-of-range id (which happens
+// to be the same value the engine itself uses to mean "no inter-note
+// silence" -- the Alert / MenuOpen / MenuClose entries already ship
+// with gapMs = 0 because they are single-note pulses, so a 0 answer
+// for an invalid id is indistinguishable from the catalogued single-
+// pulse entries and the caller's code path collapses cleanly).
+// Foreshadowed by the S232 / S233 / S234 / S235 commit bodies' "future
+// Settings -> Sounds -> System chimes picker" and "future
+// PhoneDiagScreen Sound test entry that walks every chime" design
+// notes -- the picker's preview row already pairs noteCount(id) (S233)
+// with durationMs(id) (S232) for the "(N notes, M ms)" caption and
+// firstFreqHz(id) (S234) with lastFreqHz(id) (S235) for the rising /
+// falling / level direction arrow; gapMs(id) closes the structural
+// field set by exposing the third and final catalogued field on the
+// Melody struct that had not yet surfaced at the accessor layer
+// (notes is exposed via firstFreqHz / lastFreqHz, count is exposed
+// via noteCount, the loop flag is moot for the v1 catalogue, name is
+// exposed via name, and gapMs was the remaining invisible field). The
+// picker can use gapMs(id) to render a per-row "tempo" indicator -- a
+// dotted timeline whose dots are spaced by the catalogued gap value
+// rather than evenly -- giving cues like Notify (35 ms), SmsReceived
+// (50 ms) and TimerDone (60 ms) a third axis of visual differentiation
+// beyond name + duration + note count + pitch silhouette. Distinct
+// from durationMs(id) (S232): that helper reports the TOTAL playback
+// duration including the catalogued gaps (sum of per-Note durationMs
+// plus count * gapMs when gapMs > 0), while gapMs(id) reports the
+// per-step gap as a structural field. Profile-state INDEPENDENT: the
+// catalogued gap is the same on SILENT / MEETING profiles as on
+// GENERAL / OUTDOOR / HEADSET, so a picker can lay out its tempo
+// indicator at construction time and leave it unchanged when the user
+// toggles profiles. Cheap O(1) struct field read; no engine
+// interaction, no persisted state, no per-call allocation; mirrors
+// the existing count / valid / name / melody / play / tryPlay /
+// isSilenced / durationMs / noteCount / firstFreqHz / lastFreqHz
+// cluster.
+uint16_t PhoneSystemTones::gapMs(uint8_t id){
+	if(!valid(id)) return 0;
+	return kMelodies[id].gapMs;
+}
