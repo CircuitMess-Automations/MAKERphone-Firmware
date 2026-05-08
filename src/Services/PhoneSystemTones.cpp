@@ -853,3 +853,52 @@ uint16_t PhoneSystemTones::restNoteCount(uint8_t id){
 	}
 	return rests;
 }
+
+// S246 - derived structural audible-drive-time accessor for chime id.
+// Returns the sum of durationMs across every catalogued
+// PhoneRingtoneEngine::Note entry in the underlying Melody whose
+// freq != 0 -- i.e. the wall-clock time, in ms, that the engine
+// actually drives the piezo for one playback of the chime, NOT
+// counting rest-step durations and NOT counting the per-step
+// inter-loop gapMs filler that durationMs(id) (S232) folds into
+// its TOTAL answer. Duration-side complement of audibleNoteCount(id)
+// (S243): where S243 reports "how MANY of the catalogued steps drive
+// the piezo," S246 reports "for HOW LONG the piezo is driven across
+// those steps." Together with restNoteCount(id) (S244 -- count of
+// REST steps) the catalogue exposes both halves of the audible /
+// rest split on the COUNT axis today, and the next session in this
+// cluster will promote a restDurationMs(id) sibling to round out
+// the same split on the DURATION axis. Returns 0 for an out-of-range
+// id, for the (currently impossible) empty-melody case, and for the
+// (also currently impossible) all-rests catalogue entry. For every
+// v1 catalogue entry today (no v1 chime uses rests) the audible-
+// step branch matches "sum of durationMs across every step" so the
+// answer collapses to durationMs(id) - (gapMs(id) * noteCount(id))
+// for the v1 catalogue, and only diverges from that subtraction
+// when a future v2+ entry interleaves a rest. Saturates at 0xFFFF
+// ms (the same uint16_t ceiling durationMs(id) already uses) so a
+// picker row caption can render the value as a four-digit integer
+// without an int cast at the call site. Profile-state INDEPENDENT:
+// the catalogued audible-drive duration is the same on SILENT /
+// MEETING profiles as on GENERAL / OUTDOOR / HEADSET (the S231
+// tryPlay(id) gate already reports the silenced answer separately
+// for any caller that wants to fade the row caption into a
+// "(silenced)" form). Cheap O(notes) linear scan with a uint32_t
+// accumulator clamped to a uint16_t return; no rounding, no per-
+// call allocation; mirrors the existing count / valid / name /
+// melody / play / tryPlay / isSilenced / durationMs / noteCount /
+// firstFreqHz / lastFreqHz / gapMs / loops / silhouette /
+// pitchSpanHz / peakFreqHz / troughFreqHz / meanFreqHz /
+// audibleNoteCount / restNoteCount cluster.
+uint16_t PhoneSystemTones::audibleDurationMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	uint32_t total = 0;
+	for(uint16_t i = 0; i < m.count; ++i){
+		if(m.notes[i].freq == 0) continue;
+		total += (uint32_t) m.notes[i].durationMs;
+	}
+	if(total > 0xFFFFU) return 0xFFFFU;
+	return (uint16_t) total;
+}

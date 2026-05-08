@@ -2294,6 +2294,62 @@ lowest-numbered `[ ]`.
   follow-up that the recent run of accessor-only sessions had
   silently accumulated.
 
+- [x] **S246** -- `PhoneSystemTones::audibleDurationMs(uint8_t id)`
+  derived structural audible-drive-time accessor -- returns the sum
+  of `durationMs` across every catalogued `PhoneRingtoneEngine::Note`
+  entry in the underlying Melody whose `freq != 0` (i.e. the wall-
+  clock time, in ms, that the engine actually drives the piezo for
+  one playback of the chime, NOT counting rest-step durations and
+  NOT counting the per-step inter-loop `gapMs` filler that
+  `durationMs(id)` (S232) folds into its TOTAL answer). Duration-
+  side complement of `audibleNoteCount(id)` (S243): where S243
+  reports "how MANY of the catalogued steps drive the piezo," S246
+  reports "for HOW LONG the piezo is driven across those steps,"
+  so a future "Settings -> Sounds -> System chimes" picker row
+  caption like "(3 notes, 1 rest, 180 ms audible / 60 ms silent)"
+  can read the dedicated accessor instead of walking the const
+  `Note*` pointer at the call site. Returns 0 for an out-of-range
+  id, for the (currently impossible) empty-melody case, and for
+  the (also currently impossible) all-rests catalogue entry. For
+  every v1 catalogue entry today (no v1 chime uses rests) the
+  audible-step branch collapses to
+  `durationMs(id) - (gapMs(id) * noteCount(id))`, so v1 callers
+  see a derivable answer today and only see `audibleDurationMs(id)`
+  diverge from that subtraction when a future v2+ entry interleaves
+  a rest. Saturates at `0xFFFF` ms (the same uint16_t ceiling
+  `durationMs(id)` already uses) so a picker row caption can
+  render the value as a four-digit integer without an int cast at
+  the call site. Where `durationMs(id)` (S232) reports the
+  catalogued TOTAL playback duration (rest-step durations +
+  audible-step durations + per-step `gapMs` filler) and `gapMs(id)`
+  (S236) reports the per-step filler component in isolation,
+  `audibleDurationMs(id)` reports the audible-step component in
+  isolation -- the third leg of the same partition that the
+  picker can mix and match to render any natural row caption it
+  needs (TOTAL, AUDIBLE, GAP, REST). Distinct from `durationMs`
+  (TOTAL incl. rests + gaps), distinct from `gapMs` (per-step
+  filler), distinct from `noteCount` / `audibleNoteCount` /
+  `restNoteCount` (catalogued step COUNTS, not durations), and
+  distinct from `PhoneRingtoneEngine::isPlaying()` /
+  `currentFreq()` (S191 live-piezo accessors that report runtime
+  playback state, not catalogued shape). Profile-state INDEPENDENT:
+  the catalogued audible-drive duration is the same on SILENT /
+  MEETING profiles as on GENERAL / OUTDOOR / HEADSET (the S231
+  `tryPlay(id)` gate already reports the silenced answer
+  separately for any caller that wants to fade the row caption
+  into a "(silenced)" form). Cheap O(notes) linear scan with a
+  uint32_t accumulator clamped to a uint16_t return; no rounding,
+  no per-call allocation. Header surface grows by exactly one
+  public symbol; the cpp adds a single function next to the
+  existing `count` / `valid` / `name` / `melody` / `play` /
+  `tryPlay` / `isSilenced` / `durationMs` / `noteCount` /
+  `firstFreqHz` / `lastFreqHz` / `gapMs` / `loops` / `silhouette`
+  / `pitchSpanHz` / `peakFreqHz` / `troughFreqHz` / `meanFreqHz`
+  / `audibleNoteCount` / `restNoteCount` cluster. No new
+  includes, no new const data, no new SPIFFS asset cost. Every
+  existing call site of the catalogue keeps byte-identical
+  behaviour -- the new helper is purely additive.
+
 
 ---
 
