@@ -333,3 +333,41 @@ uint16_t PhoneSystemTones::noteCount(uint8_t id){
 	if(!valid(id)) return 0;
 	return kMelodies[id].count;
 }
+
+// S234 - structural first-note pitch accessor for chime `id`. Returns
+// the catalogued frequency in Hz of the FIRST
+// PhoneRingtoneEngine::Note entry in the underlying Melody
+// (kMelodies[id].notes[0].freq). Returns 0 for an out-of-range id, for
+// the (currently impossible) empty-melody case, and -- transparently
+// -- for the (currently impossible) leading-rest case (a Note with
+// freq == 0 is the catalogue's encoding for a silent step; no v1
+// chime opens with a rest, so the answer collapses to "the catalogued
+// first audible note's pitch" for every entry that ships today, while
+// staying unambiguous if a future chime ever opens with a rest --
+// 0 is the same value the engine itself uses to mean "no tone is
+// being driven right now"). Foreshadowed by the S233 commit body's
+// "future firstFreqHz(id) accessor for the pitch indicator" design
+// note -- the foreshadowed picker's preview row uses noteCount(id)
+// for the dotted-timeline dot row and this accessor for the leading-
+// pitch indicator (the only catalogued differentiator between equal-
+// shape rows like Notify vs. SmsReceived, both two-pip pairs with the
+// same noteCount/durationMs but at NOTE_E6 / NOTE_G6 respectively).
+// Profile-state INDEPENDENT: the catalogued first-note frequency is
+// the same on SILENT / MEETING profiles as on GENERAL / OUTDOOR /
+// HEADSET, so a picker can render its pitch indicator at construction
+// time and leave it unchanged when the user toggles profiles. Cheap
+// O(1) struct field read; no engine interaction, no persisted state,
+// no per-call allocation; mirrors the existing count / valid / name /
+// melody / play / tryPlay / isSilenced / durationMs / noteCount
+// cluster. Distinct from PhoneRingtoneEngine::currentFreq() (the S191
+// live-piezo accessor) -- that helper reports the LIVE frequency the
+// engine is driving right now, the catalogue answer reports the FIRST
+// catalogued note regardless of whether the engine is playing. Both
+// are useful and live at different layers -- neither subsumes the
+// other.
+uint16_t PhoneSystemTones::firstFreqHz(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	return m.notes[0].freq;
+}

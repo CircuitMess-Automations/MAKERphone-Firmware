@@ -285,6 +285,70 @@ public:
 	 * the new helper is purely additive.
 	 */
 	static uint16_t noteCount(uint8_t id);
+
+	/**
+	 * S234 - structural first-note pitch accessor for chime `id`.
+	 * Returns the catalogued frequency in Hz of the FIRST
+	 * `PhoneRingtoneEngine::Note` entry in the underlying Melody
+	 * (i.e. `kMelodies[id].notes[0].freq`). Returns 0 for an
+	 * out-of-range id, for the (currently impossible) empty-melody
+	 * case, and -- transparently -- for the (currently impossible)
+	 * leading-rest case (a Note with `freq == 0` is the catalogue's
+	 * encoding for a silent step; no v1 chime opens with a rest, so
+	 * the answer collapses to "the catalogued first audible note's
+	 * pitch" for every entry that ships today, while staying
+	 * unambiguous if a future chime ever opens with a rest -- 0 is
+	 * the same value the engine itself uses to mean "no tone is
+	 * being driven right now").
+	 *
+	 * Foreshadowed by the S233 commit body's "future `firstFreqHz(id)`
+	 * accessor for the pitch indicator" design note: the picker's
+	 * preview row uses `noteCount(id)` for the dotted-timeline dot
+	 * row and this accessor for the leading-pitch indicator (a tiny
+	 * piano-key glyph or a horizontal bar whose height tracks the
+	 * first note's frequency), giving each row a third axis of
+	 * differentiation beyond name + duration + note count -- crucial
+	 * for the equal-length / equal-shape pip pairs in the catalogue
+	 * (Notify is two NOTE_E6 pips, SmsReceived is two NOTE_G6 pips;
+	 * `noteCount(id)` and `durationMs(id)` agree, the FIRST note's
+	 * frequency is the only catalogued differentiator between them
+	 * at construction time). A future `PhoneDiagScreen` "Sound test"
+	 * entry that walks every chime in turn wants the same answer for
+	 * the same reason -- it can show a per-chime "first pitch: 1318
+	 * Hz" caption beside the row to confirm the engine handoff
+	 * landed on the catalogued pitch and is the only catalogued
+	 * differentiator between same-shape rows.
+	 *
+	 * Profile-state INDEPENDENT: the catalogued first-note frequency
+	 * is the same on SILENT / MEETING profiles as on GENERAL /
+	 * OUTDOOR / HEADSET, so a picker can render its pitch indicator
+	 * at construction time and leave it unchanged when the user
+	 * toggles profiles. The S231 `tryPlay(id)` gate already reports
+	 * the silenced answer separately for any caller that wants to
+	 * fade the indicator into a "(silenced)" caption.
+	 *
+	 * Distinct from `PhoneRingtoneEngine::currentFreq()` (the engine
+	 * accessor S191 added for the equalizer visualiser): that helper
+	 * reports the LIVE frequency the piezo is driving right now (0
+	 * during rests, gaps and idle), the catalogue answer reports the
+	 * FIRST catalogued note regardless of whether the engine is
+	 * playing. Both are useful and live at different layers --
+	 * neither subsumes the other.
+	 *
+	 * Cheap O(1) struct field read; no engine interaction, no
+	 * persisted state, no per-call allocation. Header surface grows
+	 * by exactly one public symbol (`static uint16_t firstFreqHz`);
+	 * the cpp adds a single function next to the existing `count` /
+	 * `valid` / `name` / `melody` / `play` / `tryPlay` /
+	 * `isSilenced` / `durationMs` / `noteCount` cluster. No new
+	 * includes (the `Melody` and `Note` types live behind the
+	 * existing `PhoneRingtoneEngine.h` include and the `kMelodies`
+	 * table already lives in this translation unit's anonymous
+	 * namespace), no new const data, no new SPIFFS asset cost.
+	 * Every existing call site of the catalogue keeps byte-identical
+	 * behaviour -- the new helper is purely additive.
+	 */
+	static uint16_t firstFreqHz(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H
