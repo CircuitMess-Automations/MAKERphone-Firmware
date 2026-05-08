@@ -104,10 +104,17 @@ private:
 	lv_obj_t* heapLabel;
 	lv_obj_t* heapValue;
 
+	// S245 - single-line chime catalogue footer ("5 chimes  220-1568Hz")
+	// anchored just above the soft-key bar. The catalogue does not
+	// change at runtime so the line is computed ONCE on screen entry
+	// rather than re-derived on every refresh tick.
+	lv_obj_t* chimesSummary;
+
 	lv_timer_t* tickTimer;
 
 	void buildCaption();
 	void buildBody();
+	void buildChimesSummary();
 	void refreshLiveFields();
 
 	static void onTickTimer(lv_timer_t* timer);

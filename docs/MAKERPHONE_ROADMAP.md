@@ -2260,6 +2260,40 @@ lowest-numbered `[ ]`.
   existing call site of the catalogue keeps byte-identical
   behaviour -- the new helper is purely additive.
 
+- [x] **S245** -- `PhoneDiagScreen` chime-roster footer line. First
+  on-screen consumer of the structural `PhoneSystemTones` accessors
+  that the S232 / S240 / S241 / S243 sessions added (`durationMs`,
+  `peakFreqHz`, `troughFreqHz`, `audibleNoteCount`). The diag page
+  (S198) already groups every read-only "what is the firmware doing
+  right now" surface in one place, but until S245 the page never
+  surfaced anything from the system-chime catalogue -- meaning the
+  whole S232..S244 accessor cluster had no on-screen call site
+  inside the firmware. S245 adds a single-line `chimesSummary`
+  footer label anchored just above the soft-key bar that reads
+  `"<N> chimes  <trough>-<peak>Hz"` (e.g. `"18 chimes  220-1568Hz"`),
+  derived ONCE on screen entry inside a new
+  `PhoneDiagScreen::buildChimesSummary()` private method that walks
+  `PhoneSystemTones::count()` ids and aggregates the per-id
+  `peakFreqHz(id)` / `troughFreqHz(id)` results into a global
+  ceiling and floor across the catalogue. Defensive fallbacks for
+  `count() == 0` (prints `"0 chimes"`) and the all-rests-catalogue
+  case (prints `"<N> chimes"` with no Hz range) so a future v2
+  catalogue change cannot regress the diag page. Layout: pixelbasic7
+  on a single line at y = 106 with bodyX = 4 / bodyW = 152, in the
+  previously-unused 14 px gap between the HEAP value bottom (~y=100)
+  and the soft-key bar at y = 118; ~5 px clear margin on either
+  side. Color is `MP_LABEL_DIM` so the line reads as caption-weight
+  rather than competing with the cream live-readout values above.
+  Static catalogue snapshot -- not on the 1 Hz refresh tick -- because
+  `kMelodies` is const data baked into flash and does not change at
+  runtime, so re-deriving the answer on every tick would be wasted
+  work. Closes the long-foreshadowed "the diag page is the right
+  home for the structural chime accessors before the picker exists"
+  pattern that the S232 / S238 / S240 / S241 commit bodies kept
+  pointing at without ever wiring up. Resolves the v2.1 polish
+  follow-up that the recent run of accessor-only sessions had
+  silently accumulated.
+
 
 ---
 

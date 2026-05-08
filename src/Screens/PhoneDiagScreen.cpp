@@ -10,6 +10,7 @@
 #include "../Fonts/font.h"
 #include "../Services/PhoneLvglCost.h"
 #include "../Services/PhoneIdleDim.h"
+#include "../Services/PhoneSystemTones.h"
 
 // MAKERphone retro palette - inlined per the established pattern in
 // this codebase (see PhoneAboutScreen.cpp, PhoneFirmwareInfoScreen.cpp).
@@ -41,6 +42,7 @@ PhoneDiagScreen::PhoneDiagScreen()
 		  dimValue(nullptr),
 		  heapLabel(nullptr),
 		  heapValue(nullptr),
+		  chimesSummary(nullptr),
 		  tickTimer(nullptr) {
 
 	lv_obj_set_size(obj, LV_PCT(100), LV_PCT(100));
@@ -52,6 +54,7 @@ PhoneDiagScreen::PhoneDiagScreen()
 
 	buildCaption();
 	buildBody();
+	buildChimesSummary();
 
 	softKeys = new PhoneSoftKeyBar(obj);
 	softKeys->setLeft("");
@@ -120,6 +123,92 @@ void PhoneDiagScreen::buildBody() {
 	makePair(&peakLabel,    &peakValue,    "PEAK / TOTAL", 1);
 	makePair(&dimLabel,     &dimValue,     "IDLE DIM",     2);
 	makePair(&heapLabel,    &heapValue,    "HEAP",         3);
+}
+
+// S245 - single-line chime catalogue footer line. First on-screen
+// consumer of the structural PhoneSystemTones accessors that the
+// S232 / S240 / S241 / S243 sessions added (durationMs, peakFreqHz,
+// troughFreqHz, audibleNoteCount). The diag page already groups
+// every read-only "what is the firmware doing right now" surface
+// in one place; the chime catalogue is part of that picture (it's
+// what every Save / Error / SmsReceived feedback chirp the user
+// hears at runtime is sourced from), so anchoring a one-line
+// summary just above the soft-key bar lets a developer triaging
+// audio behaviour see the catalogue's pitch envelope at a glance
+// without standing up the long-foreshadowed "Settings -> Sounds
+// -> System chimes" picker. The catalogue does NOT change at
+// runtime -- kMelodies is const data baked into flash -- so the
+// line is computed ONCE on screen entry inside buildChimesSummary
+// rather than re-derived on every refresh tick.
+//
+// Output format: "<N> chimes  <trough>-<peak>Hz" (e.g.
+// "18 chimes  220-1568Hz"). The trough and peak are the catalogue-
+// wide minimum / maximum across every audible (non-rest) note in
+// every chime, derived by walking PhoneSystemTones::count() ids
+// and aggregating the per-id PhoneSystemTones::troughFreqHz(id)
+// and PhoneSystemTones::peakFreqHz(id) results. Both per-id
+// accessors already skip rest-encoded freq == 0 entries, so the
+// catalogue-wide aggregate inherits the same rest-aware semantics
+// without re-walking the const Melody* pointers here.
+//
+// Defensive fallbacks:
+//   - count() == 0  : prints "0 chimes" with no Hz range.
+//   - all-rests cat : prints "<N> chimes" with no Hz range
+//                     (peak / trough accumulators stayed at 0).
+// Both are currently impossible (the v1 catalogue ships 18 chimes
+// today, none of which use rests) but the formatter falls back
+// cleanly in either case so a future v2 catalogue change can't
+// regress the diag page.
+//
+// Layout: pixelbasic7 (7 px tall) on a single line, anchored at
+// y = 106 with bodyX = 4 / bodyW = 152. The soft-key bar starts
+// at y = 118 (10 px tall), so the footer sits in the previously-
+// unused 14 px gap between the HEAP value (bottom ~y = 100) and
+// the soft-key bar with ~5 px clear margin on either side. Color
+// is MP_LABEL_DIM (the muted-purple section-label tone the body
+// labels already use) so the line reads as caption-weight rather
+// than competing with the cream-colored live-readout values.
+void PhoneDiagScreen::buildChimesSummary() {
+	const uint8_t cnt = PhoneSystemTones::count();
+
+	// Walk the catalogue once, aggregate global trough / peak. Both
+	// per-id accessors skip rest-encoded freq == 0 entries already.
+	uint16_t globalPeak = 0;
+	uint16_t globalTrough = 0;
+	bool haveTrough = false;
+	for(uint8_t i = 0; i < cnt; ++i) {
+		const uint16_t pk = PhoneSystemTones::peakFreqHz(i);
+		const uint16_t tr = PhoneSystemTones::troughFreqHz(i);
+		if(pk != 0 && pk > globalPeak) globalPeak = pk;
+		if(tr != 0) {
+			if(!haveTrough || tr < globalTrough) {
+				globalTrough = tr;
+				haveTrough = true;
+			}
+		}
+	}
+
+	char buf[40];
+	if(cnt == 0) {
+		snprintf(buf, sizeof(buf), "0 chimes");
+	} else if(haveTrough && globalPeak != 0) {
+		snprintf(buf, sizeof(buf), "%u chimes  %u-%uHz",
+				 (unsigned) cnt,
+				 (unsigned) globalTrough,
+				 (unsigned) globalPeak);
+	} else {
+		// All-rests catalogue (currently impossible) - print the
+		// count without a Hz range so the line is still meaningful.
+		snprintf(buf, sizeof(buf), "%u chimes", (unsigned) cnt);
+	}
+
+	chimesSummary = lv_label_create(obj);
+	lv_obj_set_style_text_font(chimesSummary, &pixelbasic7, 0);
+	lv_obj_set_style_text_color(chimesSummary, MP_LABEL_DIM, 0);
+	lv_label_set_long_mode(chimesSummary, LV_LABEL_LONG_DOT);
+	lv_obj_set_width(chimesSummary, kBodyW);
+	lv_label_set_text(chimesSummary, buf);
+	lv_obj_set_pos(chimesSummary, kBodyX, 106);
 }
 
 void PhoneDiagScreen::refreshLiveFields() {
