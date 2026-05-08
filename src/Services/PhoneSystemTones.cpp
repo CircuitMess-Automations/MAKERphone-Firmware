@@ -902,3 +902,57 @@ uint16_t PhoneSystemTones::audibleDurationMs(uint8_t id){
 	if(total > 0xFFFFU) return 0xFFFFU;
 	return (uint16_t) total;
 }
+
+// S247 - derived structural rest-step-duration accessor for chime id.
+// Returns the sum of durationMs across every catalogued
+// PhoneRingtoneEngine::Note entry in the underlying Melody whose
+// freq == 0 -- i.e. the wall-clock time, in ms, that the engine
+// spends sitting on REST steps without driving the piezo for one
+// playback of the chime, NOT counting the audible-step durations
+// that audibleDurationMs(id) (S246) reports and NOT counting the
+// per-step inter-loop gapMs filler that durationMs(id) (S232)
+// folds into its TOTAL answer. The silence-side complement of
+// audibleDurationMs(id) (S246) and the duration-side complement of
+// restNoteCount(id) (S244): where S246 reports "for HOW LONG the
+// piezo is driven across the audible steps" and S244 reports "how
+// MANY of the catalogued steps are RESTS," restDurationMs(id)
+// reports "for HOW LONG the catalogued REST steps hold the piezo
+// silent." The four leaves of the catalogue's audible / rest split
+// now exist as dedicated accessors on both axes:
+// audibleNoteCount(id) (S243) + restNoteCount(id) (S244) on the
+// COUNT axis, audibleDurationMs(id) (S246) + restDurationMs(id)
+// (S247) on the DURATION axis. Together with gapMs(id) (S236) and
+// noteCount(id) (S233) the catalogue exposes the full structural-
+// duration partition that durationMs(id) (S232) folds together:
+// for every catalogued chime
+//     audibleDurationMs(id) + restDurationMs(id)
+//       + gapMs(id) * noteCount(id) == durationMs(id)
+// (modulo the uint16_t saturation that all four duration accessors
+// share). Returns 0 for an out-of-range id, for the (currently
+// impossible) empty-melody case, for any catalogue entry with no
+// rest steps, and -- byte-identically -- for every v1 catalogue
+// entry today (no v1 chime uses rests). Saturates at 0xFFFF ms
+// (the same uint16_t ceiling durationMs(id) and audibleDurationMs(id)
+// already use). Profile-state INDEPENDENT: the catalogued rest-step
+// duration is the same on SILENT / MEETING profiles as on GENERAL /
+// OUTDOOR / HEADSET (the S231 tryPlay(id) gate already reports the
+// silenced answer separately for any caller that wants to fade the
+// row caption into a "(silenced)" form). Cheap O(notes) linear scan
+// with a uint32_t accumulator clamped to a uint16_t return; no
+// rounding, no per-call allocation; mirrors the existing count /
+// valid / name / melody / play / tryPlay / isSilenced / durationMs
+// / noteCount / firstFreqHz / lastFreqHz / gapMs / loops /
+// silhouette / pitchSpanHz / peakFreqHz / troughFreqHz / meanFreqHz
+// / audibleNoteCount / restNoteCount / audibleDurationMs cluster.
+uint16_t PhoneSystemTones::restDurationMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	uint32_t total = 0;
+	for(uint16_t i = 0; i < m.count; ++i){
+		if(m.notes[i].freq != 0) continue;
+		total += (uint32_t) m.notes[i].durationMs;
+	}
+	if(total > 0xFFFFU) return 0xFFFFU;
+	return (uint16_t) total;
+}
