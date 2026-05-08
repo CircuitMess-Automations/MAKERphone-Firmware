@@ -462,3 +462,44 @@ uint16_t PhoneSystemTones::gapMs(uint8_t id){
 	if(!valid(id)) return 0;
 	return kMelodies[id].gapMs;
 }
+
+// S237 - structural loop-flag accessor for chime `id`. Returns the
+// catalogued `loop` field of the underlying
+// PhoneRingtoneEngine::Melody (kMelodies[id].loop), the boolean the
+// engine consults at the end of one playthrough to decide whether to
+// restart from step 0 (loop the cue indefinitely) or stop() and
+// release the LoopManager listener (one-shot cue). Returns false for
+// an out-of-range id, which is the same answer a non-existent chime
+// would naturally give -- a no-op cannot loop -- and matches the
+// catalogued answer for every v1 entry today (no system chime loops,
+// by design: looping is reserved for the call-ringer family in
+// PhoneRingtones.cpp). Foreshadowed by the S236 commit body's note
+// that the loop flag had been left without an accessor of its own
+// because no v1 chime opted into looping; S237 promotes that deferred
+// field to first-class accessor parity with the rest of the
+// structural surface so the foreshadowed picker has the FULL Melody-
+// struct field set behind dedicated accessors (noteCount for count,
+// firstFreqHz/lastFreqHz for the leading and trailing notes entries,
+// gapMs for gapMs, name for name, loops for loop), and so the
+// foreshadowed PhoneDiagScreen "Sound test" entry can fall back to a
+// fixed preview window for any future looping entry rather than
+// hanging on durationMs(id) alone (a looping entry never completes
+// on its own, so a diag walk that uses durationMs as a row-press
+// debounce would deadlock without the loops(id) escape hatch).
+// Distinct from a hypothetical PhoneRingtoneEngine::isLooping() live
+// accessor: even if such a helper existed it would report whether
+// the engine is CURRENTLY looping, while the catalogue answer reports
+// whether the Melody opted into looping at construction time
+// regardless of engine state. Profile-state INDEPENDENT: the
+// catalogued loop flag is the same on SILENT / MEETING profiles as
+// on GENERAL / OUTDOOR / HEADSET, so the foreshadowed picker can
+// render its loops indicator at construction time and leave it
+// unchanged when the user toggles profiles. Cheap O(1) struct field
+// read; no engine interaction, no persisted state, no per-call
+// allocation; mirrors the existing count / valid / name / melody /
+// play / tryPlay / isSilenced / durationMs / noteCount /
+// firstFreqHz / lastFreqHz / gapMs cluster.
+bool PhoneSystemTones::loops(uint8_t id){
+	if(!valid(id)) return false;
+	return kMelodies[id].loop;
+}

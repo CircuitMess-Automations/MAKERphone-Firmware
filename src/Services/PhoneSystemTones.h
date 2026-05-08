@@ -514,6 +514,92 @@ public:
 	 * identical behaviour -- the new helper is purely additive.
 	 */
 	static uint16_t gapMs(uint8_t id);
+
+	/**
+	 * S237 - structural loop-flag accessor for chime `id`. Returns the
+	 * catalogued `loop` field of the underlying
+	 * `PhoneRingtoneEngine::Melody` (i.e. `kMelodies[id].loop`), the
+	 * boolean the engine consults at the end of one playthrough to
+	 * decide whether to restart the melody from step 0 (loop the cue
+	 * indefinitely) or call `stop()` and release the LoopManager
+	 * listener (one-shot cue). Returns `false` for an out-of-range
+	 * id, which is the same answer a non-existent chime would
+	 * naturally give (a no-op cannot loop) and matches the catalogued
+	 * answer for every v1 entry today -- no system chime loops, by
+	 * design (looping is reserved for the call-ringer family in
+	 * `PhoneRingtones.cpp`, where the engine's loop semantics are
+	 * actually wanted; the eighteen v1 entries here are short cues
+	 * that fire once per UI event and stop).
+	 *
+	 * S236 closed by noting that the `loop` field of the Melody
+	 * struct (one of the five catalogued fields: `notes`, `count`,
+	 * `gapMs`, `loop`, `name`) had been left without an accessor of
+	 * its own because no v1 chime opted into looping and so the
+	 * field's answer was uniformly false across the catalogue. S237
+	 * promotes that deferred field to first-class accessor parity
+	 * with the rest of the structural surface for two concrete
+	 * reasons:
+	 *
+	 *   - the foreshadowed "Settings -> Sounds -> System chimes"
+	 *     picker now has the FULL Melody-struct field set behind
+	 *     dedicated accessors -- `noteCount(id)` (S233) for `count`,
+	 *     `firstFreqHz(id)` / `lastFreqHz(id)` (S234 / S235) for the
+	 *     leading and trailing entries of `notes`, `gapMs(id)`
+	 *     (S236) for `gapMs`, `name(id)` (S192) for `name`, and now
+	 *     `loops(id)` (S237) for `loop`. Picker preview rows can
+	 *     introspect the catalogue without ever dereferencing the
+	 *     const Melody* pointer at the call site, which is the
+	 *     design property that S233-S236 had been incrementally
+	 *     building toward.
+	 *
+	 *   - the foreshadowed `PhoneDiagScreen` "Sound test" entry that
+	 *     walks every chime in turn (foreshadowed in S231 / S232 /
+	 *     S233 / S234 / S235 / S236 commit bodies) wants to schedule
+	 *     the row-press debounce by `durationMs(id)` -- the catalogued
+	 *     length of one playthrough -- but ONLY if the chime
+	 *     completes after one playthrough. A future catalogue entry
+	 *     that opts into looping would never complete on its own and
+	 *     the diag walk would hang waiting for a stop() that never
+	 *     arrives. With `loops(id)` exposed, the diag walk can fall
+	 *     back to a fixed preview window (e.g. 600 ms) for looping
+	 *     entries and the natural `durationMs(id)` window for one-
+	 *     shot entries, without re-deriving the answer from the
+	 *     const Melody* pointer at the call site.
+	 *
+	 * Distinct from `PhoneRingtoneEngine::isLooping()` (a hypothetical
+	 * live-engine accessor): even if such a helper existed it would
+	 * report whether the engine is CURRENTLY in a looping playback
+	 * state, while the catalogue answer reports whether the
+	 * underlying Melody opted into looping at construction time
+	 * regardless of whether the engine is playing. Both are useful
+	 * and live at different layers; the catalogue answer is the one
+	 * the picker / diag walk wants because it lets them lay out
+	 * their UI at construction time and leave it unchanged across
+	 * profile toggles and engine state transitions.
+	 *
+	 * Profile-state INDEPENDENT: the catalogued loop flag is the
+	 * same on SILENT / MEETING profiles as on GENERAL / OUTDOOR /
+	 * HEADSET, so the foreshadowed picker can render its "loops"
+	 * indicator at construction time and leave it unchanged when
+	 * the user toggles profiles (the S231 `tryPlay(id)` gate
+	 * already reports the silenced answer separately for any caller
+	 * that wants to fade the indicator into a "(silenced)" caption).
+	 *
+	 * Cheap O(1) struct field read; no engine interaction, no
+	 * persisted state, no per-call allocation. Header surface grows
+	 * by exactly one public symbol (`static bool loops`); the cpp
+	 * adds a single function next to the existing `count` /
+	 * `valid` / `name` / `melody` / `play` / `tryPlay` /
+	 * `isSilenced` / `durationMs` / `noteCount` / `firstFreqHz` /
+	 * `lastFreqHz` / `gapMs` cluster. No new includes (the `Melody`
+	 * type lives behind the existing `PhoneRingtoneEngine.h`
+	 * include and the `kMelodies` table already lives in this
+	 * translation unit's anonymous namespace), no new const data,
+	 * no new SPIFFS asset cost. Every existing call site of the
+	 * catalogue keeps byte-identical behaviour -- the new helper is
+	 * purely additive.
+	 */
+	static bool loops(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H
