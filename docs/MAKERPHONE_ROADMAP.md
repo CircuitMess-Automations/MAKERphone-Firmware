@@ -1948,6 +1948,67 @@ lowest-numbered `[ ]`.
   existing call site of the catalogue keeps byte-identical behaviour
   -- the new helper is purely additive.
 
+- [x] **S240** -- `PhoneSystemTones::peakFreqHz(uint8_t id)` derived
+  catalogue-wide maximum-pitch accessor -- returns the highest
+  catalogued frequency, in Hz, across every Note in the underlying
+  Melody (i.e. `max(kMelodies[id].notes[i].freq)` for `i` in
+  `[0..count-1]`, ignoring rest-encoded `freq == 0` entries so a
+  future leading or trailing rest does not collapse the answer to
+  zero by accident). Returns 0 for an out-of-range id, for the
+  (currently impossible) empty-melody case, and for the (currently
+  impossible) all-rests-melody case. Foreshadowed by the S234 /
+  S235 / S238 / S239 commit bodies' progressive build-up of the
+  catalogue pitch surface: where `firstFreqHz(id)` (S234) and
+  `lastFreqHz(id)` (S235) expose the catalogued endpoints and
+  `silhouette(id)` (S238) / `pitchSpanHz(id)` (S239) expose the
+  relationship between those endpoints, S240 exposes the GLOBAL
+  maximum the cue reaches at any step. For every monotonic melody
+  in the v1 catalogue (Success ascends to NOTE_E6, Save ascends to
+  NOTE_G6, Unlock ascends to NOTE_G5, etc.) the answer agrees with
+  whichever endpoint `silhouette(id)` points at; for non-monotonic
+  entries the answer reports the catalogued ceiling regardless of
+  which step it lands on, which is the visually-meaningful one for
+  the picker / diag walk. TimerDone [NOTE_C6, NOTE_C6, NOTE_E6] is
+  level by silhouette (first==last==NOTE_C6) but its peak NOTE_E6
+  is above either endpoint, so the catalogued ceiling is the only
+  catalogued differentiator between TimerDone and the genuinely-
+  level pip pairs (Notify, SmsReceived) at the picker layer. The
+  foreshadowed "Settings -> Sounds -> System chimes" picker can
+  pair the bar's TILT (silhouette), HEIGHT (pitchSpanHz) and
+  CEILING (peakFreqHz) to render a per-row pitch bar whose top
+  traces the catalogued maximum, giving the user a visual
+  abstraction of the catalogued cue without registering a
+  LoopManager listener of its own; the foreshadowed
+  `PhoneDiagScreen` "Sound test" entry can use the same accessor
+  to show a per-chime "peak: 1318 Hz" caption beside the row to
+  confirm the engine handoff is honouring the catalogued ceiling.
+  Distinct from `firstFreqHz(id)` / `lastFreqHz(id)`: those
+  helpers report catalogued ENDPOINTS, S240 reports the catalogued
+  CEILING regardless of step. Distinct from `pitchSpanHz(id)`
+  (S239): that helper reports the absolute difference between
+  catalogued endpoints, S240 reports the absolute maximum across
+  every step. Distinct from `PhoneRingtoneEngine::currentFreq()`
+  (the S191 live-piezo accessor): that helper reports the LIVE
+  frequency the engine is driving right now, the catalogue answer
+  reports the catalogued ceiling regardless of whether the engine
+  is playing. Profile-state INDEPENDENT: the catalogued peak is
+  the same on SILENT / MEETING profiles as on GENERAL / OUTDOOR
+  / HEADSET, so the picker can lay out its bar ceiling at
+  construction time and leave it unchanged when the user toggles
+  profiles (the S231 `tryPlay(id)` gate already reports the
+  silenced answer separately for any caller that wants to fade
+  the bar into a "(silenced)" caption). Cheap O(notes) linear
+  scan with a uint16_t accumulator; no engine interaction, no
+  persisted state, no per-call allocation. Header surface grows
+  by exactly one public symbol; the cpp adds a single function
+  next to the existing `count` / `valid` / `name` / `melody` /
+  `play` / `tryPlay` / `isSilenced` / `durationMs` / `noteCount`
+  / `firstFreqHz` / `lastFreqHz` / `gapMs` / `loops` /
+  `silhouette` / `pitchSpanHz` cluster. No new includes, no new
+  const data, no new SPIFFS asset cost. Every existing call site
+  of the catalogue keeps byte-identical behaviour -- the new
+  helper is purely additive.
+
 
 ---
 

@@ -598,3 +598,51 @@ uint16_t PhoneSystemTones::pitchSpanHz(uint8_t id){
 	const uint16_t last  = lastFreqHz(id);
 	return (first > last) ? (uint16_t)(first - last) : (uint16_t)(last - first);
 }
+
+// S240 - derived catalogue-wide maximum-pitch accessor for chime
+// `id`. Returns the highest catalogued frequency, in Hz, across
+// every PhoneRingtoneEngine::Note entry in the underlying Melody
+// (max(kMelodies[id].notes[i].freq) for i in [0..count-1],
+// skipping rest-encoded freq == 0 entries so a future leading /
+// trailing / interior rest does not collapse the answer to zero by
+// accident). Returns 0 for an out-of-range id, for the (currently
+// impossible) empty-melody case, and for the (currently impossible)
+// all-rests-melody case. Foreshadowed by the S234 / S235 / S238 /
+// S239 commit bodies' progressive build-up of the catalogue pitch
+// surface: where firstFreqHz(id) (S234) and lastFreqHz(id) (S235)
+// expose the catalogued endpoints and silhouette(id) (S238) /
+// pitchSpanHz(id) (S239) expose the relationship between those
+// endpoints, S240 exposes the GLOBAL maximum the cue reaches at any
+// step. For every monotonic melody in the v1 catalogue the answer
+// agrees with whichever endpoint silhouette(id) points at; for
+// non-monotonic entries the answer reports the catalogued ceiling
+// regardless of which step it lands on -- TimerDone [NOTE_C6,
+// NOTE_C6, NOTE_E6] is level by silhouette (first==last==NOTE_C6)
+// but its peak NOTE_E6 sits above either endpoint, so the catalogued
+// ceiling is the only catalogued differentiator between TimerDone
+// and the genuinely-level pip pairs (Notify, SmsReceived) at the
+// picker layer. The foreshadowed "Settings -> Sounds -> System
+// chimes" picker can pair the bar's TILT (silhouette), HEIGHT
+// (pitchSpanHz) and CEILING (peakFreqHz) to render a per-row pitch
+// bar whose top traces the catalogued maximum. Distinct from
+// firstFreqHz(id) / lastFreqHz(id) (catalogued endpoints), distinct
+// from pitchSpanHz(id) (absolute difference between endpoints), and
+// distinct from PhoneRingtoneEngine::currentFreq() (live-piezo
+// accessor S191). Profile-state INDEPENDENT: the catalogued peak is
+// the same on SILENT / MEETING profiles as on GENERAL / OUTDOOR /
+// HEADSET. Cheap O(notes) linear scan with a uint16_t accumulator;
+// no engine interaction, no persisted state, no per-call allocation;
+// mirrors the existing count / valid / name / melody / play /
+// tryPlay / isSilenced / durationMs / noteCount / firstFreqHz /
+// lastFreqHz / gapMs / loops / silhouette / pitchSpanHz cluster.
+uint16_t PhoneSystemTones::peakFreqHz(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	uint16_t peak = 0;
+	for(uint16_t i = 0; i < m.count; ++i){
+		const uint16_t f = m.notes[i].freq;
+		if(f != 0 && f > peak) peak = f;
+	}
+	return peak;
+}
