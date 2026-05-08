@@ -1458,6 +1458,51 @@ lowest-numbered `[ ]`.
   reduces `play` to a single `(void) tryPlay(id)` call. No new
   includes, no new const data, no new SPIFFS asset cost.
 
+- [x] **S232** -- `PhoneSystemTones::durationMs(uint8_t id)` catalogue
+  duration accessor -- the S192 / S230 / S231 commit bodies had
+  foreshadowed a "future Settings -> Sounds -> System chimes picker"
+  (mirroring the existing S183 PhoneSoftKeyToneScreen pattern) and a
+  future "Sound test" entry in PhoneDiagScreen that walks every chime
+  in turn. Both wanted to know how long a catalogued cue is so they
+  could schedule a "(silenced)" caption fade-out, debounce repeat row
+  presses, or step the diag walk to the next chime once the engine has
+  finished playback -- without registering a LoopManager listener of
+  their own and without re-deriving the answer from the const Melody
+  pointer at the call site. The pre-S232 surface exposed `count()`,
+  `valid(id)`, `name(id)`, `melody(id)`, `play(id)`, `tryPlay(id)`
+  and `isSilenced()` but no helper that reported the catalogued
+  playback length. S232 grows the header by exactly one public
+  symbol -- `static uint16_t durationMs(uint8_t id)` -- whose
+  semantics mirror what `PhoneRingtoneEngine::loop()` actually does
+  with the catalogued Melody: sum of every per-Note `durationMs`
+  entry plus, when `gapMs > 0`, one `gapMs` wait per note (the
+  inGap branch in the engine state machine consumes one gap AFTER
+  every note, including the last one before step++ pushes the
+  playhead past `count` and `stop()` runs), saturated to UINT16_MAX
+  for forward-compatibility (the longest current entry, LowBattery,
+  is ~420 ms -- well under the clamp limit). Returns 0 for an
+  out-of-range id and for an empty melody. Profile-state
+  INDEPENDENT: the catalogue answer is the same on SILENT / MEETING
+  profiles as on GENERAL / OUTDOOR / HEADSET, so the foreshadowed
+  picker can debounce row presses on a stable duration regardless
+  of whether the previous press actually fired the engine (the
+  S231 `tryPlay(id)` gate already reports that boolean
+  separately). The engine's `loop` flag is intentionally ignored
+  -- no S192 catalogue entry loops, looping is reserved for the
+  call ringer family, and a future looping entry would still want
+  the duration of one pass (the meaningful answer for a picker
+  preview / diag walk). Cheap O(notes) sum with a uint32_t
+  accumulator; no engine interaction, no persisted state, no
+  per-call allocation. Header surface grows by exactly one public
+  symbol; the cpp adds a single function next to the existing
+  `count` / `valid` / `name` / `melody` / `play` / `tryPlay` /
+  `isSilenced` cluster. No new includes (the `Melody` and `Note`
+  types live behind the existing `PhoneRingtoneEngine.h` include
+  and the `kMelodies` table already lives in this translation
+  unit's anonymous namespace), no new const data, no new SPIFFS
+  asset cost. Every existing call site of the catalogue keeps
+  byte-identical behaviour -- the new helper is purely additive.
+
 ---
 
 ## How the agent reads this file

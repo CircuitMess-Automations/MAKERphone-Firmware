@@ -187,6 +187,51 @@ public:
 	 * entry point. The two helpers stay deliberately distinct.
 	 */
 	static bool tryPlay(uint8_t id);
+
+	/**
+	 * S232 - total catalogued playback duration of chime `id` in
+	 * milliseconds. Computed as the sum of the per-Note `durationMs`
+	 * entries plus the inter-note `gapMs` waits that
+	 * `PhoneRingtoneEngine::loop()` interleaves between consecutive
+	 * notes (one gap is consumed after every note when `gapMs > 0`,
+	 * including the last one before the engine transitions to
+	 * `stop()`; see `PhoneRingtoneEngine.cpp::loop()` for the
+	 * inGap/step-advance state machine). Returns 0 for an invalid
+	 * id and for an empty melody, saturates to UINT16_MAX if the
+	 * catalogue ever grows large enough to overflow (no current
+	 * entry comes close -- the longest, S192 LowBattery, is well
+	 * under 500 ms). Profile-state INDEPENDENT: the catalogue
+	 * answer is the same on SILENT / MEETING profiles as on
+	 * GENERAL / OUTDOOR / HEADSET, so the foreshadowed
+	 * "Settings -> Sounds -> System chimes" picker can debounce
+	 * repeat row presses by a stable duration regardless of
+	 * whether the previous press actually fired the engine (see
+	 * S231 `tryPlay` for the gate). Cheap O(notes) sum over the
+	 * catalogue's static const Melody pointer with a uint32_t
+	 * accumulator; no persisted state, no per-call allocation,
+	 * no engine interaction.
+	 *
+	 * Foreshadowed by the S192 / S230 / S231 commit bodies' "future
+	 * Settings -> Sounds -> System chimes picker" design notes: a
+	 * picker that drives the engine via `tryPlay(id)` and shows a
+	 * "(silenced)" caption fade for SILENT / MEETING profiles wants
+	 * to know how long the catalogued cue is so it can schedule the
+	 * caption fade-out (and its own row-press debounce) without
+	 * registering a LoopManager listener of its own. A future diag
+	 * screen that walks every chime in turn (the `PhoneDiagScreen`
+	 * "Sound test" entry foreshadowed in S231) wants the same
+	 * answer for the same reason -- it can step to the next chime
+	 * `durationMs(id)` ms after the previous tryPlay returned true,
+	 * matching the engine's natural playback boundary.
+	 *
+	 * The catalogued answer ignores the engine's `loop` flag (no
+	 * S192 chime loops -- looping is reserved for the call ringer
+	 * family) so callers do not have to special-case looping
+	 * melodies. If a future catalogue entry opts into looping the
+	 * helper still reports the duration of one pass, which is the
+	 * meaningful answer for a picker preview / diag walk.
+	 */
+	static uint16_t durationMs(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H

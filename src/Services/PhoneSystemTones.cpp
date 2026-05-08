@@ -281,3 +281,33 @@ bool PhoneSystemTones::tryPlay(uint8_t id){
 bool PhoneSystemTones::isSilenced(){
 	return !Settings.get().sound;
 }
+
+// S232 - total catalogued playback duration of chime `id` in ms.
+// Sum of per-Note `durationMs` entries plus the inter-note `gapMs`
+// waits that PhoneRingtoneEngine::loop() interleaves between
+// consecutive notes. Reading the engine source (loop() in
+// PhoneRingtoneEngine.cpp): when `gapMs > 0` the inGap branch
+// consumes one gap AFTER every note (including the last one,
+// before step++ pushes step >= count and stop() runs), so the
+// catalogue answer is `sum + count * gapMs` for non-zero gaps and
+// just `sum` for zero gaps. UINT32 accumulator with a final
+// UINT16_MAX clamp for forward-compatibility (the largest current
+// catalogue entry, LowBattery, is ~420 ms -- well under the clamp
+// limit). Profile-state INDEPENDENT: the answer is the same on
+// SILENT / MEETING profiles as on GENERAL / OUTDOOR / HEADSET so
+// the foreshadowed picker can debounce row presses on a stable
+// catalogued duration regardless of what `tryPlay(id)` reports.
+uint16_t PhoneSystemTones::durationMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	uint32_t total = 0;
+	for(uint16_t i = 0; i < m.count; ++i){
+		total += (uint32_t) m.notes[i].durationMs;
+	}
+	if(m.gapMs > 0){
+		total += (uint32_t) m.gapMs * (uint32_t) m.count;
+	}
+	if(total > 0xFFFFU) return 0xFFFFU;
+	return (uint16_t) total;
+}
