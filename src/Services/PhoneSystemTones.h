@@ -1343,6 +1343,90 @@ public:
 	 * identical behaviour -- the new helper is purely additive.
 	 */
 	static uint16_t restDurationMs(uint8_t id);
+
+	/**
+	 * S248 - derived structural inter-step gap-total accessor for chime
+	 * `id`. Returns the catalogued per-step `gapMs` filler the engine
+	 * inserts BETWEEN consecutive `PhoneRingtoneEngine::Note` steps for
+	 * one playback of the chime, summed across every step (i.e.
+	 * `gapMs(id) * noteCount(id)`, saturated at the uint16_t ceiling
+	 * the rest of the duration cluster shares). Where `gapMs(id)`
+	 * (S236) reports the per-step filler component in isolation (the
+	 * single catalogued `kMelodies[id].gapMs` field, in ms, the
+	 * engine waits between two consecutive steps), `gapTotalMs(id)`
+	 * reports the same component IN AGGREGATE across the whole
+	 * playback -- the third leg of the structural-duration partition
+	 * that `durationMs(id)` (S232) folds together.
+	 *
+	 * The aggregate-side complement of `gapMs(id)` (S236), and the
+	 * gap-axis sibling of `audibleDurationMs(id)` (S246) and
+	 * `restDurationMs(id)` (S247): every catalogued step's wall-clock
+	 * cost partitions cleanly into one of three buckets -- the
+	 * audible-step durations the piezo is driven for (S246), the
+	 * rest-step durations the piezo holds silent for (S247), and the
+	 * inter-step gap filler the engine waits between consecutive
+	 * steps (S248). Together with `noteCount(id)` (S233) the
+	 * catalogue exposes the full structural-duration partition that
+	 * `durationMs(id)` folds together: for every catalogued chime
+	 *     audibleDurationMs(id) + restDurationMs(id) + gapTotalMs(id)
+	 *       == durationMs(id)
+	 * (modulo the uint16_t saturation that all four duration
+	 * accessors share), so a future "Settings -> Sounds -> System
+	 * chimes" picker row caption like "(3 notes, 1 rest, 180 ms
+	 * audible / 60 ms silent / 90 ms gaps)" can read a dedicated
+	 * accessor for the gap-axis leg instead of computing
+	 * `gapMs(id) * noteCount(id)` (with a uint16_t-saturation guard)
+	 * at the call site or recovering it via subtraction from
+	 * `durationMs(id) - audibleDurationMs(id) - restDurationMs(id)`.
+	 *
+	 * Returns 0 for an out-of-range id, for the (currently
+	 * impossible) empty-melody case, and -- byte-identically -- for
+	 * every v1 catalogue entry whose `kMelodies[id].gapMs == 0` (i.e.
+	 * the single-pulse chimes that don't space their steps with a
+	 * gap), so the v1 callers that today read `gapMs(id)` and see 0
+	 * see the same 0 from `gapTotalMs(id)`. Saturates at `0xFFFF` ms
+	 * (the same uint16_t ceiling `durationMs(id)`,
+	 * `audibleDurationMs(id)`, and `restDurationMs(id)` already use)
+	 * so a picker row caption can render the value as a four-digit
+	 * integer without an int cast at the call site; in practice no
+	 * plausible v1+v2 chime approaches that ceiling (the longest
+	 * catalogued chime today is a few hundred ms and the per-step
+	 * gap is bounded by `gapMs`'s uint16_t storage, so the product
+	 * stays well clear of the ceiling for any realistic count).
+	 *
+	 * Distinct from `gapMs` (per-step filler in isolation), distinct
+	 * from `durationMs` (TOTAL incl. audible + rests + gaps),
+	 * distinct from `audibleDurationMs` (audible-step component in
+	 * isolation), distinct from `restDurationMs` (rest-step
+	 * component in isolation), distinct from `noteCount` /
+	 * `audibleNoteCount` / `restNoteCount` (catalogued step COUNTS,
+	 * not durations), and distinct from
+	 * `PhoneRingtoneEngine::isPlaying()` / `currentFreq()` (the
+	 * S191 live-piezo accessors that report runtime playback state,
+	 * not catalogued shape). Profile-state INDEPENDENT: the
+	 * catalogued inter-step gap total is the same on SILENT /
+	 * MEETING profiles as on GENERAL / OUTDOOR / HEADSET (the S231
+	 * `tryPlay(id)` gate already reports the silenced answer
+	 * separately for any caller that wants to fade the row caption
+	 * into a "(silenced)" form). Cheap O(1) -- two field reads, one
+	 * uint32_t multiply, one saturate-to-uint16_t -- no per-call
+	 * allocation, no scan of the underlying `Note*` array. Header
+	 * surface grows by exactly one public symbol (`static uint16_t
+	 * gapTotalMs`); the cpp adds a single function next to the
+	 * existing `count` / `valid` / `name` / `melody` / `play` /
+	 * `tryPlay` / `isSilenced` / `durationMs` / `noteCount` /
+	 * `firstFreqHz` / `lastFreqHz` / `gapMs` / `loops` /
+	 * `silhouette` / `pitchSpanHz` / `peakFreqHz` / `troughFreqHz`
+	 * / `meanFreqHz` / `audibleNoteCount` / `restNoteCount` /
+	 * `audibleDurationMs` / `restDurationMs` cluster. No new
+	 * includes (the `Melody` type lives behind the existing
+	 * `PhoneRingtoneEngine.h` include and the `kMelodies` table
+	 * already lives in this translation unit's anonymous
+	 * namespace), no new const data, no new SPIFFS asset cost.
+	 * Every existing call site of the catalogue keeps byte-
+	 * identical behaviour -- the new helper is purely additive.
+	 */
+	static uint16_t gapTotalMs(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H

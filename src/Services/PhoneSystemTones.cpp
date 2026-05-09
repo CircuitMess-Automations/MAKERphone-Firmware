@@ -956,3 +956,56 @@ uint16_t PhoneSystemTones::restDurationMs(uint8_t id){
 	if(total > 0xFFFFU) return 0xFFFFU;
 	return (uint16_t) total;
 }
+
+
+// S248 - derived structural inter-step gap-total accessor for chime
+// id. Returns the catalogued per-step gapMs filler the engine
+// inserts BETWEEN consecutive PhoneRingtoneEngine::Note steps for
+// one playback of the chime, summed across every step (i.e.
+// gapMs(id) * noteCount(id), saturated at the uint16_t ceiling the
+// rest of the duration cluster shares). Where gapMs(id) (S236)
+// reports the per-step filler component in isolation,
+// gapTotalMs(id) reports the same component IN AGGREGATE across
+// the whole playback -- the third leg of the structural-duration
+// partition that durationMs(id) (S232) folds together. The
+// aggregate-side complement of gapMs(id) and the gap-axis sibling
+// of audibleDurationMs(id) (S246) and restDurationMs(id) (S247):
+// every catalogued step's wall-clock cost partitions cleanly into
+// one of three buckets -- the audible-step durations the piezo is
+// driven for (S246), the rest-step durations the piezo holds
+// silent for (S247), and the inter-step gap filler the engine
+// waits between consecutive steps (S248). Together with
+// noteCount(id) (S233) the catalogue exposes the full structural-
+// duration partition that durationMs(id) folds together: for every
+// catalogued chime
+//     audibleDurationMs(id) + restDurationMs(id) + gapTotalMs(id)
+//       == durationMs(id)
+// (modulo the uint16_t saturation that all four duration accessors
+// share). Returns 0 for an out-of-range id, for the (currently
+// impossible) empty-melody case, and -- byte-identically -- for
+// every v1 catalogue entry whose kMelodies[id].gapMs == 0 (i.e.
+// the single-pulse chimes that don't space their steps with a
+// gap). Saturates at 0xFFFF ms (the same uint16_t ceiling
+// durationMs(id), audibleDurationMs(id), and restDurationMs(id)
+// already use). Profile-state INDEPENDENT: the catalogued
+// inter-step gap total is the same on SILENT / MEETING profiles as
+// on GENERAL / OUTDOOR / HEADSET (the S231 tryPlay(id) gate
+// already reports the silenced answer separately for any caller
+// that wants to fade the row caption into a "(silenced)" form).
+// Cheap O(1) -- two field reads, one uint32_t multiply, one
+// saturate-to-uint16_t -- no per-call allocation, no scan of the
+// underlying Note* array; mirrors the existing count / valid /
+// name / melody / play / tryPlay / isSilenced / durationMs /
+// noteCount / firstFreqHz / lastFreqHz / gapMs / loops /
+// silhouette / pitchSpanHz / peakFreqHz / troughFreqHz /
+// meanFreqHz / audibleNoteCount / restNoteCount / audibleDurationMs
+// / restDurationMs cluster.
+uint16_t PhoneSystemTones::gapTotalMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	if(m.gapMs == 0) return 0;
+	uint32_t total = (uint32_t) m.gapMs * (uint32_t) m.count;
+	if(total > 0xFFFFU) return 0xFFFFU;
+	return (uint16_t) total;
+}
