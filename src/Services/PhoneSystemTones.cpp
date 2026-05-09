@@ -1009,3 +1009,47 @@ uint16_t PhoneSystemTones::gapTotalMs(uint8_t id){
 	if(total > 0xFFFFU) return 0xFFFFU;
 	return (uint16_t) total;
 }
+
+// S249 - derived per-audible-step mean-duration accessor for chime
+// id. Returns the catalogued audible-step durations divided by the
+// count of those audible steps, i.e. the mean wall-clock duration
+// per AUDIBLE catalogued PhoneRingtoneEngine::Note step, in ms,
+// rounded toward zero by integer division. Where
+// audibleDurationMs(id) (S246) reports the SUM of the catalogued
+// audible-step durations and audibleNoteCount(id) (S243) reports
+// the COUNT of those steps, meanNoteDurationMs(id) collapses the
+// pair into a per-step CENTRE -- the duration-axis sibling of
+// meanFreqHz(id) (S242) on the pitch axis. Returns 0 for an
+// out-of-range id, for the (currently impossible) empty-melody
+// case, and for the all-rests-melody case (where the audible-step
+// counter would be zero and the divide would be undefined) -- the
+// same three "no answer" cases the pitch-axis trio peakFreqHz
+// (S240) / troughFreqHz (S241) / meanFreqHz (S242) already
+// collapse to 0. Saturates at 0xFFFF ms (the same uint16_t ceiling
+// durationMs / audibleDurationMs / restDurationMs / gapTotalMs
+// already share). Cheap O(notes) linear scan with two uint32_t
+// accumulators (audible-step duration sum + audible-step counter)
+// fused into one pass, one final divide and saturate; no
+// per-call allocation, no recursion into audibleDurationMs /
+// audibleNoteCount. Mirrors the existing count / valid / name /
+// melody / play / tryPlay / isSilenced / durationMs / noteCount /
+// firstFreqHz / lastFreqHz / gapMs / loops / silhouette /
+// pitchSpanHz / peakFreqHz / troughFreqHz / meanFreqHz /
+// audibleNoteCount / restNoteCount / audibleDurationMs /
+// restDurationMs / gapTotalMs cluster.
+uint16_t PhoneSystemTones::meanNoteDurationMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	uint32_t total = 0;
+	uint16_t audible = 0;
+	for(uint16_t i = 0; i < m.count; ++i){
+		if(m.notes[i].freq == 0) continue;
+		total += (uint32_t) m.notes[i].durationMs;
+		++audible;
+	}
+	if(audible == 0) return 0;
+	uint32_t mean = total / (uint32_t) audible;
+	if(mean > 0xFFFFU) return 0xFFFFU;
+	return (uint16_t) mean;
+}

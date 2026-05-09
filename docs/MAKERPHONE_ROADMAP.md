@@ -2489,6 +2489,77 @@ lowest-numbered `[ ]`.
   subtraction" pattern that the S247 commit body explicitly
   pointed at.
 
+- [x] **S249** -- `PhoneSystemTones::meanNoteDurationMs(uint8_t id)`
+  derived per-audible-step mean-duration accessor -- returns the
+  catalogued audible-step durations (the sum `audibleDurationMs(id)`
+  reports) divided by the count of those audible steps (the count
+  `audibleNoteCount(id)` reports), i.e. the mean wall-clock duration
+  per AUDIBLE catalogued step, in ms, rounded toward zero by integer
+  division. Where `audibleDurationMs(id)` (S246) reports the SUM of
+  the catalogued audible-step durations and `audibleNoteCount(id)`
+  (S243) reports the COUNT of those steps, `meanNoteDurationMs(id)`
+  collapses the pair into a per-step CENTRE -- the duration-axis
+  sibling of `meanFreqHz(id)` (S242) on the pitch axis. So a future
+  "Settings -> Sounds -> System chimes" picker row caption like
+  "(3 notes, ~60 ms each)" can read a dedicated accessor for the
+  per-audible-step centre instead of computing
+  `audibleDurationMs(id) / audibleNoteCount(id)` (with a divide-by-
+  zero guard) at the call site. Returns 0 for an out-of-range id,
+  for the (currently impossible) empty-melody case, for the all-
+  rests-melody case (where `audibleNoteCount(id) == 0` and the
+  divisor would be zero -- the same three "no answer" cases the
+  pitch-axis trio `peakFreqHz` (S240) / `troughFreqHz` (S241) /
+  `meanFreqHz` (S242) already collapse to 0, so the picker / diag
+  walk does not have to special-case the all-rest melody before
+  calling), and -- byte-identically -- for every catalogue entry
+  whose audible-step durations all happen to be zero (an unreachable
+  edge case in v1+v2 today, but the formula handles it transparently
+  without a side-channel). Saturates at `0xFFFF` ms (the same
+  uint16_t ceiling the duration cluster shares); in practice no
+  realistic per-step audible duration approaches that ceiling, but
+  the saturate-on-overflow guard keeps the return type honest.
+  Distinct from `audibleDurationMs` (audible-step SUM in
+  isolation), distinct from `durationMs` (TOTAL incl. audible +
+  rests + gaps), distinct from `restDurationMs` (rest-step component
+  in isolation), distinct from `gapTotalMs` (inter-step gap
+  component in isolation), distinct from `noteCount` /
+  `audibleNoteCount` / `restNoteCount` (catalogued step COUNTS, not
+  durations), distinct from `gapMs` (per-step filler in isolation,
+  not per-step audible centre), and distinct from
+  `PhoneRingtoneEngine::isPlaying()` / `currentFreq()` (the S191
+  live-piezo accessors that report runtime playback state, not
+  catalogued shape). Profile-state INDEPENDENT: the catalogued
+  per-audible-step mean is the same on SILENT / MEETING profiles
+  as on GENERAL / OUTDOOR / HEADSET (the S231 `tryPlay(id)` gate
+  already reports the silenced answer separately for any caller
+  that wants to fade the row caption into a "(silenced)" form).
+  Cheap O(notes) linear scan with two uint32_t accumulators
+  (audible-step duration sum + audible-step counter) and one final
+  divide-and-saturate; no per-call allocation, no recursion into
+  the existing `audibleDurationMs` / `audibleNoteCount` accessors
+  (the loop fuses the two passes so the catalogued `Note*` array is
+  walked exactly once per call). Header surface grows by exactly
+  one public symbol; the cpp adds a single function next to the
+  existing `count` / `valid` / `name` / `melody` / `play` /
+  `tryPlay` / `isSilenced` / `durationMs` / `noteCount` /
+  `firstFreqHz` / `lastFreqHz` / `gapMs` / `loops` / `silhouette`
+  / `pitchSpanHz` / `peakFreqHz` / `troughFreqHz` / `meanFreqHz`
+  / `audibleNoteCount` / `restNoteCount` / `audibleDurationMs`
+  / `restDurationMs` / `gapTotalMs` cluster. No new includes, no
+  new const data, no new SPIFFS asset cost. Every existing call
+  site of the catalogue keeps byte-identical behaviour -- the new
+  helper is purely additive. Closes the duration-axis gap left
+  open by the S246 / S247 / S248 trio: where the SUM-side of the
+  catalogued audible-step duration partition now exposes
+  audible-only / rest-only / inter-step-gap aggregate accessors,
+  the per-audible-step CENTRE was still recovered by computing
+  `audibleDurationMs(id) / audibleNoteCount(id)` at the call site
+  with a divide-by-zero guard. The new accessor folds that idiom
+  behind a dedicated symbol, mirroring the pitch-axis pattern
+  where `meanFreqHz(id)` (S242) similarly folds the
+  audible-pitch sum / audible-step count division behind a
+  dedicated symbol.
+
 
 ---
 

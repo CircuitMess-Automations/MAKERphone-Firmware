@@ -1427,6 +1427,80 @@ public:
 	 * identical behaviour -- the new helper is purely additive.
 	 */
 	static uint16_t gapTotalMs(uint8_t id);
+
+	/**
+	 * S249 - derived per-audible-step mean-duration accessor for chime
+	 * `id`. Returns the catalogued audible-step durations the engine
+	 * holds the piezo at a tone for (the sum `audibleDurationMs(id)`
+	 * (S246) reports) divided by the count of those audible steps (the
+	 * count `audibleNoteCount(id)` (S243) reports), i.e. the mean
+	 * wall-clock duration per AUDIBLE catalogued step, in ms, rounded
+	 * toward zero by integer division. Where `audibleDurationMs(id)`
+	 * reports the SUM of the catalogued audible-step durations and
+	 * `audibleNoteCount(id)` reports the COUNT of those steps,
+	 * `meanNoteDurationMs(id)` collapses the pair into a per-step
+	 * CENTRE -- the duration-axis sibling of `meanFreqHz(id)` (S242)
+	 * on the pitch axis.
+	 *
+	 * So a future "Settings -> Sounds -> System chimes" picker row
+	 * caption like "(3 notes, ~60 ms each)" can read a dedicated
+	 * accessor for the per-audible-step centre instead of computing
+	 * `audibleDurationMs(id) / audibleNoteCount(id)` (with a
+	 * divide-by-zero guard) at the call site. Returns 0 for an
+	 * out-of-range id, for the (currently impossible) empty-melody
+	 * case, for the all-rests-melody case (where
+	 * `audibleNoteCount(id) == 0` and the divisor would be zero) --
+	 * exactly mirroring the rest-skipping rule the pitch-axis trio
+	 * `peakFreqHz` (S240) / `troughFreqHz` (S241) / `meanFreqHz`
+	 * (S242) already use for the catalogued ceiling, floor and
+	 * centre, and the same three "no answer" cases all three pitch
+	 * accessors already collapse to 0.
+	 *
+	 * Saturates at `0xFFFF` ms (the same uint16_t ceiling the duration
+	 * cluster `durationMs` / `audibleDurationMs` / `restDurationMs` /
+	 * `gapTotalMs` already share) so a picker row caption can render
+	 * the value as a four-digit integer without an int cast at the
+	 * call site; in practice no realistic per-audible-step duration
+	 * approaches that ceiling, but the saturate-on-overflow guard
+	 * keeps the return type honest.
+	 *
+	 * Distinct from `audibleDurationMs` (audible-step SUM in
+	 * isolation), distinct from `durationMs` (TOTAL incl. audible +
+	 * rests + gaps), distinct from `restDurationMs` (rest-step
+	 * component in isolation), distinct from `gapTotalMs` (inter-step
+	 * gap component in isolation), distinct from `noteCount` /
+	 * `audibleNoteCount` / `restNoteCount` (catalogued step COUNTS,
+	 * not durations), distinct from `gapMs` (per-step filler in
+	 * isolation, not per-step audible centre), and distinct from
+	 * `PhoneRingtoneEngine::isPlaying()` / `currentFreq()` (the S191
+	 * live-piezo accessors that report runtime playback state, not
+	 * catalogued shape). Profile-state INDEPENDENT: the catalogued
+	 * per-audible-step mean is the same on SILENT / MEETING profiles
+	 * as on GENERAL / OUTDOOR / HEADSET (the S231 `tryPlay(id)` gate
+	 * already reports the silenced answer separately for any caller
+	 * that wants to fade the row caption into a "(silenced)" form).
+	 * Cheap O(notes) linear scan with two uint32_t accumulators
+	 * (audible-step duration sum + audible-step counter) and one
+	 * final divide-and-saturate; no per-call allocation, no recursion
+	 * into the existing `audibleDurationMs` / `audibleNoteCount`
+	 * accessors -- the loop fuses the two passes so the catalogued
+	 * `Note*` array is walked exactly once per call. Header surface
+	 * grows by exactly one public symbol (`static uint16_t
+	 * meanNoteDurationMs`); the cpp adds a single function next to
+	 * the existing `count` / `valid` / `name` / `melody` / `play` /
+	 * `tryPlay` / `isSilenced` / `durationMs` / `noteCount` /
+	 * `firstFreqHz` / `lastFreqHz` / `gapMs` / `loops` /
+	 * `silhouette` / `pitchSpanHz` / `peakFreqHz` / `troughFreqHz` /
+	 * `meanFreqHz` / `audibleNoteCount` / `restNoteCount` /
+	 * `audibleDurationMs` / `restDurationMs` / `gapTotalMs` cluster.
+	 * No new includes (the `Melody` and `Note` types live behind the
+	 * existing `PhoneRingtoneEngine.h` include and the `kMelodies`
+	 * table already lives in this translation unit's anonymous
+	 * namespace), no new const data, no new SPIFFS asset cost.
+	 * Every existing call site of the catalogue keeps byte-identical
+	 * behaviour -- the new helper is purely additive.
+	 */
+	static uint16_t meanNoteDurationMs(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H
