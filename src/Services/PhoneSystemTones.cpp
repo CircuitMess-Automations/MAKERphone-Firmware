@@ -1053,3 +1053,47 @@ uint16_t PhoneSystemTones::meanNoteDurationMs(uint8_t id){
 	if(mean > 0xFFFFU) return 0xFFFFU;
 	return (uint16_t) mean;
 }
+
+// S250 - derived per-audible-step maximum-duration accessor for
+// chime id. Returns the longest catalogued audible-step durationMs
+// value the engine holds the piezo at a tone for, in ms. Where
+// audibleDurationMs(id) (S246) reports the SUM of the catalogued
+// audible-step durations, audibleNoteCount(id) (S243) reports the
+// COUNT of those steps, and meanNoteDurationMs(id) (S249) collapses
+// the SUM/COUNT pair into a per-step CENTRE,
+// peakNoteDurationMs(id) reports the per-step CEILING -- the
+// duration-axis sibling of peakFreqHz(id) (S240) on the pitch axis.
+// Returns 0 for an out-of-range id, for the (currently impossible)
+// empty-melody case, and for the all-rests-melody case (where no
+// audible step exists and the ceiling is undefined) -- the same
+// three "no answer" cases the pitch-axis trio peakFreqHz (S240) /
+// troughFreqHz (S241) / meanFreqHz (S242) and the duration-axis
+// centre accessor meanNoteDurationMs (S249) already collapse to 0.
+// Saturates at 0xFFFF ms (the same uint16_t ceiling the duration
+// cluster shares); since the catalogued per-step duration is itself
+// a uint16_t the cap is in practice unreachable, but the
+// saturate-on-overflow guard keeps the return type honest. Cheap
+// O(notes) linear scan with a single uint16_t running max that
+// skips rest steps (freq == 0); no per-call allocation, no
+// recursion into the existing audibleDurationMs / audibleNoteCount
+// / meanNoteDurationMs accessors. Mirrors the existing count /
+// valid / name / melody / play / tryPlay / isSilenced / durationMs
+// / noteCount / firstFreqHz / lastFreqHz / gapMs / loops /
+// silhouette / pitchSpanHz / peakFreqHz / troughFreqHz /
+// meanFreqHz / audibleNoteCount / restNoteCount /
+// audibleDurationMs / restDurationMs / gapTotalMs /
+// meanNoteDurationMs cluster.
+uint16_t PhoneSystemTones::peakNoteDurationMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	uint16_t peak = 0;
+	bool any = false;
+	for(uint16_t i = 0; i < m.count; ++i){
+		if(m.notes[i].freq == 0) continue;
+		any = true;
+		if(m.notes[i].durationMs > peak) peak = m.notes[i].durationMs;
+	}
+	if(!any) return 0;
+	return peak;
+}

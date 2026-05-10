@@ -2561,6 +2561,83 @@ lowest-numbered `[ ]`.
   dedicated symbol.
 
 
+- [x] **S250** -- `PhoneSystemTones::peakNoteDurationMs(uint8_t id)`
+  derived per-audible-step maximum-duration accessor -- returns the
+  longest catalogued audible-step `durationMs` value the engine
+  holds the piezo at a tone for, in ms. Where `audibleDurationMs(id)`
+  (S246) reports the SUM of the catalogued audible-step durations,
+  `audibleNoteCount(id)` (S243) reports the COUNT of those steps,
+  and `meanNoteDurationMs(id)` (S249) collapses the SUM/COUNT pair
+  into a per-step CENTRE, `peakNoteDurationMs(id)` reports the
+  per-step CEILING -- the duration-axis sibling of `peakFreqHz(id)`
+  (S240) on the pitch axis. So a future "Settings -> Sounds ->
+  System chimes" picker row caption like "(3 notes, ~60 ms each,
+  longest 80 ms)" can read a dedicated accessor for the per-audible-
+  step ceiling instead of walking the catalogued `Note*` pointer at
+  the call site or computing the maximum via a per-row accumulator
+  in the picker. Returns 0 for an out-of-range id, for the
+  (currently impossible) empty-melody case, and for the all-rests-
+  melody case (where `audibleNoteCount(id) == 0`, no audible step
+  exists, and the ceiling is undefined) -- the same three "no
+  answer" cases the pitch-axis trio `peakFreqHz` (S240) /
+  `troughFreqHz` (S241) / `meanFreqHz` (S242) and the duration-axis
+  centre accessor `meanNoteDurationMs` (S249) already collapse to 0,
+  so the picker / diag walk does not have to special-case the
+  all-rest melody before calling. Saturates at `0xFFFF` ms (the same
+  uint16_t ceiling the duration cluster `durationMs` /
+  `audibleDurationMs` / `restDurationMs` / `gapTotalMs` /
+  `meanNoteDurationMs` already share); in practice no realistic
+  per-audible-step duration approaches that ceiling, but the
+  saturate-on-overflow guard keeps the return type honest. Distinct
+  from `audibleDurationMs` (audible-step SUM, not ceiling), distinct
+  from `meanNoteDurationMs` (audible-step CENTRE, not ceiling),
+  distinct from `durationMs` (TOTAL incl. audible + rests + gaps),
+  distinct from `restDurationMs` (rest-step component in isolation),
+  distinct from `gapTotalMs` (inter-step gap component in
+  isolation), distinct from `gapMs` (per-step filler in isolation,
+  not per-step audible ceiling), distinct from `noteCount` /
+  `audibleNoteCount` / `restNoteCount` (catalogued step COUNTS, not
+  durations), and distinct from
+  `PhoneRingtoneEngine::isPlaying()` / `currentFreq()` (the S191
+  live-piezo accessors that report runtime playback state, not
+  catalogued shape). Profile-state INDEPENDENT: the catalogued
+  per-audible-step ceiling is the same on SILENT / MEETING profiles
+  as on GENERAL / OUTDOOR / HEADSET (the S231 `tryPlay(id)` gate
+  already reports the silenced answer separately for any caller
+  that wants to fade the row caption into a "(silenced)" form).
+  Cheap O(notes) linear scan with a single uint16_t running max
+  that skips rest steps (`freq == 0`) so the ceiling reports the
+  longest AUDIBLE step rather than the longest catalogued step --
+  matching the rest-skipping rule the pitch-axis trio `peakFreqHz`
+  / `troughFreqHz` / `meanFreqHz` and the duration-axis centre
+  `meanNoteDurationMs` already use; no per-call allocation, no
+  recursion into the existing `audibleDurationMs` /
+  `audibleNoteCount` / `meanNoteDurationMs` accessors. Header
+  surface grows by exactly one public symbol; the cpp adds a single
+  function next to the existing `count` / `valid` / `name` /
+  `melody` / `play` / `tryPlay` / `isSilenced` / `durationMs` /
+  `noteCount` / `firstFreqHz` / `lastFreqHz` / `gapMs` / `loops` /
+  `silhouette` / `pitchSpanHz` / `peakFreqHz` / `troughFreqHz` /
+  `meanFreqHz` / `audibleNoteCount` / `restNoteCount` /
+  `audibleDurationMs` / `restDurationMs` / `gapTotalMs` /
+  `meanNoteDurationMs` cluster. No new includes, no new const data,
+  no new SPIFFS asset cost. Every existing call site of the
+  catalogue keeps byte-identical behaviour -- the new helper is
+  purely additive. Opens the duration-axis ceiling/floor pair
+  foreshadowed by the S249 commit body's "where the SUM-side of the
+  catalogued audible-step duration partition now exposes audible-
+  only / rest-only / inter-step-gap aggregate accessors, the
+  per-audible-step CENTRE was still recovered by computing
+  `audibleDurationMs(id) / audibleNoteCount(id)` at the call site"
+  framing -- now that the duration-axis CENTRE has a dedicated
+  symbol the matching CEILING does too, mirroring the
+  pitch-axis pattern where `peakFreqHz(id)` (S240) and
+  `meanFreqHz(id)` (S242) both have dedicated symbols and a
+  matching `troughFreqHz(id)` (S241) FLOOR companion. The
+  duration-axis FLOOR companion (`troughNoteDurationMs(id)`) is
+  the natural follow-up.
+
+
 ---
 
 ## How the agent reads this file
