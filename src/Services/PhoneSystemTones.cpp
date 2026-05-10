@@ -1278,3 +1278,63 @@ uint16_t PhoneSystemTones::durationSpanMs(uint8_t id){
 	const uint16_t last  = lastNoteDurationMs(id);
 	return (first > last) ? (uint16_t)(first - last) : (uint16_t)(last - first);
 }
+
+// S255 - derived audible-CEILING-FLOOR magnitude accessor on the
+// PITCH axis for chime `id`. Returns the unsigned absolute
+// difference, in Hz, between the catalogued audible CEILING and
+// the catalogued audible FLOOR of the underlying Melody --
+// peakFreqHz(id) - troughFreqHz(id) (always non-negative by
+// construction, since peakFreqHz is a max-search and
+// troughFreqHz is a min-search across the same audible-step
+// subset, so peak >= trough is invariant). The audible-axis
+// pitch sibling of pitchSpanHz(id) (S239) on the structural-
+// endpoint axis: where pitchSpanHz reports the magnitude of the
+// (LEADING, TRAILING) STRUCTURAL endpoint pair, S255 reports the
+// magnitude of the (CEILING, FLOOR) AUDIBLE envelope, so a future
+// PhoneDiagScreen "Sound test" walk that wants to render the
+// audible-pitch range of a cue (full vertical extent of the
+// pitch-bar between top tick and bottom tick) or a future
+// "Settings -> Sounds -> System chimes" picker row caption like
+// "(spans 880 Hz)" can read a dedicated derived accessor for the
+// audible-axis envelope magnitude instead of computing
+// peakFreqHz(id) - troughFreqHz(id) at the call site. Returns 0
+// for an out-of-range id (collapsing transparently because both
+// peakFreqHz(id) and troughFreqHz(id) already collapse to 0
+// there), for the (currently impossible) empty-melody case, for
+// the (currently impossible) all-rests-melody case (both sides
+// collapse to 0), and -- naturally -- for any flat-pitch chime
+// whose audible CEILING and FLOOR coincide (every audible step
+// lands on the same frequency). Distinct from pitchSpanHz
+// (structural endpoint magnitude, not audible CEILING / FLOOR
+// magnitude), distinct from peakFreqHz / troughFreqHz (catalogued
+// CEILING / FLOOR themselves, not the magnitude between them),
+// distinct from meanFreqHz (audible-step CENTRE), distinct from
+// firstFreqHz / lastFreqHz (structural endpoints, not audible
+// bounds), distinct from durationSpanMs (duration axis, not
+// pitch axis), distinct from silhouette (signed tilt sign).
+// Profile-state INDEPENDENT: catalogued audible envelope
+// magnitude is the same on SILENT / MEETING profiles as on
+// GENERAL / OUTDOOR / HEADSET. Cheap O(notes): the two helpers
+// each do a single linear scan with a uint16_t accumulator;
+// total work is two passes plus one subtraction, no engine
+// interaction, no persisted state, no per-call allocation;
+// mirrors pitchSpanHz(id) (S239) exactly with peakFreqHz /
+// troughFreqHz substituted for firstFreqHz / lastFreqHz. Lives
+// next to the existing count / valid / name / melody / play /
+// tryPlay / isSilenced / durationMs / noteCount / firstFreqHz /
+// lastFreqHz / gapMs / loops / silhouette / pitchSpanHz /
+// peakFreqHz / troughFreqHz / meanFreqHz / audibleNoteCount /
+// restNoteCount / audibleDurationMs / restDurationMs /
+// gapTotalMs / meanNoteDurationMs / peakNoteDurationMs /
+// troughNoteDurationMs / firstNoteDurationMs /
+// lastNoteDurationMs / durationSpanMs cluster. Opens the derived
+// audible-envelope-magnitude axis on the pitch side at full
+// symmetry with the structural-endpoint magnitude axis already
+// closed by pitchSpanHz; the duration-axis sibling
+// (audibleDurationSpanMs) is the natural follow-up.
+uint16_t PhoneSystemTones::audiblePitchSpanHz(uint8_t id){
+	if(!valid(id)) return 0;
+	const uint16_t peak = peakFreqHz(id);
+	const uint16_t trough = troughFreqHz(id);
+	return (peak >= trough) ? (uint16_t)(peak - trough) : (uint16_t)(trough - peak);
+}

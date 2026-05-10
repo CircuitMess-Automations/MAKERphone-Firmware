@@ -2932,6 +2932,82 @@ lowest-numbered `[ ]`.
   derived endpoint-magnitude axis on the duration side at full
   symmetry with the pitch side.
 
+- [x] **S255** -- `PhoneSystemTones::audiblePitchSpanHz(uint8_t id)`
+  derived audible-CEILING-FLOOR magnitude accessor on the PITCH
+  axis. Returns the unsigned absolute difference, in Hz, between
+  the catalogued audible CEILING and the catalogued audible FLOOR
+  of the underlying Melody -- `peakFreqHz(id) - troughFreqHz(id)`
+  (always non-negative by construction, since `peakFreqHz` is a
+  max-search and `troughFreqHz` is a min-search across the same
+  audible-step subset, so `peak >= trough` is invariant). The
+  audible-axis pitch sibling of `pitchSpanHz(id)` (S239) on the
+  structural-endpoint axis: where `pitchSpanHz(id)` reports the
+  magnitude of the (LEADING, TRAILING) STRUCTURAL endpoint pair
+  so a caller can render an opens-vs-closes pitch tick,
+  `audiblePitchSpanHz(id)` reports the magnitude of the
+  (CEILING, FLOOR) AUDIBLE envelope so the same caller can
+  render an audible-pitch-range tick at the full envelope of the
+  cue, not just at its structural endpoints. Builds directly on
+  the S240 / S241 pair (`peakFreqHz` / `troughFreqHz`) that
+  closed the audible-CEILING / FLOOR pair on the pitch axis;
+  S255 promotes that pair to a derived MAGNITUDE accessor in the
+  same way S239 promoted the S234 / S235 endpoint pair
+  (`firstFreqHz` / `lastFreqHz`) to `pitchSpanHz`. The pitch-
+  axis structural / audible / derived shape now matches:
+  `firstFreqHz` / `lastFreqHz` (S234 / S235) at the structural
+  endpoints, `peakFreqHz` / `troughFreqHz` (S240 / S241) at the
+  audible CEILING / FLOOR, `pitchSpanHz` (S239) at the
+  structural endpoint magnitude, and now `audiblePitchSpanHz`
+  (S255) at the audible CEILING / FLOOR magnitude. So a future
+  `PhoneDiagScreen` "Sound test" walk that wants to render the
+  audible-pitch range of a cue (e.g. the full vertical extent of
+  the pitch-bar between top tick and bottom tick) or a future
+  "Settings -> Sounds -> System chimes" picker row caption like
+  "(spans 880 Hz)" can read a dedicated derived accessor for the
+  audible-axis envelope magnitude instead of computing
+  `peakFreqHz(id) - troughFreqHz(id)` at the call site. Returns
+  0 for an out-of-range id (collapsing transparently because
+  both `peakFreqHz(id)` and `troughFreqHz(id)` already collapse
+  to 0 there), for the (currently impossible) empty-melody case,
+  for the (currently impossible) all-rests-melody case (both
+  sides collapse to 0), and naturally for any flat-pitch chime
+  whose audible CEILING and FLOOR coincide. Distinct from
+  `pitchSpanHz` (structural endpoint magnitude on the pitch
+  axis, not audible CEILING / FLOOR magnitude), distinct from
+  `peakFreqHz` / `troughFreqHz` (the catalogued CEILING / FLOOR
+  themselves, not the magnitude between them), distinct from
+  `meanFreqHz` (audible-step CENTRE, not envelope magnitude),
+  distinct from `firstFreqHz` / `lastFreqHz` (structural
+  endpoints, not audible bounds), distinct from `durationSpanMs`
+  (duration axis, not pitch axis), distinct from `silhouette`
+  (signed tilt sign, not absolute audible magnitude). Profile-
+  state INDEPENDENT: the catalogued audible envelope magnitude
+  is the same on SILENT / MEETING profiles as on GENERAL /
+  OUTDOOR / HEADSET. Cheap O(notes): two linear scans (max +
+  min, mirroring the S240 / S241 implementations exactly) plus
+  one subtraction; no engine interaction, no persisted state,
+  no per-call allocation; mirrors `pitchSpanHz(id)` (S239)
+  exactly with `peakFreqHz` / `troughFreqHz` substituted for
+  `firstFreqHz` / `lastFreqHz`. Header surface grows by exactly
+  one public symbol (`static uint16_t audiblePitchSpanHz`); the
+  cpp adds a single function next to the existing `count` /
+  `valid` / `name` / `melody` / `play` / `tryPlay` /
+  `isSilenced` / `durationMs` / `noteCount` / `firstFreqHz` /
+  `lastFreqHz` / `gapMs` / `loops` / `silhouette` /
+  `pitchSpanHz` / `peakFreqHz` / `troughFreqHz` / `meanFreqHz` /
+  `audibleNoteCount` / `restNoteCount` / `audibleDurationMs` /
+  `restDurationMs` / `gapTotalMs` / `meanNoteDurationMs` /
+  `peakNoteDurationMs` / `troughNoteDurationMs` /
+  `firstNoteDurationMs` / `lastNoteDurationMs` /
+  `durationSpanMs` cluster. No new includes, no new const data,
+  no new SPIFFS asset cost. Every existing call site of the
+  catalogue keeps byte-identical behaviour -- the new helper is
+  purely additive. Opens the derived audible-envelope-magnitude
+  axis on the pitch side at full symmetry with the structural-
+  endpoint magnitude axis already closed by `pitchSpanHz`; the
+  duration-axis sibling (`audibleDurationSpanMs`) is the natural
+  follow-up.
+
 
 
 ---
