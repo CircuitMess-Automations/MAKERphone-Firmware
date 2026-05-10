@@ -1150,3 +1150,45 @@ uint16_t PhoneSystemTones::troughNoteDurationMs(uint8_t id){
 	}
 	return found ? trough : 0;
 }
+
+// S252 - structural first-note duration accessor for chime `id`.
+// Returns the catalogued duration in ms of the FIRST
+// PhoneRingtoneEngine::Note entry in the underlying Melody
+// (kMelodies[id].notes[0].durationMs). The duration-axis sibling
+// of firstFreqHz(id) (S234) on the pitch axis -- where firstFreqHz
+// reports the catalogued leading pitch the engine drives the
+// piezo at on the first audible step, firstNoteDurationMs reports
+// the catalogued leading step-duration the engine holds that
+// pitch for. Returns 0 for an out-of-range id and for the
+// (currently impossible) empty-melody case -- the same two "no
+// answer" cases the structural-pair firstFreqHz / lastFreqHz
+// already collapse to 0. Like firstFreqHz / lastFreqHz this is a
+// STRUCTURAL accessor (reads the array endpoint regardless of
+// whether the first step is an audible note or a rest); in the v1
+// catalogue no chime opens with a rest so the answer collapses
+// transparently to "the leading audible step's duration" for
+// every entry that ships today. Distinct from peakNoteDurationMs
+// (audible-step CEILING), troughNoteDurationMs (audible-step
+// FLOOR), meanNoteDurationMs (audible-step CENTRE),
+// audibleDurationMs (audible-step SUM), durationMs (TOTAL incl.
+// audible + rests + gaps), restDurationMs / gapTotalMs / gapMs
+// (per-component accessors) -- none of which can be inverted to
+// recover the catalogued leading-endpoint step-duration without
+// walking the catalogued Note* pointer at the call site. Cheap
+// O(1) struct field read; no engine interaction, no persisted
+// state, no per-call allocation; mirrors firstFreqHz(id) (S234)
+// exactly with durationMs substituted for freq. Header surface
+// grows by exactly one public symbol; the cpp adds a single
+// function next to the existing count / valid / name / melody /
+// play / tryPlay / isSilenced / durationMs / noteCount /
+// firstFreqHz / lastFreqHz / gapMs / loops / silhouette /
+// pitchSpanHz / peakFreqHz / troughFreqHz / meanFreqHz /
+// audibleNoteCount / restNoteCount / audibleDurationMs /
+// restDurationMs / gapTotalMs / meanNoteDurationMs /
+// peakNoteDurationMs / troughNoteDurationMs cluster.
+uint16_t PhoneSystemTones::firstNoteDurationMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	return m.notes[0].durationMs;
+}

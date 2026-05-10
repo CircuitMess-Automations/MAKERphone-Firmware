@@ -2718,6 +2718,74 @@ lowest-numbered `[ ]`.
   the same dedicated-symbol coverage as the pitch-axis trio
   (`peakFreqHz` / `troughFreqHz` / `meanFreqHz`).
 
+- [x] **S252** -- `PhoneSystemTones::firstNoteDurationMs(uint8_t id)`
+  structural first-note duration accessor -- returns the catalogued
+  duration in ms of the FIRST `PhoneRingtoneEngine::Note` entry in
+  the underlying Melody (`kMelodies[id].notes[0].durationMs`). The
+  duration-axis sibling of `firstFreqHz(id)` (S234) on the pitch
+  axis: where `firstFreqHz(id)` reports the catalogued LEADING
+  pitch the engine drives the piezo at, `firstNoteDurationMs(id)`
+  reports the catalogued LEADING step-duration the engine holds
+  that pitch for -- the first half of the structural-pair (LEADING,
+  TRAILING) on the duration axis that mirrors the pitch-axis
+  structural pair `firstFreqHz` / `lastFreqHz` (S234 / S235). So a
+  future "Settings -> Sounds -> System chimes" picker row caption
+  like "(opens 80 ms)" or a `PhoneDiagScreen` "Sound test" walk
+  that wants to render a leading-step-duration tick beside the
+  leading-pitch indicator can read a dedicated accessor for the
+  catalogued leading endpoint instead of walking the catalogued
+  `Note*` pointer at the call site. Returns 0 for an out-of-range
+  id and for the (currently impossible) empty-melody case -- the
+  same two "no answer" cases the structural-pair `firstFreqHz` /
+  `lastFreqHz` already collapse to 0, so a caller does not have
+  to special-case the empty / out-of-range melody before reading.
+  Like `firstFreqHz` / `lastFreqHz`, this is a STRUCTURAL accessor
+  (reads the array endpoint regardless of whether the first step
+  is an audible note or a rest); in the v1 catalogue no chime
+  opens with a rest so the answer collapses transparently to "the
+  leading audible step's duration" for every entry that ships
+  today. Distinct from `peakNoteDurationMs` (audible-step CEILING,
+  not leading endpoint), distinct from `troughNoteDurationMs`
+  (audible-step FLOOR, not leading endpoint), distinct from
+  `meanNoteDurationMs` (audible-step CENTRE, not leading endpoint),
+  distinct from `audibleDurationMs` (audible-step SUM, not leading
+  endpoint), distinct from `durationMs` (TOTAL incl. audible +
+  rests + gaps), distinct from `restDurationMs` / `gapTotalMs` /
+  `gapMs` (per-component accessors) -- none of which can be
+  inverted to recover the catalogued leading-endpoint step-duration
+  without walking the catalogued `Note*` pointer at the call site.
+  Distinct from `PhoneRingtoneEngine::isPlaying()` / `currentFreq()`
+  (the S191 live-piezo accessors that report runtime playback
+  state, not catalogued shape). Profile-state INDEPENDENT: the
+  catalogued leading step-duration is the same on SILENT / MEETING
+  profiles as on GENERAL / OUTDOOR / HEADSET (the S231 `tryPlay(id)`
+  gate already reports the silenced answer separately for any
+  caller that wants to fade the row caption into a "(silenced)"
+  form). Cheap O(1) struct field read; no engine interaction, no
+  persisted state, no per-call allocation; mirrors
+  `firstFreqHz(id)` (S234) exactly with `durationMs` substituted
+  for `freq`. Header surface grows by exactly one public symbol
+  (`static uint16_t firstNoteDurationMs`); the cpp adds a single
+  function next to the existing `count` / `valid` / `name` /
+  `melody` / `play` / `tryPlay` / `isSilenced` / `durationMs` /
+  `noteCount` / `firstFreqHz` / `lastFreqHz` / `gapMs` / `loops` /
+  `silhouette` / `pitchSpanHz` / `peakFreqHz` / `troughFreqHz` /
+  `meanFreqHz` / `audibleNoteCount` / `restNoteCount` /
+  `audibleDurationMs` / `restDurationMs` / `gapTotalMs` /
+  `meanNoteDurationMs` / `peakNoteDurationMs` /
+  `troughNoteDurationMs` cluster. No new includes, no new const
+  data, no new SPIFFS asset cost. Every existing call site of the
+  catalogue keeps byte-identical behaviour -- the new helper is
+  purely additive. Opens the duration-axis structural-endpoint
+  pair foreshadowed by the S251 commit body's "duration-axis
+  (CEILING, FLOOR, CENTRE) trio now has the same dedicated-symbol
+  coverage as the pitch-axis trio" framing -- the duration-axis
+  LEADING ENDPOINT now has its own accessor, and the natural
+  follow-up is the trailing-endpoint sibling
+  (`lastNoteDurationMs(id)`) to close out the (LEADING, TRAILING)
+  structural pair on the duration axis.
+
+
 
 ---
 

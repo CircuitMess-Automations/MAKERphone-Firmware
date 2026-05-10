@@ -1665,6 +1665,90 @@ public:
 	 * helper is purely additive.
 	 */
 	static uint16_t troughNoteDurationMs(uint8_t id);
+	/**
+	 * S252 - structural first-note duration accessor for chime
+	 * `id`. Returns the catalogued duration in ms of the FIRST
+	 * `PhoneRingtoneEngine::Note` entry in the underlying Melody
+	 * (i.e. `kMelodies[id].notes[0].durationMs`). The duration-axis
+	 * sibling of `firstFreqHz(id)` (S234) on the pitch axis -- where
+	 * `firstFreqHz(id)` reports the catalogued LEADING pitch the
+	 * engine drives the piezo at on the first audible step,
+	 * `firstNoteDurationMs(id)` reports the catalogued LEADING
+	 * step-duration the engine holds that pitch for. Returns 0 for
+	 * an out-of-range id and for the (currently impossible)
+	 * empty-melody case -- the same two "no answer" cases the
+	 * structural-pair `firstFreqHz` / `lastFreqHz` already collapse
+	 * to 0, so a caller does not have to special-case the empty /
+	 * out-of-range melody before reading.
+	 *
+	 * Distinct from `peakNoteDurationMs` (audible-step CEILING, not
+	 * leading endpoint), distinct from `troughNoteDurationMs`
+	 * (audible-step FLOOR, not leading endpoint), distinct from
+	 * `meanNoteDurationMs` (audible-step CENTRE, not leading
+	 * endpoint), distinct from `audibleDurationMs` (audible-step
+	 * SUM, not leading endpoint), distinct from `durationMs` (TOTAL
+	 * incl. audible + rests + gaps), distinct from `restDurationMs`
+	 * (rest-step component in isolation), distinct from
+	 * `gapTotalMs` (inter-step gap component in isolation), and
+	 * distinct from `gapMs` (per-step filler in isolation, not
+	 * leading audible step). Like `firstFreqHz(id)` /
+	 * `lastFreqHz(id)`, this is a STRUCTURAL accessor (it reads the
+	 * array endpoint regardless of whether the first step is an
+	 * audible note or a rest) -- in the v1 catalogue no chime opens
+	 * with a rest so the answer collapses transparently to "the
+	 * leading audible step's duration" for every entry that ships
+	 * today. Foreshadowed by the duration cluster's progressive
+	 * build-up: `audibleDurationMs(id)` (S246) reports the audible-
+	 * step SUM, `audibleNoteCount(id)` (S243) reports the audible-
+	 * step COUNT, `meanNoteDurationMs(id)` (S249) collapses the
+	 * SUM/COUNT pair into a per-step CENTRE, `peakNoteDurationMs(id)`
+	 * (S250) reports the per-step CEILING, `troughNoteDurationMs(id)`
+	 * (S251) reports the per-step FLOOR, and `firstNoteDurationMs(id)`
+	 * reports the LEADING ENDPOINT -- the first half of the
+	 * structural-pair (LEADING, TRAILING) that mirrors the pitch-axis
+	 * structural pair `firstFreqHz` / `lastFreqHz` (S234 / S235).
+	 *
+	 * So a future "Settings -> Sounds -> System chimes" picker row
+	 * caption like "(opens 80 ms)" or a `PhoneDiagScreen` "Sound
+	 * test" walk that wants to render a leading-step-duration tick
+	 * beside the leading-pitch indicator can read a dedicated
+	 * accessor for the catalogued leading endpoint instead of
+	 * walking the catalogued `Note*` pointer at the call site or
+	 * pulling the answer out of the per-step CEILING / FLOOR /
+	 * CENTRE accessors that already exist (those report the
+	 * extrema across all audible steps, not the catalogued leading
+	 * step). Profile-state INDEPENDENT: the catalogued leading
+	 * step-duration is the same on SILENT / MEETING profiles as on
+	 * GENERAL / OUTDOOR / HEADSET (the S231 `tryPlay(id)` gate
+	 * already reports the silenced answer separately for any caller
+	 * that wants to fade the row caption into a "(silenced)" form).
+	 *
+	 * Distinct from `PhoneRingtoneEngine::isPlaying()` /
+	 * `currentFreq()` (the S191 live-piezo accessors that report
+	 * runtime playback state, not catalogued shape) -- both are
+	 * useful and live at different layers, neither subsumes the
+	 * other.
+	 *
+	 * Cheap O(1) struct field read; no engine interaction, no
+	 * persisted state, no per-call allocation; mirrors the existing
+	 * `firstFreqHz(id)` (S234) implementation pattern with
+	 * `durationMs` substituted for `freq`. Header surface grows by
+	 * exactly one public symbol (`static uint16_t
+	 * firstNoteDurationMs`); the cpp adds a single function next
+	 * to the existing `count` / `valid` / `name` / `melody` /
+	 * `play` / `tryPlay` / `isSilenced` / `durationMs` /
+	 * `noteCount` / `firstFreqHz` / `lastFreqHz` / `gapMs` /
+	 * `loops` / `silhouette` / `pitchSpanHz` / `peakFreqHz` /
+	 * `troughFreqHz` / `meanFreqHz` / `audibleNoteCount` /
+	 * `restNoteCount` / `audibleDurationMs` / `restDurationMs` /
+	 * `gapTotalMs` / `meanNoteDurationMs` / `peakNoteDurationMs` /
+	 * `troughNoteDurationMs` cluster. No new includes, no new const
+	 * data, no new SPIFFS asset cost. Every existing call site of
+	 * the catalogue keeps byte-identical behaviour -- the new
+	 * helper is purely additive.
+	 */
+	static uint16_t firstNoteDurationMs(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H
+
