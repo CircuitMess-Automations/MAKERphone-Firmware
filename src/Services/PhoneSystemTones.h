@@ -1578,6 +1578,93 @@ public:
 	 * the new helper is purely additive.
 	 */
 	static uint16_t peakNoteDurationMs(uint8_t id);
+
+	/**
+	 * S251 - derived per-audible-step minimum-duration accessor for
+	 * chime `id`. Returns the shortest catalogued audible-step
+	 * `durationMs` value the engine holds the piezo at a tone for,
+	 * in ms. Where `audibleDurationMs(id)` (S246) reports the SUM of
+	 * the catalogued audible-step durations, `audibleNoteCount(id)`
+	 * (S243) reports the COUNT of those steps,
+	 * `meanNoteDurationMs(id)` (S249) collapses the SUM/COUNT pair
+	 * into a per-step CENTRE, and `peakNoteDurationMs(id)` (S250)
+	 * reports the per-step CEILING, `troughNoteDurationMs(id)`
+	 * reports the per-step FLOOR -- the duration-axis sibling of
+	 * `troughFreqHz(id)` (S241) on the pitch axis, completing the
+	 * duration-axis (CEILING, FLOOR, CENTRE) trio that mirrors the
+	 * pitch-axis (CEILING, FLOOR, CENTRE) trio of S240 / S241 /
+	 * S242.
+	 *
+	 * So a future "Settings -> Sounds -> System chimes" picker row
+	 * caption like "(3 notes, 60-80 ms each, ~70 ms mean)" can read
+	 * a dedicated accessor for the per-audible-step floor instead of
+	 * walking the catalogued `Note*` pointer at the call site or
+	 * computing the minimum via a per-row accumulator in the picker.
+	 *
+	 * Returns 0 for an out-of-range id, for the (currently
+	 * impossible) empty-melody case, and for the all-rests-melody
+	 * case (where `audibleNoteCount(id) == 0`, no audible step
+	 * exists, and the floor is undefined) -- the same three "no
+	 * answer" cases the pitch-axis trio `peakFreqHz` (S240) /
+	 * `troughFreqHz` (S241) / `meanFreqHz` (S242) and the
+	 * duration-axis CENTRE / CEILING pair `meanNoteDurationMs`
+	 * (S249) / `peakNoteDurationMs` (S250) already collapse to 0.
+	 *
+	 * Saturates at `0xFFFF` ms (the same uint16_t ceiling the
+	 * duration cluster `durationMs` / `audibleDurationMs` /
+	 * `restDurationMs` / `gapTotalMs` / `meanNoteDurationMs` /
+	 * `peakNoteDurationMs` already share); since the catalogued
+	 * per-step duration is itself a uint16_t the cap is in practice
+	 * unreachable, but the saturate-on-overflow guard keeps the
+	 * return type honest.
+	 *
+	 * Distinct from `peakNoteDurationMs` (audible-step CEILING, not
+	 * floor), distinct from `meanNoteDurationMs` (audible-step
+	 * CENTRE, not floor), distinct from `audibleDurationMs`
+	 * (audible-step SUM, not floor), distinct from `durationMs`
+	 * (TOTAL incl. audible + rests + gaps), distinct from
+	 * `restDurationMs` (rest-step component in isolation), distinct
+	 * from `gapTotalMs` (inter-step gap component in isolation),
+	 * distinct from `gapMs` (per-step filler in isolation, not
+	 * per-step audible floor), distinct from `noteCount` /
+	 * `audibleNoteCount` / `restNoteCount` (catalogued step COUNTS,
+	 * not durations), and distinct from
+	 * `PhoneRingtoneEngine::isPlaying()` / `currentFreq()` (the
+	 * S191 live-piezo accessors that report runtime playback state,
+	 * not catalogued shape). Profile-state INDEPENDENT: the
+	 * catalogued per-audible-step floor is the same on SILENT /
+	 * MEETING profiles as on GENERAL / OUTDOOR / HEADSET (the S231
+	 * `tryPlay(id)` gate already reports the silenced answer
+	 * separately for any caller that wants to fade the row caption
+	 * into a "(silenced)" form).
+	 *
+	 * Cheap O(notes) linear scan with a single uint16_t running min
+	 * guarded by a `found` sentinel -- mirroring `troughFreqHz(id)`
+	 * (S241) exactly with `<` substituted for `>` and a `found`
+	 * flag because there is no natural starting value for a min-
+	 * search across uint16_t -- and it skips rest steps (`freq ==
+	 * 0`) so the floor reports the shortest AUDIBLE step rather
+	 * than the shortest catalogued step, matching the rest-skipping
+	 * rule the pitch-axis trio `peakFreqHz` / `troughFreqHz` /
+	 * `meanFreqHz` and the duration-axis centre/ceiling pair
+	 * `meanNoteDurationMs` / `peakNoteDurationMs` already use; no
+	 * per-call allocation, no recursion into the existing
+	 * `audibleDurationMs` / `audibleNoteCount` /
+	 * `meanNoteDurationMs` / `peakNoteDurationMs` accessors. Header
+	 * surface grows by exactly one public symbol; the cpp adds a
+	 * single function next to the existing `count` / `valid` /
+	 * `name` / `melody` / `play` / `tryPlay` / `isSilenced` /
+	 * `durationMs` / `noteCount` / `firstFreqHz` / `lastFreqHz` /
+	 * `gapMs` / `loops` / `silhouette` / `pitchSpanHz` /
+	 * `peakFreqHz` / `troughFreqHz` / `meanFreqHz` /
+	 * `audibleNoteCount` / `restNoteCount` / `audibleDurationMs` /
+	 * `restDurationMs` / `gapTotalMs` / `meanNoteDurationMs` /
+	 * `peakNoteDurationMs` cluster. No new includes, no new const
+	 * data, no new SPIFFS asset cost. Every existing call site of
+	 * the catalogue keeps byte-identical behaviour -- the new
+	 * helper is purely additive.
+	 */
+	static uint16_t troughNoteDurationMs(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H
