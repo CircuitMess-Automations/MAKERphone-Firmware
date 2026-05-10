@@ -1242,3 +1242,39 @@ uint16_t PhoneSystemTones::lastNoteDurationMs(uint8_t id){
 	if(m.notes == nullptr || m.count == 0) return 0;
 	return m.notes[m.count - 1].durationMs;
 }
+
+// S254 - derived catalogue-wide endpoint-magnitude accessor on the
+// DURATION axis for chime `id`. Mirrors pitchSpanHz(id) (S239)
+// exactly with durationMs substituted for freq and the S252 / S253
+// duration-endpoint pair (firstNoteDurationMs / lastNoteDurationMs)
+// substituted for the S234 / S235 pitch-endpoint pair (firstFreqHz
+// / lastFreqHz). Returns the unsigned absolute difference, in ms,
+// between the catalogued LEADING step-duration and the catalogued
+// TRAILING step-duration of the underlying Melody. Returns 0 for
+// an out-of-range id (firstNoteDurationMs / lastNoteDurationMs
+// already collapse to 0 there) and -- naturally -- for any chime
+// whose leading and trailing step-durations are equal. Closes the
+// derived endpoint-magnitude axis on the duration side at full
+// symmetry with the pitch side. Cheap O(1): two struct field reads
+// and one subtraction, no engine interaction, no allocation.
+// Distinct from peakNoteDurationMs / troughNoteDurationMs /
+// meanNoteDurationMs (audible-step CEILING / FLOOR / CENTRE across
+// every step, not the structural endpoint magnitude), distinct
+// from audibleDurationMs / restDurationMs / gapTotalMs (per-
+// component sums), distinct from durationMs (TOTAL), distinct
+// from firstNoteDurationMs / lastNoteDurationMs (the structural
+// endpoints themselves), distinct from pitchSpanHz (pitch axis,
+// not duration axis). Lives next to the existing count / valid /
+// name / melody / play / tryPlay / isSilenced / durationMs /
+// noteCount / firstFreqHz / lastFreqHz / gapMs / loops /
+// silhouette / pitchSpanHz / peakFreqHz / troughFreqHz /
+// meanFreqHz / audibleNoteCount / restNoteCount /
+// audibleDurationMs / restDurationMs / gapTotalMs /
+// meanNoteDurationMs / peakNoteDurationMs / troughNoteDurationMs
+// / firstNoteDurationMs / lastNoteDurationMs cluster.
+uint16_t PhoneSystemTones::durationSpanMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const uint16_t first = firstNoteDurationMs(id);
+	const uint16_t last  = lastNoteDurationMs(id);
+	return (first > last) ? (uint16_t)(first - last) : (uint16_t)(last - first);
+}

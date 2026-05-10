@@ -2864,6 +2864,74 @@ lowest-numbered `[ ]`.
   structural endpoint pair, bringing the duration axis to full
   symmetry with the pitch axis at the structural-accessor layer.
 
+- [x] **S254** -- `PhoneSystemTones::durationSpanMs(uint8_t id)`
+  derived catalogue-wide endpoint-magnitude accessor on the
+  DURATION axis. Returns the unsigned absolute difference, in ms,
+  between the catalogued LEADING step-duration and the catalogued
+  TRAILING step-duration of the underlying Melody --
+  `|firstNoteDurationMs(id) - lastNoteDurationMs(id)|`. The
+  duration-axis sibling of `pitchSpanHz(id)` (S239) on the pitch
+  axis: where `pitchSpanHz(id)` reports the magnitude of the
+  (LEADING, TRAILING) pitch-endpoint pair so a caller can render
+  a pitch-shape height tick without re-deriving the answer at
+  every call site, `durationSpanMs(id)` reports the magnitude of
+  the (LEADING, TRAILING) duration-endpoint pair so the same
+  caller can render a tempo-shape height tick on the duration
+  axis. Builds directly on the S252 / S253 pair
+  (`firstNoteDurationMs` / `lastNoteDurationMs`) that just closed
+  the structural endpoint pair on the duration axis; S254
+  promotes that pair to a derived MAGNITUDE accessor in the same
+  way S239 promoted the S234 / S235 pitch endpoint pair to
+  `pitchSpanHz`. The duration-axis structural / derived shape now
+  matches the pitch-axis structural / derived shape exactly:
+  `firstFreqHz` / `lastFreqHz` (S234 / S235) <->
+  `firstNoteDurationMs` / `lastNoteDurationMs` (S252 / S253) at
+  the structural-endpoint layer, and `pitchSpanHz` (S239) <->
+  `durationSpanMs` (S254) at the derived endpoint-magnitude
+  layer. So a future "Settings -> Sounds -> System chimes"
+  picker row caption like "(opens 60 ms longer than it closes)"
+  or a `PhoneDiagScreen` "Sound test" walk that wants to render
+  a tempo-shape glyph (rising tempo / falling tempo / level
+  tempo) alongside the pitch-shape glyph already powered by
+  `silhouette(id)` / `pitchSpanHz(id)` can read a dedicated
+  derived accessor for the duration-axis endpoint magnitude
+  instead of computing `abs(firstNoteDurationMs(id) -
+  lastNoteDurationMs(id))` at the call site. Returns 0 for an
+  out-of-range id (collapsing transparently because both
+  endpoint accessors already collapse to 0 there), for the
+  (currently impossible) empty-melody case, and naturally for
+  any chime whose leading and trailing step-durations are equal.
+  Distinct from `peakNoteDurationMs` / `troughNoteDurationMs`
+  (audible-step CEILING / FLOOR across every step, not the
+  structural endpoints), distinct from `meanNoteDurationMs`
+  (audible-step CENTRE), distinct from `audibleDurationMs` /
+  `restDurationMs` / `gapTotalMs` (per-component sums),
+  distinct from `durationMs` (TOTAL incl. all components),
+  distinct from `firstNoteDurationMs` / `lastNoteDurationMs`
+  (the catalogued endpoints themselves), distinct from
+  `pitchSpanHz` (pitch axis, not duration axis). Profile-state
+  INDEPENDENT: the catalogued endpoint magnitude is the same on
+  SILENT / MEETING profiles as on GENERAL / OUTDOOR / HEADSET.
+  Cheap O(1): two struct field reads + one subtraction; no
+  engine interaction, no persisted state, no per-call
+  allocation; mirrors `pitchSpanHz(id)` (S239) exactly with
+  `durationMs` substituted for `freq`. Header surface grows by
+  exactly one public symbol (`static uint16_t durationSpanMs`);
+  the cpp adds a single function next to the existing `count` /
+  `valid` / `name` / `melody` / `play` / `tryPlay` /
+  `isSilenced` / `durationMs` / `noteCount` / `firstFreqHz` /
+  `lastFreqHz` / `gapMs` / `loops` / `silhouette` /
+  `pitchSpanHz` / `peakFreqHz` / `troughFreqHz` / `meanFreqHz`
+  / `audibleNoteCount` / `restNoteCount` / `audibleDurationMs`
+  / `restDurationMs` / `gapTotalMs` / `meanNoteDurationMs` /
+  `peakNoteDurationMs` / `troughNoteDurationMs` /
+  `firstNoteDurationMs` / `lastNoteDurationMs` cluster. No new
+  includes, no new const data, no new SPIFFS asset cost. Every
+  existing call site of the catalogue keeps byte-identical
+  behaviour -- the new helper is purely additive. Closes the
+  derived endpoint-magnitude axis on the duration side at full
+  symmetry with the pitch side.
+
 
 
 ---
