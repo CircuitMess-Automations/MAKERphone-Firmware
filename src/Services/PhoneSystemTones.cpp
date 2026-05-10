@@ -1338,3 +1338,68 @@ uint16_t PhoneSystemTones::audiblePitchSpanHz(uint8_t id){
 	const uint16_t trough = troughFreqHz(id);
 	return (peak >= trough) ? (uint16_t)(peak - trough) : (uint16_t)(trough - peak);
 }
+
+// S256 -- derived audible-CEILING-FLOOR magnitude accessor on the
+// DURATION axis for chime `id`. Returns the unsigned absolute
+// difference, in milliseconds, between the catalogued audible
+// CEILING note duration and the catalogued audible FLOOR note
+// duration of the underlying Melody --
+// peakNoteDurationMs(id) - troughNoteDurationMs(id) (always
+// non-negative by construction, since peakNoteDurationMs is a
+// max-search and troughNoteDurationMs is a min-search across the
+// same audible-step subset, so peak >= trough is invariant). The
+// audible-axis duration sibling of durationSpanMs(id) (S254) on
+// the structural-endpoint axis: where durationSpanMs reports the
+// magnitude of the (LEADING, TRAILING) STRUCTURAL endpoint pair,
+// S256 reports the magnitude of the (CEILING, FLOOR) AUDIBLE
+// envelope, so a future PhoneDiagScreen "Sound test" walk that
+// wants to render the audible-duration range of a cue (full
+// horizontal extent of a duration-bar between longest-note tick
+// and shortest-note tick) or a future "Settings -> Sounds ->
+// System chimes" picker row caption like "(spans 320 ms)" can
+// read a dedicated derived accessor for the audible-axis
+// envelope magnitude instead of computing
+// peakNoteDurationMs(id) - troughNoteDurationMs(id) at the call
+// site. Returns 0 for an out-of-range id (collapsing
+// transparently because both peakNoteDurationMs(id) and
+// troughNoteDurationMs(id) already collapse to 0 there), for the
+// (currently impossible) empty-melody case, for the (currently
+// impossible) all-rests-melody case (both sides collapse to 0),
+// and -- naturally -- for any flat-duration chime whose audible
+// CEILING and FLOOR note durations coincide (every audible step
+// lasts the same number of milliseconds). Distinct from
+// durationSpanMs (structural endpoint magnitude, not audible
+// CEILING / FLOOR magnitude), distinct from peakNoteDurationMs /
+// troughNoteDurationMs (catalogued CEILING / FLOOR themselves),
+// distinct from meanNoteDurationMs (audible-step CENTRE),
+// distinct from firstNoteDurationMs / lastNoteDurationMs
+// (structural endpoints, not audible bounds), distinct from
+// audiblePitchSpanHz (pitch axis, not duration axis), distinct
+// from audibleDurationMs (audible-step duration TOTAL), distinct
+// from silhouette (signed tilt sign). Profile-state INDEPENDENT:
+// catalogued audible envelope magnitude is the same on SILENT /
+// MEETING profiles as on GENERAL / OUTDOOR / HEADSET. Cheap
+// O(notes): the two helpers each do a single linear scan with a
+// uint16_t accumulator; total work is two passes plus one
+// subtraction, no engine interaction, no persisted state, no
+// per-call allocation; mirrors audiblePitchSpanHz(id) (S255)
+// exactly with peakNoteDurationMs / troughNoteDurationMs
+// substituted for peakFreqHz / troughFreqHz. Lives next to the
+// existing count / valid / name / melody / play / tryPlay /
+// isSilenced / durationMs / noteCount / firstFreqHz / lastFreqHz
+// / gapMs / loops / silhouette / pitchSpanHz / peakFreqHz /
+// troughFreqHz / meanFreqHz / audibleNoteCount / restNoteCount /
+// audibleDurationMs / restDurationMs / gapTotalMs /
+// meanNoteDurationMs / peakNoteDurationMs / troughNoteDurationMs
+// / firstNoteDurationMs / lastNoteDurationMs / durationSpanMs /
+// audiblePitchSpanHz cluster. Closes the derived audible-
+// envelope-magnitude axis on the duration side at full symmetry
+// with the pitch side already closed by audiblePitchSpanHz,
+// completing the four-corner derived-magnitude grid (structural-
+// endpoint + audible-envelope on each axis).
+uint16_t PhoneSystemTones::audibleDurationSpanMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const uint16_t peak = peakNoteDurationMs(id);
+	const uint16_t trough = troughNoteDurationMs(id);
+	return (peak >= trough) ? (uint16_t)(peak - trough) : (uint16_t)(trough - peak);
+}

@@ -2014,6 +2014,113 @@ public:
 	 * is the natural follow-up).
 	 */
 	static uint16_t audiblePitchSpanHz(uint8_t id);
+
+	/**
+	 * S256 -- derived audible-CEILING-FLOOR magnitude accessor on
+	 * the DURATION axis for chime `id`. Returns the unsigned
+	 * absolute difference, in milliseconds, between the catalogued
+	 * audible CEILING note duration and the catalogued audible
+	 * FLOOR note duration of the underlying Melody --
+	 * `peakNoteDurationMs(id) - troughNoteDurationMs(id)` (always
+	 * non-negative by construction, since `peakNoteDurationMs` is
+	 * a max-search and `troughNoteDurationMs` is a min-search
+	 * across the same audible-step subset, so `peak >= trough` is
+	 * invariant). The audible-axis duration sibling of
+	 * `durationSpanMs(id)` (S254) on the structural-endpoint axis:
+	 * where `durationSpanMs(id)` reports the magnitude of the
+	 * (LEADING, TRAILING) STRUCTURAL endpoint pair --
+	 * `|firstNoteDurationMs(id) - lastNoteDurationMs(id)|` -- so
+	 * a caller can render an opens-vs-closes duration tick,
+	 * `audibleDurationSpanMs(id)` reports the magnitude of the
+	 * (CEILING, FLOOR) AUDIBLE envelope --
+	 * `peakNoteDurationMs(id) - troughNoteDurationMs(id)` -- so
+	 * the same caller can render an audible-duration-range tick
+	 * at the full envelope of the cue, not just at its structural
+	 * endpoints. Builds directly on the S250 / S251 pair
+	 * (`peakNoteDurationMs` / `troughNoteDurationMs`) that closed
+	 * the audible-CEILING / FLOOR pair on the duration axis; S256
+	 * promotes that pair to a derived MAGNITUDE accessor in the
+	 * same way S254 promoted the S252 / S253 endpoint pair
+	 * (`firstNoteDurationMs` / `lastNoteDurationMs`) to
+	 * `durationSpanMs`, and in the same way S239 promoted the
+	 * S234 / S235 pair (`firstFreqHz` / `lastFreqHz`) to
+	 * `pitchSpanHz` and S255 promoted the S240 / S241 pair
+	 * (`peakFreqHz` / `troughFreqHz`) to `audiblePitchSpanHz`.
+	 * The duration-axis structural / audible / derived shape now
+	 * matches the pitch-axis shape: `firstNoteDurationMs` /
+	 * `lastNoteDurationMs` (S252 / S253) at the structural
+	 * endpoints, `peakNoteDurationMs` / `troughNoteDurationMs`
+	 * (S250 / S251) at the audible CEILING / FLOOR,
+	 * `durationSpanMs` (S254) at the structural endpoint
+	 * magnitude, and now `audibleDurationSpanMs` (S256) at the
+	 * audible CEILING / FLOOR magnitude -- closing the symmetry
+	 * with the pitch axis, where `pitchSpanHz` (S239) and
+	 * `audiblePitchSpanHz` (S255) already cover the same two
+	 * derived corners. So a future `PhoneDiagScreen` "Sound test"
+	 * walk that wants to render the audible-duration range of a
+	 * cue (e.g. the full horizontal extent of a duration-bar
+	 * between longest-note tick and shortest-note tick) or a
+	 * future "Settings -> Sounds -> System chimes" picker row
+	 * caption like "(spans 320 ms)" can read a dedicated derived
+	 * accessor for the audible-axis envelope magnitude instead of
+	 * computing `peakNoteDurationMs(id) - troughNoteDurationMs(id)`
+	 * at the call site. Returns 0 for an out-of-range id
+	 * (collapsing transparently because both
+	 * `peakNoteDurationMs(id)` and `troughNoteDurationMs(id)`
+	 * already collapse to 0 there), for the (currently impossible)
+	 * empty-melody case, for the (currently impossible) all-rests-
+	 * melody case (both sides collapse to 0), and -- naturally --
+	 * for any flat-duration chime whose audible CEILING and FLOOR
+	 * note durations coincide (i.e. every audible step lasts the
+	 * same number of milliseconds). Distinct from `durationSpanMs`
+	 * (structural endpoint magnitude on the duration axis, not
+	 * audible CEILING / FLOOR magnitude), distinct from
+	 * `peakNoteDurationMs` / `troughNoteDurationMs` (the catalogued
+	 * CEILING / FLOOR themselves, not the magnitude between them),
+	 * distinct from `meanNoteDurationMs` (audible-step CENTRE,
+	 * not envelope magnitude), distinct from `firstNoteDurationMs`
+	 * / `lastNoteDurationMs` (structural endpoints, not audible
+	 * bounds), distinct from `audiblePitchSpanHz` (pitch axis,
+	 * not duration axis), distinct from `audibleDurationMs`
+	 * (audible-step duration TOTAL, not envelope magnitude),
+	 * distinct from `silhouette` (signed tilt sign, not absolute
+	 * audible magnitude). Profile-state INDEPENDENT: the
+	 * catalogued audible envelope magnitude is the same on SILENT
+	 * / MEETING profiles as on GENERAL / OUTDOOR / HEADSET (the
+	 * S231 `tryPlay(id)` gate already reports the silenced answer
+	 * separately for any caller that wants to fade the row caption
+	 * into a "(silenced)" form). Cheap O(notes): two linear scans
+	 * (one max, one min, mirroring the S250 / S251 implementations
+	 * exactly) plus one subtraction; no engine interaction, no
+	 * persisted state, no per-call allocation; mirrors
+	 * `audiblePitchSpanHz(id)` (S255) exactly with
+	 * `peakNoteDurationMs` / `troughNoteDurationMs` substituted
+	 * for `peakFreqHz` / `troughFreqHz`. Header surface grows by
+	 * exactly one public symbol (`static uint16_t
+	 * audibleDurationSpanMs`); the cpp adds a single function
+	 * next to the existing `count` / `valid` / `name` / `melody` /
+	 * `play` / `tryPlay` / `isSilenced` / `durationMs` /
+	 * `noteCount` / `firstFreqHz` / `lastFreqHz` / `gapMs` /
+	 * `loops` / `silhouette` / `pitchSpanHz` / `peakFreqHz` /
+	 * `troughFreqHz` / `meanFreqHz` / `audibleNoteCount` /
+	 * `restNoteCount` / `audibleDurationMs` / `restDurationMs` /
+	 * `gapTotalMs` / `meanNoteDurationMs` / `peakNoteDurationMs` /
+	 * `troughNoteDurationMs` / `firstNoteDurationMs` /
+	 * `lastNoteDurationMs` / `durationSpanMs` /
+	 * `audiblePitchSpanHz` cluster. No new includes, no new const
+	 * data, no new SPIFFS asset cost. Every existing call site of
+	 * the catalogue keeps byte-identical behaviour -- the new
+	 * helper is purely additive. Closes the derived audible-
+	 * envelope-magnitude axis on the duration side at full
+	 * symmetry with the pitch side already closed by
+	 * `audiblePitchSpanHz`; the duration axis now has its derived
+	 * endpoint-magnitude accessor (`durationSpanMs`) AND its
+	 * derived audible-envelope-magnitude accessor
+	 * (`audibleDurationSpanMs`), bringing the duration axis level
+	 * with the pitch axis at the four-corner derived-magnitude
+	 * grid (structural-endpoint + audible-envelope on each axis).
+	 */
+	static uint16_t audibleDurationSpanMs(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H
