@@ -1192,3 +1192,53 @@ uint16_t PhoneSystemTones::firstNoteDurationMs(uint8_t id){
 	if(m.notes == nullptr || m.count == 0) return 0;
 	return m.notes[0].durationMs;
 }
+
+// S253 - structural last-note duration accessor for chime `id`.
+// Returns the catalogued duration in ms of the LAST
+// PhoneRingtoneEngine::Note entry in the underlying Melody
+// (kMelodies[id].notes[m.count - 1].durationMs). The trailing-
+// endpoint sibling of firstNoteDurationMs(id) (S252) on the
+// duration axis, and the duration-axis sibling of lastFreqHz(id)
+// (S235) on the pitch axis -- where lastFreqHz reports the
+// catalogued trailing pitch the engine drives the piezo at on the
+// final audible step, lastNoteDurationMs reports the catalogued
+// trailing step-duration the engine holds that pitch for. With
+// S252 it closes the duration-axis structural pair (LEADING,
+// TRAILING) so the duration axis now matches the pitch axis
+// exactly: firstFreqHz / lastFreqHz on the pitch axis <->
+// firstNoteDurationMs / lastNoteDurationMs on the duration axis.
+// Returns 0 for an out-of-range id and for the (currently
+// impossible) empty-melody case -- the same two "no answer" cases
+// the structural-pair firstFreqHz / lastFreqHz / firstNoteDurationMs
+// already collapse to 0. Like firstFreqHz / lastFreqHz /
+// firstNoteDurationMs this is a STRUCTURAL accessor (reads the
+// array endpoint regardless of whether the last step is an
+// audible note or a rest); in the v1 catalogue no chime closes
+// with a rest so the answer collapses transparently to "the
+// trailing audible step's duration" for every entry that ships
+// today. Distinct from firstNoteDurationMs (LEADING endpoint),
+// peakNoteDurationMs (audible-step CEILING), troughNoteDurationMs
+// (audible-step FLOOR), meanNoteDurationMs (audible-step CENTRE),
+// audibleDurationMs (audible-step SUM), durationMs (TOTAL incl.
+// audible + rests + gaps), restDurationMs / gapTotalMs / gapMs
+// (per-component accessors) -- none of which can be inverted to
+// recover the catalogued trailing-endpoint step-duration without
+// walking the catalogued Note* pointer at the call site. Cheap
+// O(1) struct field read; no engine interaction, no persisted
+// state, no per-call allocation; mirrors lastFreqHz(id) (S235)
+// exactly with durationMs substituted for freq. Header surface
+// grows by exactly one public symbol; the cpp adds a single
+// function next to the existing count / valid / name / melody /
+// play / tryPlay / isSilenced / durationMs / noteCount /
+// firstFreqHz / lastFreqHz / gapMs / loops / silhouette /
+// pitchSpanHz / peakFreqHz / troughFreqHz / meanFreqHz /
+// audibleNoteCount / restNoteCount / audibleDurationMs /
+// restDurationMs / gapTotalMs / meanNoteDurationMs /
+// peakNoteDurationMs / troughNoteDurationMs / firstNoteDurationMs
+// cluster.
+uint16_t PhoneSystemTones::lastNoteDurationMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	return m.notes[m.count - 1].durationMs;
+}

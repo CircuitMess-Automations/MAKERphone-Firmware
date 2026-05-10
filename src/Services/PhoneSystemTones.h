@@ -1748,6 +1748,101 @@ public:
 	 * helper is purely additive.
 	 */
 	static uint16_t firstNoteDurationMs(uint8_t id);
+
+	/**
+	 * S253 -- Structural last-note duration accessor for chime
+	 * `id`. Returns the catalogued duration in ms of the LAST
+	 * `PhoneRingtoneEngine::Note` entry in the underlying Melody
+	 * (i.e. `kMelodies[id].notes[m.count - 1].durationMs`). The
+	 * trailing-endpoint sibling of `firstNoteDurationMs(id)` (S252)
+	 * on the duration axis, and the duration-axis sibling of
+	 * `lastFreqHz(id)` (S235) on the pitch axis -- where
+	 * `lastFreqHz(id)` reports the catalogued TRAILING pitch the
+	 * engine drives the piezo at on the final audible step,
+	 * `lastNoteDurationMs(id)` reports the catalogued TRAILING
+	 * step-duration the engine holds that pitch for. With S252 it
+	 * closes the duration-axis structural pair (LEADING, TRAILING)
+	 * so the duration axis now matches the pitch axis exactly:
+	 * `firstFreqHz` / `lastFreqHz` (S234 / S235) on the pitch axis
+	 * <-> `firstNoteDurationMs` / `lastNoteDurationMs` (S252 /
+	 * S253) on the duration axis. Returns 0 for an out-of-range id
+	 * and for the (currently impossible) empty-melody case -- the
+	 * same two "no answer" cases the structural-pair `firstFreqHz`
+	 * / `lastFreqHz` and `firstNoteDurationMs` already collapse to
+	 * 0, so a caller does not have to special-case the empty /
+	 * out-of-range melody before reading.
+	 *
+	 * Distinct from `firstNoteDurationMs` (LEADING endpoint, not
+	 * trailing), distinct from `peakNoteDurationMs` (audible-step
+	 * CEILING, not trailing endpoint), distinct from
+	 * `troughNoteDurationMs` (audible-step FLOOR, not trailing
+	 * endpoint), distinct from `meanNoteDurationMs` (audible-step
+	 * CENTRE, not trailing endpoint), distinct from
+	 * `audibleDurationMs` (audible-step SUM, not trailing endpoint),
+	 * distinct from `durationMs` (TOTAL incl. audible + rests +
+	 * gaps), distinct from `restDurationMs` (rest-step component
+	 * in isolation), distinct from `gapTotalMs` (inter-step gap
+	 * component in isolation), and distinct from `gapMs` (per-step
+	 * filler in isolation, not trailing audible step). Like
+	 * `firstFreqHz(id)` / `lastFreqHz(id)` / `firstNoteDurationMs(id)`,
+	 * this is a STRUCTURAL accessor (it reads the array endpoint
+	 * regardless of whether the last step is an audible note or a
+	 * rest) -- in the v1 catalogue no chime closes with a rest so
+	 * the answer collapses transparently to "the trailing audible
+	 * step's duration" for every entry that ships today.
+	 *
+	 * So a future "Settings -> Sounds -> System chimes" picker row
+	 * caption like "(closes 120 ms)" or a `PhoneDiagScreen` "Sound
+	 * test" walk that wants to render a trailing-step-duration tick
+	 * beside the trailing-pitch indicator can read a dedicated
+	 * accessor for the catalogued trailing endpoint instead of
+	 * walking the catalogued `Note*` pointer at the call site or
+	 * pulling the answer out of the per-step CEILING / FLOOR /
+	 * CENTRE accessors that already exist (those report the
+	 * extrema across all audible steps, not the catalogued trailing
+	 * step). The (LEADING, TRAILING) pair on the duration axis
+	 * also lets a caller compute a per-chime step-duration
+	 * direction sign (open-vs-close, "the chime accelerates" /
+	 * "the chime decelerates" / "the chime holds" tempo silhouette)
+	 * the same way the (LEADING, TRAILING) pair on the pitch axis
+	 * already powers the rising / falling / level pitch silhouette
+	 * via `silhouette(id)` (S237). Profile-state INDEPENDENT: the
+	 * catalogued trailing step-duration is the same on SILENT /
+	 * MEETING profiles as on GENERAL / OUTDOOR / HEADSET (the S231
+	 * `tryPlay(id)` gate already reports the silenced answer
+	 * separately for any caller that wants to fade the row caption
+	 * into a "(silenced)" form).
+	 *
+	 * Distinct from `PhoneRingtoneEngine::isPlaying()` /
+	 * `currentFreq()` (the S191 live-piezo accessors that report
+	 * runtime playback state, not catalogued shape) -- both are
+	 * useful and live at different layers, neither subsumes the
+	 * other.
+	 *
+	 * Cheap O(1) struct field read; no engine interaction, no
+	 * persisted state, no per-call allocation; mirrors the existing
+	 * `lastFreqHz(id)` (S235) implementation pattern with
+	 * `durationMs` substituted for `freq`. Header surface grows by
+	 * exactly one public symbol (`static uint16_t
+	 * lastNoteDurationMs`); the cpp adds a single function next
+	 * to the existing `count` / `valid` / `name` / `melody` /
+	 * `play` / `tryPlay` / `isSilenced` / `durationMs` /
+	 * `noteCount` / `firstFreqHz` / `lastFreqHz` / `gapMs` /
+	 * `loops` / `silhouette` / `pitchSpanHz` / `peakFreqHz` /
+	 * `troughFreqHz` / `meanFreqHz` / `audibleNoteCount` /
+	 * `restNoteCount` / `audibleDurationMs` / `restDurationMs` /
+	 * `gapTotalMs` / `meanNoteDurationMs` / `peakNoteDurationMs` /
+	 * `troughNoteDurationMs` / `firstNoteDurationMs` cluster. No
+	 * new includes, no new const data, no new SPIFFS asset cost.
+	 * Every existing call site of the catalogue keeps byte-
+	 * identical behaviour -- the new helper is purely additive.
+	 * Closes the duration-axis structural endpoint pair foreshadowed
+	 * by the S252 commit body's "the natural follow-up is the
+	 * trailing-endpoint sibling (`lastNoteDurationMs(id)`) to close
+	 * out the (LEADING, TRAILING) structural pair on the duration
+	 * axis" framing.
+	 */
+	static uint16_t lastNoteDurationMs(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H
