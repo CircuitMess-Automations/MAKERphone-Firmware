@@ -1403,3 +1403,71 @@ uint16_t PhoneSystemTones::audibleDurationSpanMs(uint8_t id){
 	const uint16_t trough = troughNoteDurationMs(id);
 	return (peak >= trough) ? (uint16_t)(peak - trough) : (uint16_t)(trough - peak);
 }
+
+// S257 - derived per-rest-step mean-duration accessor for chime
+// id. Returns the catalogued rest-step durations the engine holds
+// the piezo SILENT for (the sum restDurationMs(id) (S247) reports)
+// divided by the count of those rest steps (the count
+// restNoteCount(id) (S244) reports), i.e. the mean wall-clock
+// duration per REST catalogued step, in ms, rounded toward zero
+// by integer division. The rest-axis sibling of
+// meanNoteDurationMs(id) (S249) on the audible-step axis, exactly
+// how restDurationMs(id) (S247) is the rest-axis sibling of
+// audibleDurationMs(id) (S246) on the audible-step axis. Returns
+// 0 for an out-of-range id, for the (currently impossible) empty-
+// melody case, and for the no-rests-melody case (where
+// restNoteCount(id) == 0 and the divisor would be zero) -- so a
+// flat audible-only cue with no rests, or an out-of-range id,
+// collapse to the same 0 the catalogued rest-axis pair
+// restNoteCount (S244) / restDurationMs (S247) already collapse
+// to. Saturates at 0xFFFF ms (the same uint16_t ceiling the
+// duration cluster shares) so a picker row caption can render
+// the value as a four-digit integer without an int cast at the
+// call site. Distinct from restDurationMs (rest-step SUM in
+// isolation, not per-step centre), distinct from restNoteCount
+// (rest-step COUNT in isolation), distinct from meanNoteDurationMs
+// (audible-step CENTRE, not rest-step centre), distinct from
+// audibleDurationMs (audible-step SUM), distinct from durationMs
+// (TOTAL incl. audible + rests + gaps), distinct from gapTotalMs /
+// gapMs (inter-step filler component, not per-rest centre),
+// distinct from peakNoteDurationMs / troughNoteDurationMs
+// (audible-axis CEILING / FLOOR per-step extents, not rest-axis
+// CENTRE), distinct from firstNoteDurationMs / lastNoteDurationMs
+// (structural endpoints, not rest-step centre), distinct from
+// durationSpanMs / audibleDurationSpanMs (derived endpoint /
+// envelope MAGNITUDES on the audible-duration axis). Profile-
+// state INDEPENDENT: the catalogued per-rest-step mean is the
+// same on SILENT / MEETING profiles as on GENERAL / OUTDOOR /
+// HEADSET. Cheap O(notes) linear scan with two uint32_t
+// accumulators (rest-step duration sum + rest-step counter) and
+// one final divide-and-saturate; no per-call allocation, no
+// recursion into the existing restDurationMs / restNoteCount
+// accessors -- the loop fuses the two passes so the catalogued
+// Note* array is walked exactly once per call. Mirrors
+// meanNoteDurationMs(id) (S249) exactly with the rest-step
+// predicate (freq == 0) substituted for the audible-step
+// predicate (freq != 0). Lives next to the existing count /
+// valid / name / melody / play / tryPlay / isSilenced /
+// durationMs / noteCount / firstFreqHz / lastFreqHz / gapMs /
+// loops / silhouette / pitchSpanHz / peakFreqHz / troughFreqHz /
+// meanFreqHz / audibleNoteCount / restNoteCount /
+// audibleDurationMs / restDurationMs / gapTotalMs /
+// meanNoteDurationMs / peakNoteDurationMs / troughNoteDurationMs
+// / firstNoteDurationMs / lastNoteDurationMs / durationSpanMs /
+// audiblePitchSpanHz / audibleDurationSpanMs cluster.
+uint16_t PhoneSystemTones::meanRestDurationMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	uint32_t total = 0;
+	uint16_t rests = 0;
+	for(uint16_t i = 0; i < m.count; ++i){
+		if(m.notes[i].freq != 0) continue;
+		total += (uint32_t) m.notes[i].durationMs;
+		++rests;
+	}
+	if(rests == 0) return 0;
+	uint32_t mean = total / (uint32_t) rests;
+	if(mean > 0xFFFFU) return 0xFFFFU;
+	return (uint16_t) mean;
+}
