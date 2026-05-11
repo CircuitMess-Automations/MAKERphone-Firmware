@@ -3359,6 +3359,97 @@ public:
 	 * starting from the existing rest-axis pitch accessors.
 	 */
 	static uint16_t meanEnvelopeDurationMs(uint8_t id);
+
+	/**
+	 * S270 - derived structural-endpoint CENTRE accessor on the
+	 * AUDIBLE PITCH axis for chime `id`. Returns the arithmetic
+	 * mean, in Hz, of the catalogued structural-endpoint pair
+	 * (firstFreqHz(id), lastFreqHz(id)) of the underlying
+	 * Melody -- (firstFreqHz(id) + lastFreqHz(id)) / 2. The
+	 * pitch-axis sibling of meanNoteEndpointDurationMs(id)
+	 * (S265) on the duration axis: where S265 collapses the
+	 * (FIRST, LAST) structural-endpoint pair into a CENTRE-of-
+	 * ENDPOINTS scalar on the audible-step duration axis, S270
+	 * lifts the same collapse onto the audible PITCH axis. With
+	 * pitchSpanHz(id) (S239) already exposing the structural-
+	 * endpoint MAGNITUDE on the pitch axis, S270 closes the
+	 * (MAGNITUDE, CENTRE) pitch-axis structural-endpoint pair:
+	 * pitchSpanHz reports |first - last|, meanEndpointFreqHz
+	 * reports (first + last) / 2. The (firstFreqHz, lastFreqHz)
+	 * endpoint pair the picker already uses to render a rising
+	 * / falling / level direction arrow becomes a (CENTRE,
+	 * MAGNITUDE) pair through (meanEndpointFreqHz, pitchSpanHz),
+	 * letting a future "Settings -> Sounds -> System chimes"
+	 * picker row caption render "(endpoints centred at 880 Hz)"
+	 * or a future PhoneDiagScreen "Sound test" walk render a
+	 * TICK at the endpoint CENTRE of the catalogued pitch-bar
+	 * without recomputing (firstFreqHz(id) + lastFreqHz(id)) /
+	 * 2 at the call site. Opens the pitch-axis derived-metrics
+	 * surface that the S269 commit body foreshadowed as the
+	 * natural follow-up to closing the duration-axis 2x2 grid.
+	 *
+	 * Returns 0 for an out-of-range id, for the (currently
+	 * impossible) empty-melody case, and -- transparently --
+	 * for the (currently impossible) all-rests melody case
+	 * (where both firstFreqHz and lastFreqHz collapse to 0).
+	 * Returns the shared value for any chime whose first and
+	 * last note are the same pitch (every level-pitch cue --
+	 * Notify, Alert, SmsReceived, MenuOpen, MenuClose, TimerDone
+	 * -- the CENTRE of two equal scalars is that same scalar).
+	 * For ascending cues (first<last: Success, Unlock, Save,
+	 * NetworkOk, LevelUp, AlarmDismiss) and descending cues
+	 * (first>last: Error, Lock, CallEnd, DeleteItem, NetworkFail,
+	 * LowBattery) the answer is the catalogued midpoint between
+	 * the two endpoints. Profile-state INDEPENDENT: the
+	 * catalogued endpoint CENTRE is the same on SILENT / MEETING
+	 * profiles as on GENERAL / OUTDOOR / HEADSET, so a picker
+	 * can render the endpoint tick at construction time and
+	 * leave it unchanged when the user toggles profiles. Distinct
+	 * from `meanFreqHz` (S242) which reports the catalogued
+	 * audible-step arithmetic MEAN across ALL non-rest steps (an
+	 * N-step linear sum / N divide), not the two-endpoint
+	 * midpoint; distinct from `peakFreqHz` / `troughFreqHz`
+	 * (catalogued envelope CEILING / FLOOR, not the structural-
+	 * endpoint pair); distinct from `pitchSpanHz` (structural-
+	 * endpoint MAGNITUDE, not the CENTRE); distinct from
+	 * `audiblePitchSpanHz` (audible-envelope MAGNITUDE, not the
+	 * structural-endpoint CENTRE); distinct from
+	 * `meanNoteEndpointDurationMs` (the duration-axis sibling --
+	 * S270 lifts the same idea onto the pitch axis).
+	 *
+	 * Cheap O(1): two array field reads (one
+	 * kMelodies[id].notes[0].freq, one
+	 * kMelodies[id].notes[count - 1].freq, both reused through
+	 * the S234 / S235 accessors) plus one unsigned addition and
+	 * one divide-by-two; no engine interaction, no persisted
+	 * state, no per-call allocation. Uses `uint32_t` for the
+	 * intermediate sum so the first + last addition never
+	 * wraps even at the full `uint16_t` ceiling. Header surface
+	 * grows by exactly one public symbol (`static uint16_t
+	 * meanEndpointFreqHz`); the cpp adds a single function next
+	 * to the existing `count` / `valid` / `name` / `melody` /
+	 * `play` / `tryPlay` / `isSilenced` / `durationMs` /
+	 * `noteCount` / `firstFreqHz` / `lastFreqHz` / `gapMs` /
+	 * `loops` / `silhouette` / `pitchSpanHz` / `peakFreqHz` /
+	 * `troughFreqHz` / `meanFreqHz` / `audibleNoteCount` /
+	 * `restNoteCount` / `audibleDurationMs` / `restDurationMs`
+	 * / `gapTotalMs` / `meanNoteDurationMs` /
+	 * `peakNoteDurationMs` / `troughNoteDurationMs` /
+	 * `firstNoteDurationMs` / `lastNoteDurationMs` /
+	 * `durationSpanMs` / `audiblePitchSpanHz` /
+	 * `audibleDurationSpanMs` / `meanRestDurationMs` /
+	 * `peakRestDurationMs` / `troughRestDurationMs` /
+	 * `restDurationSpanMs` / `firstRestDurationMs` /
+	 * `lastRestDurationMs` / `restDurationEndpointSpanMs` /
+	 * `meanRestEndpointDurationMs` / `meanNoteEndpointDurationMs`
+	 * / `meanEndpointDurationMs` / `meanEndpointSpanMs` /
+	 * `meanEnvelopeSpanMs` / `meanEnvelopeDurationMs` cluster.
+	 * No new includes, no new const data, no new SPIFFS asset
+	 * cost. Every existing call site of the catalogue keeps
+	 * byte-identical behaviour -- the new helper is purely
+	 * additive.
+	 */
+	static uint16_t meanEndpointFreqHz(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H

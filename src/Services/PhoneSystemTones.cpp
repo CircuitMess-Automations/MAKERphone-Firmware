@@ -2089,3 +2089,71 @@ uint16_t PhoneSystemTones::meanEnvelopeDurationMs(uint8_t id){
 	if(mean > 0xFFFFU) return 0xFFFFU;
 	return (uint16_t) mean;
 }
+
+// S270 - derived structural-endpoint CENTRE accessor on the
+// AUDIBLE PITCH axis for chime `id`. Returns the arithmetic
+// mean, in Hz, of the catalogued structural-endpoint pair
+// (firstFreqHz(id), lastFreqHz(id)) of the underlying Melody --
+// (firstFreqHz(id) + lastFreqHz(id)) / 2. The pitch-axis
+// sibling of meanNoteEndpointDurationMs(id) (S265) on the
+// duration axis: where S265 collapses the (FIRST, LAST)
+// structural-endpoint pair into a CENTRE-of-ENDPOINTS scalar on
+// the audible-step duration axis, S270 lifts the same collapse
+// onto the audible PITCH axis. With pitchSpanHz(id) (S239)
+// already exposing the structural-endpoint MAGNITUDE on the
+// pitch axis, S270 closes the (MAGNITUDE, CENTRE) pitch-axis
+// structural-endpoint pair: pitchSpanHz reports |first - last|,
+// meanEndpointFreqHz reports (first + last) / 2. The
+// (firstFreqHz, lastFreqHz) endpoint pair the picker already
+// uses to render a rising / falling / level direction arrow
+// becomes a (CENTRE, MAGNITUDE) pair through
+// (meanEndpointFreqHz, pitchSpanHz), letting a future
+// "Settings -> Sounds -> System chimes" picker row caption
+// render "(endpoints centred at 880 Hz)" or a future
+// PhoneDiagScreen "Sound test" walk render a TICK at the
+// endpoint CENTRE of the catalogued pitch-bar without
+// recomputing (firstFreqHz(id) + lastFreqHz(id)) / 2 at the
+// call site. Opens the pitch-axis derived-metrics surface that
+// the S269 commit body foreshadowed as the natural follow-up
+// to closing the duration-axis 2x2 grid. Returns 0 for an out-
+// of-range id, for the (currently impossible) empty-melody
+// case, and -- transparently -- for the (currently impossible)
+// all-rests melody case. Returns the shared value for any
+// level-pitch chime (first == last). Profile-state INDEPENDENT.
+// Cheap O(1): two array field reads (firstFreqHz / lastFreqHz)
+// plus one unsigned addition and one divide-by-two; no engine
+// interaction, no persisted state, no per-call allocation.
+// Uses uint32_t for the intermediate sum so the first + last
+// addition never wraps even at the full uint16_t ceiling.
+// Distinct from meanFreqHz (audible-step arithmetic mean
+// across ALL non-rest steps, not the two-endpoint midpoint);
+// distinct from peakFreqHz / troughFreqHz (catalogued envelope
+// CEILING / FLOOR, not the endpoint pair); distinct from
+// pitchSpanHz (structural-endpoint MAGNITUDE, not the CENTRE);
+// distinct from audiblePitchSpanHz (envelope MAGNITUDE, not
+// the structural-endpoint CENTRE); distinct from
+// meanNoteEndpointDurationMs (the duration-axis sibling -- S270
+// lifts the same idea onto the pitch axis). Lives next to the
+// existing count / valid / name / melody / play / tryPlay /
+// isSilenced / durationMs / noteCount / firstFreqHz /
+// lastFreqHz / gapMs / loops / silhouette / pitchSpanHz /
+// peakFreqHz / troughFreqHz / meanFreqHz / audibleNoteCount /
+// restNoteCount / audibleDurationMs / restDurationMs /
+// gapTotalMs / meanNoteDurationMs / peakNoteDurationMs /
+// troughNoteDurationMs / firstNoteDurationMs /
+// lastNoteDurationMs / durationSpanMs / audiblePitchSpanHz /
+// audibleDurationSpanMs / meanRestDurationMs /
+// peakRestDurationMs / troughRestDurationMs /
+// restDurationSpanMs / firstRestDurationMs / lastRestDurationMs
+// / restDurationEndpointSpanMs / meanRestEndpointDurationMs /
+// meanNoteEndpointDurationMs / meanEndpointDurationMs /
+// meanEndpointSpanMs / meanEnvelopeSpanMs /
+// meanEnvelopeDurationMs cluster.
+uint16_t PhoneSystemTones::meanEndpointFreqHz(uint8_t id){
+	if(!valid(id)) return 0;
+	const uint32_t first = (uint32_t) firstFreqHz(id);
+	const uint32_t last  = (uint32_t) lastFreqHz(id);
+	const uint32_t mean  = (first + last) / 2u;
+	if(mean > 0xFFFFU) return 0xFFFFU;
+	return (uint16_t) mean;
+}

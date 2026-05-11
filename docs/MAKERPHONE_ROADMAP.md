@@ -4185,6 +4185,64 @@ lowest-numbered `[ ]`.
   MAGNITUDES treatment onto the PITCH axis, starting from the
   existing rest-axis pitch accessors.
 
+- [x] **S270** -- `PhoneSystemTones::meanEndpointFreqHz(uint8_t id)`
+  derived structural-endpoint CENTRE accessor on the AUDIBLE
+  PITCH axis. Returns the arithmetic mean, in Hz, of the
+  catalogued structural-endpoint pair (`firstFreqHz(id)` (S234),
+  `lastFreqHz(id)` (S235)) of the underlying Melody --
+  `(firstFreqHz(id) + lastFreqHz(id)) / 2`. The pitch-axis
+  sibling of `meanNoteEndpointDurationMs(id)` (S265) on the
+  duration axis: where S265 collapses the (FIRST, LAST)
+  structural-endpoint pair into a CENTRE-of-ENDPOINTS scalar on
+  the audible-step duration axis, S270 lifts the same collapse
+  onto the audible PITCH axis. With `pitchSpanHz(id)` (S239)
+  already exposing the structural-endpoint MAGNITUDE on the
+  pitch axis, S270 closes the (MAGNITUDE, CENTRE) pitch-axis
+  structural-endpoint pair: `pitchSpanHz` reports
+  `|first - last|`, `meanEndpointFreqHz` reports
+  `(first + last) / 2`. The (`firstFreqHz`, `lastFreqHz`)
+  endpoint pair the picker already uses to render a rising /
+  falling / level direction arrow becomes a (CENTRE, MAGNITUDE)
+  pair through (`meanEndpointFreqHz`, `pitchSpanHz`), letting a
+  future "Settings -> Sounds -> System chimes" picker row
+  caption render "(endpoints centred at 880 Hz)" or a future
+  PhoneDiagScreen "Sound test" walk render a TICK at the
+  endpoint CENTRE of the catalogued pitch-bar without
+  recomputing `(firstFreqHz(id) + lastFreqHz(id)) / 2` at the
+  call site. Opens the pitch-axis derived-metrics surface that
+  the S269 commit body foreshadowed as the natural follow-up
+  to closing the duration-axis 2x2 grid; subsequent sessions
+  can lift `audiblePitchSpanHz` (S255) into an envelope CENTRE
+  accessor (`meanEnvelopeFreqHz` = `(peakFreqHz + troughFreqHz)
+  / 2`) and onward toward the full (endpoint, envelope) x
+  (MAGNITUDE, CENTRE) 2x2 on the pitch axis. Returns 0 for an
+  out-of-range id, for the (currently impossible) empty-melody
+  case, and -- transparently -- for the (currently impossible)
+  all-rests melody case. Returns the shared value for any
+  level-pitch chime (`first == last`: Notify, Alert,
+  SmsReceived, MenuOpen, MenuClose, TimerDone -- the CENTRE of
+  two equal scalars is that same scalar). Profile-state
+  INDEPENDENT. Distinct from `meanFreqHz` (audible-step
+  arithmetic MEAN across ALL non-rest steps, not the two-
+  endpoint midpoint); distinct from `peakFreqHz` /
+  `troughFreqHz` (catalogued envelope CEILING / FLOOR, not the
+  endpoint pair); distinct from `pitchSpanHz` (structural-
+  endpoint MAGNITUDE, not the CENTRE); distinct from
+  `audiblePitchSpanHz` (envelope MAGNITUDE, not the structural-
+  endpoint CENTRE); distinct from `meanNoteEndpointDurationMs`
+  (the duration-axis sibling). Cheap O(1): two array field
+  reads plus one unsigned addition and one divide-by-two; no
+  engine interaction, no persisted state, no per-call
+  allocation. Uses `uint32_t` for the intermediate sum so the
+  `first + last` addition never wraps even at the full
+  `uint16_t` ceiling. Header surface grows by exactly one
+  public symbol (`static uint16_t meanEndpointFreqHz`); the
+  cpp adds a single function next to the existing
+  `meanEnvelopeDurationMs` cluster. No new includes, no new
+  const data, no new SPIFFS asset cost. Every existing call
+  site of the catalogue keeps byte-identical behaviour -- the
+  new helper is purely additive.
+
 
 ---
 
