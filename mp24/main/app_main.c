@@ -27,6 +27,8 @@
 #include "driver/i2c.h"
 #include "driver/gpio.h"
 
+#include "hal/display.h"
+
 static const char *TAG = "MP24";
 
 /* ----------------------------------------------------------------- */
@@ -158,7 +160,7 @@ static void print_banner(void)
     esp_chip_info_t info;
     esp_chip_info(&info);
     ESP_LOGI(TAG, "==========================================");
-    ESP_LOGI(TAG, " MAKERphone v2.4 firmware — S-MP01 skeleton");
+    ESP_LOGI(TAG, " MAKERphone v2.4 firmware — S-MP02 display");
     ESP_LOGI(TAG, " IDF=%s  chip=%s rev%d  cores=%d",
              esp_get_idf_version(),
              (info.model == CHIP_ESP32S3) ? "ESP32-S3" : "?",
@@ -168,6 +170,47 @@ static void print_banner(void)
     ESP_LOGI(TAG, "==========================================");
 }
 
+/* Draw a boot screen the firmware can leave on display while later
+ * subsystems initialise. Title bar + a thin RGB-W stripe under it so a
+ * technician can visually confirm every colour channel is working
+ * before the field tests in S-MP04+ begin.
+ *
+ * Palette (synthwave preview — these RGB888 triples are the locked
+ * MP_* values from MAKERPHONE_HANDOFF_SUMMARY.md §1).
+ */
+static void draw_boot_screen(void)
+{
+    const uint16_t MP_BG     = display_rgb( 20,  12,  36);
+    const uint16_t MP_ACCENT = display_rgb(255, 140,  30);
+    const uint16_t MP_TEXT   = display_rgb(255, 220, 180);
+    const uint16_t MP_DIM    = display_rgb( 70,  56, 100);
+
+    display_fill(MP_BG);
+
+    /* Title strip across the top */
+    display_fill_rect(0, 0, TFT_WIDTH, 14, MP_ACCENT);
+    display_str(4, 4, "MAKERphone v2.4", MP_BG, MP_ACCENT);
+
+    /* Status block */
+    display_str(4, 22, "S-MP02  display OK",      MP_TEXT, MP_BG);
+    display_str(4, 34, "IDF v5.5  esp32s3  PSRAM", MP_DIM,  MP_BG);
+
+    /* Thin RGB+W chroma bar — quick sanity check for the 16-bit pipe */
+    const int bar_y = 50;
+    const int bar_h = 10;
+    const int bar_w = TFT_WIDTH / 4;
+    display_fill_rect(0 * bar_w, bar_y, bar_w, bar_h, COLOR_RED);
+    display_fill_rect(1 * bar_w, bar_y, bar_w, bar_h, COLOR_GREEN);
+    display_fill_rect(2 * bar_w, bar_y, bar_w, bar_h, COLOR_BLUE);
+    display_fill_rect(3 * bar_w, bar_y, bar_w, bar_h, COLOR_WHITE);
+
+    /* What's blinking, and why */
+    display_str(4,  72, "Bringing up I2C",   MP_TEXT, MP_BG);
+    display_str(4,  84, "AW9523B + 8 LEDs",  MP_TEXT, MP_BG);
+    display_str(4,  96, "Watch the keypad",  MP_DIM,  MP_BG);
+    display_str(4, 108, "LEDs blink at 2Hz", MP_DIM,  MP_BG);
+}
+
 /* ----------------------------------------------------------------- */
 /* app_main                                                          */
 /* ----------------------------------------------------------------- */
@@ -175,6 +218,15 @@ static void print_banner(void)
 void app_main(void)
 {
     print_banner();
+
+    /* Display first — if anything later fails, the user can still
+     * read the status on the panel. Display init is non-fatal: the
+     * LED blink stays the ultimate "alive" indicator. */
+    if (display_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Display init failed — continuing headless");
+    } else {
+        draw_boot_screen();
+    }
 
     if (i2c_bus_init() != ESP_OK) {
         ESP_LOGE(TAG, "I²C init failed — halting in a tight loop");

@@ -1,12 +1,13 @@
 # mp24/main — entry point component
 #
-# S-MP01 scope: bring up USB CDC console, I²C bus, AW9523B,
-# and blink the 8 on-board LEDs to prove the build pipeline.
-# Display, input, audio, modem, etc. land in later sessions.
+# S-MP01..S-MP02 scope: USB CDC console, ST7735 display init + boot
+# splash, I²C bus, AW9523B, LED blink. Display, input, audio, modem,
+# etc. fill out across subsequent sessions.
 
 idf_component_register(
     SRCS
         "app_main.c"
+        "hal/display.c"
     INCLUDE_DIRS
         "."
     REQUIRES
