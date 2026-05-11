@@ -1808,3 +1808,57 @@ uint16_t PhoneSystemTones::meanRestEndpointDurationMs(uint8_t id){
 	if(mean > 0xFFFFU) return 0xFFFFU;
 	return (uint16_t) mean;
 }
+
+// S265 - derived audible-axis structural-endpoint CENTRE accessor
+// on the DURATION axis for chime `id`. Returns the arithmetic
+// mean, in ms, of the catalogued LEADING audible-step duration
+// (firstNoteDurationMs(id), S252) and the catalogued TRAILING
+// audible-step duration (lastNoteDurationMs(id), S253) of the
+// underlying Melody -- (firstNoteDurationMs(id) +
+// lastNoteDurationMs(id)) / 2. The audible-axis structural-
+// endpoint CENTRE sibling of durationSpanMs(id) (S254) on the
+// duration axis: where durationSpanMs reports the unsigned
+// MAGNITUDE of the (LEADING, TRAILING) AUDIBLE structural
+// endpoint pair in ms, S265 reports the CENTRE of that same pair.
+// Together with meanRestEndpointDurationMs(id) (S264) it closes
+// the (audible-endpoint, rest-endpoint) derived structural-
+// CENTRE pair on the duration axis, mirroring how durationSpanMs
+// (S254) and restDurationEndpointSpanMs (S263) close the
+// MAGNITUDE pair. Returns 0 for an out-of-range id, for the
+// (currently impossible) empty-melody case, and for the no-
+// audible-notes case (both endpoint accessors collapse to 0).
+// Returns the shared catalogued duration for any chime whose
+// LEADING and TRAILING audible-step share an identical duration
+// (including the structural-degenerate single-audible-step case,
+// where the LEADING audible step IS the TRAILING audible step
+// and the two accessors return the same value). Distinct from
+// durationSpanMs (audible-axis structural-endpoint MAGNITUDE,
+// not CENTRE), meanNoteDurationMs (audible-step per-step CENTRE
+// across every audible step, not just the LEADING-TRAILING pair),
+// meanRestEndpointDurationMs (rest-axis endpoint CENTRE),
+// firstNoteDurationMs / lastNoteDurationMs (the endpoint values
+// themselves). Cheap O(notes): two linear scans (one forward via
+// firstNoteDurationMs, one reverse via lastNoteDurationMs) plus a
+// single unsigned addition and a divide-by-two. Uses uint32_t for
+// the intermediate sum so the firstNote + lastNote addition never
+// wraps even at the full uint16_t ceiling. Lives next to the
+// existing count / valid / name / melody / play / tryPlay /
+// isSilenced / durationMs / noteCount / firstFreqHz / lastFreqHz
+// / gapMs / loops / silhouette / pitchSpanHz / peakFreqHz /
+// troughFreqHz / meanFreqHz / audibleNoteCount / restNoteCount /
+// audibleDurationMs / restDurationMs / gapTotalMs /
+// meanNoteDurationMs / peakNoteDurationMs / troughNoteDurationMs
+// / firstNoteDurationMs / lastNoteDurationMs / durationSpanMs /
+// audiblePitchSpanHz / audibleDurationSpanMs / meanRestDurationMs
+// / peakRestDurationMs / troughRestDurationMs /
+// restDurationSpanMs / firstRestDurationMs / lastRestDurationMs /
+// restDurationEndpointSpanMs / meanRestEndpointDurationMs
+// cluster.
+uint16_t PhoneSystemTones::meanNoteEndpointDurationMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const uint32_t first = (uint32_t) firstNoteDurationMs(id);
+	const uint32_t last  = (uint32_t) lastNoteDurationMs(id);
+	const uint32_t mean  = (first + last) / 2u;
+	if(mean > 0xFFFFU) return 0xFFFFU;
+	return (uint16_t) mean;
+}

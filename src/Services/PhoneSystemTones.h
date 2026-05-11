@@ -2868,6 +2868,99 @@ public:
 	 * pair on the duration axis.
 	 */
 	static uint16_t meanRestEndpointDurationMs(uint8_t id);
+
+	/**
+	 * S265 -- Derived audible-axis structural-endpoint CENTRE
+	 * accessor on the DURATION axis for chime `id`. Returns the
+	 * arithmetic mean, in ms, of the catalogued LEADING audible-
+	 * step duration (`firstNoteDurationMs(id)`, S252) and the
+	 * catalogued TRAILING audible-step duration
+	 * (`lastNoteDurationMs(id)`, S253) of the underlying Melody
+	 * -- `(firstNoteDurationMs(id) + lastNoteDurationMs(id)) /
+	 * 2`. The audible-axis structural-endpoint CENTRE sibling of
+	 * `durationSpanMs(id)` (S254) on the duration axis: where
+	 * `durationSpanMs` reports the unsigned MAGNITUDE of the
+	 * (LEADING, TRAILING) AUDIBLE structural endpoint pair in
+	 * ms, `meanNoteEndpointDurationMs` reports the CENTRE of
+	 * that same pair in ms. Completes the (MAGNITUDE, CENTRE)
+	 * derived pair on the audible-axis structural-endpoint
+	 * corner of the duration axis in the same way
+	 * `meanRestEndpointDurationMs(id)` (S264) sits alongside
+	 * `restDurationEndpointSpanMs(id)` (S263) on the rest-axis
+	 * structural-endpoint corner. With S264 it closes the cross-
+	 * axis (audible-endpoint, rest-endpoint) derived CENTRE pair
+	 * on the duration axis, mirroring how `durationSpanMs` (S254)
+	 * and `restDurationEndpointSpanMs` (S263) close the
+	 * MAGNITUDE pair. A future PhoneDiagScreen "Sound test"
+	 * walk that wants to caption the audible-bookend duration
+	 * midpoint of a cue or a "Settings -> Sounds -> System
+	 * chimes" picker row caption like "(audible centre 90 ms)"
+	 * can read a dedicated derived accessor for the audible-
+	 * axis structural-endpoint CENTRE instead of computing
+	 * `(firstNoteDurationMs(id) + lastNoteDurationMs(id)) / 2`
+	 * at the call site.
+	 *
+	 * Returns 0 for an out-of-range id, for the (currently
+	 * impossible) empty-melody case, and for the no-audible-
+	 * notes case (both endpoint accessors collapse to 0, so
+	 * their integer mean is also 0). Returns the shared
+	 * catalogued duration for any chime whose LEADING and
+	 * TRAILING audible-step share an identical duration
+	 * (including the structural-degenerate single-audible-step
+	 * case, where the LEADING audible step IS the TRAILING
+	 * audible step and the mean of the two equal accessor values
+	 * is exactly that catalogued duration). Profile-state
+	 * INDEPENDENT: the catalogued audible-endpoint mean is the
+	 * same on SILENT / MEETING profiles as on GENERAL / OUTDOOR
+	 * / HEADSET. Distinct from `durationSpanMs` (audible-axis
+	 * structural-endpoint MAGNITUDE, not CENTRE), distinct from
+	 * `meanNoteDurationMs` (audible-step per-step CENTRE across
+	 * every audible step in the melody, not just the LEADING-
+	 * TRAILING pair), distinct from `meanRestDurationMs` (rest-
+	 * step per-step CENTRE, not audible-step), distinct from
+	 * `meanRestEndpointDurationMs` (rest-axis structural-
+	 * endpoint CENTRE, not audible-axis), distinct from
+	 * `firstNoteDurationMs` / `lastNoteDurationMs` (audible-axis
+	 * endpoint values themselves, not their arithmetic mean),
+	 * distinct from `audibleDurationSpanMs` / `restDurationSpanMs`
+	 * / `restDurationEndpointSpanMs` (derived MAGNITUDE
+	 * accessors on the duration axis, not CENTRE).
+	 *
+	 * Cheap O(notes): two linear scans (one forward via
+	 * `firstNoteDurationMs`, one reverse via
+	 * `lastNoteDurationMs`) plus a single unsigned addition and
+	 * a divide-by-two; no engine interaction, no persisted
+	 * state, no per-call allocation. Uses `uint32_t` for the
+	 * intermediate sum so the `firstNote + lastNote` addition
+	 * never wraps even at the full `uint16_t` ceiling. Header
+	 * surface grows by exactly one public symbol (`static
+	 * uint16_t meanNoteEndpointDurationMs`); the cpp adds a
+	 * single function next to the existing `count` / `valid` /
+	 * `name` / `melody` / `play` / `tryPlay` / `isSilenced` /
+	 * `durationMs` / `noteCount` / `firstFreqHz` / `lastFreqHz`
+	 * / `gapMs` / `loops` / `silhouette` / `pitchSpanHz` /
+	 * `peakFreqHz` / `troughFreqHz` / `meanFreqHz` /
+	 * `audibleNoteCount` / `restNoteCount` / `audibleDurationMs`
+	 * / `restDurationMs` / `gapTotalMs` / `meanNoteDurationMs` /
+	 * `peakNoteDurationMs` / `troughNoteDurationMs` /
+	 * `firstNoteDurationMs` / `lastNoteDurationMs` /
+	 * `durationSpanMs` / `audiblePitchSpanHz` /
+	 * `audibleDurationSpanMs` / `meanRestDurationMs` /
+	 * `peakRestDurationMs` / `troughRestDurationMs` /
+	 * `restDurationSpanMs` / `firstRestDurationMs` /
+	 * `lastRestDurationMs` / `restDurationEndpointSpanMs` /
+	 * `meanRestEndpointDurationMs` cluster. No new includes, no
+	 * new const data, no new SPIFFS asset cost. Every existing
+	 * call site of the catalogue keeps byte-identical behaviour
+	 * -- the new helper is purely additive. Together with
+	 * `meanRestEndpointDurationMs(id)` (S264) this closes the
+	 * (audible-endpoint, rest-endpoint) derived structural-
+	 * CENTRE pair on the duration axis, mirroring how
+	 * `durationSpanMs(id)` (S254) and
+	 * `restDurationEndpointSpanMs(id)` (S263) close the
+	 * MAGNITUDE pair.
+	 */
+	static uint16_t meanNoteEndpointDurationMs(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H
