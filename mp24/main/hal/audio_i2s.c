@@ -9,6 +9,8 @@
 #include "hal/audio_i2s.h"
 #include "hal/pins.h"
 #include "driver/i2s_std.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "esp_log.h"
 
 static const char *TAG = "I2S1";
