@@ -3263,6 +3263,105 @@ lowest-numbered `[ ]`.
   (`peakNoteDurationMs`, `troughNoteDurationMs`,
   `meanNoteDurationMs`) trio.
 
+- [x] **S259** -- `PhoneSystemTones::troughRestDurationMs(uint8_t id)`
+  derived per-rest-step minimum-duration accessor for chime
+  `id`. Returns the shortest catalogued rest-step durationMs
+  value the engine holds the piezo SILENT for, in ms. Where
+  `restDurationMs(id)` (S247) reports the SUM of the
+  catalogued rest-step durations, `restNoteCount(id)` (S244)
+  reports the COUNT of those steps, `meanRestDurationMs(id)`
+  (S257) collapses the SUM / COUNT pair into a per-step CENTRE
+  on the rest-duration axis, and `peakRestDurationMs(id)`
+  (S258) reports the per-step CEILING,
+  `troughRestDurationMs(id)` reports the per-step FLOOR -- the
+  rest-axis sibling of `troughNoteDurationMs(id)` (S251) on
+  the audible-step axis, exactly how `peakRestDurationMs(id)`
+  (S258) is the rest-axis sibling of `peakNoteDurationMs(id)`
+  (S250) and `meanRestDurationMs(id)` (S257) is the rest-axis
+  sibling of `meanNoteDurationMs(id)` (S249) on the audible-
+  step axis. Closes the rest-axis (CEILING, FLOOR, CENTRE)
+  trio (`peakRestDurationMs`, `troughRestDurationMs`,
+  `meanRestDurationMs`) in mirror of the audible-axis
+  (CEILING, FLOOR, CENTRE) trio (`peakNoteDurationMs`,
+  `troughNoteDurationMs`, `meanNoteDurationMs`). So a future
+  "Settings -> Sounds -> System chimes" picker row caption
+  like "(shortest rest 40 ms)" or a future `PhoneDiagScreen`
+  chime-roster footer line that wants to render the shortest
+  per-rest hold of a cue can read a dedicated derived
+  accessor for the per-rest-step FLOOR instead of scanning the
+  catalogued `Note*` array at the call site. Returns 0 for an
+  out-of-range id, for the (currently impossible) empty-melody
+  case, and for the no-rests-melody case (where
+  `restNoteCount(id) == 0` and no rest step exists, so the
+  FLOOR is undefined) -- so a flat audible-only cue with no
+  rests, or an out-of-range id, collapses to the same 0 the
+  catalogued rest-axis pair `restNoteCount` (S244) /
+  `restDurationMs` (S247), the rest-axis CENTRE
+  `meanRestDurationMs` (S257), and the rest-axis CEILING
+  `peakRestDurationMs` (S258) already collapse to. Saturates
+  at `0xFFFF` ms (the same uint16_t ceiling the duration
+  cluster `durationMs` / `audibleDurationMs` /
+  `restDurationMs` / `gapTotalMs` / `meanNoteDurationMs` /
+  `peakNoteDurationMs` / `troughNoteDurationMs` /
+  `firstNoteDurationMs` / `lastNoteDurationMs` /
+  `durationSpanMs` / `audibleDurationSpanMs` /
+  `meanRestDurationMs` / `peakRestDurationMs` already share);
+  since the catalogued per-step duration is itself a uint16_t
+  the cap is in practice unreachable. Distinct from
+  `restDurationMs` (rest-step SUM in isolation, not per-step
+  FLOOR), distinct from `restNoteCount` (rest-step COUNT in
+  isolation), distinct from `meanRestDurationMs` (rest-axis
+  per-step CENTRE, not per-step FLOOR), distinct from
+  `peakRestDurationMs` (rest-axis per-step CEILING, not per-
+  step FLOOR), distinct from `troughNoteDurationMs` (audible-
+  axis per-step FLOOR, not rest-axis FLOOR), distinct from
+  `peakNoteDurationMs` (audible-axis per-step CEILING, not
+  rest-axis FLOOR), distinct from `meanNoteDurationMs`
+  (audible-axis per-step CENTRE, not rest-axis FLOOR),
+  distinct from `audibleDurationMs` (audible-step SUM in
+  isolation), distinct from `durationMs` (TOTAL incl. audible
+  + rests + gaps), distinct from `gapTotalMs` / `gapMs`
+  (inter-step filler component, not per-rest FLOOR), distinct
+  from `firstNoteDurationMs` / `lastNoteDurationMs`
+  (structural endpoints), distinct from `durationSpanMs` /
+  `audibleDurationSpanMs` (derived endpoint / envelope
+  MAGNITUDES on the audible-duration axis, not rest-axis
+  FLOOR). Profile-state INDEPENDENT: the catalogued per-rest-
+  step FLOOR is the same on SILENT / MEETING profiles as on
+  GENERAL / OUTDOOR / HEADSET. Cheap O(notes) linear scan
+  with a single uint16_t running min guarded by a `found`
+  sentinel (no natural starting value for a min-search when
+  the rest set may be empty); no per-call allocation, no
+  recursion into the existing `restDurationMs` /
+  `restNoteCount` / `meanRestDurationMs` /
+  `peakRestDurationMs` accessors. Mirrors
+  `troughNoteDurationMs` (S251) exactly with the rest-step
+  predicate (`freq == 0`) substituted for the audible-step
+  predicate (`freq != 0`), and mirrors `peakRestDurationMs`
+  (S258) exactly with `<` substituted for `>`. Header surface
+  grows by exactly one public symbol (`static uint16_t
+  troughRestDurationMs`); the cpp adds a single function next
+  to the existing `count` / `valid` / `name` / `melody` /
+  `play` / `tryPlay` / `isSilenced` / `durationMs` /
+  `noteCount` / `firstFreqHz` / `lastFreqHz` / `gapMs` /
+  `loops` / `silhouette` / `pitchSpanHz` / `peakFreqHz` /
+  `troughFreqHz` / `meanFreqHz` / `audibleNoteCount` /
+  `restNoteCount` / `audibleDurationMs` / `restDurationMs` /
+  `gapTotalMs` / `meanNoteDurationMs` / `peakNoteDurationMs` /
+  `troughNoteDurationMs` / `firstNoteDurationMs` /
+  `lastNoteDurationMs` / `durationSpanMs` /
+  `audiblePitchSpanHz` / `audibleDurationSpanMs` /
+  `meanRestDurationMs` / `peakRestDurationMs` cluster. No new
+  includes, no new const data, no new SPIFFS asset cost. Every
+  existing call site of the catalogue keeps byte-identical
+  behaviour -- the new helper is purely additive. Closes the
+  rest-axis (CEILING, FLOOR, CENTRE) trio in mirror of the
+  audible-axis (CEILING, FLOOR, CENTRE) trio already on the
+  duration axis; the natural follow-up is the rest-axis
+  MAGNITUDE (`restDurationSpanMs = peakRestDurationMs -
+  troughRestDurationMs`) that mirrors `audibleDurationSpanMs`
+  (S256) on the audible-duration axis.
+
 
 
 ---

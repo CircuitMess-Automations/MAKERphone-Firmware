@@ -1522,3 +1522,61 @@ uint16_t PhoneSystemTones::peakRestDurationMs(uint8_t id){
 	if(!any) return 0;
 	return peak;
 }
+
+// S259 - derived per-rest-step minimum-duration accessor for chime
+// `id`. Returns the shortest catalogued rest-step durationMs
+// value the engine holds the piezo SILENT for, in ms. Where
+// restDurationMs(id) (S247) reports the SUM of the catalogued
+// rest-step durations, restNoteCount(id) (S244) reports the COUNT
+// of those steps, meanRestDurationMs(id) (S257) collapses the SUM
+// / COUNT pair into a per-step CENTRE on the rest-duration axis,
+// and peakRestDurationMs(id) (S258) reports the per-step CEILING,
+// troughRestDurationMs(id) reports the per-step FLOOR -- the
+// rest-axis sibling of troughNoteDurationMs(id) (S251) on the
+// audible-step axis, closing the rest-axis (CEILING, FLOOR,
+// CENTRE) trio in mirror of the audible-axis (CEILING, FLOOR,
+// CENTRE) trio. Returns 0 for an out-of-range id, for the
+// (currently impossible) empty-melody case, and for the no-rests-
+// melody case (where restNoteCount(id) == 0 and the FLOOR is
+// undefined) -- the same three "no answer" cases the rest-axis
+// pair restNoteCount / restDurationMs, the rest-axis CENTRE
+// meanRestDurationMs, and the rest-axis CEILING peakRestDurationMs
+// already collapse to 0. Saturates at 0xFFFF ms (the same uint16_t
+// ceiling the duration cluster durationMs / audibleDurationMs /
+// restDurationMs / gapTotalMs / meanNoteDurationMs /
+// peakNoteDurationMs / troughNoteDurationMs / firstNoteDurationMs
+// / lastNoteDurationMs / durationSpanMs / audibleDurationSpanMs /
+// meanRestDurationMs / peakRestDurationMs already share); since
+// the catalogued per-step duration is itself a uint16_t the cap is
+// in practice unreachable. Cheap O(notes) linear scan with a
+// single uint16_t running min guarded by a `found` sentinel (no
+// natural starting value for a min-search when the rest set may be
+// empty) -- mirroring troughNoteDurationMs(id) (S251) exactly with
+// the rest-step predicate (freq == 0) substituted for the audible-
+// step predicate (freq != 0), and mirroring peakRestDurationMs(id)
+// (S258) exactly with `<` substituted for `>`. No per-call
+// allocation, no recursion into the existing restDurationMs /
+// restNoteCount / meanRestDurationMs / peakRestDurationMs
+// accessors. Lives next to the existing count / valid / name /
+// melody / play / tryPlay / isSilenced / durationMs / noteCount /
+// firstFreqHz / lastFreqHz / gapMs / loops / silhouette /
+// pitchSpanHz / peakFreqHz / troughFreqHz / meanFreqHz /
+// audibleNoteCount / restNoteCount / audibleDurationMs /
+// restDurationMs / gapTotalMs / meanNoteDurationMs /
+// peakNoteDurationMs / troughNoteDurationMs / firstNoteDurationMs
+// / lastNoteDurationMs / durationSpanMs / audiblePitchSpanHz /
+// audibleDurationSpanMs / meanRestDurationMs / peakRestDurationMs
+// cluster.
+uint16_t PhoneSystemTones::troughRestDurationMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	uint16_t trough = 0;
+	bool found = false;
+	for(uint16_t i = 0; i < m.count; ++i){
+		if(m.notes[i].freq != 0) continue;
+		const uint16_t d = m.notes[i].durationMs;
+		if(!found || d < trough){ trough = d; found = true; }
+	}
+	return found ? trough : 0;
+}
