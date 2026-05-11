@@ -22,7 +22,7 @@ partition, E=button alias remap to joystick/A/B/C/D, F=USB CDC console).
 - [x] **S-MP03** I²C expanders — refactor I²C + AW9523B into `hal/`,
       add XL9555 driver (U5 @ 0x20, U9 @ 0x21), AW9523B LED API,
       INT1/INT2 interrupt sources wired but not yet consumed.
-- [ ] **S-MP04** Input HAL — `InputI2cKeypad` reading both XL9555s on
+- [x] **S-MP04** Input HAL — `InputI2cKeypad` reading both XL9555s on
       interrupt, exposing CircuitOS-compatible `buttonPressed/Released`.
       Button enum: full MP2.4 set + Decision-E legacy aliases.
       Lifts `dashboard.c` `k_buttons[]` bit map verbatim.
