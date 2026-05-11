@@ -1471,3 +1471,54 @@ uint16_t PhoneSystemTones::meanRestDurationMs(uint8_t id){
 	if(mean > 0xFFFFU) return 0xFFFFU;
 	return (uint16_t) mean;
 }
+
+// S258 - derived per-rest-step maximum-duration accessor for chime
+// `id`. Returns the longest catalogued rest-step durationMs value
+// the engine holds the piezo SILENT for, in ms. Where
+// restDurationMs(id) (S247) reports the SUM of the catalogued
+// rest-step durations, restNoteCount(id) (S244) reports the COUNT
+// of those steps, and meanRestDurationMs(id) (S257) collapses the
+// SUM / COUNT pair into a per-step CENTRE on the rest-duration
+// axis, peakRestDurationMs(id) reports the per-step CEILING -- the
+// rest-axis sibling of peakNoteDurationMs(id) (S250) on the
+// audible-step axis. Returns 0 for an out-of-range id, for the
+// (currently impossible) empty-melody case, and for the no-rests-
+// melody case (where restNoteCount(id) == 0 and no rest step
+// exists, so the CEILING is undefined). Saturates at 0xFFFF ms
+// (the same uint16_t ceiling the duration cluster durationMs /
+// audibleDurationMs / restDurationMs / gapTotalMs /
+// meanNoteDurationMs / peakNoteDurationMs / troughNoteDurationMs /
+// firstNoteDurationMs / lastNoteDurationMs / durationSpanMs /
+// audibleDurationSpanMs / meanRestDurationMs already share); since
+// the catalogued per-step duration is itself a uint16_t the cap is
+// in practice unreachable. Cheap O(notes) linear scan with a
+// single uint16_t running max guarded by a `found` sentinel -- no
+// natural starting value for a max-search when the rest set may
+// be empty -- mirroring peakNoteDurationMs(id) (S250) exactly with
+// the rest-step predicate (freq == 0) substituted for the audible-
+// step predicate (freq != 0). No per-call allocation, no recursion
+// into the existing restDurationMs / restNoteCount /
+// meanRestDurationMs accessors. Lives next to the existing count /
+// valid / name / melody / play / tryPlay / isSilenced /
+// durationMs / noteCount / firstFreqHz / lastFreqHz / gapMs /
+// loops / silhouette / pitchSpanHz / peakFreqHz / troughFreqHz /
+// meanFreqHz / audibleNoteCount / restNoteCount /
+// audibleDurationMs / restDurationMs / gapTotalMs /
+// meanNoteDurationMs / peakNoteDurationMs / troughNoteDurationMs
+// / firstNoteDurationMs / lastNoteDurationMs / durationSpanMs /
+// audiblePitchSpanHz / audibleDurationSpanMs / meanRestDurationMs
+// cluster.
+uint16_t PhoneSystemTones::peakRestDurationMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	uint16_t peak = 0;
+	bool any = false;
+	for(uint16_t i = 0; i < m.count; ++i){
+		if(m.notes[i].freq != 0) continue;
+		any = true;
+		if(m.notes[i].durationMs > peak) peak = m.notes[i].durationMs;
+	}
+	if(!any) return 0;
+	return peak;
+}
