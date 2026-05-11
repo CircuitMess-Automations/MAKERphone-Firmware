@@ -19,7 +19,7 @@ partition, E=button alias remap to joystick/A/B/C/D, F=USB CDC console).
       with fill / fill_rect / 5x7 text. Boot splash drawn before any other
       subsystem init. LVGL integration is deferred to its own session
       after the rest of the HAL settles.
-- [ ] **S-MP03** I²C expanders — refactor I²C + AW9523B into `hal/`,
+- [x] **S-MP03** I²C expanders — refactor I²C + AW9523B into `hal/`,
       add XL9555 driver (U5 @ 0x20, U9 @ 0x21), AW9523B LED API,
       INT1/INT2 interrupt sources wired but not yet consumed.
 - [ ] **S-MP04** Input HAL — `InputI2cKeypad` reading both XL9555s on
