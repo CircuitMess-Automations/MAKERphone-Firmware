@@ -1619,3 +1619,45 @@ uint16_t PhoneSystemTones::restDurationSpanMs(uint8_t id){
 	const uint16_t trough = troughRestDurationMs(id);
 	return (peak >= trough) ? (uint16_t)(peak - trough) : (uint16_t)(trough - peak);
 }
+
+// S261 - structural first-rest duration accessor for chime `id`.
+// Returns the catalogued duration in ms of the FIRST
+// PhoneRingtoneEngine::Note entry whose freq == 0 (i.e. the
+// LEADING rest-step) in the underlying Melody. The rest-axis
+// sibling of firstNoteDurationMs(id) (S252) on the structural-
+// endpoint axis: where firstNoteDurationMs reads the catalogued
+// LEADING duration regardless of note-vs-rest character,
+// firstRestDurationMs scans forward for the FIRST occurrence of
+// a rest-step and reports the catalogued duration the engine
+// holds silence for at that LEADING rest position. Returns 0 for
+// an out-of-range id, for the (currently impossible) empty-
+// melody case, for the no-rests-melody case (a chime that
+// contains zero freq == 0 steps), and naturally for any rest
+// step the catalogue marks with a zero duration. Distinct from
+// firstNoteDurationMs (structural LEADING duration), restDurationMs
+// (rest-step SUM), meanRestDurationMs (rest-step CENTRE),
+// peakRestDurationMs / troughRestDurationMs (rest CEILING /
+// FLOOR), restDurationSpanMs (rest CEILING-FLOOR magnitude),
+// restNoteCount (rest-step COUNT). Cheap O(notes): a single
+// forward linear scan that returns on the first freq == 0 hit;
+// no engine interaction, no persisted state, no per-call
+// allocation. Lives next to the existing count / valid / name /
+// melody / play / tryPlay / isSilenced / durationMs / noteCount
+// / firstFreqHz / lastFreqHz / gapMs / loops / silhouette /
+// pitchSpanHz / peakFreqHz / troughFreqHz / meanFreqHz /
+// audibleNoteCount / restNoteCount / audibleDurationMs /
+// restDurationMs / gapTotalMs / meanNoteDurationMs /
+// peakNoteDurationMs / troughNoteDurationMs / firstNoteDurationMs
+// / lastNoteDurationMs / durationSpanMs / audiblePitchSpanHz /
+// audibleDurationSpanMs / meanRestDurationMs /
+// peakRestDurationMs / troughRestDurationMs / restDurationSpanMs
+// cluster.
+uint16_t PhoneSystemTones::firstRestDurationMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const Melody& m = kMelodies[id];
+	if(m.notes == nullptr || m.count == 0) return 0;
+	for(uint16_t i = 0; i < m.count; ++i){
+		if(m.notes[i].freq == 0) return m.notes[i].durationMs;
+	}
+	return 0;
+}

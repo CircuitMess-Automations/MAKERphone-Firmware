@@ -2570,6 +2570,70 @@ public:
 	 * `pitchSpanHz` (S239).
 	 */
 	static uint16_t restDurationSpanMs(uint8_t id);
+
+	/**
+	 * S261 -- Structural first-rest duration accessor for chime
+	 * `id`. Returns the catalogued duration in ms of the FIRST
+	 * `PhoneRingtoneEngine::Note` entry whose `freq == 0` (i.e.
+	 * the LEADING rest-step) in the underlying Melody. The
+	 * rest-axis sibling of `firstNoteDurationMs(id)` (S252) on
+	 * the structural-endpoint axis: where `firstNoteDurationMs`
+	 * walks the catalogued array LEADING endpoint regardless of
+	 * note-vs-rest character and effectively reports the
+	 * structural LEADING duration, `firstRestDurationMs` walks
+	 * the catalogued array for the FIRST occurrence of a rest-
+	 * step and reports the catalogued duration the engine holds
+	 * silence for at that LEADING rest position. Together with
+	 * the future `lastRestDurationMs` it would close the rest-
+	 * axis structural endpoint pair (LEADING, TRAILING) in the
+	 * same way `firstNoteDurationMs` / `lastNoteDurationMs`
+	 * (S252 / S253) closed the audible-axis structural endpoint
+	 * pair on the duration axis, and in the same way
+	 * `firstFreqHz` / `lastFreqHz` (S234 / S235) closed the
+	 * structural endpoint pair on the pitch axis.
+	 *
+	 * Returns 0 for an out-of-range id, for the (currently
+	 * impossible) empty-melody case, for the no-rests-melody
+	 * case (a chime that contains zero `freq == 0` steps), and
+	 * naturally for any rest step the catalogue marks with a
+	 * zero duration. Profile-state INDEPENDENT: the catalogued
+	 * leading-rest duration is the same on SILENT / MEETING
+	 * profiles as on GENERAL / OUTDOOR / HEADSET. Distinct from
+	 * `firstNoteDurationMs` (structural LEADING duration --
+	 * leading audible OR rest, whichever comes first), distinct
+	 * from `restDurationMs` (rest-step SUM across the whole
+	 * melody, not the LEADING rest's duration), distinct from
+	 * `meanRestDurationMs` (rest-step CENTRE across every rest,
+	 * not the LEADING rest), distinct from `peakRestDurationMs`
+	 * / `troughRestDurationMs` (rest CEILING / FLOOR across
+	 * every rest, not the LEADING rest), distinct from
+	 * `restDurationSpanMs` (rest CEILING-FLOOR magnitude, not
+	 * the LEADING rest), distinct from `restNoteCount` (rest-
+	 * step COUNT, not the LEADING rest's duration).
+	 *
+	 * Cheap O(notes): a single forward linear scan that returns
+	 * on the first `freq == 0` hit; no engine interaction, no
+	 * persisted state, no per-call allocation. Header surface
+	 * grows by exactly one public symbol (`static uint16_t
+	 * firstRestDurationMs`); the cpp adds a single function next
+	 * to the existing `count` / `valid` / `name` / `melody` /
+	 * `play` / `tryPlay` / `isSilenced` / `durationMs` /
+	 * `noteCount` / `firstFreqHz` / `lastFreqHz` / `gapMs` /
+	 * `loops` / `silhouette` / `pitchSpanHz` / `peakFreqHz` /
+	 * `troughFreqHz` / `meanFreqHz` / `audibleNoteCount` /
+	 * `restNoteCount` / `audibleDurationMs` / `restDurationMs` /
+	 * `gapTotalMs` / `meanNoteDurationMs` / `peakNoteDurationMs`
+	 * / `troughNoteDurationMs` / `firstNoteDurationMs` /
+	 * `lastNoteDurationMs` / `durationSpanMs` /
+	 * `audiblePitchSpanHz` / `audibleDurationSpanMs` /
+	 * `meanRestDurationMs` / `peakRestDurationMs` /
+	 * `troughRestDurationMs` / `restDurationSpanMs` cluster. No
+	 * new includes, no new const data, no new SPIFFS asset
+	 * cost. Every existing call site of the catalogue keeps
+	 * byte-identical behaviour -- the new helper is purely
+	 * additive.
+	 */
+	static uint16_t firstRestDurationMs(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H
