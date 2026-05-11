@@ -26,14 +26,12 @@ jobs:
       - name: Locate or install ESP-IDF v5.5
         shell: bash
         run: |
-          # The self-hosted Mac runner may already have ESP-IDF installed
-          # (the legacy job has its own toolchain dance for arduino-cli;
-          # IDF lives elsewhere). Honour an existing install at the
-          # standard locations, then fall back to a per-runner install
-          # under ~/.espressif if nothing is found.
+          # The self-hosted Mac runner may already have ESP-IDF cloned
+          # (e.g. by a previous run or by hand). Honour an existing
+          # source tree at the standard locations, then fall back to a
+          # per-runner clone under ~/esp/esp-idf if nothing is found.
           set -euo pipefail
 
-          # Candidate IDF roots, in preference order.
           CANDIDATES=(
             "$HOME/esp/v5.5/esp-idf"
             "$HOME/esp/esp-idf"
@@ -45,13 +43,13 @@ jobs:
           for c in "${CANDIDATES[@]}"; do
             if [ -f "$c/export.sh" ]; then
               IDF_PATH_FOUND="$c"
-              echo "Using existing ESP-IDF at $c"
+              echo "Using existing ESP-IDF source at $c"
               break
             fi
           done
 
           if [ -z "$IDF_PATH_FOUND" ]; then
-            echo "ESP-IDF not found in standard locations — installing v5.5"
+            echo "ESP-IDF source not found — cloning v5.5"
             mkdir -p "$HOME/esp"
             cd "$HOME/esp"
             if [ ! -d esp-idf ]; then
@@ -60,12 +58,23 @@ jobs:
               cd esp-idf
               git submodule update --init --recursive --depth 1
             fi
-            cd "$HOME/esp/esp-idf"
-            ./install.sh esp32s3
             IDF_PATH_FOUND="$HOME/esp/esp-idf"
           fi
 
           echo "IDF_PATH=$IDF_PATH_FOUND" >> "$GITHUB_ENV"
+
+      - name: Ensure ESP-IDF tools installed for esp32s3
+        shell: bash
+        run: |
+          # install.sh is idempotent: it only downloads what's missing.
+          # On a fresh runner this fetches xtensa-esp-elf, cmake, ninja,
+          # openocd, and the Python venv (~250 MB total). On a warm
+          # runner it's a no-op. Running it unconditionally avoids the
+          # previous failure mode where an existing export.sh existed
+          # but the runner had no CMake.
+          set -euo pipefail
+          cd "$IDF_PATH"
+          ./install.sh esp32s3
 
       - name: Build firmware
         shell: bash
