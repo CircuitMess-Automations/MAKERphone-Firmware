@@ -76,6 +76,54 @@ jobs:
           cd "$IDF_PATH"
           ./install.sh esp32s3
 
+      - name: Ensure cmake and ninja are on PATH
+        shell: bash
+        run: |
+          # On macOS, ESP-IDF expects CMake + Ninja to come from the
+          # system (typically Homebrew) — install.sh does NOT install
+          # them. The self-hosted runner has them via Homebrew, but the
+          # non-login bash GitHub Actions launches does not source
+          # ~/.zprofile, so /opt/homebrew/bin is not on PATH.
+          # This step:
+          #   1. Adds the standard Homebrew bin dirs to PATH for all
+          #      subsequent steps in this job (via $GITHUB_PATH).
+          #   2. If cmake or ninja are still missing, installs them
+          #      via brew.
+          #   3. If brew itself is missing, fails with a clear message
+          #      so the runner owner knows what to do.
+          set -euo pipefail
+
+          for brew_bin in /opt/homebrew/bin /usr/local/bin; do
+            if [ -d "$brew_bin" ]; then
+              echo "$brew_bin" >> "$GITHUB_PATH"
+              export PATH="$brew_bin:$PATH"
+            fi
+          done
+
+          need_install=()
+          for tool in cmake ninja; do
+            if ! command -v "$tool" >/dev/null 2>&1; then
+              need_install+=("$tool")
+            fi
+          done
+
+          if [ "${#need_install[@]}" -gt 0 ]; then
+            echo "Missing build tools: ${need_install[*]}"
+            if command -v brew >/dev/null 2>&1; then
+              echo "Installing via Homebrew (one-time on this runner)..."
+              brew install "${need_install[@]}"
+            else
+              echo "ERROR: cmake/ninja missing and Homebrew unavailable."
+              echo "Run on the runner once:"
+              echo "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+              echo "  brew install cmake ninja"
+              exit 1
+            fi
+          fi
+
+          echo "cmake: $(cmake --version | head -1)"
+          echo "ninja: $(ninja --version)"
+
       - name: Build firmware
         shell: bash
         run: |
