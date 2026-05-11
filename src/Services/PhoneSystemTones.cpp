@@ -2016,3 +2016,76 @@ uint16_t PhoneSystemTones::meanEnvelopeSpanMs(uint8_t id){
 	if(mean > 0xFFFFU) return 0xFFFFU;
 	return (uint16_t) mean;
 }
+
+// S269 - derived cross-axis CEILING-FLOOR envelope CENTRE-of-
+// CENTRES accessor on the DURATION axis for chime `id`.
+// Returns the arithmetic mean, in ms, of the audible-axis
+// envelope CENTRE (meanNoteDurationMs(id), S249) and the rest-
+// axis envelope CENTRE (meanRestDurationMs(id), S257) of the
+// underlying Melody -- (meanNoteDurationMs(id) +
+//                       meanRestDurationMs(id)) / 2.
+// The cross-axis collapse of the (audible-envelope CENTRE,
+// rest-envelope CENTRE) duration-axis pair into a single
+// CENTRE-of-CENTRES scalar, the envelope-axis sibling of
+// meanEnvelopeSpanMs(id) (S268) which collapses the same pair
+// on the MAGNITUDE axis. Where S268 closes the cross-axis
+// MAGNITUDE-of-MAGNITUDES corner on the CEILING-FLOOR envelope
+// axis, S269 closes the cross-axis CENTRE-of-CENTRES corner on
+// the same axis -- together with S266 / S267 / S268 this
+// completes the (endpoint, envelope) x (MAGNITUDE, CENTRE)
+// duration-axis 2x2 grid: S266 = endpoint CENTRE-of-CENTRES,
+// S267 = endpoint MAGNITUDE-of-MAGNITUDES, S268 = envelope
+// MAGNITUDE-of-MAGNITUDES, S269 = envelope CENTRE-of-CENTRES.
+// Returns 0 for an out-of-range id, for the (currently
+// impossible) empty-melody case, and for the all-collapse case
+// where both envelope CENTRE accessors return 0 (a melody with
+// neither audible steps nor rests, which does not exist in
+// today's catalogue but is handled defensively). Returns the
+// shared value when the audible-envelope CENTRE and the rest-
+// envelope CENTRE happen to be equal (the CENTRE-of-CENTRES of
+// two equal scalars is that same scalar). When only one axis
+// has notes (e.g. an audible-only or rest-only melody where
+// one CENTRE collapses to 0), the CENTRE-of-CENTRES is exactly
+// half of the non-zero CENTRE -- documented defensive behaviour,
+// reflecting that the collapsed axis genuinely contributes a
+// 0-ms envelope CENTRE to the cross-axis mean. Profile-state
+// INDEPENDENT: the catalogued cross-axis envelope CENTRE-of-
+// CENTRES is the same on SILENT / MEETING profiles as on
+// GENERAL / OUTDOOR / HEADSET. Distinct from meanNoteDurationMs
+// (audible-axis envelope CENTRE only, not the cross-axis
+// collapse), distinct from meanRestDurationMs (rest-axis
+// envelope CENTRE only, not the cross-axis collapse), distinct
+// from meanEnvelopeSpanMs (cross-axis envelope MAGNITUDE-of-
+// MAGNITUDES, not envelope CENTRE-of-CENTRES), distinct from
+// meanEndpointDurationMs (cross-axis structural-endpoint
+// CENTRE-of-CENTRES on the FIRST/LAST bookend axis, not the
+// peak/trough envelope axis), distinct from meanEndpointSpanMs
+// (cross-axis structural-endpoint MAGNITUDE-of-MAGNITUDES).
+// Cheap O(notes): two linear scans (reused through the S249 /
+// S257 accessors) plus two unsigned additions and one divide-
+// by-two; no engine interaction, no persisted state, no per-
+// call allocation. Uses uint32_t for the intermediate sum so
+// the audible-CENTRE + rest-CENTRE addition never wraps even
+// at the full uint16_t ceiling. Lives next to the existing
+// count / valid / name / melody / play / tryPlay / isSilenced /
+// durationMs / noteCount / firstFreqHz / lastFreqHz / gapMs /
+// loops / silhouette / pitchSpanHz / peakFreqHz / troughFreqHz
+// / meanFreqHz / audibleNoteCount / restNoteCount /
+// audibleDurationMs / restDurationMs / gapTotalMs /
+// meanNoteDurationMs / peakNoteDurationMs / troughNoteDurationMs
+// / firstNoteDurationMs / lastNoteDurationMs / durationSpanMs /
+// audiblePitchSpanHz / audibleDurationSpanMs /
+// meanRestDurationMs / peakRestDurationMs / troughRestDurationMs
+// / restDurationSpanMs / firstRestDurationMs /
+// lastRestDurationMs / restDurationEndpointSpanMs /
+// meanRestEndpointDurationMs / meanNoteEndpointDurationMs /
+// meanEndpointDurationMs / meanEndpointSpanMs /
+// meanEnvelopeSpanMs cluster.
+uint16_t PhoneSystemTones::meanEnvelopeDurationMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const uint32_t audibleCentre = (uint32_t) meanNoteDurationMs(id);
+	const uint32_t restCentre    = (uint32_t) meanRestDurationMs(id);
+	const uint32_t mean          = (audibleCentre + restCentre) / 2u;
+	if(mean > 0xFFFFU) return 0xFFFFU;
+	return (uint16_t) mean;
+}
