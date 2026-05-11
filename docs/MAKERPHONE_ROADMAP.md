@@ -3616,6 +3616,75 @@ lowest-numbered `[ ]`.
   derived structural-magnitude pair on the duration axis.
 
 
+- [x] **S263** -- `PhoneSystemTones::restDurationEndpointSpanMs(uint8_t id)`
+  derived rest-axis structural-endpoint magnitude accessor on
+  the DURATION axis. Returns the unsigned absolute difference,
+  in ms, between the catalogued LEADING rest-step duration
+  (`firstRestDurationMs(id)`, S261) and the catalogued TRAILING
+  rest-step duration (`lastRestDurationMs(id)`, S262) of the
+  underlying Melody --
+  `|firstRestDurationMs(id) - lastRestDurationMs(id)|`. The rest-
+  axis structural-endpoint sibling of `durationSpanMs(id)`
+  (S254) on the duration axis: where `durationSpanMs` reports
+  the magnitude of the (LEADING, TRAILING) audible-or-rest
+  structural endpoint pair in ms, `restDurationEndpointSpanMs`
+  reports the magnitude of the (LEADING, TRAILING) REST-only
+  structural endpoint pair in ms, so a future PhoneDiagScreen
+  "Sound test" walk that wants to render the silence-bookend
+  duration delta of a cue (how much longer or shorter the
+  trailing silence is than the leading silence) or a future
+  "Settings -> Sounds -> System chimes" picker row caption like
+  "(rest delta 40 ms)" can read a dedicated derived accessor
+  for the rest-axis structural-endpoint magnitude instead of
+  computing `|firstRestDurationMs(id) - lastRestDurationMs(id)|`
+  at the call site. Returns 0 for an out-of-range id, for the
+  (currently impossible) empty-melody case, for the no-rests-
+  melody case (both endpoint accessors collapse to 0), and
+  naturally for any chime whose LEADING and TRAILING rest-step
+  share an identical catalogued duration (including the
+  structural-degenerate single-rest case, where the LEADING
+  rest IS the TRAILING rest and the two accessors return the
+  same value). Profile-state INDEPENDENT: the catalogued rest-
+  endpoint delta is the same on SILENT / MEETING profiles as
+  on GENERAL / OUTDOOR / HEADSET. Distinct from `durationSpanMs`
+  (structural endpoint magnitude -- audible-or-rest, not REST-
+  only), distinct from `audibleDurationSpanMs` (audible-axis
+  CEILING-FLOOR magnitude, not REST-axis endpoint magnitude),
+  distinct from `restDurationSpanMs` (rest-axis CEILING-FLOOR
+  magnitude across every rest, not the LEADING-TRAILING
+  endpoint pair), distinct from `firstRestDurationMs` /
+  `lastRestDurationMs` (rest-axis endpoint values themselves,
+  not their unsigned difference). Cheap O(notes): two linear
+  scans (one forward via `firstRestDurationMs`, one reverse via
+  `lastRestDurationMs`) plus a single unsigned subtraction; no
+  engine interaction, no persisted state, no per-call
+  allocation. Header surface grows by exactly one public symbol
+  (`static uint16_t restDurationEndpointSpanMs`); the cpp adds
+  a single function next to the existing `count` / `valid` /
+  `name` / `melody` / `play` / `tryPlay` / `isSilenced` /
+  `durationMs` / `noteCount` / `firstFreqHz` / `lastFreqHz` /
+  `gapMs` / `loops` / `silhouette` / `pitchSpanHz` /
+  `peakFreqHz` / `troughFreqHz` / `meanFreqHz` /
+  `audibleNoteCount` / `restNoteCount` / `audibleDurationMs` /
+  `restDurationMs` / `gapTotalMs` / `meanNoteDurationMs` /
+  `peakNoteDurationMs` / `troughNoteDurationMs` /
+  `firstNoteDurationMs` / `lastNoteDurationMs` /
+  `durationSpanMs` / `audiblePitchSpanHz` /
+  `audibleDurationSpanMs` / `meanRestDurationMs` /
+  `peakRestDurationMs` / `troughRestDurationMs` /
+  `restDurationSpanMs` / `firstRestDurationMs` /
+  `lastRestDurationMs` cluster. No new includes, no new const
+  data, no new SPIFFS asset cost. Every existing call site of
+  the catalogue keeps byte-identical behaviour -- the new
+  helper is purely additive. Together with `durationSpanMs(id)`
+  (S254) this completes the (audible-endpoint, rest-endpoint)
+  derived structural-magnitude pair on the duration axis; the
+  natural follow-up is the rest-axis CENTRE accessor on the
+  structural-endpoint corner (`meanRestEndpointDurationMs` --
+  the arithmetic mean of `firstRestDurationMs(id)` and
+  `lastRestDurationMs(id)`).
+
+
 
 ---
 

@@ -1713,3 +1713,48 @@ uint16_t PhoneSystemTones::lastRestDurationMs(uint8_t id){
 	}
 	return 0;
 }
+
+// S263 - derived rest-axis structural-endpoint magnitude accessor
+// on the DURATION axis for chime `id`. Returns the unsigned
+// absolute difference, in ms, between the catalogued LEADING
+// rest-step duration and the catalogued TRAILING rest-step
+// duration of the underlying Melody --
+// |firstRestDurationMs(id) - lastRestDurationMs(id)|. The rest-
+// axis structural-endpoint sibling of durationSpanMs(id) (S254)
+// on the duration axis: where durationSpanMs reports the
+// magnitude of the (LEADING, TRAILING) audible-or-rest
+// structural endpoint pair, S263 reports the magnitude of the
+// (LEADING, TRAILING) REST-only structural endpoint pair. Returns
+// 0 for an out-of-range id, for the (currently impossible)
+// empty-melody case, for the no-rests-melody case (both endpoint
+// accessors collapse to 0), and naturally for any chime whose
+// LEADING and TRAILING rest-step share an identical catalogued
+// duration (including the structural-degenerate single-rest
+// case, where the LEADING rest IS the TRAILING rest and the two
+// accessors return the same value). Distinct from durationSpanMs
+// (structural endpoint magnitude -- audible-or-rest, not REST-
+// only), audibleDurationSpanMs (audible-axis CEILING-FLOOR
+// magnitude), restDurationSpanMs (rest-axis CEILING-FLOOR
+// magnitude across every rest, not the LEADING-TRAILING endpoint
+// pair), firstRestDurationMs / lastRestDurationMs (rest-axis
+// endpoint values themselves, not their unsigned difference).
+// Cheap O(notes): two linear scans (one forward via
+// firstRestDurationMs, one reverse via lastRestDurationMs) plus a
+// single unsigned subtraction. Lives next to the existing count /
+// valid / name / melody / play / tryPlay / isSilenced /
+// durationMs / noteCount / firstFreqHz / lastFreqHz / gapMs /
+// loops / silhouette / pitchSpanHz / peakFreqHz / troughFreqHz /
+// meanFreqHz / audibleNoteCount / restNoteCount /
+// audibleDurationMs / restDurationMs / gapTotalMs /
+// meanNoteDurationMs / peakNoteDurationMs / troughNoteDurationMs
+// / firstNoteDurationMs / lastNoteDurationMs / durationSpanMs /
+// audiblePitchSpanHz / audibleDurationSpanMs / meanRestDurationMs
+// / peakRestDurationMs / troughRestDurationMs /
+// restDurationSpanMs / firstRestDurationMs / lastRestDurationMs
+// cluster.
+uint16_t PhoneSystemTones::restDurationEndpointSpanMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const uint16_t first = firstRestDurationMs(id);
+	const uint16_t last  = lastRestDurationMs(id);
+	return (first > last) ? (uint16_t)(first - last) : (uint16_t)(last - first);
+}
