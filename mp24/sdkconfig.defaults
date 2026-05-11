@@ -1,0 +1,66 @@
+# MAKERphone v2.4 production firmware — sdkconfig.defaults
+#
+# Target: ESP32-S3FH4R2 (4 MB flash, 2 MB octal PSRAM)
+# Requires ESP-IDF v5.5+
+
+CONFIG_IDF_TARGET="esp32s3"
+
+# -------------------------------------------------------------------
+# Flash
+# -------------------------------------------------------------------
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+# -------------------------------------------------------------------
+# PSRAM (Decision: enabled for production)
+# ESP32-S3FH4R2 has 2 MB octal PSRAM. Useful for LVGL double buffers,
+# audio mixing buffers, and the GSM modem response cache.
+# -------------------------------------------------------------------
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+
+# -------------------------------------------------------------------
+# Console — Decision F1: USB CDC on the native USB-OTG peripheral
+# Frees GPIO 43/44 for UMAX I²C. Host sees a CDC serial device on
+# the existing USB-C connector.
+# -------------------------------------------------------------------
+CONFIG_ESP_CONSOLE_USB_CDC=y
+CONFIG_ESP_CONSOLE_USB_CDC_SUPPORT_ETS_PRINTF=y
+
+# -------------------------------------------------------------------
+# Logging
+# -------------------------------------------------------------------
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+CONFIG_LOG_MAXIMUM_LEVEL_DEBUG=y
+CONFIG_LOG_COLORS=y
+
+# -------------------------------------------------------------------
+# Watchdog — re-enabled for production
+# -------------------------------------------------------------------
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_INIT=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=y
+
+# -------------------------------------------------------------------
+# Partition table — Decision D
+# 4-entry layout: nvs + phy + 2 MB app + 2 MB SPIFFS
+# -------------------------------------------------------------------
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# -------------------------------------------------------------------
+# FreeRTOS — main app on PRO_CPU, peripheral / RF on APP_CPU
+# -------------------------------------------------------------------
+CONFIG_FREERTOS_HZ=1000
+
+# -------------------------------------------------------------------
+# Bootloader log level — quiet to keep boot fast
+# -------------------------------------------------------------------
+CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y

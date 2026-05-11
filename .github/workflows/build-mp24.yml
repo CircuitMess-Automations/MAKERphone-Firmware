@@ -1,0 +1,104 @@
+name: Build MP2.4 Firmware (ESP-IDF)
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'mp24/**'
+      - '.github/workflows/build-mp24.yml'
+  pull_request:
+    branches: [ master, main ]
+    paths:
+      - 'mp24/**'
+      - '.github/workflows/build-mp24.yml'
+  workflow_dispatch:
+
+jobs:
+  build-mp24:
+    runs-on: [self-hosted, bit-flash]
+    defaults:
+      run:
+        working-directory: mp24
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Locate or install ESP-IDF v5.5
+        shell: bash
+        run: |
+          # The self-hosted Mac runner may already have ESP-IDF installed
+          # (the legacy job has its own toolchain dance for arduino-cli;
+          # IDF lives elsewhere). Honour an existing install at the
+          # standard locations, then fall back to a per-runner install
+          # under ~/.espressif if nothing is found.
+          set -euo pipefail
+
+          # Candidate IDF roots, in preference order.
+          CANDIDATES=(
+            "$HOME/esp/v5.5/esp-idf"
+            "$HOME/esp/esp-idf"
+            "$HOME/.espressif/esp-idf-v5.5"
+            "/opt/esp/esp-idf"
+          )
+
+          IDF_PATH_FOUND=""
+          for c in "${CANDIDATES[@]}"; do
+            if [ -f "$c/export.sh" ]; then
+              IDF_PATH_FOUND="$c"
+              echo "Using existing ESP-IDF at $c"
+              break
+            fi
+          done
+
+          if [ -z "$IDF_PATH_FOUND" ]; then
+            echo "ESP-IDF not found in standard locations — installing v5.5"
+            mkdir -p "$HOME/esp"
+            cd "$HOME/esp"
+            if [ ! -d esp-idf ]; then
+              git clone --depth 1 --branch v5.5 \
+                https://github.com/espressif/esp-idf.git esp-idf
+              cd esp-idf
+              git submodule update --init --recursive --depth 1
+            fi
+            cd "$HOME/esp/esp-idf"
+            ./install.sh esp32s3
+            IDF_PATH_FOUND="$HOME/esp/esp-idf"
+          fi
+
+          echo "IDF_PATH=$IDF_PATH_FOUND" >> "$GITHUB_ENV"
+
+      - name: Build firmware
+        shell: bash
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source "$IDF_PATH/export.sh"
+          idf.py --version
+          idf.py set-target esp32s3
+          idf.py build
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mp24-firmware
+          path: |
+            mp24/build/makerphone_mp24.bin
+            mp24/build/bootloader/bootloader.bin
+            mp24/build/partition_table/partition-table.bin
+            mp24/build/flash_args
+          if-no-files-found: warn
+
+      - name: Flash to device (if connected)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source "$IDF_PATH/export.sh"
+          PORT=$(ls /dev/cu.usbmodem* /dev/cu.usbserial* /dev/cu.SLAB* \
+                    2>/dev/null | head -1 || true)
+          if [ -n "$PORT" ]; then
+            echo "Flashing to $PORT"
+            idf.py -p "$PORT" -b 460800 flash
+          else
+            echo "No device connected — skipping flash"
+          fi

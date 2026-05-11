@@ -1,0 +1,15 @@
+# MAKERphone v2.4 partition table — Decision D
+# Target: ESP32-S3FH4R2 (4 MB embedded flash)
+#
+# Layout:
+#   0x00000 - 0x08FFF   bootloader + partition table (handled by ESP-IDF)
+#   0x09000 - 0x0EFFF   nvs           (24 KB)  — Settings, contacts, NVS-backed state
+#   0x0F000 - 0x0FFFF   phy_init      (4 KB)   — RF calibration data
+#   0x10000 - 0x20FFFF  factory app   (2 MB)   — firmware
+#   0x210000 - 0x3FFFFF spiffs        (2 MB - 4 KB) — assets (intros, avatars, etc.)
+#
+# Name,    Type, SubType, Offset,   Size
+nvs,       data, nvs,     0x9000,   0x6000,
+phy_init,  data, phy,     0xF000,   0x1000,
+factory,   app,  factory, 0x10000,  0x200000,
+spiffs,    data, spiffs,  0x210000, 0x1F0000,

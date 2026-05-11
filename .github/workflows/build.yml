@@ -1,10 +1,22 @@
-name: Build MAKERphone Firmware
+name: Build Chatter Firmware (legacy)
 
 on:
   push:
     branches: [ master, main ]
+    paths:
+      - 'MAKERphone-Firmware.ino'
+      - 'src/**'
+      - 'libraries/**'
+      - 'data/**'
+      - '.github/workflows/build.yml'
   pull_request:
     branches: [ master, main ]
+    paths:
+      - 'MAKERphone-Firmware.ino'
+      - 'src/**'
+      - 'libraries/**'
+      - 'data/**'
+      - '.github/workflows/build.yml'
   workflow_dispatch:
 
 jobs:
