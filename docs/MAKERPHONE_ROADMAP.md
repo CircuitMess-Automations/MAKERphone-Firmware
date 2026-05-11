@@ -3544,6 +3544,78 @@ lowest-numbered `[ ]`.
   (S253) closed it on the audible side.
 
 
+- [x] **S262** -- `PhoneSystemTones::lastRestDurationMs(uint8_t id)`
+  structural TRAILING rest-step duration accessor on the
+  duration axis. Returns the catalogued duration in ms of the
+  LAST `PhoneRingtoneEngine::Note` entry whose `freq == 0` in
+  the underlying Melody. The trailing-endpoint sibling of
+  `firstRestDurationMs(id)` (S261) on the rest-axis structural-
+  endpoint corner, and the rest-axis analogue of
+  `lastNoteDurationMs(id)` (S253) on the audible-axis
+  structural-endpoint corner: where `lastNoteDurationMs(id)`
+  reads the catalogued TRAILING duration regardless of note-vs-
+  rest character, `lastRestDurationMs(id)` scans backward for
+  the LAST occurrence of a rest-step and reports the catalogued
+  duration the engine holds silence for at that TRAILING rest
+  position. With S261 it closes the rest-axis structural
+  endpoint pair (LEADING, TRAILING) in the same way
+  `firstNoteDurationMs` / `lastNoteDurationMs` (S252 / S253)
+  closed the audible-axis structural endpoint pair on the
+  duration axis, and in the same way `firstFreqHz` /
+  `lastFreqHz` (S234 / S235) closed the structural endpoint
+  pair on the pitch axis. Returns 0 for an out-of-range id,
+  for the (currently impossible) empty-melody case, for the
+  no-rests-melody case (a chime that contains zero `freq == 0`
+  steps), and naturally for any rest step the catalogue marks
+  with a zero duration -- the same "no answer" cases the rest-
+  axis sibling `firstRestDurationMs(id)` (S261) already
+  collapses to 0. Profile-state INDEPENDENT: the catalogued
+  trailing-rest duration is the same on SILENT / MEETING
+  profiles as on GENERAL / OUTDOOR / HEADSET. Distinct from
+  `firstRestDurationMs` (rest-axis LEADING endpoint, not
+  TRAILING), distinct from `lastNoteDurationMs` (structural
+  TRAILING duration -- trailing audible OR rest, whichever
+  comes last), distinct from `restDurationMs` (rest-step SUM
+  across the whole melody, not the TRAILING rest's duration),
+  distinct from `meanRestDurationMs` (rest-step CENTRE across
+  every rest, not the TRAILING rest), distinct from
+  `peakRestDurationMs` / `troughRestDurationMs` (rest CEILING
+  / FLOOR across every rest, not the TRAILING rest), distinct
+  from `restDurationSpanMs` (rest CEILING-FLOOR magnitude, not
+  the TRAILING rest), distinct from `restNoteCount` (rest-step
+  COUNT, not the TRAILING rest's duration). Cheap O(notes): a
+  single reverse linear scan that returns on the first
+  `freq == 0` hit from the trailing end; no engine interaction,
+  no persisted state, no per-call allocation; mirrors
+  `firstRestDurationMs(id)` (S261) exactly with the scan
+  direction flipped. Header surface grows by exactly one public
+  symbol (`static uint16_t lastRestDurationMs`); the cpp adds a
+  single function next to the existing `count` / `valid` /
+  `name` / `melody` / `play` / `tryPlay` / `isSilenced` /
+  `durationMs` / `noteCount` / `firstFreqHz` / `lastFreqHz` /
+  `gapMs` / `loops` / `silhouette` / `pitchSpanHz` /
+  `peakFreqHz` / `troughFreqHz` / `meanFreqHz` /
+  `audibleNoteCount` / `restNoteCount` / `audibleDurationMs` /
+  `restDurationMs` / `gapTotalMs` / `meanNoteDurationMs` /
+  `peakNoteDurationMs` / `troughNoteDurationMs` /
+  `firstNoteDurationMs` / `lastNoteDurationMs` /
+  `durationSpanMs` / `audiblePitchSpanHz` /
+  `audibleDurationSpanMs` / `meanRestDurationMs` /
+  `peakRestDurationMs` / `troughRestDurationMs` /
+  `restDurationSpanMs` / `firstRestDurationMs` cluster. No new
+  includes, no new const data, no new SPIFFS asset cost. Every
+  existing call site of the catalogue keeps byte-identical
+  behaviour -- the new helper is purely additive. Closes the
+  rest-axis structural endpoint pair on the duration axis; the
+  natural follow-up is a rest-axis structural-endpoint
+  MAGNITUDE accessor (`restDurationEndpointSpanMs` -- the
+  `|firstRestDurationMs(id) - lastRestDurationMs(id)|` derived
+  sibling of `durationSpanMs(id)` (S254) on the rest-axis
+  structural-endpoint corner), which together with S254 would
+  give the catalogue the full (audible-endpoint, rest-endpoint)
+  derived structural-magnitude pair on the duration axis.
+
+
 
 ---
 
