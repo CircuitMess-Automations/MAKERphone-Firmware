@@ -2961,6 +2961,108 @@ public:
 	 * MAGNITUDE pair.
 	 */
 	static uint16_t meanNoteEndpointDurationMs(uint8_t id);
+	/**
+	 * S266 -- Derived cross-axis structural-endpoint CENTRE-of-
+	 * CENTRES accessor on the DURATION axis for chime `id`.
+	 * Returns the arithmetic mean, in ms, of the audible-axis
+	 * structural-endpoint CENTRE (`meanNoteEndpointDurationMs(id)`,
+	 * S265) and the rest-axis structural-endpoint CENTRE
+	 * (`meanRestEndpointDurationMs(id)`, S264) of the underlying
+	 * Melody -- `(meanNoteEndpointDurationMs(id) +
+	 * meanRestEndpointDurationMs(id)) / 2`. The cross-axis
+	 * collapse of the (audible-endpoint CENTRE, rest-endpoint
+	 * CENTRE) duration-axis pair into a single CENTRE-of-CENTRES
+	 * scalar, in the same way that `meanFreqHz(id)` (S242)
+	 * collapses the (peakFreqHz, troughFreqHz) extrema pair on
+	 * the pitch axis. Sits on top of the now-closed
+	 * (audible-endpoint, rest-endpoint) x (MAGNITUDE, CENTRE)
+	 * 2x2 grid: `durationSpanMs(id)` (S254) and
+	 * `restDurationEndpointSpanMs(id)` (S263) close the
+	 * MAGNITUDE pair; `meanNoteEndpointDurationMs(id)` (S265)
+	 * and `meanRestEndpointDurationMs(id)` (S264) close the
+	 * CENTRE pair; S266 reduces the CENTRE pair to a single
+	 * cross-axis CENTRE-of-CENTRES scalar. A future
+	 * PhoneDiagScreen "Sound test" walk that wants to caption
+	 * the cross-axis bookend duration midpoint of a cue, or a
+	 * "Settings -> Sounds -> System chimes" picker row caption
+	 * like "(endpoint centre 85 ms)" can read a dedicated
+	 * derived accessor for the cross-axis structural-endpoint
+	 * CENTRE-of-CENTRES instead of computing
+	 * `(meanNoteEndpointDurationMs(id) +
+	 * meanRestEndpointDurationMs(id)) / 2` at the call site.
+	 *
+	 * Returns 0 for an out-of-range id, for the (currently
+	 * impossible) empty-melody case, and for the all-collapse
+	 * case where both endpoint CENTRE accessors return 0 (a
+	 * no-audible-notes AND no-rests melody, which today does
+	 * not exist in the catalogue but is handled defensively).
+	 * Returns the shared value for any chime whose audible-
+	 * endpoint CENTRE and rest-endpoint CENTRE happen to be
+	 * equal (the CENTRE-of-CENTRES of two equal scalars is that
+	 * same scalar). When only one axis has any steps (e.g. a
+	 * pure-tone all-audible melody where every rest accessor
+	 * collapses to 0), the CENTRE-of-CENTRES is exactly half of
+	 * the non-zero endpoint CENTRE -- this is the documented
+	 * defensive behaviour, not a bug, and reflects the fact that
+	 * the collapsed axis genuinely contributes a 0-ms structural
+	 * CENTRE to the cross-axis mean. Profile-state INDEPENDENT:
+	 * the catalogued cross-axis endpoint CENTRE-of-CENTRES is
+	 * the same on SILENT / MEETING profiles as on GENERAL /
+	 * OUTDOOR / HEADSET. Distinct from
+	 * `meanNoteEndpointDurationMs` (audible-axis structural-
+	 * endpoint CENTRE only, not the cross-axis collapse),
+	 * distinct from `meanRestEndpointDurationMs` (rest-axis
+	 * structural-endpoint CENTRE only, not the cross-axis
+	 * collapse), distinct from `durationSpanMs` /
+	 * `restDurationEndpointSpanMs` (structural-endpoint
+	 * MAGNITUDE accessors, not CENTRE), distinct from
+	 * `meanNoteDurationMs` / `meanRestDurationMs` (per-step
+	 * CENTRE accessors across every audible / rest step in the
+	 * melody, not just the LEADING-TRAILING structural pair),
+	 * distinct from `audibleDurationSpanMs` / `restDurationSpanMs`
+	 * (audible / rest CEILING-FLOOR envelope MAGNITUDE accessors,
+	 * not endpoint CENTRE).
+	 *
+	 * Cheap O(notes): four linear scans (one forward via
+	 * `firstNoteDurationMs`, one reverse via `lastNoteDurationMs`,
+	 * one forward via `firstRestDurationMs`, one reverse via
+	 * `lastRestDurationMs`, all reused through the S264 / S265
+	 * accessors) plus two unsigned additions and two divides-by-
+	 * two; no engine interaction, no persisted state, no per-
+	 * call allocation. Uses `uint32_t` for the intermediate sum
+	 * so the audible-CENTRE + rest-CENTRE addition never wraps
+	 * even at the full `uint16_t` ceiling. Header surface grows
+	 * by exactly one public symbol (`static uint16_t
+	 * meanEndpointDurationMs`); the cpp adds a single function
+	 * next to the existing `count` / `valid` / `name` / `melody`
+	 * / `play` / `tryPlay` / `isSilenced` / `durationMs` /
+	 * `noteCount` / `firstFreqHz` / `lastFreqHz` / `gapMs` /
+	 * `loops` / `silhouette` / `pitchSpanHz` / `peakFreqHz` /
+	 * `troughFreqHz` / `meanFreqHz` / `audibleNoteCount` /
+	 * `restNoteCount` / `audibleDurationMs` / `restDurationMs` /
+	 * `gapTotalMs` / `meanNoteDurationMs` / `peakNoteDurationMs`
+	 * / `troughNoteDurationMs` / `firstNoteDurationMs` /
+	 * `lastNoteDurationMs` / `durationSpanMs` /
+	 * `audiblePitchSpanHz` / `audibleDurationSpanMs` /
+	 * `meanRestDurationMs` / `peakRestDurationMs` /
+	 * `troughRestDurationMs` / `restDurationSpanMs` /
+	 * `firstRestDurationMs` / `lastRestDurationMs` /
+	 * `restDurationEndpointSpanMs` / `meanRestEndpointDurationMs`
+	 * / `meanNoteEndpointDurationMs` cluster. No new includes,
+	 * no new const data, no new SPIFFS asset cost. Every
+	 * existing call site of the catalogue keeps byte-identical
+	 * behaviour -- the new helper is purely additive. Together
+	 * with S264 and S265 this lifts the duration-axis
+	 * structural-endpoint CENTRE corner from a (audible, rest)
+	 * pair to a single cross-axis scalar; the natural follow-up
+	 * is the cross-axis MAGNITUDE-of-MAGNITUDES collapse
+	 * (arithmetic mean of `durationSpanMs(id)` and
+	 * `restDurationEndpointSpanMs(id)`), or a cross-axis ratio
+	 * such as `restDurationEndpointSpanMs / durationSpanMs`
+	 * reporting what fraction of the structural-endpoint
+	 * duration spread is attributable to the rest-step bookends.
+	 */
+	static uint16_t meanEndpointDurationMs(uint8_t id);
 };
 
 #endif // MAKERPHONE_PHONESYSTEMTONES_H
