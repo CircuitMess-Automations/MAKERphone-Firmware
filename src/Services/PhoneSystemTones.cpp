@@ -1915,3 +1915,54 @@ uint16_t PhoneSystemTones::meanEndpointDurationMs(uint8_t id){
 	if(mean > 0xFFFFU) return 0xFFFFU;
 	return (uint16_t) mean;
 }
+
+// S267 - derived cross-axis structural-endpoint MAGNITUDE-of-
+// MAGNITUDES accessor on the DURATION axis for chime `id`.
+// Returns the arithmetic mean, in ms, of the audible-axis
+// structural-endpoint MAGNITUDE (durationSpanMs(id), S254) and
+// the rest-axis structural-endpoint MAGNITUDE
+// (restDurationEndpointSpanMs(id), S263) of the underlying
+// Melody -- (durationSpanMs(id) +
+//            restDurationEndpointSpanMs(id)) / 2.
+// The cross-axis collapse of the (audible-endpoint MAGNITUDE,
+// rest-endpoint MAGNITUDE) duration-axis pair into a single
+// MAGNITUDE-of-MAGNITUDES scalar, the MAGNITUDE-axis sibling of
+// meanEndpointDurationMs(id) (S266) which collapses the CENTRE
+// pair. Closes the (MAGNITUDE-of-MAGNITUDES, CENTRE-of-CENTRES)
+// cross-axis structural-endpoint corner on the duration axis:
+// S266 supplies the CENTRE-of-CENTRES scalar, S267 supplies the
+// MAGNITUDE-of-MAGNITUDES scalar. Returns 0 for an out-of-range
+// id, for the (currently impossible) empty-melody case, and for
+// the all-collapse case where both endpoint MAGNITUDE accessors
+// return 0. Returns the shared value when the audible-endpoint
+// MAGNITUDE and the rest-endpoint MAGNITUDE happen to be equal.
+// When only one axis has structural spread, the MAGNITUDE-of-
+// MAGNITUDES is exactly half of the non-zero endpoint MAGNITUDE
+// -- documented defensive behaviour. Profile-state INDEPENDENT.
+// Cheap O(notes): four linear scans (reused through the S254 /
+// S263 accessors) plus two unsigned additions and one divide-by-
+// two; no engine interaction, no persisted state, no per-call
+// allocation. Uses uint32_t for the intermediate sum so the
+// audible-MAGNITUDE + rest-MAGNITUDE addition never wraps even
+// at the full uint16_t ceiling. Lives next to the existing
+// count / valid / name / melody / play / tryPlay / isSilenced /
+// durationMs / noteCount / firstFreqHz / lastFreqHz / gapMs /
+// loops / silhouette / pitchSpanHz / peakFreqHz / troughFreqHz
+// / meanFreqHz / audibleNoteCount / restNoteCount /
+// audibleDurationMs / restDurationMs / gapTotalMs /
+// meanNoteDurationMs / peakNoteDurationMs / troughNoteDurationMs
+// / firstNoteDurationMs / lastNoteDurationMs / durationSpanMs /
+// audiblePitchSpanHz / audibleDurationSpanMs /
+// meanRestDurationMs / peakRestDurationMs / troughRestDurationMs
+// / restDurationSpanMs / firstRestDurationMs /
+// lastRestDurationMs / restDurationEndpointSpanMs /
+// meanRestEndpointDurationMs / meanNoteEndpointDurationMs /
+// meanEndpointDurationMs cluster.
+uint16_t PhoneSystemTones::meanEndpointSpanMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const uint32_t audibleSpan = (uint32_t) durationSpanMs(id);
+	const uint32_t restSpan    = (uint32_t) restDurationEndpointSpanMs(id);
+	const uint32_t mean        = (audibleSpan + restSpan) / 2u;
+	if(mean > 0xFFFFU) return 0xFFFFU;
+	return (uint16_t) mean;
+}

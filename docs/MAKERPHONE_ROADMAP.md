@@ -3950,6 +3950,100 @@ lowest-numbered `[ ]`.
   what fraction of the structural-endpoint duration spread
   is attributable to the rest-step bookends.
 
+- [x] **S267** -- `PhoneSystemTones::meanEndpointSpanMs(uint8_t id)`
+  derived cross-axis structural-endpoint MAGNITUDE-of-
+  MAGNITUDES accessor on the DURATION axis. Returns the
+  arithmetic mean, in ms, of the audible-axis structural-
+  endpoint MAGNITUDE (`durationSpanMs(id)`, S254) and the
+  rest-axis structural-endpoint MAGNITUDE
+  (`restDurationEndpointSpanMs(id)`, S263) of the underlying
+  Melody -- `(durationSpanMs(id) +
+  restDurationEndpointSpanMs(id)) / 2`. Collapses the
+  (audible-endpoint MAGNITUDE, rest-endpoint MAGNITUDE)
+  duration-axis pair into a single cross-axis MAGNITUDE-of-
+  MAGNITUDES scalar, the MAGNITUDE-axis sibling of
+  `meanEndpointDurationMs(id)` (S266) which collapses the
+  CENTRE pair. Closes the (MAGNITUDE-of-MAGNITUDES,
+  CENTRE-of-CENTRES) cross-axis structural-endpoint corner:
+  S266 supplies the CENTRE-of-CENTRES scalar, S267 supplies
+  the MAGNITUDE-of-MAGNITUDES scalar, completing the cross-
+  axis collapse of the (audible-endpoint, rest-endpoint) x
+  (MAGNITUDE, CENTRE) 2x2 grid into a single (MAGNITUDE,
+  CENTRE) cross-axis pair. A future PhoneDiagScreen "Sound
+  test" walk that wants to caption the cross-axis bookend
+  duration spread of a cue, or a "Settings -> Sounds ->
+  System chimes" picker row caption like "(endpoint spread
+  60 ms)" can read a dedicated derived accessor for the
+  cross-axis structural-endpoint MAGNITUDE-of-MAGNITUDES
+  instead of computing `(durationSpanMs(id) +
+  restDurationEndpointSpanMs(id)) / 2` at the call site.
+  Returns 0 for an out-of-range id, for the (currently
+  impossible) empty-melody case, and for the all-collapse
+  case where both endpoint MAGNITUDE accessors return 0
+  (a single-audible-step AND single-rest-step melody, or a
+  no-audible-notes AND no-rests melody). Returns the shared
+  value for any chime whose audible-endpoint MAGNITUDE and
+  rest-endpoint MAGNITUDE happen to be equal. When only one
+  axis has structural spread (e.g. a flat-duration audible
+  envelope where `durationSpanMs` collapses to 0), the
+  MAGNITUDE-of-MAGNITUDES is exactly half of the non-zero
+  endpoint MAGNITUDE -- documented defensive behaviour,
+  reflecting that the collapsed axis genuinely contributes a
+  0-ms structural MAGNITUDE to the cross-axis mean. Profile-
+  state INDEPENDENT: the catalogued cross-axis endpoint
+  MAGNITUDE-of-MAGNITUDES is the same on SILENT / MEETING
+  profiles as on GENERAL / OUTDOOR / HEADSET. Distinct from
+  `durationSpanMs` (audible-axis structural-endpoint
+  MAGNITUDE only, not the cross-axis collapse), distinct
+  from `restDurationEndpointSpanMs` (rest-axis structural-
+  endpoint MAGNITUDE only, not the cross-axis collapse),
+  distinct from `meanEndpointDurationMs` (cross-axis
+  structural-endpoint CENTRE-of-CENTRES, not MAGNITUDE-of-
+  MAGNITUDES), distinct from `meanNoteEndpointDurationMs` /
+  `meanRestEndpointDurationMs` (per-axis structural-endpoint
+  CENTRE accessors, not MAGNITUDE), distinct from
+  `audibleDurationSpanMs` / `restDurationSpanMs` (audible /
+  rest CEILING-FLOOR envelope MAGNITUDE accessors, not
+  endpoint MAGNITUDE). Cheap O(notes): four linear scans
+  (one forward via `firstNoteDurationMs`, one reverse via
+  `lastNoteDurationMs`, one forward via `firstRestDurationMs`,
+  one reverse via `lastRestDurationMs`, all reused through
+  the S254 / S263 accessors) plus two unsigned additions and
+  one divide-by-two; no engine interaction, no persisted
+  state, no per-call allocation. Uses `uint32_t` for the
+  intermediate sum so the audible-MAGNITUDE + rest-MAGNITUDE
+  addition never wraps even at the full `uint16_t` ceiling.
+  Header surface grows by exactly one public symbol
+  (`static uint16_t meanEndpointSpanMs`); the cpp adds a
+  single function next to the existing `count` / `valid` /
+  `name` / `melody` / `play` / `tryPlay` / `isSilenced` /
+  `durationMs` / `noteCount` / `firstFreqHz` / `lastFreqHz`
+  / `gapMs` / `loops` / `silhouette` / `pitchSpanHz` /
+  `peakFreqHz` / `troughFreqHz` / `meanFreqHz` /
+  `audibleNoteCount` / `restNoteCount` / `audibleDurationMs`
+  / `restDurationMs` / `gapTotalMs` / `meanNoteDurationMs`
+  / `peakNoteDurationMs` / `troughNoteDurationMs` /
+  `firstNoteDurationMs` / `lastNoteDurationMs` /
+  `durationSpanMs` / `audiblePitchSpanHz` /
+  `audibleDurationSpanMs` / `meanRestDurationMs` /
+  `peakRestDurationMs` / `troughRestDurationMs` /
+  `restDurationSpanMs` / `firstRestDurationMs` /
+  `lastRestDurationMs` / `restDurationEndpointSpanMs` /
+  `meanRestEndpointDurationMs` / `meanNoteEndpointDurationMs`
+  / `meanEndpointDurationMs` cluster. No new includes, no
+  new const data, no new SPIFFS asset cost. Every existing
+  call site of the catalogue keeps byte-identical behaviour
+  -- the new helper is purely additive. Together with S266
+  this closes the (MAGNITUDE-of-MAGNITUDES, CENTRE-of-
+  CENTRES) cross-axis structural-endpoint corner on the
+  duration axis; the natural follow-up is a cross-axis
+  ratio such as `meanEndpointSpanMs / meanEndpointDurationMs`
+  reporting the relative cross-axis structural-endpoint
+  spread/centre balance, or extending the same MAGNITUDE-
+  of-MAGNITUDES + CENTRE-of-CENTRES pair onto the CEILING-
+  FLOOR envelope axis (`audibleDurationSpanMs` +
+  `restDurationSpanMs`).
+
 
 ---
 
