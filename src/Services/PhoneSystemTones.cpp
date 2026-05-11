@@ -1580,3 +1580,42 @@ uint16_t PhoneSystemTones::troughRestDurationMs(uint8_t id){
 	}
 	return found ? trough : 0;
 }
+
+// S260 - derived rest-CEILING-FLOOR magnitude accessor on the
+// DURATION axis. Returns the unsigned absolute difference, in
+// milliseconds, between the catalogued per-rest-step CEILING note
+// duration and the catalogued per-rest-step FLOOR note duration of
+// the underlying Melody --
+// peakRestDurationMs(id) - troughRestDurationMs(id) (always non-
+// negative by construction, since peakRestDurationMs is a max-
+// search and troughRestDurationMs is a min-search across the same
+// rest-step subset, so peak >= trough is invariant). The rest-
+// axis sibling of audibleDurationSpanMs(id) (S256) on the
+// audible-duration envelope axis: where audibleDurationSpanMs(id)
+// reports the magnitude of the (CEILING, FLOOR) AUDIBLE envelope,
+// restDurationSpanMs(id) reports the magnitude of the
+// (CEILING, FLOOR) REST envelope. Returns 0 for an out-of-range
+// id (collapsing transparently because both peakRestDurationMs(id)
+// and troughRestDurationMs(id) already collapse to 0 there), for
+// the (currently impossible) empty-melody case, for the no-rests-
+// melody case (both sides collapse to 0 there too), and naturally
+// for any flat-rest-duration chime whose rest CEILING and FLOOR
+// coincide. Cheap O(notes): mirrors audibleDurationSpanMs(id)
+// (S256) exactly with peakRestDurationMs / troughRestDurationMs
+// substituted for peakNoteDurationMs / troughNoteDurationMs. Lives
+// next to the existing count / valid / name / melody / play /
+// tryPlay / isSilenced / durationMs / noteCount / firstFreqHz /
+// lastFreqHz / gapMs / loops / silhouette / pitchSpanHz /
+// peakFreqHz / troughFreqHz / meanFreqHz / audibleNoteCount /
+// restNoteCount / audibleDurationMs / restDurationMs /
+// gapTotalMs / meanNoteDurationMs / peakNoteDurationMs /
+// troughNoteDurationMs / firstNoteDurationMs /
+// lastNoteDurationMs / durationSpanMs / audiblePitchSpanHz /
+// audibleDurationSpanMs / meanRestDurationMs /
+// peakRestDurationMs / troughRestDurationMs cluster.
+uint16_t PhoneSystemTones::restDurationSpanMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const uint16_t peak = peakRestDurationMs(id);
+	const uint16_t trough = troughRestDurationMs(id);
+	return (peak >= trough) ? (uint16_t)(peak - trough) : (uint16_t)(trough - peak);
+}

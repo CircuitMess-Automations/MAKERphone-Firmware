@@ -3362,6 +3362,124 @@ lowest-numbered `[ ]`.
   troughRestDurationMs`) that mirrors `audibleDurationSpanMs`
   (S256) on the audible-duration axis.
 
+- [x] **S260** -- `PhoneSystemTones::restDurationSpanMs(uint8_t id)`
+  derived rest-CEILING-FLOOR magnitude accessor on the DURATION
+  axis. Returns the unsigned absolute difference, in
+  milliseconds, between the catalogued per-rest-step CEILING note
+  duration and the catalogued per-rest-step FLOOR note duration
+  of the underlying Melody -- `peakRestDurationMs(id) -
+  troughRestDurationMs(id)` (always non-negative by construction,
+  since `peakRestDurationMs` is a max-search and
+  `troughRestDurationMs` is a min-search across the same rest-
+  step subset, so `peak >= trough` is invariant). The rest-axis
+  sibling of `audibleDurationSpanMs(id)` (S256) on the audible-
+  duration envelope axis: where `audibleDurationSpanMs(id)`
+  reports the magnitude of the (CEILING, FLOOR) AUDIBLE envelope
+  so a caller can render an audible-duration-range tick at the
+  full envelope of the audible steps, `restDurationSpanMs(id)`
+  reports the magnitude of the (CEILING, FLOOR) REST envelope
+  so the same caller can render a rest-duration-range tick at
+  the full envelope of the silent steps. Builds directly on the
+  S258 / S259 pair (`peakRestDurationMs` /
+  `troughRestDurationMs`) that closed the rest-CEILING / FLOOR
+  pair on the duration axis; S260 promotes that pair to a
+  derived MAGNITUDE accessor in the same way S256 promoted the
+  S250 / S251 audible CEILING / FLOOR pair (`peakNoteDurationMs`
+  / `troughNoteDurationMs`) to `audibleDurationSpanMs`, S254
+  promoted the S252 / S253 endpoint pair
+  (`firstNoteDurationMs` / `lastNoteDurationMs`) to
+  `durationSpanMs`, S239 promoted (`firstFreqHz` /
+  `lastFreqHz`) to `pitchSpanHz`, and S255 promoted
+  (`peakFreqHz` / `troughFreqHz`) to `audiblePitchSpanHz`. The
+  duration-axis structural / audible / rest / derived shape now
+  matches the pitch-axis shape on the rest side too:
+  `peakRestDurationMs` / `troughRestDurationMs` (S258 / S259) at
+  the rest CEILING / FLOOR, and now `restDurationSpanMs` (S260)
+  at the rest CEILING / FLOOR magnitude. So a future
+  `PhoneDiagScreen` "Sound test" walk that wants to render the
+  rest-duration range of a cue (e.g. the full horizontal extent
+  of a rest-duration-bar between longest-rest tick and shortest-
+  rest tick) or a future "Settings -> Sounds -> System chimes"
+  picker row caption like "(rest spans 200 ms)" can read a
+  dedicated derived accessor for the rest-axis envelope
+  magnitude instead of computing `peakRestDurationMs(id) -
+  troughRestDurationMs(id)` at the call site. Returns 0 for an
+  out-of-range id (collapsing transparently because both
+  `peakRestDurationMs(id)` and `troughRestDurationMs(id)` already
+  collapse to 0 there), for the (currently impossible) empty-
+  melody case, for the no-rests-melody case (both sides collapse
+  to 0 there too), and naturally for any flat-rest-duration
+  chime whose rest CEILING and FLOOR coincide. Saturates at
+  `0xFFFF` ms (the same uint16_t ceiling the duration cluster
+  `durationMs` / `audibleDurationMs` / `restDurationMs` /
+  `gapTotalMs` / `meanNoteDurationMs` / `peakNoteDurationMs` /
+  `troughNoteDurationMs` / `firstNoteDurationMs` /
+  `lastNoteDurationMs` / `durationSpanMs` /
+  `audibleDurationSpanMs` / `meanRestDurationMs` /
+  `peakRestDurationMs` / `troughRestDurationMs` already share);
+  since both inputs are themselves uint16_t and the subtraction
+  is always non-negative the cap is in practice unreachable.
+  Distinct from `audibleDurationSpanMs` (audible envelope
+  magnitude on the duration axis, not rest envelope magnitude),
+  distinct from `durationSpanMs` (structural endpoint magnitude
+  on the duration axis, not rest CEILING / FLOOR magnitude),
+  distinct from `peakRestDurationMs` / `troughRestDurationMs`
+  (the catalogued rest CEILING / FLOOR themselves, not the
+  magnitude between them), distinct from `meanRestDurationMs`
+  (rest-axis per-step CENTRE, not envelope magnitude), distinct
+  from `peakNoteDurationMs` / `troughNoteDurationMs` (audible-
+  axis per-step extents), distinct from `meanNoteDurationMs`
+  (audible-step CENTRE), distinct from `firstNoteDurationMs` /
+  `lastNoteDurationMs` (structural endpoints on the audible-
+  duration axis), distinct from `audiblePitchSpanHz` /
+  `pitchSpanHz` (pitch axis magnitudes, not duration axis),
+  distinct from `restDurationMs` (rest-step duration TOTAL, not
+  envelope magnitude), distinct from `audibleDurationMs`
+  (audible-step duration TOTAL), distinct from `gapTotalMs` /
+  `gapMs` (inter-step filler component, not per-rest envelope
+  magnitude), distinct from `silhouette` (signed tilt sign, not
+  absolute rest magnitude). Profile-state INDEPENDENT: the
+  catalogued rest envelope magnitude is the same on SILENT /
+  MEETING profiles as on GENERAL / OUTDOOR / HEADSET. Cheap
+  O(notes): two linear scans (max + min, mirroring the S258 /
+  S259 implementations exactly) plus one subtraction; no engine
+  interaction, no persisted state, no per-call allocation;
+  mirrors `audibleDurationSpanMs(id)` (S256) exactly with
+  `peakRestDurationMs` / `troughRestDurationMs` substituted for
+  `peakNoteDurationMs` / `troughNoteDurationMs`. Delegates
+  straight to the S258 / S259 CEILING / FLOOR pair so the
+  catalogued `Note*` array is walked twice per call, exactly
+  matching the `audibleDurationSpanMs` cost model. Header
+  surface grows by exactly one public symbol (`static uint16_t
+  restDurationSpanMs`); the cpp adds a single function next to
+  the existing `count` / `valid` / `name` / `melody` / `play` /
+  `tryPlay` / `isSilenced` / `durationMs` / `noteCount` /
+  `firstFreqHz` / `lastFreqHz` / `gapMs` / `loops` /
+  `silhouette` / `pitchSpanHz` / `peakFreqHz` / `troughFreqHz` /
+  `meanFreqHz` / `audibleNoteCount` / `restNoteCount` /
+  `audibleDurationMs` / `restDurationMs` / `gapTotalMs` /
+  `meanNoteDurationMs` / `peakNoteDurationMs` /
+  `troughNoteDurationMs` / `firstNoteDurationMs` /
+  `lastNoteDurationMs` / `durationSpanMs` / `audiblePitchSpanHz`
+  / `audibleDurationSpanMs` / `meanRestDurationMs` /
+  `peakRestDurationMs` / `troughRestDurationMs` cluster. No new
+  includes, no new const data, no new SPIFFS asset cost. Every
+  existing call site of the catalogue keeps byte-identical
+  behaviour -- the new helper is purely additive. Closes the
+  rest-axis envelope-magnitude corner at full symmetry with the
+  audible-axis envelope-magnitude corner
+  (`audibleDurationSpanMs`, S256) on the duration axis,
+  completing the (audible-envelope, rest-envelope) derived-
+  magnitude pair on the duration side; the natural follow-up is
+  the rest-axis CENTRE/CEILING/FLOOR triad's POSITION-WITHIN-
+  ENVELOPE accessor (the rest-axis analogue of S237's
+  `meanFreqHz`-vs-extrema position metric on the pitch axis)
+  or a structural-vs-envelope cross-axis ratio (e.g.
+  `audibleDurationSpanMs / durationSpanMs` to report what
+  fraction of the structural-endpoint duration spread is
+  attributable to the audible-step envelope rather than the
+  rest-step / gap residue).
+
 
 
 ---
