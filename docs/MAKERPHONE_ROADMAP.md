@@ -4044,6 +4044,84 @@ lowest-numbered `[ ]`.
   FLOOR envelope axis (`audibleDurationSpanMs` +
   `restDurationSpanMs`).
 
+- [x] **S268** -- `PhoneSystemTones::meanEnvelopeSpanMs(uint8_t id)`
+  derived cross-axis CEILING-FLOOR envelope MAGNITUDE-of-
+  MAGNITUDES accessor on the DURATION axis. Returns the
+  arithmetic mean, in ms, of the audible-axis CEILING-FLOOR
+  envelope MAGNITUDE (`audibleDurationSpanMs(id)`, S256) and
+  the rest-axis CEILING-FLOOR envelope MAGNITUDE
+  (`restDurationSpanMs(id)`, S260) of the underlying Melody --
+  `(audibleDurationSpanMs(id) + restDurationSpanMs(id)) / 2`.
+  The cross-axis collapse of the (audible-envelope MAGNITUDE,
+  rest-envelope MAGNITUDE) duration-axis pair into a single
+  MAGNITUDE-of-MAGNITUDES scalar, the envelope-axis sibling
+  of `meanEndpointSpanMs(id)` (S267) which collapses the same
+  pair on the structural-endpoint axis. Where S267 closes the
+  cross-axis MAGNITUDE-of-MAGNITUDES corner on the structural-
+  endpoint axis (FIRST/LAST per-axis bookend spread), S268
+  closes the cross-axis MAGNITUDE-of-MAGNITUDES corner on the
+  CEILING-FLOOR envelope axis (peak/trough per-axis spread).
+  Returns 0 for an out-of-range id, for the (currently
+  impossible) empty-melody case, and for the all-collapse case
+  where both envelope MAGNITUDE accessors return 0. Returns
+  the shared value for any chime whose audible-envelope
+  MAGNITUDE and rest-envelope MAGNITUDE happen to be equal.
+  When only one axis has envelope spread (e.g. a flat-duration
+  audible envelope where `audibleDurationSpanMs` collapses to
+  0), the MAGNITUDE-of-MAGNITUDES is exactly half of the non-
+  zero envelope MAGNITUDE -- documented defensive behaviour,
+  reflecting that the collapsed axis genuinely contributes a
+  0-ms envelope MAGNITUDE to the cross-axis mean. Profile-
+  state INDEPENDENT: the catalogued cross-axis envelope
+  MAGNITUDE-of-MAGNITUDES is the same on SILENT / MEETING
+  profiles as on GENERAL / OUTDOOR / HEADSET. Distinct from
+  `audibleDurationSpanMs` (audible-axis envelope MAGNITUDE
+  only, not the cross-axis collapse), distinct from
+  `restDurationSpanMs` (rest-axis envelope MAGNITUDE only,
+  not the cross-axis collapse), distinct from
+  `meanEndpointSpanMs` (cross-axis structural-endpoint
+  MAGNITUDE-of-MAGNITUDES on the FIRST/LAST bookend axis, not
+  the peak/trough envelope axis), distinct from
+  `meanEndpointDurationMs` (cross-axis structural-endpoint
+  CENTRE-of-CENTRES, not envelope MAGNITUDE), distinct from
+  `durationSpanMs` / `restDurationEndpointSpanMs` (per-axis
+  structural-endpoint MAGNITUDE accessors, not envelope).
+  Cheap O(notes): two peak/trough sweeps (reused through the
+  S256 / S260 accessors) plus two unsigned additions and one
+  divide-by-two; no engine interaction, no persisted state,
+  no per-call allocation. Uses `uint32_t` for the intermediate
+  sum so the audible-MAGNITUDE + rest-MAGNITUDE addition never
+  wraps even at the full `uint16_t` ceiling. Header surface
+  grows by exactly one public symbol (`static uint16_t
+  meanEnvelopeSpanMs`); the cpp adds a single function next
+  to the existing `count` / `valid` / `name` / `melody` /
+  `play` / `tryPlay` / `isSilenced` / `durationMs` /
+  `noteCount` / `firstFreqHz` / `lastFreqHz` / `gapMs` /
+  `loops` / `silhouette` / `pitchSpanHz` / `peakFreqHz` /
+  `troughFreqHz` / `meanFreqHz` / `audibleNoteCount` /
+  `restNoteCount` / `audibleDurationMs` / `restDurationMs` /
+  `gapTotalMs` / `meanNoteDurationMs` / `peakNoteDurationMs`
+  / `troughNoteDurationMs` / `firstNoteDurationMs` /
+  `lastNoteDurationMs` / `durationSpanMs` /
+  `audiblePitchSpanHz` / `audibleDurationSpanMs` /
+  `meanRestDurationMs` / `peakRestDurationMs` /
+  `troughRestDurationMs` / `restDurationSpanMs` /
+  `firstRestDurationMs` / `lastRestDurationMs` /
+  `restDurationEndpointSpanMs` / `meanRestEndpointDurationMs`
+  / `meanNoteEndpointDurationMs` / `meanEndpointDurationMs` /
+  `meanEndpointSpanMs` cluster. No new includes, no new const
+  data, no new SPIFFS asset cost. Every existing call site of
+  the catalogue keeps byte-identical behaviour -- the new
+  helper is purely additive. Together with S267 this lifts
+  the cross-axis MAGNITUDE-of-MAGNITUDES from the structural-
+  endpoint axis to also covering the CEILING-FLOOR envelope
+  axis, completing the (endpoint, envelope) x (MAGNITUDE-of-
+  MAGNITUDES) duration-axis pair; the natural follow-up is
+  the matching envelope-axis CENTRE-of-CENTRES (arithmetic
+  mean of `meanNoteDurationMs(id)` and
+  `meanRestDurationMs(id)`) to close the (endpoint, envelope)
+  x (MAGNITUDE, CENTRE) cross-axis 2x2 grid.
+
 
 ---
 
