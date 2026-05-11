@@ -1758,3 +1758,53 @@ uint16_t PhoneSystemTones::restDurationEndpointSpanMs(uint8_t id){
 	const uint16_t last  = lastRestDurationMs(id);
 	return (first > last) ? (uint16_t)(first - last) : (uint16_t)(last - first);
 }
+
+// S264 - derived rest-axis structural-endpoint CENTRE accessor on
+// the DURATION axis for chime `id`. Returns the arithmetic mean,
+// in ms, of the catalogued LEADING rest-step duration
+// (firstRestDurationMs(id), S261) and the catalogued TRAILING
+// rest-step duration (lastRestDurationMs(id), S262) of the
+// underlying Melody -- (firstRestDurationMs(id) +
+// lastRestDurationMs(id)) / 2. The rest-axis structural-endpoint
+// CENTRE sibling of restDurationEndpointSpanMs(id) (S263) on the
+// duration axis: where S263 reports the unsigned MAGNITUDE of the
+// (LEADING, TRAILING) REST-only structural endpoint pair, S264
+// reports the CENTRE of that same pair. Completes the (MAGNITUDE,
+// CENTRE) derived pair on the rest-axis structural-endpoint
+// corner of the duration axis. Returns 0 for an out-of-range id,
+// for the (currently impossible) empty-melody case, and for the
+// no-rests-melody case (both endpoint accessors collapse to 0).
+// Returns the shared catalogued duration for any chime whose
+// LEADING and TRAILING rest-step share an identical duration
+// (including the structural-degenerate single-rest case).
+// Distinct from restDurationEndpointSpanMs (rest-axis structural-
+// endpoint MAGNITUDE, not CENTRE), meanRestDurationMs (rest-axis
+// per-step CENTRE across every rest, not just the LEADING-
+// TRAILING pair), meanNoteDurationMs (audible-step per-step
+// CENTRE, not rest-step), firstRestDurationMs /
+// lastRestDurationMs (rest-axis endpoint values themselves, not
+// their arithmetic mean). Cheap O(notes): two linear scans (one
+// forward via firstRestDurationMs, one reverse via
+// lastRestDurationMs) plus a single unsigned addition and a
+// divide-by-two. Uses uint32_t for the intermediate sum so the
+// firstRest + lastRest addition never wraps even at the full
+// uint16_t ceiling. Lives next to the existing count / valid /
+// name / melody / play / tryPlay / isSilenced / durationMs /
+// noteCount / firstFreqHz / lastFreqHz / gapMs / loops /
+// silhouette / pitchSpanHz / peakFreqHz / troughFreqHz /
+// meanFreqHz / audibleNoteCount / restNoteCount /
+// audibleDurationMs / restDurationMs / gapTotalMs /
+// meanNoteDurationMs / peakNoteDurationMs / troughNoteDurationMs
+// / firstNoteDurationMs / lastNoteDurationMs / durationSpanMs /
+// audiblePitchSpanHz / audibleDurationSpanMs / meanRestDurationMs
+// / peakRestDurationMs / troughRestDurationMs /
+// restDurationSpanMs / firstRestDurationMs / lastRestDurationMs /
+// restDurationEndpointSpanMs cluster.
+uint16_t PhoneSystemTones::meanRestEndpointDurationMs(uint8_t id){
+	if(!valid(id)) return 0;
+	const uint32_t first = (uint32_t) firstRestDurationMs(id);
+	const uint32_t last  = (uint32_t) lastRestDurationMs(id);
+	const uint32_t mean  = (first + last) / 2u;
+	if(mean > 0xFFFFU) return 0xFFFFU;
+	return (uint16_t) mean;
+}

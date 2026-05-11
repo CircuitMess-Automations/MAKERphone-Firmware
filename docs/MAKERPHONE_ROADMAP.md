@@ -3685,6 +3685,88 @@ lowest-numbered `[ ]`.
   `lastRestDurationMs(id)`).
 
 
+- [x] **S264** -- `PhoneSystemTones::meanRestEndpointDurationMs(uint8_t id)`
+  derived rest-axis structural-endpoint CENTRE accessor on the
+  DURATION axis. Returns the arithmetic mean, in ms, of the
+  catalogued LEADING rest-step duration
+  (`firstRestDurationMs(id)`, S261) and the catalogued TRAILING
+  rest-step duration (`lastRestDurationMs(id)`, S262) of the
+  underlying Melody --
+  `(firstRestDurationMs(id) + lastRestDurationMs(id)) / 2`. The
+  rest-axis structural-endpoint CENTRE sibling of
+  `restDurationEndpointSpanMs(id)` (S263) on the duration axis:
+  where `restDurationEndpointSpanMs` reports the unsigned
+  MAGNITUDE of the (LEADING, TRAILING) REST-only structural
+  endpoint pair in ms, `meanRestEndpointDurationMs` reports the
+  CENTRE of that same pair in ms, so a future PhoneDiagScreen
+  "Sound test" walk that wants to caption the silence-bookend
+  duration midpoint of a cue or a future "Settings -> Sounds ->
+  System chimes" picker row caption like "(rest centre 60 ms)"
+  can read a dedicated derived accessor for the rest-axis
+  structural-endpoint CENTRE instead of computing
+  `(firstRestDurationMs(id) + lastRestDurationMs(id)) / 2` at
+  the call site. Completes the (MAGNITUDE, CENTRE) derived pair
+  on the rest-axis structural-endpoint corner of the duration
+  axis in the same way `meanNoteDurationMs(id)` (S249) sits
+  alongside the audible-axis envelope and `meanRestDurationMs(id)`
+  (S257) sits alongside the rest-axis envelope. Returns 0 for an
+  out-of-range id, for the (currently impossible) empty-melody
+  case, and for the no-rests-melody case (both endpoint accessors
+  collapse to 0, so their integer mean is also 0). Returns the
+  shared catalogued duration for any chime whose LEADING and
+  TRAILING rest-step share an identical duration (including the
+  structural-degenerate single-rest case, where the LEADING rest
+  IS the TRAILING rest and the mean of the two equal accessor
+  values is exactly that catalogued duration). Profile-state
+  INDEPENDENT: the catalogued rest-endpoint mean is the same on
+  SILENT / MEETING profiles as on GENERAL / OUTDOOR / HEADSET.
+  Distinct from `restDurationEndpointSpanMs` (rest-axis
+  structural-endpoint MAGNITUDE, not CENTRE), distinct from
+  `meanRestDurationMs` (rest-axis per-step CENTRE across every
+  rest in the melody, not just the LEADING-TRAILING pair),
+  distinct from `meanNoteDurationMs` (audible-step per-step
+  CENTRE, not rest-step), distinct from `firstRestDurationMs` /
+  `lastRestDurationMs` (rest-axis endpoint values themselves,
+  not their arithmetic mean), distinct from `durationSpanMs` /
+  `audibleDurationSpanMs` / `restDurationSpanMs` (derived
+  MAGNITUDE accessors on the duration axis, not CENTRE). Cheap
+  O(notes): two linear scans (one forward via
+  `firstRestDurationMs`, one reverse via `lastRestDurationMs`)
+  plus a single unsigned addition and a divide-by-two; no engine
+  interaction, no persisted state, no per-call allocation. Uses
+  `uint32_t` for the intermediate sum so the `firstRest +
+  lastRest` addition never wraps even at the full `uint16_t`
+  ceiling. Header surface grows by exactly one public symbol
+  (`static uint16_t meanRestEndpointDurationMs`); the cpp adds a
+  single function next to the existing `count` / `valid` /
+  `name` / `melody` / `play` / `tryPlay` / `isSilenced` /
+  `durationMs` / `noteCount` / `firstFreqHz` / `lastFreqHz` /
+  `gapMs` / `loops` / `silhouette` / `pitchSpanHz` /
+  `peakFreqHz` / `troughFreqHz` / `meanFreqHz` /
+  `audibleNoteCount` / `restNoteCount` / `audibleDurationMs` /
+  `restDurationMs` / `gapTotalMs` / `meanNoteDurationMs` /
+  `peakNoteDurationMs` / `troughNoteDurationMs` /
+  `firstNoteDurationMs` / `lastNoteDurationMs` /
+  `durationSpanMs` / `audiblePitchSpanHz` /
+  `audibleDurationSpanMs` / `meanRestDurationMs` /
+  `peakRestDurationMs` / `troughRestDurationMs` /
+  `restDurationSpanMs` / `firstRestDurationMs` /
+  `lastRestDurationMs` / `restDurationEndpointSpanMs` cluster.
+  No new includes, no new const data, no new SPIFFS asset cost.
+  Every existing call site of the catalogue keeps byte-identical
+  behaviour -- the new helper is purely additive. Together with
+  `restDurationEndpointSpanMs(id)` (S263) this closes the rest-
+  axis structural-endpoint (MAGNITUDE, CENTRE) derived pair on
+  the duration axis; the natural follow-up is a rest-axis
+  structural-endpoint POSITION-WITHIN-ENVELOPE accessor (the
+  rest-axis analogue of S237's `meanFreqHz`-vs-extrema position
+  metric on the pitch axis) or a cross-axis ratio such as
+  `restDurationEndpointSpanMs / durationSpanMs` reporting what
+  fraction of the structural-endpoint duration spread is
+  attributable to the rest-step bookends rather than the
+  audible-step bookends.
+
+
 
 ---
 
