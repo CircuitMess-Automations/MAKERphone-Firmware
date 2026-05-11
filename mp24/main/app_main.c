@@ -32,6 +32,7 @@
 #include "hal/xl9555.h"
 #include "hal/buttons.h"
 #include "hal/input_keypad.h"
+#include "hal/piezo.h"
 
 static const char *TAG = "MP24";
 
@@ -59,6 +60,19 @@ static void on_button_event(btn_id_t btn, bool pressed, void *ctx)
                                 | (pressed ? EVT_PRESSED : 0);
     atomic_store(&s_last_event_packed, packed);
 
+    /* Audible feedback on press — different frequency per button
+     * group, so a technician can tell at a glance whether the
+     * keypad-to-audio pipeline is working end-to-end. Releases are
+     * silent so we don't double-beep on a tap. */
+    if (pressed) {
+        uint32_t freq;
+        if (btn <= BTN_HASH)                       freq = 880;   /* numpad */
+        else if (btn <= BTN_FACE_D)                freq = 1320;  /* face A-D */
+        else if (btn <= BTN_JOY_CLICK)             freq = 660;   /* joystick */
+        else                                       freq = 440;   /* volume */
+        piezo_tone(freq, 40);   /* ~40 ms click */
+    }
+
     ESP_LOGI(TAG, "%s %s",
              pressed ? "PRESS  " : "release", btn_name(btn));
 }
@@ -77,7 +91,7 @@ static void print_banner(void)
     esp_chip_info_t info;
     esp_chip_info(&info);
     ESP_LOGI(TAG, "==========================================");
-    ESP_LOGI(TAG, " MAKERphone v2.4 firmware — S-MP04 input");
+    ESP_LOGI(TAG, " MAKERphone v2.4 firmware — S-MP05 audio");
     ESP_LOGI(TAG, " IDF=%s  chip=%s rev%d  cores=%d",
              esp_get_idf_version(),
              (info.model == CHIP_ESP32S3) ? "ESP32-S3" : "?",
@@ -104,8 +118,8 @@ static void draw_boot_screen(void)
     display_fill_rect(0, 0, TFT_WIDTH, 14, MP_ACCENT);
     display_str(4, 4, "MAKERphone v2.4", MP_BG, MP_ACCENT);
 
-    display_str(4, 22, "S-MP04  input HAL OK",  MP_TEXT, MP_BG);
-    display_str(4, 34, "23 buttons, IRQ-driven", MP_DIM,  MP_BG);
+    display_str(4, 22, "S-MP05  audio + input",  MP_TEXT, MP_BG);
+    display_str(4, 34, "23 btns, I2S piezo amp", MP_DIM,  MP_BG);
 
     /* Chroma stripe stays — visual confidence in every boot. */
     const int bar_y = 50;
@@ -119,9 +133,9 @@ static void draw_boot_screen(void)
     /* Labels for live values. */
     display_str(4, 64,  "Last :",        MP_DIM, MP_BG);
     display_str(4, 76,  "Events:",       MP_DIM, MP_BG);
-    display_str(4, 90,  "U5 raw:",       MP_DIM, MP_BG);
-    display_str(4, 102, "U9 raw:",       MP_DIM, MP_BG);
-    display_str(4, 116, "Press any key", MP_DIM, MP_BG);
+    display_str(4, 88,  "Tone :",        MP_DIM, MP_BG);
+    display_str(4, 100, "U5 raw:",       MP_DIM, MP_BG);
+    display_str(4, 112, "U9 raw:",       MP_DIM, MP_BG);
 }
 
 /* Erase a fixed strip first so changing-width values don't leave
@@ -152,11 +166,17 @@ static void update_dashboard(void)
     snprintf(buf, sizeof(buf), "%lu/%lu", (unsigned long)p, (unsigned long)r);
     redraw_value(58, 76, buf, MP_TEXT, MP_BG);
 
+    /* "Tone : 880 Hz" or "Tone : --" */
+    uint32_t freq = piezo_current_freq();
+    if (freq > 0) snprintf(buf, sizeof(buf), "%lu Hz", (unsigned long)freq);
+    else          snprintf(buf, sizeof(buf), "--");
+    redraw_value(46, 88, buf, freq > 0 ? MP_HILITE : MP_DIM, MP_BG);
+
     /* Raw 16-bit cached state per chip. */
     snprintf(buf, sizeof(buf), "0x%04X", input_keypad_raw(0));
-    redraw_value(58, 90, buf, MP_TEXT, MP_BG);
+    redraw_value(58, 100, buf, MP_TEXT, MP_BG);
     snprintf(buf, sizeof(buf), "0x%04X", input_keypad_raw(1));
-    redraw_value(58, 102, buf, MP_TEXT, MP_BG);
+    redraw_value(58, 112, buf, MP_TEXT, MP_BG);
 }
 
 /* ----------------------------------------------------------------- */
@@ -205,6 +225,23 @@ void app_main(void)
 
     if (input_keypad_init() != ESP_OK) {
         ESP_LOGW(TAG, "Keypad input HAL not started (continuing)");
+    }
+
+    /* Audio: piezo_init brings up I²S TX + spawns synth task. SD_MODE
+     * is already HIGH from aw9523b_init(). Non-fatal: a silent firmware
+     * is still useful for keypad debug. */
+    if (piezo_init() != ESP_OK) {
+        ESP_LOGW(TAG, "Piezo init failed (continuing silently)");
+    } else {
+        /* 3-note boot chime — C5 → E5 → G5 ascending arpeggio. The
+         * synth task starts producing samples while we sleep here, so
+         * the chime plays alongside the rest of bring-up. */
+        piezo_tone(523, 140);   /* C5 */
+        vTaskDelay(pdMS_TO_TICKS(150));
+        piezo_tone(659, 140);   /* E5 */
+        vTaskDelay(pdMS_TO_TICKS(150));
+        piezo_tone(784, 200);   /* G5 */
+        vTaskDelay(pdMS_TO_TICKS(220));
     }
 
     ESP_LOGI(TAG, "Entering live dashboard loop.");

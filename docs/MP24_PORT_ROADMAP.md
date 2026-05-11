@@ -26,9 +26,15 @@ partition, E=button alias remap to joystick/A/B/C/D, F=USB CDC console).
       interrupt, exposing CircuitOS-compatible `buttonPressed/Released`.
       Button enum: full MP2.4 set + Decision-E legacy aliases.
       Lifts `dashboard.c` `k_buttons[]` bit map verbatim.
-- [ ] **S-MP05** Audio shim — `PiezoI2S` with `Piezo.tone(freq, durMs)` API
-      synthesising square waves into MAX98357A on I²S1
-      (BCLK 39 / WS 40 / DOUT 38). SD_MODE driven via AW9523B P1_1.
+- [x] **S-MP05** Audio shim — native `hal/audio_i2s.{c,h}` and
+      `hal/piezo.{c,h}` with `piezo_tone(freq, dur_ms)` /
+      `piezo_no_tone()` synthesising integer-math square waves at
+      22.05 kHz into MAX98357A on I²S1. SD_MODE is asserted by
+      `aw9523b_init()` (P1_1). C++ CircuitOS `Audio/Piezo.h` shim
+      forwarding to this C API — and the BuzzerService /
+      PhoneRingtoneEngine / PhoneSystemTones bring-up — is left for
+      the next audio-side session once the shim component starts
+      being populated.
 - [ ] **S-MP06** Battery + power — ADC1_CH2 on GPIO 3, TL431-calibrated
       via CALIB_EN. Power button → ShutdownService. USB detect →
       ChargeChime. Brightness no-op + idle-dim = blank.
