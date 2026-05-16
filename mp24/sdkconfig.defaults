@@ -103,3 +103,19 @@ CONFIG_BOOTLOADER_LOG_LEVEL_INFO=y
 # the kind of upstream divergence we're explicitly trying to avoid.
 # -------------------------------------------------------------------
 CONFIG_COMPILER_CXX_EXCEPTIONS=y
+
+# -------------------------------------------------------------------
+# LVGL features needed by upstream src/ code
+#
+# S-MP17b discovery: Pics.cpp creates an lv_gif widget for any
+# .gif asset (used by sticker / emoji-pack assets that the
+# upstream firmware ships). lv_gif_create / lv_gif_set_src live
+# in the LV_USE_GIF feature module, off by default in LVGL 8's
+# Kconfig defaults.
+#
+# Cost: ~1 KB code + minimal RAM (only loaded when an animated
+# asset is actually used). Worth it — upstream Pics.cpp is a
+# header included from many screens and a missing widget here
+# poisons every transitive .cpp.
+# -------------------------------------------------------------------
+CONFIG_LV_USE_GIF=y
