@@ -67,6 +67,12 @@ idf_component_register(
         # header for the static-archive linking explanation.
         "shim/Anchor.cpp"
 
+        # S-MP17c: first real LVScreen subclass that runs on
+        # hardware. Replaces the temporary three-button boot UI
+        # in app_main. Proves the LVScreen → SCREEN_LOADED →
+        # LoopManager defer → onStart pipeline works at runtime.
+        "screens/TestScreen.cpp"
+
     INCLUDE_DIRS
         # Nothing exported to other components yet. Screens will be
         # invoked from chatter_app's own entry point eventually.

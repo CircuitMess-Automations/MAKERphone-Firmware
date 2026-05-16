@@ -161,24 +161,14 @@ static std::atomic<uint32_t> s_release_count {0};
 #define EVT_PRESSED (1u << 6)
 static std::atomic<uint32_t> s_last_event_packed {0};
 
-/* S-MP16c — LVGL screen objects + timer callback.
- *
- * s_lvgl_btn_label is created at boot and refreshed every 200 ms
- * by mp24_status_timer_cb (registered with lv_timer_create). The
- * callback runs from inside lv_timer_handler (i.e. the LVGL task),
- * so all LVGL API calls happen from a single thread. The data it
- * reads (s_press_count) is an atomic — safe to load from any task. */
-static lv_obj_t *s_lvgl_btn_label = NULL;
-
-static void mp24_status_timer_cb(lv_timer_t *t)
-{
-    (void)t;
-    if (s_lvgl_btn_label == NULL) return;
-    char buf[32];
-    snprintf(buf, sizeof(buf), "btn: %lu",
-             (unsigned long) s_press_count.load());
-    lv_label_set_text(s_lvgl_btn_label, buf);
-}
+/* S-MP17c: the status-label timer that used to live here was
+ * removed when TestScreen replaced the three-button boot UI.
+ * That UI built s_lvgl_btn_label as a widget on lv_scr_act();
+ * since TestScreen now lv_scr_loads its own screen instead, the
+ * old label widget is orphaned and the timer callback would
+ * write to a hidden (or freed) object. If we want a press
+ * counter on TestScreen later, we add it as a widget inside
+ * TestScreen and refresh it from a TestScreen-owned timer. */
 
 static void on_button_event(btn_id_t btn, bool pressed, void *ctx)
 {
@@ -439,55 +429,30 @@ extern "C" void app_main(void)
     if (lvgl_glue_init() != ESP_OK) {
         ESP_LOGE(TAG, "LVGL init failed — continuing without UI");
     } else {
-        ESP_LOGI(TAG, "LVGL initialised, building boot UI");
+        ESP_LOGI(TAG, "LVGL initialised, instantiating TestScreen");
 
-        lv_obj_t *scr = lv_scr_act();
-        lv_obj_set_style_bg_color(scr,
-                                  lv_color_hex(0x140C24),   /* MP_BG */
-                                  LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
-
-        /* "MP2.4" title at the top — non-focusable label, doesn't
-         * join the navigation group. */
-        lv_obj_t *title = lv_label_create(scr);
-        lv_label_set_text(title, "MP2.4");
-        lv_obj_set_style_text_color(title,
-                                    lv_color_hex(0xFF8C1E), /* MP_ACCENT */
-                                    LV_PART_MAIN);
-        lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 4);
-
-        /* S-MP16d: focusable button column to visually demonstrate
-         * keypad navigation. Three lv_btn widgets stacked vertically,
-         * each auto-added to the default group (created in
-         * lvgl_glue_init), so JOY_UP/DOWN move the focus highlight
-         * and JOY_CLICK fires the click event. With no event handler
-         * attached the click just visually pulses the button — that
-         * pulse is the proof.
+        /* S-MP17c: replace the temporary three-button boot UI
+         * with a real LVScreen subclass. TestScreen lives in
+         * chatter_app; its constructor builds the widget tree and
+         * start(false) calls lv_scr_load to swap it in as the
+         * active screen.
          *
-         * LVGL 8 spells this 'lv_btn_create' (LVGL 9 added the
-         * 'lv_button_create' alias). We're on 8.4. */
-        const char *menu_items[] = { "Messages", "Contacts", "Settings" };
-        for (int i = 0; i < 3; ++i) {
-            lv_obj_t *btn = lv_btn_create(scr);
-            lv_obj_set_size(btn, 140, 26);
-            lv_obj_align(btn, LV_ALIGN_TOP_MID, 0, 22 + i * 30);
+         * Order constraint: lvgl_glue_init() must be done first
+         * (lv_obj_create needs LVGL state). lvgl_glue_run() is
+         * deliberately called AFTER this — that way the screen
+         * load + SCREEN_LOADED event are dispatched from the
+         * LVGL task's very first iteration, and we know the load
+         * timing is predictable (rather than racing the LVGL task
+         * already in mid-flight). */
+        extern void chatter_app_start_test_screen(void);
+        chatter_app_start_test_screen();
+        ESP_LOGI(TAG, "TestScreen instantiated + start()ed");
 
-            lv_obj_t *lbl = lv_label_create(btn);
-            lv_label_set_text(lbl, menu_items[i]);
-            lv_obj_center(lbl);
-        }
-
-        /* Small status row below the buttons — proves the UI
-         * coexists with timer-driven label updates. */
-        s_lvgl_btn_label = lv_label_create(scr);
-        lv_label_set_text(s_lvgl_btn_label, "btn: 0");
-        lv_obj_set_style_text_color(s_lvgl_btn_label,
-                                    lv_color_hex(0x7AE8FF), /* MP_HILITE */
-                                    LV_PART_MAIN);
-        lv_obj_align(s_lvgl_btn_label, LV_ALIGN_BOTTOM_MID, 0, -2);
-
-        /* 200 ms refresh = same cadence the legacy dashboard used. */
-        lv_timer_create(mp24_status_timer_cb, 200, NULL);
+        /* The mp24_status_timer for the 'btn:N' counter is no
+         * longer hooked to any visible widget — TestScreen owns
+         * the screen now. Leaving the timer creation in would
+         * just call into a callback that touches the old (now
+         * orphaned) s_lvgl_btn_label pointer. Drop it. */
 
         lvgl_glue_run();
         ESP_LOGI(TAG, "LVGL frame pump running");
