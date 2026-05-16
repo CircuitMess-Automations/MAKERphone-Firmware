@@ -127,6 +127,27 @@ idf_component_register(
         "${SRC_DIR}/Elements/PhoneChargingOverlay.cpp"
         "${SRC_DIR}/Elements/PhoneMissedCallFlash.cpp"
 
+        # S-MP18f: ten utility / info / game screens, all with
+        # dependency closure inside what chatter_app already
+        # links (status bar + soft-key bar + universal Elements +
+        # Settings + PhoneClock). Each ~150-700 LOC; ~4500 LOC
+        # total of new compile coverage.
+        #
+        # No instantiation in any factory yet — the linker drops
+        # them until referenced. This is breadth compile-validation,
+        # not runtime work. Once we want to switch the boot screen
+        # to one of these, the factory is a 5-line addition.
+        "${SRC_DIR}/Screens/PhoneAccentScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneBrightnessScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneDateTimeScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneFirmwareInfoScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneDemoSpeedScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneDemoModeScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneFlashlight.cpp"
+        "${SRC_DIR}/Screens/PhoneFortuneCookie.cpp"
+        "${SRC_DIR}/Screens/PhoneCalculator.cpp"
+        "${SRC_DIR}/Screens/PhoneCalendar.cpp"
+
         # S-MP18d: first screen that USES the status bar + soft-key
         # bar + wallpaper combo. 113 LOC, takes an uppercase app
         # name in the ctor, renders 'NOT YET BUILT' under it. We're
