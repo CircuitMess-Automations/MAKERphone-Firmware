@@ -103,6 +103,30 @@ idf_component_register(
         "${SRC_DIR}/Elements/PhoneStatusBar.cpp"
         "${SRC_DIR}/Elements/PhoneSoftKeyBar.cpp"
 
+        # S-MP18e: bulk Element compile expansion. Every file
+        # below has clean deps (only Fonts + MakerphoneTheme +
+        # LoopListener + Chatter + LVObject — all already in the
+        # build). Linker will drop them until something
+        # instantiates them, but compile success on the full set
+        # is broad validation that the LVGL 8.4 + arduino-esp32 +
+        # shim toolchain is stable across the upstream Element/
+        # surface.
+        #
+        # NotificationElement deliberately omitted — pulls
+        # Services/MessageService.h which we haven't shimmed.
+        "${SRC_DIR}/Elements/PhoneSignalIcon.cpp"
+        "${SRC_DIR}/Elements/PhoneBatteryIcon.cpp"
+        "${SRC_DIR}/Elements/PhoneClockFace.cpp"
+        "${SRC_DIR}/Elements/PhoneIconTile.cpp"
+        "${SRC_DIR}/Elements/PhoneDialerKey.cpp"
+        "${SRC_DIR}/Elements/PhoneNotificationToast.cpp"
+        "${SRC_DIR}/Elements/PhoneTipBanner.cpp"
+        "${SRC_DIR}/Elements/PhoneChatBubble.cpp"
+        "${SRC_DIR}/Elements/PhoneIdleHint.cpp"
+        "${SRC_DIR}/Elements/PhoneLockHint.cpp"
+        "${SRC_DIR}/Elements/PhoneChargingOverlay.cpp"
+        "${SRC_DIR}/Elements/PhoneMissedCallFlash.cpp"
+
         # S-MP18d: first screen that USES the status bar + soft-key
         # bar + wallpaper combo. 113 LOC, takes an uppercase app
         # name in the ctor, renders 'NOT YET BUILT' under it. We're
