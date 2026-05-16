@@ -15,11 +15,14 @@ CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
 
 # -------------------------------------------------------------------
 # PSRAM (Decision: enabled for production)
-# ESP32-S3FH4R2 has 2 MB octal PSRAM. Useful for LVGL double buffers,
-# audio mixing buffers, and the GSM modem response cache.
+# ESP32-S3FH4R2 has 2 MB *quad* SPI PSRAM (the "R2" suffix marks
+# quad — only "FN8R8", "FH4R8" etc. variants have octal PSRAM).
+# Using OCT mode against this chip makes the bootloader's JEDEC-ID
+# handshake fail and CONFIG_SPIRAM_BOOT_INIT halts boot before
+# app_main runs.
 # -------------------------------------------------------------------
 CONFIG_SPIRAM=y
-CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_MODE_QUAD=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_USE_MALLOC=y
 CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
