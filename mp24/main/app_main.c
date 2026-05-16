@@ -38,6 +38,7 @@
 #include "hal/modem.h"
 #include "hal/power.h"
 #include "hal/sms.h"
+#include "hal/calls.h"
 
 static const char *TAG = "MP24";
 
@@ -232,7 +233,8 @@ static void update_dashboard(void)
 /* ----------------------------------------------------------------- */
 
 /* One-shot worker: waits up to 35 s for the modem to enter READY,
- * then runs sms_init() to configure text mode + +CMTI routing. Keeps
+ * then runs sms_init() + calls_init() to configure text mode +
+ * +CMTI routing + RING/CONNECT/NO_CARRIER call URCs. Keeps
  * app_main free of long blocking calls so the dashboard goes live
  * while the modem boots in parallel. */
 static void sms_boot_task(void *arg)
@@ -242,6 +244,14 @@ static void sms_boot_task(void *arg)
     if (r != ESP_OK) {
         ESP_LOGW(TAG, "SMS layer not started (modem state: %s, err: %s)",
                  modem_state_name(modem_state()), esp_err_to_name(r));
+    }
+    /* calls_init's ready-wait will return immediately since the
+     * modem is already READY at this point (sms_init succeeded) or
+     * FAILED (in which case calls_init also short-circuits). */
+    r = calls_init(5000);
+    if (r != ESP_OK) {
+        ESP_LOGW(TAG, "Call control not started (err: %s)",
+                 esp_err_to_name(r));
     }
     vTaskDelete(NULL);
 }

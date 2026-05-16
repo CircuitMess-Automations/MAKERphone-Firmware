@@ -105,9 +105,18 @@ partition, E=button alias remap to joystick/A/B/C/D, F=USB CDC console).
       callback, then `AT+CMGD=N` to free SIM storage. Counters
       exposed for the dashboard. CircuitOS `MessageService`
       rewiring lands alongside the C++ shim.
-- [ ] **S-MP10** Voice calls + I²S2 audio bridge — `PhoneCallService` to
-      `ATD` / `ATA` / `ATH`. PCM forwarding between I²S1 and I²S2
-      under a FreeRTOS task. AEC deferred to polish.
+- [~] **S-MP10** Voice calls — control plane shipped in
+      `hal/calls.{c,h}`: `calls_dial(number)` → `ATD<num>;`,
+      `calls_answer()` → `ATA`, `calls_hangup()` → `ATH`. URC
+      subscriptions on `RING` / `+CLIP` / `CONNECT` / `NO CARRIER`
+      / `BUSY` / `NO ANSWER` feed a queue → pump task → state
+      machine (IDLE → DIALING / RINGING_IN → ACTIVE →
+      TERMINATED → IDLE). +CLIP turned on so inbound calls
+      carry the caller number. Counters + remote-number snapshot
+      exposed for the dashboard.
+      Audio bridge (PCM forwarding I²S1 mic ↔ I²S2 modem ↔ I²S1
+      speaker, AT+QDAI configuration) deferred to S-MP10b — needs
+      hardware tuning that's pointless without working RX path.
 
 ## CI & bring-up
 
