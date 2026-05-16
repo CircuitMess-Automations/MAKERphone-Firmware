@@ -30,6 +30,8 @@
 
 #include "esp_err.h"
 
+#include <lvgl.h>     /* needed for lv_group_t in the prototype below */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -39,6 +41,13 @@ extern "C" {
  * to call exactly once. After this returns, lv_screen_active() is
  * valid and you can build widgets on it. */
 esp_err_t lvgl_glue_init(void);
+
+/* The default group all newly-created widgets are added to. Returned
+ * pointer is valid after lvgl_glue_init() succeeds. Use this if you
+ * want to explicitly add an object to the keypad-navigation group,
+ * though by default lv_obj_create() etc. add to it automatically
+ * because we call lv_group_set_default() in init. */
+lv_group_t *lvgl_glue_get_group(void);
 
 /* Start the LVGL task. After this call, all LVGL API access has to
  * happen from inside the LVGL task — use lv_async_call() or similar

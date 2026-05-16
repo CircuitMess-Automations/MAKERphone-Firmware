@@ -413,26 +413,41 @@ extern "C" void app_main(void)
                                   LV_PART_MAIN);
         lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
 
+        /* "MP2.4" title at the top — non-focusable label, doesn't
+         * join the navigation group. */
         lv_obj_t *title = lv_label_create(scr);
         lv_label_set_text(title, "MP2.4");
         lv_obj_set_style_text_color(title,
                                     lv_color_hex(0xFF8C1E), /* MP_ACCENT */
                                     LV_PART_MAIN);
-        lv_obj_align(title, LV_ALIGN_CENTER, 0, -16);
+        lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 4);
 
+        /* S-MP16d: focusable button column to visually demonstrate
+         * keypad navigation. Three lv_button widgets stacked
+         * vertically, each auto-added to the default group
+         * (created in lvgl_glue_init), so JOY_UP/DOWN should move
+         * the focus highlight and JOY_CLICK should fire the click
+         * event. With no event handler attached the click just
+         * visually pulses the button — that pulse is the proof. */
+        const char *menu_items[] = { "Messages", "Contacts", "Settings" };
+        for (int i = 0; i < 3; ++i) {
+            lv_obj_t *btn = lv_button_create(scr);
+            lv_obj_set_size(btn, 140, 26);
+            lv_obj_align(btn, LV_ALIGN_TOP_MID, 0, 22 + i * 30);
+
+            lv_obj_t *lbl = lv_label_create(btn);
+            lv_label_set_text(lbl, menu_items[i]);
+            lv_obj_center(lbl);
+        }
+
+        /* Small status row below the buttons — proves the UI
+         * coexists with timer-driven label updates. */
         s_lvgl_btn_label = lv_label_create(scr);
         lv_label_set_text(s_lvgl_btn_label, "btn: 0");
         lv_obj_set_style_text_color(s_lvgl_btn_label,
-                                    lv_color_hex(0xFFDCB4), /* MP_TEXT */
-                                    LV_PART_MAIN);
-        lv_obj_align(s_lvgl_btn_label, LV_ALIGN_CENTER, 0, 4);
-
-        lv_obj_t *hint = lv_label_create(scr);
-        lv_label_set_text(hint, "LVGL OK");
-        lv_obj_set_style_text_color(hint,
                                     lv_color_hex(0x7AE8FF), /* MP_HILITE */
                                     LV_PART_MAIN);
-        lv_obj_align(hint, LV_ALIGN_CENTER, 0, 22);
+        lv_obj_align(s_lvgl_btn_label, LV_ALIGN_BOTTOM_MID, 0, -2);
 
         /* 200 ms refresh = same cadence the legacy dashboard used. */
         lv_timer_create(mp24_status_timer_cb, 200, NULL);

@@ -4,6 +4,8 @@
 
 #include "lvgl_glue.h"
 #include "hal/display.h"
+#include "hal/buttons.h"
+#include "hal/input_keypad.h"
 
 #include <lvgl.h>
 
@@ -56,6 +58,80 @@ static uint16_t s_buf2[LVGL_BUF_PIXELS];
 
 static lv_display_t *s_disp;
 
+/* ----- input (keypad) -------------------------------------------- */
+
+static lv_indev_t *s_indev   = NULL;
+static lv_group_t *s_group   = NULL;
+/* The last key we reported to LVGL. When no button is currently
+ * pressed, the read callback reports this key with RELEASED state
+ * so LVGL's internal state machine sees a clean press → release
+ * pair for the most-recently-active key. */
+static uint32_t    s_last_key = 0;
+
+/* Map our hardware button enum (hal/buttons.h) to LVGL's standard
+ * key codes. Anything not in this table is silently ignored — the
+ * digit pad / star / hash become relevant only for the dialer
+ * screen and we map them then. */
+static uint32_t btn_to_lv_key(btn_id_t btn)
+{
+    switch (btn) {
+        case JOY_UP:    return LV_KEY_UP;
+        case JOY_DOWN:  return LV_KEY_DOWN;
+        case JOY_LEFT:  return LV_KEY_LEFT;
+        case JOY_RIGHT: return LV_KEY_RIGHT;
+        case JOY_CLICK: return LV_KEY_ENTER;
+        /* BTN_C maps to ESC because Decision E aliases BTN_BACK →
+         * BTN_C. Same physical key, two semantic names. */
+        case BTN_C:     return LV_KEY_ESC;
+        case BTN_A:     return LV_KEY_NEXT;
+        case BTN_B:     return LV_KEY_PREV;
+        default:        return 0;
+    }
+}
+
+/* LVGL keypad read callback. Called by lv_timer_handler at ~30 Hz
+ * (configurable via lv_indev_set_long_press_time and friends; the
+ * default rate is comfortably faster than any human can press a
+ * physical button). Polls hal/input_keypad cached state — that
+ * cache is maintained by the kp_input task off the XL9555 INT1/
+ * INT2 ISRs, so it's always current.
+ *
+ * Priority order matters when multiple buttons are held at once:
+ * confirm + back take precedence over navigation so a panic
+ * release-and-confirm always works. Multi-button combos beyond
+ * pairs are intentionally not modelled — LV_INDEV_TYPE_KEYPAD is
+ * a single-key abstraction. */
+static void lvgl_keypad_read_cb(lv_indev_t *indev,
+                                lv_indev_data_t *data)
+{
+    (void)indev;
+
+    static const btn_id_t prio[] = {
+        JOY_CLICK, BTN_C,
+        JOY_UP, JOY_DOWN, JOY_LEFT, JOY_RIGHT,
+        BTN_A, BTN_B,
+    };
+
+    for (size_t i = 0; i < sizeof(prio) / sizeof(prio[0]); ++i) {
+        if (input_keypad_is_pressed(prio[i])) {
+            uint32_t k = btn_to_lv_key(prio[i]);
+            if (k != 0) {
+                s_last_key  = k;
+                data->key   = k;
+                data->state = LV_INDEV_STATE_PRESSED;
+                return;
+            }
+        }
+    }
+
+    /* No button currently held — report the most-recently-active
+     * key as RELEASED so LVGL's edge-detection sees a clean
+     * transition. data->key must still carry the key so LVGL can
+     * route the release to the right widget. */
+    data->key   = s_last_key;
+    data->state = LV_INDEV_STATE_RELEASED;
+}
+
 /* ----- public API ------------------------------------------------- */
 
 esp_err_t lvgl_glue_init(void)
@@ -78,10 +154,37 @@ esp_err_t lvgl_glue_init(void)
                            sizeof(s_buf1),
                            LV_DISPLAY_RENDER_MODE_PARTIAL);
 
-    ESP_LOGI(TAG, "LVGL ready (160x128, RGB565, %d-row partial buf)",
+    /* S-MP16d: keypad input device + default navigation group.
+     * Creating the group here and making it default means every
+     * subsequently-created focusable widget (lv_button, lv_list
+     * items, lv_dropdown, etc.) auto-joins the navigation group
+     * without the app needing to call lv_group_add_obj manually. */
+    s_indev = lv_indev_create();
+    if (s_indev == NULL) {
+        ESP_LOGE(TAG, "lv_indev_create returned NULL");
+        return ESP_FAIL;
+    }
+    lv_indev_set_type(s_indev, LV_INDEV_TYPE_KEYPAD);
+    lv_indev_set_read_cb(s_indev, lvgl_keypad_read_cb);
+
+    s_group = lv_group_create();
+    if (s_group == NULL) {
+        ESP_LOGE(TAG, "lv_group_create returned NULL");
+        return ESP_FAIL;
+    }
+    lv_group_set_default(s_group);
+    lv_indev_set_group(s_indev, s_group);
+
+    ESP_LOGI(TAG, "LVGL ready (160x128, RGB565, %d-row partial buf, "
+                  "keypad indev wired)",
              LVGL_BUF_ROWS);
     inited = true;
     return ESP_OK;
+}
+
+lv_group_t *lvgl_glue_get_group(void)
+{
+    return s_group;
 }
 
 /* ----- task ------------------------------------------------------- */
