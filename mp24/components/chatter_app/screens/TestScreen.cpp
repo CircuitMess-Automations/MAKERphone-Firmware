@@ -37,6 +37,7 @@
  */
 
 #include "Interface/LVScreen.h"   /* via PRIV_INCLUDE_DIRS = src/ */
+#include "Elements/BatteryElement.h"
 
 #include <lvgl.h>
 
@@ -59,6 +60,21 @@ public:
                                     lv_color_hex(0xFF8C1E),
                                     LV_PART_MAIN);
         lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 4);
+
+        /* S-MP17d: BatteryElement in the top-right. Even without
+         * the SPIFFS asset pack present, the widget should
+         * construct cleanly, register as a LoopListener, and tick
+         * every LoopManager pump cycle. The lv_img inside it
+         * tries to load 'S:/Battery/N.bin' from LVGL's filesystem
+         * driver — we haven't wired the LVGL FS-driver yet so
+         * those reads will fail silently; the visible widget will
+         * be a 19x12 transparent rectangle. That's fine for now.
+         * The compile-link path + LoopListener registration is
+         * what we're proving. The visual asset path lands when
+         * we wire LVGL's lv_fs_drv against /spiffs (probably
+         * an S-MP07b follow-up). */
+        BatteryElement *bat = new BatteryElement(obj);
+        lv_obj_align(bat->getLvObj(), LV_ALIGN_TOP_RIGHT, -4, 4);
 
         /* Centred subtitle — also non-focusable. */
         lv_obj_t *info = lv_label_create(obj);

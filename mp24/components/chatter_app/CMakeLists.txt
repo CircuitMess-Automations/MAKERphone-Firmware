@@ -57,6 +57,15 @@ idf_component_register(
         "${SRC_DIR}/Interface/Pics.cpp"
         "${SRC_DIR}/Interface/PhoneTransitions.cpp"
 
+        # S-MP17d: first Element/ widget. BatteryElement is the
+        # leanest one — 24 LOC, depends only on LVObject (already
+        # compiled), Battery singleton (MP24Battery shim), and
+        # LoopListener (CircuitOS). Good runtime smoke test for
+        # the LoopManager listener pattern: it registers itself
+        # and ticks every LoopManager pump cycle, calling
+        # Battery.getLevel() and updating an lv_img if changed.
+        "${SRC_DIR}/Elements/BatteryElement.cpp"
+
         # Our replacement for src/InputLVGL.cpp. The upstream one is
         # intentionally NOT listed.
         "shim/InputLVGL.cpp"
