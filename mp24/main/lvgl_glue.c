@@ -71,21 +71,27 @@ static uint32_t    s_last_key = 0;
 /* Map our hardware button enum (hal/buttons.h) to LVGL's standard
  * key codes. Anything not in this table is silently ignored — the
  * digit pad / star / hash become relevant only for the dialer
- * screen and we map them then. */
+ * screen and we map them then.
+ *
+ * Button-naming reminder: hal/buttons.h's actual enum members use
+ * the BTN_JOY_* and BTN_FACE_* prefixes; the bare BTN_LEFT /
+ * BTN_BACK / BTN_A aliases above them are #defines layered on top
+ * for the legacy Chatter app. We use the raw enum names here to
+ * avoid surprises from the macro chain. */
 static uint32_t btn_to_lv_key(btn_id_t btn)
 {
     switch (btn) {
-        case JOY_UP:    return LV_KEY_UP;
-        case JOY_DOWN:  return LV_KEY_DOWN;
-        case JOY_LEFT:  return LV_KEY_LEFT;
-        case JOY_RIGHT: return LV_KEY_RIGHT;
-        case JOY_CLICK: return LV_KEY_ENTER;
-        /* BTN_C maps to ESC because Decision E aliases BTN_BACK →
-         * BTN_C. Same physical key, two semantic names. */
-        case BTN_C:     return LV_KEY_ESC;
-        case BTN_A:     return LV_KEY_NEXT;
-        case BTN_B:     return LV_KEY_PREV;
-        default:        return 0;
+        case BTN_JOY_UP:    return LV_KEY_UP;
+        case BTN_JOY_DOWN:  return LV_KEY_DOWN;
+        case BTN_JOY_LEFT:  return LV_KEY_LEFT;
+        case BTN_JOY_RIGHT: return LV_KEY_RIGHT;
+        case BTN_JOY_CLICK: return LV_KEY_ENTER;
+        /* Face C is the "back" button per hal/buttons.h's BTN_BACK
+         * alias (#define BTN_BACK BTN_FACE_C). */
+        case BTN_FACE_C:    return LV_KEY_ESC;
+        case BTN_FACE_A:    return LV_KEY_NEXT;
+        case BTN_FACE_B:    return LV_KEY_PREV;
+        default:            return 0;
     }
 }
 
@@ -107,9 +113,9 @@ static void lvgl_keypad_read_cb(lv_indev_t *indev,
     (void)indev;
 
     static const btn_id_t prio[] = {
-        JOY_CLICK, BTN_C,
-        JOY_UP, JOY_DOWN, JOY_LEFT, JOY_RIGHT,
-        BTN_A, BTN_B,
+        BTN_JOY_CLICK, BTN_FACE_C,
+        BTN_JOY_UP, BTN_JOY_DOWN, BTN_JOY_LEFT, BTN_JOY_RIGHT,
+        BTN_FACE_A, BTN_FACE_B,
     };
 
     for (size_t i = 0; i < sizeof(prio) / sizeof(prio[0]); ++i) {
