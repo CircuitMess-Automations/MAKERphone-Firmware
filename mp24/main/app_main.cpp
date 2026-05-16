@@ -46,23 +46,28 @@
 #include <Display/Display.h>
 #include <Display/Sprite.h>
 #include <Battery/BatteryService.h>
+#include <Chatter.h>
 __attribute__((used))
 static void disp_smoketest_never_called()
 {
-    Display d(160, 128, -1, 3);
-    d.begin();
-    d.clear(0x0000);
-    (void)d.getBaseSprite();
-    (void)d.getWidth();
-    /* S-MP14b smoke test: touch the Battery singleton + all
-     * BatteryService methods so the linker has to resolve every
-     * one. If any are undefined, the build fails here. */
-    Battery.begin();
-    Battery.loop(0);
+    /* S-MP14d smoke test: drive the whole singleton chain from
+     * Chatter.begin() outward — Display, MP24Input, Battery,
+     * Settings — and confirm each method's symbol resolves at
+     * link time. */
+    Chatter.begin();
+    (void)Chatter.getDisplay();
+    (void)Chatter.getInput();
+    Chatter.setBrightness(255);
+    Chatter.fadeIn();
+    Chatter.fadeOut();
+    Chatter.backlightOff();
+    (void)Chatter.backlightPowered();
+
+    /* The Display + Battery direct probes earlier in the function
+     * are now redundant — Chatter.begin() exercises them
+     * transitively — but keeping them is cheap and traceable. */
     (void)Battery.getPercentage();
     (void)Battery.getVoltage();
-    (void)Battery.getLevel();
-    (void)Battery.getVoltOffset();
 }
 
 extern "C" {

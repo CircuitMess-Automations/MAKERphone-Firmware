@@ -39,6 +39,12 @@ idf_component_register(
         # provides definitions for every BatteryService method +
         # the `Battery` singleton, routed to hal/battery.
         "MP24Battery.cpp"
+        # S-MP14d: ChatterImpl + Chatter singleton. Upstream
+        # Chatter-Library/src/Chatter.cpp is excluded (Display +
+        # InputShift + LoRa SPI bring-up doesn't apply on MP2.4).
+        # This file ties the shim singletons together so
+        # Chatter.begin() — the legacy entry point — works.
+        "MP24Chatter.cpp"
     INCLUDE_DIRS
         "include"
         # The hal/ headers live under main/ for the legacy
