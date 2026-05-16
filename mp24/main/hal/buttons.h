@@ -102,5 +102,16 @@ typedef enum {
 #define BTN_C      BTN_R
 
 /* Short human-readable label for a button, e.g. "0", "JLT", "VUP".
- * Returns "?" for out-of-range ids. Safe to call from log statements. */
+ * Returns "?" for out-of-range ids. Safe to call from log statements.
+ *
+ * extern "C" so the symbol keeps C linkage when this header is
+ * pulled into a C++ translation unit (e.g. via <Pins.hpp>) — without
+ * the guard the C++ side mangles the name and the linker can't find
+ * the implementation in hal/buttons.c. */
+#ifdef __cplusplus
+extern "C" {
+#endif
 const char *btn_name(btn_id_t b);
+#ifdef __cplusplus
+}
+#endif
