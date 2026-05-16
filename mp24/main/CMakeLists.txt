@@ -54,6 +54,11 @@ idf_component_register(
         circuitos_shim
         circuitos
         chatter_library
+        # S-MP17a: first component to compile actual upstream src/
+        # phone-firmware code. Currently just the Interface/ base
+        # layer (LVObject + LVScreen) plus our InputLVGL shim.
+        # Grows one feature at a time.
+        chatter_app
         lvgl__lvgl                 # S-MP16: managed-component name
                                    # uses '<namespace>__<name>'
                                    # double-underscore form (same

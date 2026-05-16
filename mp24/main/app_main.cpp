@@ -73,12 +73,29 @@ static_assert(BATTERY_PIN == 3,
               "Pins.hpp override regressed — BATTERY_PIN must be "
               "GPIO3 (ADC1_CH2) on MP2.4");
 
-/* (Smoke test removed in S-MP16-lvgl8: the real boot path now calls
- * Chatter.begin() inside MP24Chatter and lvgl_glue_init() +
- * lv_label_create / lv_btn_create directly in app_main, so the
- * separate never-called diagnostic function is redundant. The
- * static_asserts above still catch include-order regressions on
- * Pins.hpp.) */
+/* S-MP17a anchor: force the linker to pull in chatter_app's static
+ * library archive so that LVObject.o + LVScreen.o + our InputLVGL
+ * shim end up in the final binary. Without an external symbol
+ * reference, ESP-IDF wraps chatter_app in --gc-sections / ar-style
+ * archive linking and drops every .o that no one references —
+ * meaning we'd happily build a 'green' firmware that never actually
+ * contained the code we want to test.
+ *
+ * The pattern: a __attribute__((used)) function in main (kept past
+ * compiler GC) that calls into a chatter_app extern symbol. The
+ * symbol resolution itself loads the relevant .o from the .a, and
+ * that .o's own references chain forward to LVScreen + LVObject.
+ *
+ * The anchor function is never executed at runtime. Its job is
+ * purely to add an unresolved external reference at compile time
+ * so the linker fills it. */
+extern "C" void chatter_app_force_link(void);
+
+__attribute__((used))
+static void chatter_app_link_anchor()
+{
+    chatter_app_force_link();
+}
 
 extern "C" {
 #include "freertos/FreeRTOS.h"
