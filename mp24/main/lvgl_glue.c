@@ -73,6 +73,33 @@ static uint32_t    s_last_key = 0;
  * digit pad / star / hash become relevant only for the dialer
  * screen and we map them then.
  *
+ * KEY-CODE SUBTLETY (LVGL 9 group navigation):
+ *
+ *   lv_group_t responds ONLY to LV_KEY_NEXT and LV_KEY_PREV for
+ *   "move focus to the next/previous widget". LV_KEY_UP / DOWN /
+ *   LEFT / RIGHT are forwarded to the *focused widget* — useful
+ *   for an lv_slider (LEFT/RIGHT) or an lv_textarea (UP/DOWN), but
+ *   meaningless on a plain lv_button.
+ *
+ * That means a phone-style joystick has to map *vertical* motion
+ * to PREV/NEXT for menu navigation to work. The first cut of this
+ * mapping had JOY_UP → LV_KEY_UP, which on a button-list focused
+ * widget was silently dropped (visible symptom: the click event
+ * fired but the focus ring never moved). Fixed:
+ *
+ *   BTN_JOY_UP    → LV_KEY_PREV   (move focus up the list)
+ *   BTN_JOY_DOWN  → LV_KEY_NEXT   (move focus down the list)
+ *   BTN_JOY_LEFT  → LV_KEY_LEFT   (widget-internal, e.g. slider)
+ *   BTN_JOY_RIGHT → LV_KEY_RIGHT  (widget-internal)
+ *   BTN_JOY_CLICK → LV_KEY_ENTER  (activate focused widget)
+ *   BTN_FACE_C    → LV_KEY_ESC    (back / cancel)
+ *
+ * The face A / B mappings are intentionally dropped from this
+ * commit. They were redundant with JOY_UP/DOWN now that those go
+ * to PREV/NEXT, and re-mapping them needs an actual purpose
+ * (e.g. tab switching, soft-key roles) — to be decided on the
+ * first screen that needs them.
+ *
  * Button-naming reminder: hal/buttons.h's actual enum members use
  * the BTN_JOY_* and BTN_FACE_* prefixes; the bare BTN_LEFT /
  * BTN_BACK / BTN_A aliases above them are #defines layered on top
@@ -81,16 +108,12 @@ static uint32_t    s_last_key = 0;
 static uint32_t btn_to_lv_key(btn_id_t btn)
 {
     switch (btn) {
-        case BTN_JOY_UP:    return LV_KEY_UP;
-        case BTN_JOY_DOWN:  return LV_KEY_DOWN;
+        case BTN_JOY_UP:    return LV_KEY_PREV;
+        case BTN_JOY_DOWN:  return LV_KEY_NEXT;
         case BTN_JOY_LEFT:  return LV_KEY_LEFT;
         case BTN_JOY_RIGHT: return LV_KEY_RIGHT;
         case BTN_JOY_CLICK: return LV_KEY_ENTER;
-        /* Face C is the "back" button per hal/buttons.h's BTN_BACK
-         * alias (#define BTN_BACK BTN_FACE_C). */
         case BTN_FACE_C:    return LV_KEY_ESC;
-        case BTN_FACE_A:    return LV_KEY_NEXT;
-        case BTN_FACE_B:    return LV_KEY_PREV;
         default:            return 0;
     }
 }
@@ -115,7 +138,6 @@ static void lvgl_keypad_read_cb(lv_indev_t *indev,
     static const btn_id_t prio[] = {
         BTN_JOY_CLICK, BTN_FACE_C,
         BTN_JOY_UP, BTN_JOY_DOWN, BTN_JOY_LEFT, BTN_JOY_RIGHT,
-        BTN_FACE_A, BTN_FACE_B,
     };
 
     for (size_t i = 0; i < sizeof(prio) / sizeof(prio[0]); ++i) {
