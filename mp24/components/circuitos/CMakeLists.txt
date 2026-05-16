@@ -93,6 +93,7 @@ idf_component_register(
         espressif__arduino-esp32  # CircuitOS code is full of '#include <Arduino.h>'
         freertos
         nvs_flash                 # CIRCUITOS_NVS path uses NVS
+        efuse                     # HWRevision.cpp reads efuse bits
 )
 
 # CircuitOS code emits a lot of -Wmissing-field-initializers and a
