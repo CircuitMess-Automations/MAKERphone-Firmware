@@ -48,6 +48,7 @@ idf_component_register(
         esp_common
         circuitos_shim
         circuitos
+        chatter_library
         # arduino-esp32 is pulled in by idf_component.yml as
         # "espressif/arduino-esp32"; when the IDF Component Manager
         # installs it, the directory becomes
