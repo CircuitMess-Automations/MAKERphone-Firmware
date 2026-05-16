@@ -11,10 +11,15 @@
 # RING / CLIP / NO CARRIER state machine). The I²S2 PCM audio
 # bridge for in-call audio routing lands in a follow-up session
 # once we have hardware to tune it against.
+#
+# S-MP13a — entry point is now C++ (.cpp) so the arduino-esp32
+# component's initArduino() can be called and so the CircuitOS
+# classes (S-MP13b+) link in. The HAL stays in C; its headers are
+# wrapped in extern "C" at every C++ inclusion site.
 
 idf_component_register(
     SRCS
-        "app_main.c"
+        "app_main.cpp"
         "hal/display.c"
         "hal/i2c_bus.c"
         "hal/aw9523b.c"
@@ -42,6 +47,10 @@ idf_component_register(
         freertos
         esp_common
         circuitos_shim
+        # arduino-esp32 is pulled in by idf_component.yml as
+        # "espressif/arduino-esp32"; the component manager
+        # registers it under the name "arduino" by convention.
+        arduino
 )
 
 # Pack everything in mp24/spiffs/ into the `spiffs` partition image at

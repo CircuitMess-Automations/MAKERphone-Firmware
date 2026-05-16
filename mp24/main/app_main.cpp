@@ -1,23 +1,39 @@
 /*
- * mp24/main/app_main.c
+ * mp24/main/app_main.cpp
  *
- * S-MP04 — wires the input HAL to the live dashboard.
+ * S-MP13a — entry point is now C++ so we can call into the
+ * arduino-esp32 component (initArduino()) and, in S-MP13b+, into
+ * the CircuitOS C++ classes that the existing phone firmware is
+ * written against.
+ *
+ * The HAL still lives in C — its headers are wrapped in extern "C"
+ * below so the function declarations don't get C++ name-mangled.
  *
  * Boot sequence:
- *   1. USB CDC banner.
- *   2. Display + boot screen (S-MP02 deliverable).
- *   3. I²C bus + AW9523B + XL9555s + interrupt-driven keypad
+ *   1. USB-Serial/JTAG banner.
+ *   2. initArduino() — bootstraps the Arduino core (millis() clock,
+ *      pinMode table, Serial object). Does NOT call Serial.begin();
+ *      our log path is ESP_LOG over USB-Serial/JTAG.
+ *   3. Display + boot screen (S-MP02 deliverable).
+ *   4. I²C bus + AW9523B + XL9555s + interrupt-driven keypad
  *      input dispatcher (S-MP03 + S-MP04).
- *   4. A small local listener fires on every press / release —
+ *   5. A small local listener fires on every press / release —
  *      bumps a counter, captures the event for on-screen display,
- *      and logs via USB CDC.
- *   5. Forever loop: blink the LEDs at ~2.5 Hz and redraw the live
+ *      and logs via USB-Serial/JTAG.
+ *   6. Forever loop: blink the LEDs at ~2.5 Hz and redraw the live
  *      dashboard at ~5 fps.
  */
 
-#include <stdio.h>
-#include <string.h>
-#include <stdatomic.h>
+#include <cstdio>
+#include <cstring>
+#include <atomic>
+
+#include <Arduino.h>     // arduino-esp32 — for initArduino() and the
+                         // Arduino-shaped types the rest of the phone
+                         // firmware depends on. Pulls in <stdint.h>,
+                         // <FreeRTOS.h>, esp_log etc. transitively.
+
+extern "C" {
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -40,6 +56,7 @@
 #include "hal/sms.h"
 #include "hal/calls.h"
 #include "hal/audio_i2s2.h"
+}
 
 static const char *TAG = "MP24";
 
@@ -47,25 +64,25 @@ static const char *TAG = "MP24";
 /* Listener that captures every event for the on-screen dashboard.   */
 /* ----------------------------------------------------------------- */
 
-static atomic_uint_fast32_t s_press_count   = 0;
-static atomic_uint_fast32_t s_release_count = 0;
+static std::atomic<uint32_t> s_press_count   {0};
+static std::atomic<uint32_t> s_release_count {0};
 
 /* Last-event snapshot. We pack [pressed:1 | btn_id:7] into a byte
  * with the top bit reserved as a "valid" flag (so bit 7 set = an
  * event has occurred; bit 6 = pressed). 0 = uninitialised. */
 #define EVT_VALID   (1u << 7)
 #define EVT_PRESSED (1u << 6)
-static atomic_uint_fast32_t s_last_event_packed = 0;
+static std::atomic<uint32_t> s_last_event_packed {0};
 
 static void on_button_event(btn_id_t btn, bool pressed, void *ctx)
 {
     (void)ctx;
-    if (pressed) atomic_fetch_add(&s_press_count, 1);
-    else         atomic_fetch_add(&s_release_count, 1);
+    if (pressed) s_press_count.fetch_add(1);
+    else         s_release_count.fetch_add(1);
 
     uint32_t packed = EVT_VALID | ((uint32_t)btn & 0x3F)
                                 | (pressed ? EVT_PRESSED : 0);
-    atomic_store(&s_last_event_packed, packed);
+    s_last_event_packed.store(packed);
 
     /* Audible feedback on press — different frequency per button
      * group, so a technician can tell at a glance whether the
@@ -161,7 +178,7 @@ static void update_dashboard(void)
     char buf[48];
 
     /* "Last :" line */
-    uint32_t evt = atomic_load(&s_last_event_packed);
+    uint32_t evt = s_last_event_packed.load();
     if (evt & EVT_VALID) {
         btn_id_t btn  = (btn_id_t)(evt & 0x3F);
         bool   was_p  = (evt & EVT_PRESSED) != 0;
@@ -171,8 +188,8 @@ static void update_dashboard(void)
     }
 
     /* "Events: N / N" */
-    uint32_t p = (uint32_t) atomic_load(&s_press_count);
-    uint32_t r = (uint32_t) atomic_load(&s_release_count);
+    uint32_t p = (uint32_t) s_press_count.load();
+    uint32_t r = (uint32_t) s_release_count.load();
     snprintf(buf, sizeof(buf), "%lu/%lu", (unsigned long)p, (unsigned long)r);
     redraw_value(48, 73, buf, MP_TEXT, MP_BG);
 
@@ -266,9 +283,18 @@ static void sms_boot_task(void *arg)
     vTaskDelete(NULL);
 }
 
-void app_main(void)
+extern "C" void app_main(void)
 {
     print_banner();
+
+    /* Bootstrap the Arduino layer BEFORE any HAL init so its global
+     * constructors are run and millis() / pinMode() / Serial work in
+     * any code we call subsequently. initArduino() does NOT call
+     * Serial.begin() — we leave Serial silent and log via ESP_LOG over
+     * USB-Serial/JTAG, which survives panics and never collides with
+     * peripheral pin assignments. */
+    initArduino();
+    ESP_LOGI(TAG, "Arduino layer initialised");
 
     if (display_init() != ESP_OK) {
         ESP_LOGE(TAG, "Display init failed — continuing headless");
@@ -388,7 +414,7 @@ void app_main(void)
      * wakes the display back to the live dashboard. */
     const TickType_t IDLE_TIMEOUT = pdMS_TO_TICKS(30 * 1000);   /* 30 s */
     TickType_t       last_activity = xTaskGetTickCount();
-    uint32_t         last_keypad_n = (uint32_t) atomic_load(&s_press_count);
+    uint32_t         last_keypad_n = (uint32_t) s_press_count.load();
     uint32_t         last_power_n  = power_button_press_count();
     bool             blanked       = false;
 
@@ -400,7 +426,7 @@ void app_main(void)
          * the timer and wakes from blank. Reading the keypad press
          * count via the atomic that the listener already maintains
          * avoids hooking another callback for this. */
-        uint32_t k = (uint32_t) atomic_load(&s_press_count);
+        uint32_t k = (uint32_t) s_press_count.load();
         uint32_t p = power_button_press_count();
         if (k != last_keypad_n || p != last_power_n) {
             last_keypad_n = k;

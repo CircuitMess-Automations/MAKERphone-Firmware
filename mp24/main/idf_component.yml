@@ -1,0 +1,25 @@
+## mp24/main component dependencies
+##
+## arduino-esp32 v3.3.x is the line compatible with ESP-IDF v5.5 (our IDF).
+## The component pulls in the Arduino core APIs (Arduino.h, Serial, SPI,
+## SPIFFS, etc.) that the existing CircuitOS / Chatter-Library / phone
+## firmware was written against.
+##
+## CONFIG_AUTOSTART_ARDUINO is left UNSET in our sdkconfig so the
+## arduino-esp32 component does NOT take over app_main. We keep control
+## of the entry point and call initArduino() ourselves before bootstrapping
+## the Chatter app code.
+##
+## Component sizes to be aware of:
+##   - arduino-esp32 base: ~600 KB compiled
+##   - WiFi/BLE/OTA libraries pulled by default: ~400 KB more
+## We can strip these via CONFIG_ARDUINO_SELECTIVE_* knobs once the
+## footprint becomes a problem. For S-MP13a (the foundation) we leave
+## the defaults so we can see what actually breaks first.
+
+dependencies:
+  idf:
+    version: ">=5.5,<5.6"
+
+  espressif/arduino-esp32:
+    version: "^3.3.8"
