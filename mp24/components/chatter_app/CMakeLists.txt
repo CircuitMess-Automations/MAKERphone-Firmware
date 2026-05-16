@@ -103,6 +103,14 @@ idf_component_register(
         "${SRC_DIR}/Elements/PhoneStatusBar.cpp"
         "${SRC_DIR}/Elements/PhoneSoftKeyBar.cpp"
 
+        # S-MP18d: first screen that USES the status bar + soft-key
+        # bar + wallpaper combo. 113 LOC, takes an uppercase app
+        # name in the ctor, renders 'NOT YET BUILT' under it. We're
+        # going to use it as our new boot screen to force StatusBar
+        # + SoftKeyBar into the link graph and exercise them at
+        # runtime.
+        "${SRC_DIR}/Screens/PhoneAppStubScreen.cpp"
+
         # Our replacement for src/InputLVGL.cpp. The upstream one is
         # intentionally NOT listed.
         "shim/InputLVGL.cpp"
@@ -124,6 +132,11 @@ idf_component_register(
         # the greeting label has content, then constructs +
         # starts the screen.
         "screens/WelcomeFactory.cpp"
+
+        # S-MP18d: factory for PhoneAppStubScreen. Both factories
+        # coexist; app_main picks one to call. Keeps WelcomeFactory
+        # available as the easy revert path.
+        "screens/AppStubFactory.cpp"
 
     INCLUDE_DIRS
         # Nothing exported to other components yet. Screens will be

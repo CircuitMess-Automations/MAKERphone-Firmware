@@ -431,34 +431,25 @@ extern "C" void app_main(void)
     } else {
         ESP_LOGI(TAG, "LVGL initialised, instantiating TestScreen");
 
-        /* S-MP17c → S-MP18b: replaced TestScreen with PhoneWelcomeScreen
-         * as the boot destination. PhoneWelcomeScreen is the first
-         * full upstream screen that runs untouched on our toolchain —
-         * uses PhoneSynthwaveBg as wallpaper, custom pixel fonts,
-         * Settings (for the owner name), all wired through chatter_app
-         * with no source patches.
+        /* S-MP18d: replaced PhoneWelcomeScreen with
+         * PhoneAppStubScreen as the boot destination. AppStubScreen
+         * is the leanest upstream screen that instantiates the
+         * universal-UI trio: PhoneSynthwaveBg wallpaper +
+         * PhoneStatusBar (top) + PhoneSoftKeyBar (bottom). Running
+         * it forces all three into the link graph and exercises
+         * them at runtime on real hardware.
          *
-         * The factory in screens/WelcomeFactory.cpp pre-populates
-         * Settings.ownerName so the greeting label has visible text;
-         * passes nullptr DismissHandler + durationMs=0 so the screen
-         * holds indefinitely (until the user presses any button,
-         * which fires the InputListener path and tears the screen
-         * down — see file header for the lifecycle caveat).
+         * WelcomeFactory + chatter_app_start_welcome_screen stay
+         * in the build for one-line revert.
          *
-         * If something blows up on hardware, reverting to TestScreen
-         * is a one-line edit (call chatter_app_start_test_screen
-         * instead). Both factories live in chatter_app.
-         *
-         * Order constraint: lvgl_glue_init() must be done first
-         * (lv_obj_create needs LVGL state). lvgl_glue_run() is
-         * deliberately called AFTER this — that way the screen
-         * load + SCREEN_LOADED event are dispatched from the
-         * LVGL task's very first iteration, and we know the load
-         * timing is predictable (rather than racing the LVGL task
-         * already in mid-flight). */
-        extern void chatter_app_start_welcome_screen(void);
-        chatter_app_start_welcome_screen();
-        ESP_LOGI(TAG, "PhoneWelcomeScreen instantiated + start()ed");
+         * Order constraint: same as before — lvgl_glue_init first
+         * (LVGL state ready), screen instantiation second
+         * (constructor uses LVGL API on app_main task), then
+         * lvgl_glue_run (LVGL task starts, processes the queued
+         * screen load on its first iteration). */
+        extern void chatter_app_start_appstub_screen(void);
+        chatter_app_start_appstub_screen();
+        ESP_LOGI(TAG, "PhoneAppStubScreen instantiated + start()ed");
 
         /* The mp24_status_timer for the 'btn:N' counter is no
          * longer hooked to any visible widget — TestScreen owns
