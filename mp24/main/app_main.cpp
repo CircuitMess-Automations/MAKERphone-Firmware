@@ -45,6 +45,7 @@
 // smoke test can be removed.
 #include <Display/Display.h>
 #include <Display/Sprite.h>
+#include <Battery/BatteryService.h>
 __attribute__((used))
 static void disp_smoketest_never_called()
 {
@@ -53,6 +54,10 @@ static void disp_smoketest_never_called()
     d.clear(0x0000);
     (void)d.getBaseSprite();
     (void)d.getWidth();
+    /* S-MP14b probe: confirm upstream BatteryService.h still parses
+     * on ESP-IDF 5.5 despite its <esp_adc_cal.h> include — if yes,
+     * we don't need a shim BatteryService.h. */
+    (void)sizeof(BatteryService);
 }
 
 extern "C" {
