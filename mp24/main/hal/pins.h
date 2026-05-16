@@ -70,7 +70,7 @@
 #define PIN_MODEM_UART_TX      17    /* ESP32 → modem RX (uUART1_GSM_TX) */
 #define PIN_MODEM_UART_RX      18    /* modem TX → ESP32 (uUART1_GSM_RX) */
 #define PIN_MODEM_PWR_KEY      12    /* uGSM_PWR_KEY — active-high pulse to toggle power */
-#define PIN_MODEM_RESET_N      15    /* uGSM_RESET_N — XTAL_32K_N pin in IO_MUX, used as GPIO; active-low */
+#define PIN_MODEM_RESET_N      16    /* uGSM_RESET_N — XTAL_32K_N pin (chip pad #22) in IO_MUX, used as GPIO; active-low */
 #define PIN_MODEM_PSM_INT      11    /* uGSM_PSM_EXT_INT — wake-from-PSM interrupt (deferred to PSM session) */
 
 #define MODEM_UART_PORT        UART_NUM_1
