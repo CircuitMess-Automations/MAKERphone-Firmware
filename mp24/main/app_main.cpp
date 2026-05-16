@@ -587,22 +587,36 @@ extern "C" void app_main(void)
                 tskIDLE_PRIORITY + 1, NULL);
 
     ESP_LOGI(TAG, "Entering background-tasks-only loop (LVGL owns the panel).");
-    bool led_on = false;
 
-    /* Main task post-bringup: LVGL renders on its own task, so the
-     * primary task drops to a 200 ms LED blink. Keypad + battery +
-     * modem + power-button tasks all run independently in the
-     * background and don't need polling here.
+    /* Main task post-bringup: every visible/audible piece of work
+     * has its own task or LVGL/LoopManager-driven cadence.
      *
-     * The legacy dashboard's update_dashboard / draw_boot_screen /
-     * idle-blank logic is retired in this commit — LVGL owns the
-     * SPI bus for the panel from now on, and the diagnostic info
-     * the dashboard used to show (button count, battery %, modem
-     * state) will be rebuilt as LVGL widgets over the next few
-     * commits. For now only the press counter is shown. */
+     *   - LVGL renders on the lvgl task (lvgl_glue_run).
+     *   - LoopManager pumps Display/Input/Battery/Settings + the
+     *     LVScreen deferred queue on the loopmgr task.
+     *   - Keypad ISRs feed the kp_input task, which fans out to
+     *     hal/input_keypad listeners.
+     *   - Battery sampler, modem RX, audio_i2s2 sampler all run
+     *     in their own tasks too.
+     *
+     * So app_main literally has nothing left to do. The previous
+     * revision blinked the four AW9523B LEDs at 2.5 Hz here as a
+     * "we're alive" indicator — now removed (user feedback: the
+     * blink is visually noisy and the LVGL screen + battery LED
+     * status are already plenty of alive-signal). The LEDs go
+     * dark; if we want them re-enabled for a specific signal
+     * (e.g. modem state, missed-call indicator), that comes
+     * later as deliberate UI, not a heartbeat.
+     *
+     * Putting the AW9523B LEDs to OFF once explicitly so we
+     * don't inherit whatever level they were at when the loop
+     * was running. */
+    aw9523b_set_leds(false);
+
+    /* Idle indefinitely. The task can't exit without taking the
+     * FreeRTOS scheduler down, so we vTaskDelay forever. 1 s
+     * granularity — nothing depends on this task waking. */
     for (;;) {
-        led_on = !led_on;
-        aw9523b_set_leds(led_on);
-        vTaskDelay(pdMS_TO_TICKS(200));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
