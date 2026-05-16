@@ -38,14 +38,25 @@ partition, E=button alias remap to joystick/A/B/C/D, F=USB CDC console).
 - [x] **S-MP06** Battery monitor — ADC1_CH2 on GPIO 3, eFuse
       curve-fit calibration, 1 Hz background sampler, Li-Po SOC
       curve, dashboard renders `Batt : X.XX V (N%)` with red/amber/
-      green colour. Deferred to follow-up sessions (Decision F-2
-      pending): power button → shutdown service (need uBUTTON_PWR
-      schematic trace), USB detect → charge chime (need to find
-      USB_DETECT bit on expanders), TL431/CALIB_EN calibration
-      (schematic shows CALIB_EN only as `input` to sub-sheets —
-      nothing drives it on v2.4 PCB, eFuse cal is ±20 mV which is
-      sufficient), idle-dim = blank display (need to define what
-      "idle" means first).
+      green colour.
+- [~] **S-MP06b** Power-related deferred items, addressed in pieces:
+      - [x] **Power button** read-only — `uBUTTON_PWR` traced to
+            GPIO2, 50 Hz debounced poller in `hal/power.c`,
+            dashboard `Pwr  : idle / HELD X.Ys (#N)` row. Kill
+            output (`uPOWER_OFF` on GPIO1) left high-Z this
+            session — polarity unverified, driving wrong cuts
+            our own supply. Phase 2 wires actual shutdown.
+      - [ ] **USB detect** — needs reconciliation between stale
+            `pin_config.h` (U5 P0.4) and `dashboard.c`'s button
+            map (which uses that same bit). Next session.
+      - [ ] **Idle-dim** — Decision-C blank-display behaviour;
+            needs an "idle" timeout policy (e.g. no key press
+            for 30 s). Next session.
+      - **TL431 / CALIB_EN** stays deferred *permanently* —
+            schematic shows `CALIB_EN` only as `input` on every
+            sheet with no driver, eFuse cal is already ±20 mV
+            which is well below the per-1%-SOC voltage step on
+            a Li-Po. Not a bug, not a gap.
 
 ## Transport (GSM modem)
 

@@ -77,6 +77,27 @@
 #define MODEM_UART_BAUD        115200
 
 /* ----------------------------------------------------------------- */
+/* Power supply: button input + system kill output                   */
+/* ----------------------------------------------------------------- */
+/* uBUTTON_PWR comes IN from the power-supply sub-sheet (where the
+ * physical side-switch + load-switch IC sit) and lands on GPIO2 — an
+ * input the ESP32 reads to detect press / hold events on the side
+ * power button while the system is already running.
+ *
+ * uPOWER_OFF is an OUTPUT we drive to tell the power-supply sub-sheet
+ * to cut the main rail — i.e., a software shutdown. Topology of the
+ * downstream load-switch and polarity of this signal are not yet
+ * verified, so this session leaves the pin in a safe default state
+ * (input, no pull) and writes no values. Phase 2 will add the actual
+ * power-down call after we verify polarity from observed behaviour
+ * (e.g., reading the load-switch's CTRL pin idle state).
+ *
+ * Both pins also alias to ADC1_CH0 (GPIO1) and ADC1_CH1 (GPIO2), but
+ * we use them as plain digital lines. */
+#define PIN_PWR_BUTTON         2     /* uBUTTON_PWR — input, active-low (idle HIGH via PMIC pull-up; assumed) */
+#define PIN_PWR_OFF            1     /* uPOWER_OFF  — output; left high-impedance for now */
+
+/* ----------------------------------------------------------------- */
 /* I²S2 — modem voice PCM (S-MP10 session, not yet used)             */
 /* ----------------------------------------------------------------- */
 #define PIN_I2S2_CLK           14    /* uI2S2_PHONE_CLK */

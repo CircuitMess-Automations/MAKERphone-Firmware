@@ -36,6 +36,7 @@
 #include "hal/battery.h"
 #include "hal/storage.h"
 #include "hal/modem.h"
+#include "hal/power.h"
 
 static const char *TAG = "MP24";
 
@@ -121,8 +122,8 @@ static void draw_boot_screen(void)
     display_fill_rect(0, 0, TFT_WIDTH, 14, MP_ACCENT);
     display_str(4, 4, "MAKERphone v2.4", MP_BG, MP_ACCENT);
 
-    display_str(4, 22, "S-MP08  GSM modem",        MP_TEXT, MP_BG);
-    display_str(4, 34, "Quectel EG912U-GL @ UART1", MP_DIM,  MP_BG);
+    display_str(4, 22, "S-MP08+ pwr btn",          MP_TEXT, MP_BG);
+    display_str(4, 34, "Modem + power monitor",    MP_DIM,  MP_BG);
 
     /* Chroma stripe stays — visual confidence in every boot. */
     const int bar_y = 50;
@@ -133,15 +134,15 @@ static void draw_boot_screen(void)
     display_fill_rect(2 * bar_w, bar_y, bar_w, bar_h, COLOR_BLUE);
     display_fill_rect(3 * bar_w, bar_y, bar_w, bar_h, COLOR_WHITE);
 
-    /* Labels for live values — six 11-px rows. Tone+U5/U9 combined
-     * to free a row for Modem state since the modem is the headline
-     * deliverable of this session. */
+    /* Labels for live values — six 11-px rows. U5/U9 debug row
+     * traded for power-button state now that the keypad path is
+     * verified working. */
     display_str(4, 62,  "Last :",   MP_DIM, MP_BG);
     display_str(4, 73,  "Events:",  MP_DIM, MP_BG);
     display_str(4, 84,  "Tone :",   MP_DIM, MP_BG);
     display_str(4, 95,  "Batt :",   MP_DIM, MP_BG);
     display_str(4, 106, "Modem:",   MP_DIM, MP_BG);
-    display_str(4, 117, "U5/U9:",   MP_DIM, MP_BG);
+    display_str(4, 117, "Pwr  :",   MP_DIM, MP_BG);
 }
 
 /* Erase a fixed strip first so changing-width values don't leave
@@ -210,10 +211,21 @@ static void update_dashboard(void)
     }
     redraw_value(48, 106, buf, mcol, MP_BG);
 
-    /* Combined raw keypad-expander state. */
-    snprintf(buf, sizeof(buf), "0x%04X 0x%04X",
-             input_keypad_raw(0), input_keypad_raw(1));
-    redraw_value(48, 117, buf, MP_TEXT, MP_BG);
+    /* "Pwr  : idle (#N)" or "Pwr  : HELD 1.2s (#N)" with colour
+     * shift on press so it's visually obvious. */
+    bool pressed = power_button_pressed();
+    uint32_t held = power_button_held_ms();
+    uint32_t n    = power_button_press_count();
+    if (pressed) {
+        snprintf(buf, sizeof(buf), "HELD %lu.%lus (#%lu)",
+                 (unsigned long)(held / 1000),
+                 (unsigned long)((held % 1000) / 100),
+                 (unsigned long)n);
+        redraw_value(48, 117, buf, MP_HILITE, MP_BG);
+    } else {
+        snprintf(buf, sizeof(buf), "idle (#%lu)", (unsigned long)n);
+        redraw_value(48, 117, buf, MP_DIM, MP_BG);
+    }
 }
 
 /* ----------------------------------------------------------------- */
@@ -309,6 +321,17 @@ void app_main(void)
      * in MODEM_FAILED, the rest of the firmware is unaffected. */
     if (modem_init() != ESP_OK) {
         ESP_LOGW(TAG, "Modem HAL init failed (continuing without GSM)");
+    }
+
+    /* Power button: read-only this session. GPIO2 (uBUTTON_PWR) gets
+     * configured as input with pull-up; a 50 Hz background task
+     * debounces and exposes pressed / held-ms / press-count. The
+     * kill-power output on GPIO1 (uPOWER_OFF) is intentionally NOT
+     * driven yet — its polarity is unverified, and driving it wrong
+     * cuts our own supply mid-test. Phase 2 wires the actual
+     * shutdown call once polarity is confirmed. */
+    if (power_init() != ESP_OK) {
+        ESP_LOGW(TAG, "Power button HAL init failed (continuing)");
     }
 
     ESP_LOGI(TAG, "Entering live dashboard loop.");

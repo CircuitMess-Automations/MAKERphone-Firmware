@@ -22,6 +22,7 @@ idf_component_register(
         "hal/battery.c"
         "hal/storage.c"
         "hal/modem.c"
+        "hal/power.c"
     INCLUDE_DIRS
         "."
     REQUIRES
