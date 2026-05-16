@@ -100,6 +100,9 @@ static void lvgl_task(void *arg)
 
 void lvgl_glue_run(void)
 {
+    static bool spawned = false;
+    if (spawned) return;
+    spawned = true;
     /* 8 KB stack — LVGL widget callbacks recurse a fair bit; 4 KB is
      * the minimum quoted in LVGL docs, 8 KB gives margin. */
     xTaskCreate(lvgl_task, "lvgl", 8192, NULL, 5, NULL);

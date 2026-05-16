@@ -127,6 +127,25 @@ static std::atomic<uint32_t> s_release_count {0};
 #define EVT_PRESSED (1u << 6)
 static std::atomic<uint32_t> s_last_event_packed {0};
 
+/* S-MP16c — LVGL screen objects + timer callback.
+ *
+ * s_lvgl_btn_label is created at boot and refreshed every 200 ms
+ * by mp24_status_timer_cb (registered with lv_timer_create). The
+ * callback runs from inside lv_timer_handler (i.e. the LVGL task),
+ * so all LVGL API calls happen from a single thread. The data it
+ * reads (s_press_count) is an atomic — safe to load from any task. */
+static lv_obj_t *s_lvgl_btn_label = NULL;
+
+static void mp24_status_timer_cb(lv_timer_t *t)
+{
+    (void)t;
+    if (s_lvgl_btn_label == NULL) return;
+    char buf[32];
+    snprintf(buf, sizeof(buf), "btn: %lu",
+             (unsigned long) s_press_count.load());
+    lv_label_set_text(s_lvgl_btn_label, buf);
+}
+
 static void on_button_event(btn_id_t btn, bool pressed, void *ctx)
 {
     (void)ctx;
@@ -220,12 +239,20 @@ static void draw_boot_screen(void)
 
 /* Erase a fixed strip first so changing-width values don't leave
  * artefacts from the previous frame. */
+/* The two functions below are retained but no longer called as of
+ * S-MP16c (LVGL took over panel rendering). Kept for reference
+ * since LVGL widgets for battery / modem / power-button status are
+ * a near-term port — these functions are the spec for what those
+ * widgets need to show. Marked unused so GCC doesn't warn under
+ * -Wunused-function; the linker will GC them out anyway. */
+__attribute__((unused))
 static void redraw_value(int x, int y, const char *s, uint16_t fg, uint16_t bg)
 {
     display_fill_rect(x, y, 110, 7, bg);
     display_str(x, y, s, fg, bg);
 }
 
+__attribute__((unused))
 static void update_dashboard(void)
 {
     char buf[48];
@@ -360,17 +387,58 @@ extern "C" void app_main(void)
         draw_boot_screen();
     }
 
-    /* S-MP16b: initialise LVGL (boot — but do NOT start the task yet).
-     * lvgl_glue_init() calls lv_init(), registers the display + flush
-     * callback against hal/display, and arms the esp_timer-based tick
-     * source. The actual frame pump (lvgl_glue_run()) is gated to a
-     * later commit — running it concurrently with the dashboard's
-     * manual draws would race for the SPI bus. Calling init here is
-     * harmless: LVGL just sits idle until a task drives it. */
+    /* S-MP16c: build a minimal LVGL UI and start the frame pump.
+     * From this point on, the LVGL task owns the panel — the
+     * dashboard's manual display_fill / display_str calls are
+     * retired (would race on the SPI bus). The keypad listener and
+     * battery/modem/power-button background tasks continue as
+     * before; they don't touch the panel.
+     *
+     * UI for this first cut is intentionally tiny:
+     *   - dark synthwave bg
+     *   - "MP2.4" title centred
+     *   - button counter line that an lv_timer refreshes 5×/s
+     * That's enough to prove the flush path end-to-end and lets us
+     * eyeball the panel for tearing / colour-channel swaps / wrong
+     * geometry. Real screens (IntroScreen, MainMenu) land on top of
+     * this same flush in later sessions. */
     if (lvgl_glue_init() != ESP_OK) {
         ESP_LOGE(TAG, "LVGL init failed — continuing without UI");
     } else {
-        ESP_LOGI(TAG, "LVGL initialised (frame pump deferred)");
+        ESP_LOGI(TAG, "LVGL initialised, building boot UI");
+
+        lv_obj_t *scr = lv_screen_active();
+        lv_obj_set_style_bg_color(scr,
+                                  lv_color_hex(0x140C24),   /* MP_BG */
+                                  LV_PART_MAIN);
+        lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
+
+        lv_obj_t *title = lv_label_create(scr);
+        lv_label_set_text(title, "MP2.4");
+        lv_obj_set_style_text_color(title,
+                                    lv_color_hex(0xFF8C1E), /* MP_ACCENT */
+                                    LV_PART_MAIN);
+        lv_obj_align(title, LV_ALIGN_CENTER, 0, -16);
+
+        s_lvgl_btn_label = lv_label_create(scr);
+        lv_label_set_text(s_lvgl_btn_label, "btn: 0");
+        lv_obj_set_style_text_color(s_lvgl_btn_label,
+                                    lv_color_hex(0xFFDCB4), /* MP_TEXT */
+                                    LV_PART_MAIN);
+        lv_obj_align(s_lvgl_btn_label, LV_ALIGN_CENTER, 0, 4);
+
+        lv_obj_t *hint = lv_label_create(scr);
+        lv_label_set_text(hint, "LVGL OK");
+        lv_obj_set_style_text_color(hint,
+                                    lv_color_hex(0x7AE8FF), /* MP_HILITE */
+                                    LV_PART_MAIN);
+        lv_obj_align(hint, LV_ALIGN_CENTER, 0, 22);
+
+        /* 200 ms refresh = same cadence the legacy dashboard used. */
+        lv_timer_create(mp24_status_timer_cb, 200, NULL);
+
+        lvgl_glue_run();
+        ESP_LOGI(TAG, "LVGL frame pump running");
     }
 
     if (i2c_bus_init() != ESP_OK) {
@@ -469,54 +537,23 @@ extern "C" void app_main(void)
     xTaskCreate(sms_boot_task, "sms_boot", 4096, NULL,
                 tskIDLE_PRIORITY + 1, NULL);
 
-    ESP_LOGI(TAG, "Entering live dashboard loop.");
+    ESP_LOGI(TAG, "Entering background-tasks-only loop (LVGL owns the panel).");
     bool led_on = false;
-    TickType_t last_wake = xTaskGetTickCount();
 
-    /* Idle-dim (Decision C): blank the display after IDLE_TIMEOUT_MS
-     * of no key/power-button activity. The backlight is hardware-on
-     * (no software dimming possible), so "dim" really means "draw
-     * black over the dashboard". Any keypad or power-button press
-     * wakes the display back to the live dashboard. */
-    const TickType_t IDLE_TIMEOUT = pdMS_TO_TICKS(30 * 1000);   /* 30 s */
-    TickType_t       last_activity = xTaskGetTickCount();
-    uint32_t         last_keypad_n = (uint32_t) s_press_count.load();
-    uint32_t         last_power_n  = power_button_press_count();
-    bool             blanked       = false;
-
+    /* Main task post-bringup: LVGL renders on its own task, so the
+     * primary task drops to a 200 ms LED blink. Keypad + battery +
+     * modem + power-button tasks all run independently in the
+     * background and don't need polling here.
+     *
+     * The legacy dashboard's update_dashboard / draw_boot_screen /
+     * idle-blank logic is retired in this commit — LVGL owns the
+     * SPI bus for the panel from now on, and the diagnostic info
+     * the dashboard used to show (button count, battery %, modem
+     * state) will be rebuilt as LVGL widgets over the next few
+     * commits. For now only the press counter is shown. */
     for (;;) {
         led_on = !led_on;
         aw9523b_set_leds(led_on);
-
-        /* Activity detection: any new press on either input bumps
-         * the timer and wakes from blank. Reading the keypad press
-         * count via the atomic that the listener already maintains
-         * avoids hooking another callback for this. */
-        uint32_t k = (uint32_t) s_press_count.load();
-        uint32_t p = power_button_press_count();
-        if (k != last_keypad_n || p != last_power_n) {
-            last_keypad_n = k;
-            last_power_n  = p;
-            last_activity = xTaskGetTickCount();
-            if (blanked) {
-                ESP_LOGI(TAG, "Idle wake — redrawing dashboard");
-                draw_boot_screen();
-                blanked = false;
-            }
-        }
-
-        TickType_t now = xTaskGetTickCount();
-        if (!blanked && (now - last_activity) > IDLE_TIMEOUT) {
-            ESP_LOGI(TAG, "Idle %lu ms — blanking display",
-                     (unsigned long) ((now - last_activity) * portTICK_PERIOD_MS));
-            display_fill(0x0000);   /* black */
-            blanked = true;
-        }
-
-        if (!blanked) {
-            update_dashboard();
-        }
-
-        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(200));   /* 5 fps */
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
