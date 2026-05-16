@@ -48,9 +48,12 @@ idf_component_register(
         esp_common
         circuitos_shim
         # arduino-esp32 is pulled in by idf_component.yml as
-        # "espressif/arduino-esp32"; the component manager
-        # registers it under the name "arduino" by convention.
-        arduino
+        # "espressif/arduino-esp32"; when the IDF Component Manager
+        # installs it, the directory becomes
+        # managed_components/espressif__arduino-esp32/ and the
+        # CMake component name uses the same '<namespace>__<name>'
+        # double-underscore form.
+        espressif__arduino-esp32
 )
 
 # Pack everything in mp24/spiffs/ into the `spiffs` partition image at
