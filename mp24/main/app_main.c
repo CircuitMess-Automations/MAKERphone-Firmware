@@ -183,6 +183,17 @@ static void update_dashboard(void)
 
 void app_main(void)
 {
+    /* Pre-init heartbeat: if the firmware reaches app_main at all, we
+     * see 30 "alive tick N" lines on the USB-Serial/JTAG console before
+     * any peripheral init starts. Use this to distinguish "firmware
+     * halted in bootloader" (no ticks) from "firmware halted in some
+     * specific peripheral init" (ticks visible, then silence). Drop
+     * this block once bring-up is stable. */
+    for (int i = 0; i < 30; i++) {
+        ESP_LOGI("BOOT", "alive tick %d / 30  (pre-init heartbeat)", i);
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
     print_banner();
 
     if (display_init() != ESP_OK) {

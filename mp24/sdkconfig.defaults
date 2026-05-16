@@ -82,6 +82,8 @@ CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 CONFIG_FREERTOS_HZ=1000
 
 # -------------------------------------------------------------------
-# Bootloader log level — quiet to keep boot fast
+# Bootloader log level — INFO during bring-up so PSRAM init, partition
+# table mount, etc. are all visible via the USB-Serial/JTAG console.
+# Drop to WARN once the firmware is reliably booting.
 # -------------------------------------------------------------------
-CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
+CONFIG_BOOTLOADER_LOG_LEVEL_INFO=y
