@@ -55,9 +55,16 @@ partition, E=button alias remap to joystick/A/B/C/D, F=USB CDC console).
       (`intro.gif` / `splash.bin` / avatars / sfx) into the
       `mp24/spiffs/` directory alongside the C++ shim work; the
       build picks them up automatically.
-- [ ] **S-MP08** GSM modem layer 1 — UART driver, AT request/response,
-      URC parser, power sequencing (PWR_KEY pulse, monitor STATUS,
-      wait for `+CPIN: READY` then `+CEREG: 0,1`).
+- [x] **S-MP08** GSM modem layer 1 — UART1 driver on GPIO 17/18,
+      PWR_KEY pulse + RESET_N control on GPIO 12/15, full AT
+      request/response framework with synchronous `modem_at_send`
+      (mutex-serialised, queue-coordinated with the RX line splitter)
+      and URC dispatcher. State machine: OFF → POWERING_ON → BOOTING
+      → READY (probes AT every 500 ms with a 30 s cap, then ATE0 +
+      AT+CGMM for identity) or → FAILED. Dashboard surfaces the
+      state. Deferred to follow-up sessions: PSM external wake on
+      GPIO 11, hard-reset recovery path, +CMUX multiplexing, AT
+      command timeouts tuned per command class.
 - [ ] **S-MP09** SMS — `MessageService` rewired to `AT+CMGS` / `+CMTI`.
       Each Friend gains a phone number field. `PairService` becomes
       "add contact by number."

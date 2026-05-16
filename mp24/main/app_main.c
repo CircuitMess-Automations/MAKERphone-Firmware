@@ -35,6 +35,7 @@
 #include "hal/piezo.h"
 #include "hal/battery.h"
 #include "hal/storage.h"
+#include "hal/modem.h"
 
 static const char *TAG = "MP24";
 
@@ -93,7 +94,7 @@ static void print_banner(void)
     esp_chip_info_t info;
     esp_chip_info(&info);
     ESP_LOGI(TAG, "==========================================");
-    ESP_LOGI(TAG, " MAKERphone v2.4 firmware — S-MP07 storage");
+    ESP_LOGI(TAG, " MAKERphone v2.4 firmware — S-MP08 modem");
     ESP_LOGI(TAG, " IDF=%s  chip=%s rev%d  cores=%d",
              esp_get_idf_version(),
              (info.model == CHIP_ESP32S3) ? "ESP32-S3" : "?",
@@ -120,8 +121,8 @@ static void draw_boot_screen(void)
     display_fill_rect(0, 0, TFT_WIDTH, 14, MP_ACCENT);
     display_str(4, 4, "MAKERphone v2.4", MP_BG, MP_ACCENT);
 
-    display_str(4, 22, "S-MP07  storage HAL",       MP_TEXT, MP_BG);
-    display_str(4, 34, "SPIFFS + battery + I2S",    MP_DIM,  MP_BG);
+    display_str(4, 22, "S-MP08  GSM modem",        MP_TEXT, MP_BG);
+    display_str(4, 34, "Quectel EG912U-GL @ UART1", MP_DIM,  MP_BG);
 
     /* Chroma stripe stays — visual confidence in every boot. */
     const int bar_y = 50;
@@ -132,12 +133,15 @@ static void draw_boot_screen(void)
     display_fill_rect(2 * bar_w, bar_y, bar_w, bar_h, COLOR_BLUE);
     display_fill_rect(3 * bar_w, bar_y, bar_w, bar_h, COLOR_WHITE);
 
-    /* Labels for live values — tight 12-px rows, six visible. */
+    /* Labels for live values — six 11-px rows. Tone+U5/U9 combined
+     * to free a row for Modem state since the modem is the headline
+     * deliverable of this session. */
     display_str(4, 62,  "Last :",   MP_DIM, MP_BG);
-    display_str(4, 74,  "Events:",  MP_DIM, MP_BG);
-    display_str(4, 86,  "Tone :",   MP_DIM, MP_BG);
-    display_str(4, 98,  "Batt :",   MP_DIM, MP_BG);
-    display_str(4, 110, "U5/U9 :",  MP_DIM, MP_BG);
+    display_str(4, 73,  "Events:",  MP_DIM, MP_BG);
+    display_str(4, 84,  "Tone :",   MP_DIM, MP_BG);
+    display_str(4, 95,  "Batt :",   MP_DIM, MP_BG);
+    display_str(4, 106, "Modem:",   MP_DIM, MP_BG);
+    display_str(4, 117, "U5/U9:",   MP_DIM, MP_BG);
 }
 
 /* Erase a fixed strip first so changing-width values don't leave
@@ -150,7 +154,7 @@ static void redraw_value(int x, int y, const char *s, uint16_t fg, uint16_t bg)
 
 static void update_dashboard(void)
 {
-    char buf[40];
+    char buf[48];
 
     /* "Last :" line */
     uint32_t evt = atomic_load(&s_last_event_packed);
@@ -159,41 +163,57 @@ static void update_dashboard(void)
         bool   was_p  = (evt & EVT_PRESSED) != 0;
         snprintf(buf, sizeof(buf), "%s %s",
                  was_p ? "PRESS" : "REL  ", btn_name(btn));
-        redraw_value(54, 62, buf, was_p ? MP_HILITE : MP_TEXT, MP_BG);
+        redraw_value(48, 62, buf, was_p ? MP_HILITE : MP_TEXT, MP_BG);
     }
 
-    /* "Events: N press / N rel" */
+    /* "Events: N / N" */
     uint32_t p = (uint32_t) atomic_load(&s_press_count);
     uint32_t r = (uint32_t) atomic_load(&s_release_count);
     snprintf(buf, sizeof(buf), "%lu/%lu", (unsigned long)p, (unsigned long)r);
-    redraw_value(54, 74, buf, MP_TEXT, MP_BG);
+    redraw_value(48, 73, buf, MP_TEXT, MP_BG);
 
-    /* "Tone : 880 Hz" or "Tone : --" */
+    /* "Tone : 880 Hz" */
     uint32_t freq = piezo_current_freq();
     if (freq > 0) snprintf(buf, sizeof(buf), "%lu Hz", (unsigned long)freq);
     else          snprintf(buf, sizeof(buf), "--");
-    redraw_value(54, 86, buf, freq > 0 ? MP_HILITE : MP_DIM, MP_BG);
+    redraw_value(48, 84, buf, freq > 0 ? MP_HILITE : MP_DIM, MP_BG);
 
-    /* "Batt : 3.85 V (74%)" — colour-coded by SOC.
-     * Renders even before the first ADC sample (shows "..."). */
+    /* "Batt : 3.85 V (74%)" */
     if (!battery_ready()) {
-        redraw_value(54, 98, "...", MP_DIM, MP_BG);
+        redraw_value(48, 95, "...", MP_DIM, MP_BG);
     } else {
         float volts = battery_voltage();
         int   pct   = battery_percent();
         uint16_t batt_col = MP_TEXT;
         if      (pct <= 10) batt_col = COLOR_RED;
-        else if (pct <= 25) batt_col = display_rgb(255, 180, 60);    /* amber */
-        else                batt_col = display_rgb(120, 220, 120);   /* green */
+        else if (pct <= 25) batt_col = display_rgb(255, 180, 60);
+        else                batt_col = display_rgb(120, 220, 120);
         snprintf(buf, sizeof(buf), "%.2f V (%d%%)", volts, pct);
-        redraw_value(54, 98, buf, batt_col, MP_BG);
+        redraw_value(48, 95, buf, batt_col, MP_BG);
     }
 
-    /* Combined raw register read of both keypad expanders on one row,
-     * frees a line for the battery row above. */
+    /* "Modem: STATE  <model>" */
+    modem_state_t mst = modem_state();
+    const char *model = modem_model();
+    if (model && model[0]) {
+        snprintf(buf, sizeof(buf), "%s %s", modem_state_name(mst), model);
+    } else {
+        snprintf(buf, sizeof(buf), "%s", modem_state_name(mst));
+    }
+    uint16_t mcol = MP_TEXT;
+    switch (mst) {
+        case MODEM_READY:        mcol = display_rgb(120, 220, 120); break;
+        case MODEM_FAILED:       mcol = COLOR_RED;                  break;
+        case MODEM_BOOTING:
+        case MODEM_POWERING_ON:  mcol = display_rgb(255, 180, 60);  break;
+        default:                 mcol = MP_DIM;                     break;
+    }
+    redraw_value(48, 106, buf, mcol, MP_BG);
+
+    /* Combined raw keypad-expander state. */
     snprintf(buf, sizeof(buf), "0x%04X 0x%04X",
              input_keypad_raw(0), input_keypad_raw(1));
-    redraw_value(54, 110, buf, MP_TEXT, MP_BG);
+    redraw_value(48, 117, buf, MP_TEXT, MP_BG);
 }
 
 /* ----------------------------------------------------------------- */
@@ -278,6 +298,17 @@ void app_main(void)
      * iterate on the C++ shim. */
     if (storage_init() != ESP_OK) {
         ESP_LOGW(TAG, "SPIFFS mount failed (continuing without assets)");
+    }
+
+    /* GSM modem: configures UART1 (GPIO 17/18) + PWR_KEY (GPIO 12) +
+     * RESET_N (GPIO 15) and spawns a background task that drives the
+     * power-on sequence asynchronously. Returns in ms; modem boot
+     * itself takes 8-30 s and runs in parallel with the dashboard
+     * loop. State is observable via modem_state() and shown on the
+     * dashboard. Non-fatal: a missing or unpowered modem just sits
+     * in MODEM_FAILED, the rest of the firmware is unaffected. */
+    if (modem_init() != ESP_OK) {
+        ESP_LOGW(TAG, "Modem HAL init failed (continuing without GSM)");
     }
 
     ESP_LOGI(TAG, "Entering live dashboard loop.");
