@@ -47,6 +47,16 @@ idf_component_register(
         "${SRC_DIR}/Interface/LVObject.cpp"
         "${SRC_DIR}/Interface/LVScreen.cpp"
 
+        # S-MP17b: more Interface/ infrastructure. Each pulls
+        # additional LVGL 8 + CircuitOS surface through the
+        # compiler. ConvoView.cpp deliberately omitted — it pulls
+        # Model/Storage/MessageService which we haven't shimmed
+        # yet.
+        "${SRC_DIR}/Interface/LVSelectable.cpp"
+        "${SRC_DIR}/Interface/LVModal.cpp"
+        "${SRC_DIR}/Interface/Pics.cpp"
+        "${SRC_DIR}/Interface/PhoneTransitions.cpp"
+
         # Our replacement for src/InputLVGL.cpp. The upstream one is
         # intentionally NOT listed.
         "shim/InputLVGL.cpp"
