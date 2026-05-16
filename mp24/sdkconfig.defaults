@@ -87,3 +87,19 @@ CONFIG_FREERTOS_HZ=1000
 # Drop to WARN once the firmware is reliably booting.
 # -------------------------------------------------------------------
 CONFIG_BOOTLOADER_LOG_LEVEL_INFO=y
+
+# -------------------------------------------------------------------
+# C++ exceptions — required by upstream src/ phone-firmware code
+#
+# S-MP17a discovery: src/Interface/LVScreen.cpp's destructor calls
+# `throw std::exception()` if a screen is destroyed while still
+# running. ESP-IDF's default is exceptions OFF (smaller binary,
+# faster), which makes the compiler reject the throw at compile
+# time with 'exception handling disabled'.
+#
+# Enabling adds a few KB of unwind tables to the binary but unblocks
+# the entire src/ corpus. Worth it. If we ever want exceptions back
+# off, we'd need to patch ~30 src/ files that use throw — which is
+# the kind of upstream divergence we're explicitly trying to avoid.
+# -------------------------------------------------------------------
+CONFIG_COMPILER_CXX_EXCEPTIONS=y
