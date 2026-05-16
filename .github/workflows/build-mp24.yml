@@ -143,6 +143,7 @@ jobs:
             mp24/build/bootloader/bootloader.bin
             mp24/build/partition_table/partition-table.bin
             mp24/build/flash_args
+            mp24/build/spiffs.bin
           if-no-files-found: warn
 
   # ----------------------------------------------------------------
