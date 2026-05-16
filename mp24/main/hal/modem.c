@@ -86,8 +86,13 @@ static esp_err_t init_gpios(void)
     esp_err_t r = gpio_config(&out_cfg);
     if (r != ESP_OK) return r;
 
-    /* Idle states: PWR_KEY low (no pulse), RESET_N high (out of reset). */
-    gpio_set_level(PIN_MODEM_PWR_KEY, 0);
+    /* Idle states per Quectel EG912U hardware design:
+     *   PWR_KEY high  — module sees pin un-asserted (not "pressed").
+     *                   Active-low pin in VBAT power domain.
+     *   RESET_N high  — out of reset (also active-low).
+     * Holding PWR_KEY high here means the modem stays off until
+     * pulse_pwr_key() pulls it low for the boot trigger. */
+    gpio_set_level(PIN_MODEM_PWR_KEY, 1);
     gpio_set_level(PIN_MODEM_RESET_N, 1);
     return ESP_OK;
 }
@@ -305,9 +310,13 @@ static void set_state(modem_state_t s)
 
 static void pulse_pwr_key(uint32_t ms)
 {
-    gpio_set_level(PIN_MODEM_PWR_KEY, 1);
-    vTaskDelay(pdMS_TO_TICKS(ms));
+    /* Active-low pulse: pull PWR_KEY to ground for `ms`, then
+     * release back to its idle-high state. Quectel datasheet
+     * (EG912U-GL Hardware Design V1.1, §3.4.1) requires ≥2 s low
+     * for power-on; we pass 2500 ms from the caller for margin. */
     gpio_set_level(PIN_MODEM_PWR_KEY, 0);
+    vTaskDelay(pdMS_TO_TICKS(ms));
+    gpio_set_level(PIN_MODEM_PWR_KEY, 1);
 }
 
 static void modem_sm_task(void *arg)
@@ -319,10 +328,12 @@ static void modem_sm_task(void *arg)
 
     set_state(MODEM_POWERING_ON);
 
-    /* Quectel EG912U-GL power-on pulse: PWR_KEY high for ≥500 ms.
-     * Datasheet recommends 1000 ms for robust start-up against
-     * supply ramp jitter. */
-    pulse_pwr_key(1000);
+    /* Quectel EG912U-GL power-on: PWR_KEY pulled low for ≥2 s.
+     * (Datasheet V1.1 §3.4.1; the older revision required ≥500 ms
+     * which is what an earlier comment here was citing. The 2 s
+     * floor is the safe number for production silicon.) We use
+     * 2500 ms for jitter margin against supply ramp. */
+    pulse_pwr_key(2500);
 
     set_state(MODEM_BOOTING);
 

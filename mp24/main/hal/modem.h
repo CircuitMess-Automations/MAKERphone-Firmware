@@ -6,7 +6,9 @@
  *     GPIO 17 (TX) → modem RX
  *     GPIO 18 (RX) ← modem TX
  *     115200 8N1, no flow control (Quectel default)
- *   GPIO 12  uGSM_PWR_KEY    active-high pulse, 1 s = power on, 700 ms = power off
+ *   GPIO 12  uGSM_PWR_KEY    active-low pulse (≥2 s low) to power on,
+ *                            idle held high; Quectel EG912U Hardware
+ *                            Design V1.1 §3.4.1.
  *   GPIO 16  uGSM_RESET_N    active-low (chip pad #22, XTAL_32K_N in IO_MUX)
  *   GPIO 11  uGSM_PSM_EXT_INT (deferred — power-saving wake interrupt)
  *
