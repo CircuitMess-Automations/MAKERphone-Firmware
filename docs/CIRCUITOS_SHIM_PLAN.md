@@ -18,9 +18,22 @@
 | S-MP14a | `7cbe34f` | `MP24Input` — subclass of CircuitOS `Input`, `scanButtons()` polls `hal/input_keypad` cached state |
 | S-MP14b | `26ad52e` + `d7149d8` | `MP24Battery` — definitions for every `BatteryService` method + the `Battery` singleton, routed to `hal/battery` |
 | S-MP14d | `001ec2c` | `MP24Chatter` — `Chatter.begin()` wires Display + MP24Input + Battery + Settings into `LoopManager`; the legacy entry point now works on MP2.4 |
+| S-MP16a | `75c9f84` | `lvgl/lvgl ^9.5` added as managed component; build green with defaults |
+| S-MP16b | `845ba08` | `mp24/main/lvgl_glue.{c,h}` + `display_blit_rect` in `hal/display`; LVGL flush callback routes to our SPI panel |
+| S-MP16b/1 | `8285752` | `lvgl_glue_init()` called at boot (frame pump deferred); proves LVGL symbols actually link |
 
-Binary grew 392 KB → **407 KB** after the smoke test forced real
-symbol references; still 81 % free.
+Binary grew **407 KB → 679 KB** at S-MP16b/1 — that's LVGL core
+linking in. Still **68 % of the 2 MB partition free**.
+
+> **Flash state note (2026-05-16):** the CI flash job started
+> failing right at the LVGL dependency add (S-MP16a) even though
+> that commit's binary was byte-for-byte identical to
+> S-MP14d's. Failure mode is consistent: device is detected at
+> `/dev/cu.usbmodem2101`, but esptool gets "Failed to connect to
+> ESP32-S3: No serial data received." Most likely the firmware
+> flashed at S-MP14d wandered into a state where USB-Serial/JTAG's
+> ROM reset path isn't responsive. Recovery: **power-cycle the
+> MAKERphone**, then re-run the flash (workflow_dispatch on main).
 
 ## What's deferred (and why)
 
