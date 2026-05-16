@@ -1,0 +1,2 @@
+MAKERphone v2.4 mp24 firmware — SPIFFS bring-up sentinel (S-MP07).
+If you see this string in the boot log, SPIFFS mounted and reads work.

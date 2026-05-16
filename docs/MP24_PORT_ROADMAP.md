@@ -49,8 +49,12 @@ partition, E=button alias remap to joystick/A/B/C/D, F=USB CDC console).
 
 ## Transport (GSM modem)
 
-- [ ] **S-MP07** SPIFFS — generate image, flash, mount, sanity-check
-      `intro.gif` / `splash.bin` / avatars resolve from FSLVGL.
+- [x] **S-MP07** SPIFFS — partition image built from `mp24/spiffs/`
+      via `spiffs_create_partition_image`, mounted at `/spiffs`,
+      enumerated + sentinel-read at boot. Drop CircuitOS assets
+      (`intro.gif` / `splash.bin` / avatars / sfx) into the
+      `mp24/spiffs/` directory alongside the C++ shim work; the
+      build picks them up automatically.
 - [ ] **S-MP08** GSM modem layer 1 — UART driver, AT request/response,
       URC parser, power sequencing (PWR_KEY pulse, monitor STATUS,
       wait for `+CPIN: READY` then `+CEREG: 0,1`).

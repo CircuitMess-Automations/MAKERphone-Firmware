@@ -34,6 +34,7 @@
 #include "hal/input_keypad.h"
 #include "hal/piezo.h"
 #include "hal/battery.h"
+#include "hal/storage.h"
 
 static const char *TAG = "MP24";
 
@@ -92,7 +93,7 @@ static void print_banner(void)
     esp_chip_info_t info;
     esp_chip_info(&info);
     ESP_LOGI(TAG, "==========================================");
-    ESP_LOGI(TAG, " MAKERphone v2.4 firmware — S-MP06 battery");
+    ESP_LOGI(TAG, " MAKERphone v2.4 firmware — S-MP07 storage");
     ESP_LOGI(TAG, " IDF=%s  chip=%s rev%d  cores=%d",
              esp_get_idf_version(),
              (info.model == CHIP_ESP32S3) ? "ESP32-S3" : "?",
@@ -119,8 +120,8 @@ static void draw_boot_screen(void)
     display_fill_rect(0, 0, TFT_WIDTH, 14, MP_ACCENT);
     display_str(4, 4, "MAKERphone v2.4", MP_BG, MP_ACCENT);
 
-    display_str(4, 22, "S-MP06  battery monitor",  MP_TEXT, MP_BG);
-    display_str(4, 34, "23 btns, I2S, ADC1_CH2",    MP_DIM,  MP_BG);
+    display_str(4, 22, "S-MP07  storage HAL",       MP_TEXT, MP_BG);
+    display_str(4, 34, "SPIFFS + battery + I2S",    MP_DIM,  MP_BG);
 
     /* Chroma stripe stays — visual confidence in every boot. */
     const int bar_y = 50;
@@ -267,6 +268,16 @@ void app_main(void)
      * stack. */
     if (battery_init() != ESP_OK) {
         ESP_LOGW(TAG, "Battery monitor init failed (continuing)");
+    }
+
+    /* Storage: mount /spiffs from the 1984 KB partition at 0x210000.
+     * Enumerates root and reads the sentinel file. format_if_mount_
+     * failed=true means a wiped chip auto-formats on first boot
+     * (slow — adds ~10 s — but the firmware survives). Non-fatal:
+     * the GSM/dashboard stack works fine without assets while we
+     * iterate on the C++ shim. */
+    if (storage_init() != ESP_OK) {
+        ESP_LOGW(TAG, "SPIFFS mount failed (continuing without assets)");
     }
 
     ESP_LOGI(TAG, "Entering live dashboard loop.");
