@@ -95,9 +95,16 @@ partition, E=button alias remap to joystick/A/B/C/D, F=USB CDC console).
       state. Deferred to follow-up sessions: PSM external wake on
       GPIO 11, hard-reset recovery path, +CMUX multiplexing, AT
       command timeouts tuned per command class.
-- [ ] **S-MP09** SMS — `MessageService` rewired to `AT+CMGS` / `+CMTI`.
-      Each Friend gains a phone number field. `PairService` becomes
-      "add contact by number."
+- [x] **S-MP09** SMS — `hal/sms.{c,h}` layers on top of the modem AT
+      framework. `sms_init()` configures text mode (`AT+CMGF=1`),
+      GSM-7 charset, and `+CMTI` URC routing. `sms_send()` uses
+      the new `modem_at_send_data()` (interactive '>'-prompt
+      command flow) for the `AT+CMGS` send dance. Inbound: a
+      dedicated fetch task picks `+CMTI: "SM",N` URCs off a queue,
+      runs `AT+CMGR=N`, parses sender + body, fires the user
+      callback, then `AT+CMGD=N` to free SIM storage. Counters
+      exposed for the dashboard. CircuitOS `MessageService`
+      rewiring lands alongside the C++ shim.
 - [ ] **S-MP10** Voice calls + I²S2 audio bridge — `PhoneCallService` to
       `ATD` / `ATA` / `ATH`. PCM forwarding between I²S1 and I²S2
       under a FreeRTOS task. AEC deferred to polish.

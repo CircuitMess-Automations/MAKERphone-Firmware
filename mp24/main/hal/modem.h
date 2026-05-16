@@ -7,7 +7,7 @@
  *     GPIO 18 (RX) ← modem TX
  *     115200 8N1, no flow control (Quectel default)
  *   GPIO 12  uGSM_PWR_KEY    active-high pulse, 1 s = power on, 700 ms = power off
- *   GPIO 15  uGSM_RESET_N    active-low (XTAL_32K_N pin used as IO_MUX GPIO)
+ *   GPIO 16  uGSM_RESET_N    active-low (chip pad #22, XTAL_32K_N in IO_MUX)
  *   GPIO 11  uGSM_PSM_EXT_INT (deferred — power-saving wake interrupt)
  *
  * I²S2 (GPIO 13/14/21) is the voice-PCM path and lands in its own
@@ -24,9 +24,15 @@
  *   - modem_at_send() is synchronous and thread-safe; it blocks the
  *     calling task on a queue while the RX task accumulates the
  *     response. Use it from any non-ISR context.
+ *   - modem_at_send_data() handles interactive commands such as
+ *     AT+CMGS that emit a '>' prompt mid-stream. The RX task is
+ *     briefly paused so the sender can poll UART directly for the
+ *     prompt before resuming normal line-based response collection.
  *   - URCs (Unsolicited Result Codes — RING, +CMTI, +CREG, etc.) are
- *     dispatched to a user callback registered via modem_set_urc_cb().
- *     S-MP08 only logs them; S-MP09 wires them into MessageService.
+ *     dispatched to prefix-matched subscribers registered via
+ *     modem_subscribe_urc(). Multiple subscribers can coexist (SMS,
+ *     voice, network state, etc.). modem_set_urc_cb() registers a
+ *     catch-all subscriber that sees every URC line.
  *
  * If the modem doesn't respond (no battery, no SIM, wrong pinout,
  * missing module) the HAL transitions to FAILED, logs a clear error
@@ -36,6 +42,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include "esp_err.h"
 
 typedef enum {
@@ -84,9 +91,38 @@ esp_err_t modem_at_send(const char *cmd,
                         char *resp_buf, size_t buf_len,
                         uint32_t timeout_ms);
 
+/* Interactive AT command for prompt-based protocols (AT+CMGS, AT+QFUPL,
+ * etc.). Steps:
+ *   1. Sends "AT<cmd>\r\n" verbatim.
+ *   2. Pauses RX task and polls UART directly for prompt_char (typ.
+ *      '>'). Times out at prompt_timeout_ms.
+ *   3. On prompt, writes `data` (`data_len` bytes) followed by the
+ *      0x1A (Ctrl-Z) terminator.
+ *   4. Resumes RX task, waits up to response_timeout_ms for the
+ *      final OK / ERROR line.
+ *
+ * resp_buf/buf_len same semantics as modem_at_send. Returns ESP_OK
+ * only on terminal OK; ESP_FAIL on ERROR/+CMS ERROR; ESP_ERR_TIMEOUT
+ * if either phase times out. */
+esp_err_t modem_at_send_data(const char *cmd,
+                             char prompt_char,
+                             const void *data, size_t data_len,
+                             char *resp_buf, size_t buf_len,
+                             uint32_t prompt_timeout_ms,
+                             uint32_t response_timeout_ms);
+
 /* URC (Unsolicited Result Code) callback. Invoked once per URC line
  * from the modem RX task — short, non-blocking work only; offload
  * anything heavy to a separate task or queue. The line is NUL-
  * terminated and does NOT include the trailing CRLF. */
 typedef void (*modem_urc_cb_t)(const char *line);
+
+/* Register a URC subscriber filtered by line prefix. The callback
+ * fires for any URC line whose first chars match `prefix` (case
+ * sensitive). Up to 8 subscribers; further registrations fail
+ * silently with a warning log. Use prefix="" for a catch-all. */
+esp_err_t modem_subscribe_urc(const char *prefix, modem_urc_cb_t cb);
+
+/* Compatibility: register a catch-all URC subscriber. Equivalent to
+ * modem_subscribe_urc("", cb). Existing callers stay working. */
 void modem_set_urc_cb(modem_urc_cb_t cb);

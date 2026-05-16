@@ -39,7 +39,22 @@ static _Atomic int  s_state         = MODEM_OFF;
 static bool         s_inited        = false;
 static char         s_model[32]     = "";
 
-static modem_urc_cb_t s_urc_cb      = NULL;
+/* URC subscriptions. Subscribers are matched by prefix against each
+ * arriving URC line; a subscriber with prefix="" sees every URC. The
+ * array is small + static — registration is rare (during init) and
+ * dispatch is hot (once per URC). */
+#define MAX_URC_SUBS  8
+typedef struct {
+    char           prefix[24];
+    modem_urc_cb_t cb;
+} urc_sub_t;
+static urc_sub_t s_urc_subs[MAX_URC_SUBS] = {0};
+static int       s_urc_sub_count          = 0;
+
+/* When non-zero, the RX task drops UART reads — used by
+ * modem_at_send_data() during the interactive-prompt phase so the
+ * sender can poll UART directly for a non-CRLF '>' character. */
+static volatile bool s_rx_paused = false;
 
 /* Mutual exclusion for the AT command channel. Only one task may be
  * inside modem_at_send() at a time. */
@@ -147,6 +162,16 @@ static void enqueue_line(const char *line, size_t len)
     }
 }
 
+static void dispatch_urc(const char *line)
+{
+    for (int i = 0; i < s_urc_sub_count; i++) {
+        const char *p = s_urc_subs[i].prefix;
+        if (p[0] == '\0' || strncmp(line, p, strlen(p)) == 0) {
+            s_urc_subs[i].cb(line);
+        }
+    }
+}
+
 static void modem_rx_task(void *arg)
 {
     (void) arg;
@@ -154,6 +179,14 @@ static void modem_rx_task(void *arg)
     size_t line_len = 0;
 
     for (;;) {
+        /* Pause window: modem_at_send_data() is doing its own UART
+         * polling for the '>' prompt — yielding the bus avoids
+         * race-eating the prompt byte. Resumes on its own. */
+        if (s_rx_paused) {
+            vTaskDelay(pdMS_TO_TICKS(5));
+            continue;
+        }
+
         uint8_t byte;
         int n = uart_read_bytes(MODEM_UART_PORT, &byte, 1,
                                 pdMS_TO_TICKS(1000));
@@ -168,7 +201,7 @@ static void modem_rx_task(void *arg)
 
             if (is_urc(line)) {
                 ESP_LOGI(TAG, "URC: %s", line);
-                if (s_urc_cb) s_urc_cb(line);
+                dispatch_urc(line);
             } else {
                 /* Either an intermediate response line, an echo, or
                  * a terminator. Push it all to the AT queue; the
@@ -378,9 +411,131 @@ const char *modem_model(void)
     return s_model;
 }
 
+esp_err_t modem_subscribe_urc(const char *prefix, modem_urc_cb_t cb)
+{
+    if (!cb) return ESP_ERR_INVALID_ARG;
+    if (s_urc_sub_count >= MAX_URC_SUBS) {
+        ESP_LOGW(TAG, "URC sub table full, dropping registration for '%s'",
+                 prefix ? prefix : "");
+        return ESP_ERR_NO_MEM;
+    }
+    const char *p = prefix ? prefix : "";
+    size_t pl = strlen(p);
+    if (pl >= sizeof(s_urc_subs[0].prefix)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    memcpy(s_urc_subs[s_urc_sub_count].prefix, p, pl + 1);
+    s_urc_subs[s_urc_sub_count].cb = cb;
+    s_urc_sub_count++;
+    return ESP_OK;
+}
+
 void modem_set_urc_cb(modem_urc_cb_t cb)
 {
-    s_urc_cb = cb;
+    /* Backward-compat shim: a catch-all subscriber. */
+    modem_subscribe_urc("", cb);
+}
+
+esp_err_t modem_at_send_data(const char *cmd,
+                             char prompt_char,
+                             const void *data, size_t data_len,
+                             char *resp_buf, size_t buf_len,
+                             uint32_t prompt_timeout_ms,
+                             uint32_t response_timeout_ms)
+{
+    if (!s_inited) return ESP_ERR_INVALID_STATE;
+    if ((modem_state_t) atomic_load(&s_state) != MODEM_READY) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (!cmd || !data) return ESP_ERR_INVALID_ARG;
+
+    if (xSemaphoreTake(s_at_mutex,
+                       pdMS_TO_TICKS(prompt_timeout_ms +
+                                     response_timeout_ms)) != pdTRUE) {
+        return ESP_ERR_TIMEOUT;
+    }
+
+    /* Phase 0: drain any stale lines. */
+    char *junk = NULL;
+    while (xQueueReceive(s_at_q, &junk, 0) == pdTRUE) free(junk);
+
+    /* Phase 1: send the command. Don't pause RX yet — we want the
+     * echo (if echo isn't disabled) to flow through the line-splitter
+     * normally before the prompt arrives mid-stream. */
+    char tx[MODEM_LINE_MAX];
+    int tlen = snprintf(tx, sizeof(tx), "AT%s\r\n", cmd);
+    if (tlen <= 0 || tlen >= (int) sizeof(tx)) {
+        xSemaphoreGive(s_at_mutex);
+        return ESP_ERR_INVALID_ARG;
+    }
+    uart_write_bytes(MODEM_UART_PORT, tx, tlen);
+
+    /* Phase 2: pause RX, poll UART directly for the prompt char. The
+     * modem sends "\r\n> " (with trailing space) once it's ready for
+     * the payload. We match just the prompt_char to be flexible. */
+    s_rx_paused = true;
+    /* Brief yield so the RX task notices the pause flag before we
+     * start reading. */
+    vTaskDelay(pdMS_TO_TICKS(20));
+
+    TickType_t deadline = xTaskGetTickCount() +
+                          pdMS_TO_TICKS(prompt_timeout_ms);
+    bool got_prompt = false;
+    while (xTaskGetTickCount() < deadline) {
+        uint8_t b;
+        int n = uart_read_bytes(MODEM_UART_PORT, &b, 1, pdMS_TO_TICKS(50));
+        if (n == 1 && b == (uint8_t) prompt_char) {
+            got_prompt = true;
+            break;
+        }
+    }
+
+    if (!got_prompt) {
+        s_rx_paused = false;
+        xSemaphoreGive(s_at_mutex);
+        ESP_LOGW(TAG, "data-send: no '%c' prompt within %lu ms",
+                 prompt_char, (unsigned long) prompt_timeout_ms);
+        return ESP_ERR_TIMEOUT;
+    }
+
+    /* Phase 3: write payload + Ctrl-Z (0x1A) submit byte. */
+    uart_write_bytes(MODEM_UART_PORT, data, data_len);
+    uint8_t ctrl_z = 0x1A;
+    uart_write_bytes(MODEM_UART_PORT, &ctrl_z, 1);
+
+    /* Phase 4: resume RX and collect the terminal response. */
+    s_rx_paused = false;
+
+    deadline = xTaskGetTickCount() + pdMS_TO_TICKS(response_timeout_ms);
+    size_t resp_len = 0;
+    if (resp_buf && buf_len > 0) resp_buf[0] = '\0';
+
+    esp_err_t result = ESP_ERR_TIMEOUT;
+    for (;;) {
+        TickType_t now = xTaskGetTickCount();
+        if (now >= deadline) break;
+        char *line = NULL;
+        if (xQueueReceive(s_at_q, &line, deadline - now) != pdTRUE) break;
+
+        if (is_terminator(line)) {
+            result = (strcmp(line, "OK") == 0) ? ESP_OK : ESP_FAIL;
+            free(line);
+            break;
+        }
+        if (resp_buf && buf_len > 0) {
+            size_t ll = strlen(line);
+            if (resp_len + ll + 2 < buf_len) {
+                if (resp_len > 0) resp_buf[resp_len++] = '\n';
+                memcpy(resp_buf + resp_len, line, ll);
+                resp_len += ll;
+                resp_buf[resp_len] = '\0';
+            }
+        }
+        free(line);
+    }
+
+    xSemaphoreGive(s_at_mutex);
+    return result;
 }
 
 esp_err_t modem_init(void)

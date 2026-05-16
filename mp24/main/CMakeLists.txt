@@ -1,13 +1,14 @@
 # mp24/main — entry point component
 #
-# S-MP01..S-MP08 scope: USB-Serial/JTAG console, ST7735 display, I²C
+# S-MP01..S-MP09 scope: USB-Serial/JTAG console, ST7735 display, I²C
 # HAL with AW9523B + XL9555 drivers, interrupt-driven keypad input
 # dispatcher, I²S MAX98357A amp + square-wave piezo synthesiser,
 # ADC1_CH2 battery monitor with Li-Po SOC estimate, SPIFFS storage
 # HAL mounted at /spiffs from a 1984 KB partition, Quectel EG912U-GL
-# modem layer 1 (UART + AT framework + URC dispatch + power-on
-# state machine). SMS (S-MP09) and voice calls (S-MP10) build on
-# the modem HAL in subsequent sessions.
+# modem layer 1 (UART + AT framework + URC dispatch + power-on state
+# machine), power button + idle-dim, text-mode SMS send/receive
+# (+CMGS interactive prompt + +CMTI URC dispatch + AT+CMGR fetch).
+# Voice calls (S-MP10) on the I²S2 audio bridge land next.
 
 idf_component_register(
     SRCS
@@ -23,6 +24,7 @@ idf_component_register(
         "hal/storage.c"
         "hal/modem.c"
         "hal/power.c"
+        "hal/sms.c"
     INCLUDE_DIRS
         "."
     REQUIRES

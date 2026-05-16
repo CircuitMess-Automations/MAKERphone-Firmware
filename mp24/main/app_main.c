@@ -37,6 +37,7 @@
 #include "hal/storage.h"
 #include "hal/modem.h"
 #include "hal/power.h"
+#include "hal/sms.h"
 
 static const char *TAG = "MP24";
 
@@ -230,6 +231,21 @@ static void update_dashboard(void)
 
 /* ----------------------------------------------------------------- */
 
+/* One-shot worker: waits up to 35 s for the modem to enter READY,
+ * then runs sms_init() to configure text mode + +CMTI routing. Keeps
+ * app_main free of long blocking calls so the dashboard goes live
+ * while the modem boots in parallel. */
+static void sms_boot_task(void *arg)
+{
+    (void) arg;
+    esp_err_t r = sms_init(35000);
+    if (r != ESP_OK) {
+        ESP_LOGW(TAG, "SMS layer not started (modem state: %s, err: %s)",
+                 modem_state_name(modem_state()), esp_err_to_name(r));
+    }
+    vTaskDelete(NULL);
+}
+
 void app_main(void)
 {
     print_banner();
@@ -333,6 +349,13 @@ void app_main(void)
     if (power_init() != ESP_OK) {
         ESP_LOGW(TAG, "Power button HAL init failed (continuing)");
     }
+
+    /* SMS: needs the modem in READY state, which takes 8-30 s after
+     * modem_init returns. Spawn a one-shot task that waits for
+     * readiness then configures text mode + +CMTI URC routing.
+     * Putting the wait in a task keeps app_main non-blocking. */
+    xTaskCreate(sms_boot_task, "sms_boot", 4096, NULL,
+                tskIDLE_PRIORITY + 1, NULL);
 
     ESP_LOGI(TAG, "Entering live dashboard loop.");
     bool led_on = false;
