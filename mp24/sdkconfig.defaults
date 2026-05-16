@@ -28,12 +28,30 @@ CONFIG_SPIRAM_USE_MALLOC=y
 CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
 
 # -------------------------------------------------------------------
-# Console — Decision F1: USB CDC on the native USB-OTG peripheral
-# Frees GPIO 43/44 for UMAX I²C. Host sees a CDC serial device on
-# the existing USB-C connector.
+# Console — Decision F1: USB-based console on the native USB-C port.
+# Frees GPIO 43/44 for UMAX I²C.
+#
+# Originally specced as USB-OTG CDC (CONFIG_ESP_CONSOLE_USB_CDC).
+# That works but it puts a soft-init peripheral (TinyUSB) on the path
+# and shares GPIO 19/20 with USB-Serial/JTAG — so any firmware halt
+# *before* USB-OTG re-enumeration leaves the chip unreachable from
+# esptool, and recovery requires physically pressing SW24 (the
+# in-case BOOT button) at power-on. Hit that failure mode while
+# bringing up S-MP05; switched to the hardware-level USB-Serial/JTAG
+# controller instead. Trade-offs:
+#
+#   USB-Serial/JTAG  | USB-OTG CDC
+#   ---------------- | -------------------------------------------
+#   Always-on        | Initialised by TinyUSB during app start
+#   Survives panics  | Brick risk if panic before re-enumeration
+#   ~1 Mbit/s burst  | Up to 12 Mbit/s
+#   Built into ROM   | Adds ~25 KB TinyUSB
+#
+# Console traffic is light (ESP_LOGI lines); we gain nothing from
+# USB-OTG's higher bandwidth and lose unbrick-ability. Decision F1
+# now means "USB-Serial/JTAG console", same end goal (no UART0).
 # -------------------------------------------------------------------
-CONFIG_ESP_CONSOLE_USB_CDC=y
-CONFIG_ESP_CONSOLE_USB_CDC_SUPPORT_ETS_PRINTF=y
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 
 # -------------------------------------------------------------------
 # Logging
