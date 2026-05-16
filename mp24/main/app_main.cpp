@@ -97,6 +97,29 @@ static void chatter_app_link_anchor()
     chatter_app_force_link();
 }
 
+/* S-MP15a: LoopManager pump task. CircuitOS's LoopManager is a
+ * pure-static singleton (a class, not an object — all state in
+ * static members) and exposes `static void loop()` that must be
+ * called from somewhere. In Arduino setups this is called from
+ * the main loop(); under ESP-IDF we run a dedicated FreeRTOS task.
+ *
+ * Header pulled via CircuitOS' module path. LoopManager.h includes
+ * <Arduino.h> + <unordered_set>, both already in this TU's tree. */
+#include <Loop/LoopManager.h>
+
+static void loop_manager_task(void * /*arg*/)
+{
+    /* Initialise the elapsed-time tracker. The very first call to
+     * loop() after resetTime() reports delta_us == 0; subsequent
+     * calls report micros-since-previous-loop. */
+    LoopManager::resetTime();
+
+    for (;;) {
+        LoopManager::loop();
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+}
+
 extern "C" {
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -468,6 +491,38 @@ extern "C" void app_main(void)
 
         lvgl_glue_run();
         ESP_LOGI(TAG, "LVGL frame pump running");
+
+        /* S-MP15a: LoopManager task. Drives every CircuitOS
+         * LoopListener (Display, Input, Battery, Settings — all
+         * registered by MP24Chatter::begin()) AND, crucially,
+         * the LoopManager::defer() queue that LVScreen uses to
+         * run its onStart() callbacks after lv_scr_load completes.
+         *
+         * Without this task running, any LVScreen subclass we
+         * try to instantiate would lv_scr_load to the panel
+         * fine, but its onStart() would never fire and the
+         * keypad-group switch on screen entry would never happen
+         * either — the user would see the new screen but be
+         * unable to interact with anything on it.
+         *
+         * Why a separate task instead of CIRCUITOS_TASK mode:
+         * the CircuitOS-internal startTask() machinery uses its
+         * own Util/Task wrapper that depends on Arduino's
+         * FreeRTOS bridge. We get a cleaner failure surface by
+         * just spawning the task ourselves from ESP-IDF directly.
+         *
+         * Sizing:
+         *   - 8 KB stack matches the LVGL task. LoopListener
+         *     subclasses are mostly small (timer ticks, state
+         *     advances), but downstream code may eventually do
+         *     LVGL widget creation inside deferred callbacks.
+         *   - 5 ms polling = 200 Hz. CircuitOS's own task does
+         *     vTaskDelay(1) for ~1 kHz, but that's wasteful for
+         *     UI work where we redraw at 30 fps max anyway. */
+        xTaskCreate(loop_manager_task, "loopmgr", 8192, NULL,
+                    4 /* priority — same band as lvgl task */,
+                    NULL);
+        ESP_LOGI(TAG, "LoopManager task spawned");
     }
 
     if (i2c_bus_init() != ESP_OK) {
