@@ -47,11 +47,31 @@
 #include <Display/Sprite.h>
 #include <Battery/BatteryService.h>
 #include <Chatter.h>
+#include <Pins.hpp>
 #include <lvgl.h>
 
 extern "C" {
 #include "lvgl_glue.h"
 }
+
+/* S-MP14c compile-time assertion: prove the Pins.hpp that resolves
+ * here is the MP2.4 shim, not the upstream Chatter copy. If the
+ * include-search order ever regresses and we accidentally pick up
+ * the wrong file, BTN_LEFT would equal 4 (Chatter's shift-register
+ * bit position) instead of BTN_JOY_LEFT's enum value. The static
+ * assertions below fail the build at that point. */
+static_assert(BTN_LEFT == BTN_JOY_LEFT,
+              "Pins.hpp override regressed — BTN_LEFT must equal "
+              "BTN_JOY_LEFT on MP2.4, not a raw GPIO number");
+static_assert(BTN_BACK == BTN_FACE_C,
+              "Pins.hpp override regressed — BTN_BACK must equal "
+              "BTN_FACE_C on MP2.4");
+static_assert(LORA_SS == -1,
+              "Pins.hpp override regressed — LORA_SS must be -1 on "
+              "MP2.4 (cellular modem replaces LoRa)");
+static_assert(BATTERY_PIN == 3,
+              "Pins.hpp override regressed — BATTERY_PIN must be "
+              "GPIO3 (ADC1_CH2) on MP2.4");
 
 __attribute__((used))
 static void disp_smoketest_never_called()
