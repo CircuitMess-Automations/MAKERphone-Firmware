@@ -1,9 +1,11 @@
 # CircuitOS Shim Strategy (S-MP13+)
 
-> **Status as of 2026-05-16:** S-MP13 (foundation) and the first
-> piece of S-MP14 (MP24Input) are shipped on `main`. The next
-> blocking architectural decision is the Display / Sprite /
-> TFT_eSPI question — see §9 below.
+> **Status as of 2026-05-16:** S-MP13 (foundation) and the
+> majority of S-MP14 are shipped on `main`. The Display question
+> is resolved with **Decision 9C** (shim stubs, no TFT_eSPI). The
+> `Chatter.begin()` legacy entry point now works on MP2.4.
+> Next decision is whether to do LVGL integration (S-MP16) or
+> the LoRa→SMS service substitution (S-MP15) first.
 
 ## What's shipped
 
@@ -12,12 +14,49 @@
 | S-MP13a | `9cbdb2b` + `26bbe15` | arduino-esp32 3.3.8 as managed component, `app_main.cpp` with `initArduino()` |
 | S-MP13b | `e0f1b1d` + 5 fix-forwards through `f4003a4` | CircuitOS vendored at `mp24/components/circuitos/` (MIT), 11 subsystems excluded |
 | S-MP13c | `39d2064` | Chatter-Library wrapper at `mp24/components/chatter_library/` pointing at the existing `libraries/Chatter-Library/src/` tree |
-| S-MP14a | `7cbe34f` | `MP24Input` class in `circuitos_shim`, subclasses CircuitOS `Input`, polls `hal/input_keypad` cached state in `scanButtons()` |
+| S-MP13d | `42e111e` | Display + Sprite + TFT_eSPI shim stubs (**Decision 9C**) — `<Display/Display.h>` resolves to OUR copy with no real TFT_eSPI dependency |
+| S-MP14a | `7cbe34f` | `MP24Input` — subclass of CircuitOS `Input`, `scanButtons()` polls `hal/input_keypad` cached state |
+| S-MP14b | `26ad52e` + `d7149d8` | `MP24Battery` — definitions for every `BatteryService` method + the `Battery` singleton, routed to `hal/battery` |
+| S-MP14d | `001ec2c` | `MP24Chatter` — `Chatter.begin()` wires Display + MP24Input + Battery + Settings into `LoopManager`; the legacy entry point now works on MP2.4 |
 
-Binary size still **0x5fd00 / 0x200000 (81 % free)** — the linker
-strips every shim class that's not yet instantiated.
+Binary grew 392 KB → **407 KB** after the smoke test forced real
+symbol references; still 81 % free.
 
-## What's still open
+## What's deferred (and why)
+
+- **S-MP14c MP24Pins.hpp override** — not blocking yet. The
+  upstream `Pins.hpp` isn't compiled into anything in the mp24
+  build (Chatter.cpp + similar are excluded), and `hal/pins.h`
+  already has MP2.4 values. Needs to land before we add screen
+  source files that reference `BTN_LEFT` etc.
+
+- **S-MP15 LoRaService → SMS adapter** — bigger than a normal
+  shim. The upstream `LoRaService` is heavy (RadioLib, pair
+  broadcast, encryption keys, packet ringbuffer). The semantics
+  are P2P direct + broadcast pairing, which doesn't map onto SMS
+  client-server. Real architectural work: deciding how UID_t maps
+  to phone numbers, whether pairing becomes contact-add, whether
+  the encryption layer survives. Probably its own multi-session
+  effort. Until it lands, `MessageService` etc. won't compile.
+
+- **S-MP16 LVGL component + IntroScreen** — vendor LVGL via the
+  IDF component manager (espressif maintains an `lvgl` package),
+  configure flush callback to push pixels through `hal/display`
+  directly (bypassing the shim TFT_eSPI), provide an LVGL tick
+  source from a FreeRTOS timer, port the IntroScreen as the first
+  visible LVGL screen. Mechanical, well-documented, bounded.
+
+## Recommendation for next session
+
+The fastest path to a visible MainMenu is S-MP16, not S-MP15.
+LVGL needs only Display + Input from the shim — both already
+shipped. The lock screen and MainMenu are pure LVGL, no
+LoRaService dependency. We can show a working MainMenu without
+ever calling `LoRa.send()`.
+
+LoRa→SMS becomes the next blocker only when we start porting
+the Messages screen.
+
 
 ## 1. Why this is the long pole
 
