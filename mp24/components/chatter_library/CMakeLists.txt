@@ -44,12 +44,19 @@ idf_component_register(
         "${CHATTER_LIB_SRC_DIR}"  # so '#include <Notes.h>' etc. work
     REQUIRES
         espressif__arduino-esp32  # Arduino.h types
-        circuitos_shim            # MP2.4 Display/Sprite shims — MUST
-                                  # come before circuitos so OUR
-                                  # <Display/Display.h> wins the
-                                  # include search over the
-                                  # TFT_eSPI-coupled upstream copy
         circuitos                 # Util/Settings, Loop/LoopManager
+        # NOTE: we previously listed circuitos_shim BEFORE circuitos
+        # so chatter_library code would find OUR <Display/Display.h>
+        # before the upstream's TFT_eSPI-coupled one. That created a
+        # cycle once circuitos_shim started needing <Battery/...>
+        # from chatter_library (MP24Battery.cpp).
+        # The override is currently unused — chatter_library only
+        # compiles Settings.cpp which doesn't include any Display
+        # header. When we start compiling Chatter.cpp / other
+        # Display-using files in S-MP14d+, we'll re-introduce the
+        # override via a different mechanism (likely shadowing the
+        # upstream header at the chatter_library INCLUDE_DIRS level
+        # directly).
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE

@@ -54,10 +54,15 @@ static void disp_smoketest_never_called()
     d.clear(0x0000);
     (void)d.getBaseSprite();
     (void)d.getWidth();
-    /* S-MP14b probe: confirm upstream BatteryService.h still parses
-     * on ESP-IDF 5.5 despite its <esp_adc_cal.h> include — if yes,
-     * we don't need a shim BatteryService.h. */
-    (void)sizeof(BatteryService);
+    /* S-MP14b smoke test: touch the Battery singleton + all
+     * BatteryService methods so the linker has to resolve every
+     * one. If any are undefined, the build fails here. */
+    Battery.begin();
+    Battery.loop(0);
+    (void)Battery.getPercentage();
+    (void)Battery.getVoltage();
+    (void)Battery.getLevel();
+    (void)Battery.getVoltOffset();
 }
 
 extern "C" {

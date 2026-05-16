@@ -32,6 +32,13 @@ idf_component_register(
         # TFT_eSPI-coupled originals.
         "MP24Display.cpp"
         "MP24Sprite.cpp"
+        # S-MP14b: BatteryService impl. Upstream
+        # Chatter-Library/src/Battery/BatteryService.cpp is excluded
+        # because it depends on Util/HWRevision (also excluded) and
+        # the v4-era esp_adc_cal raw_to_voltage API. This file
+        # provides definitions for every BatteryService method +
+        # the `Battery` singleton, routed to hal/battery.
+        "MP24Battery.cpp"
     INCLUDE_DIRS
         "include"
         # The hal/ headers live under main/ for the legacy
@@ -42,6 +49,8 @@ idf_component_register(
         log
         circuitos                  # base Input / Vector / LoopListener
                                    #  + upstream Color.h via angle-bracket
+        chatter_library            # MP24Battery.cpp needs
+                                   # <Battery/BatteryService.h>
         espressif__arduino-esp32   # Arduino types via -include Arduino.h
         esp_psram                  # MP24Sprite framebuffer goes in PSRAM
 )
