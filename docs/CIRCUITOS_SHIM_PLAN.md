@@ -1,9 +1,23 @@
 # CircuitOS Shim Strategy (S-MP13+)
 
-> **Status:** Planning. No shim code has shipped yet beyond a placeholder
-> at `mp24/components/circuitos_shim/`. This document captures the
-> research and recommends a path so the next session can start
-> implementing with confidence.
+> **Status as of 2026-05-16:** S-MP13 (foundation) and the first
+> piece of S-MP14 (MP24Input) are shipped on `main`. The next
+> blocking architectural decision is the Display / Sprite /
+> TFT_eSPI question — see §9 below.
+
+## What's shipped
+
+| Session | Commit | What it delivers |
+|---|---|---|
+| S-MP13a | `9cbdb2b` + `26bbe15` | arduino-esp32 3.3.8 as managed component, `app_main.cpp` with `initArduino()` |
+| S-MP13b | `e0f1b1d` + 5 fix-forwards through `f4003a4` | CircuitOS vendored at `mp24/components/circuitos/` (MIT), 11 subsystems excluded |
+| S-MP13c | `39d2064` | Chatter-Library wrapper at `mp24/components/chatter_library/` pointing at the existing `libraries/Chatter-Library/src/` tree |
+| S-MP14a | `7cbe34f` | `MP24Input` class in `circuitos_shim`, subclasses CircuitOS `Input`, polls `hal/input_keypad` cached state in `scanButtons()` |
+
+Binary size still **0x5fd00 / 0x200000 (81 % free)** — the linker
+strips every shim class that's not yet instantiated.
+
+## What's still open
 
 ## 1. Why this is the long pole
 
@@ -279,3 +293,103 @@ When picking this up:
 This document does not commit any code under `mp24/components/`.
 The placeholder shim component there from S-MP01 (just
 `circuitos_shim_version()`) is still the only thing shipped.
+
+## 9. Display / Sprite / TFT_eSPI — the next architectural call
+
+S-MP13a/b/c shipped without resolving `<Display/Display.h>`. We
+excluded every CircuitOS subsystem that depends on TFT_eSPI
+(Display/, UI/, Elements/, Support/) so the foundation could
+link. Any commit that wants to compile a screen — the IntroScreen
+in S-MP16, the MainMenu in S-MP19, anything — has to unblock
+this first.
+
+The reason it's not trivial: upstream CircuitOS `Display.h`
+declares the class with **`TFT_eSPI tft;` as a member** (not a
+pointer). That means `<Display/Display.h>` cannot be included
+without a *complete* `TFT_eSPI` type, not a forward declaration.
+Same story for `Sprite` (uses `TFT_eSprite` as a member).
+
+Three viable paths, in increasing order of effort:
+
+### Path 9A — Vendor TFT_eSPI
+
+`Bodmer/TFT_eSPI` is the de-facto Arduino library for ST77xx /
+ILI9xxx displays. It's a real library with proper Arduino API,
+broadly compatible with arduino-esp32, MIT-licensed. Vendor it
+the same way we vendored CircuitOS: drop the source into
+`mp24/components/tft_espi/`, write a CMakeLists, exclude the
+chip variants we don't use.
+
+  Pros:
+  - Upstream `Display.h` / `Sprite.h` work unchanged.
+  - The 506-file phone firmware compiles against TFT_eSPI without
+    edits.
+  - Bodmer maintains the library actively; pin configs for our
+    ST7735 panel are pre-baked.
+
+  Cons:
+  - ~80 files, ~40 KB compiled (estimated, before LVGL).
+  - Pin configuration is done via macros — needs a User_Setup.h
+    matching our ST7735 GPIO wiring. We'd `define` over the
+    upstream's defaults.
+  - Adds a dependency that's effectively unused for LVGL flush
+    (we can call our `hal/display` directly). But it's used by
+    the Sprite class which the screens may use for direct
+    drawing.
+
+### Path 9B — Replace Display.h + Sprite.h + TFT_eSPI.h with shim stubs
+
+Ship slim header files in `mp24/components/circuitos_shim/include/`
+that:
+  - Declare `Display` with the same public API but back it with
+    `hal/display` directly (no TFT_eSPI dependency).
+  - Declare `Sprite` as a software framebuffer in PSRAM (no
+    TFT_eSprite dependency).
+  - Declare `TFT_eSPI` as a complete type with the few methods
+    the LVGL flush callback uses (`startWrite`, `setAddrWindow`,
+    `pushColors`), each delegating to `hal/display`.
+
+  Pros:
+  - Zero external dependency.
+  - Direct route from LVGL flush to our `hal/display`.
+
+  Cons:
+  - Sprite is the heavy part — `drawPixel`, `drawLine`, `drawRect`,
+    `fillRect`, `drawCircle`, `drawString`, font rendering, etc.
+    Replicating all of it is multi-week.
+  - Diverges from upstream — future Chatter changes to Sprite
+    won't trickle in.
+
+### Path 9C — Compile only LVGL-driven screens; punt on Sprite
+
+Only port screens that go through LVGL widgets and don't touch
+Sprite directly. The lock screen, MainMenu, message list, dialer,
+contacts — these are all LVGL. Skip the games (which use Sprite
+for sprite-sheet rendering).
+
+  Pros:
+  - Minimal shim work — provide a stub Display whose `getTft()`
+    returns nullptr, and never instantiate Sprite.
+  - Gets a functional phone UI fastest.
+
+  Cons:
+  - Half the firmware (games + low-level screens) doesn't port
+    until Sprite is solved.
+  - Sprite likely comes back as a requirement during S-MP17+.
+
+### Recommendation
+
+For "first MainMenu visible" milestone, **9C is enough**. The
+phone UI uses LVGL; Sprite isn't on the critical path.
+
+For "full phone firmware feature parity," **9A is the right answer**
+— vendor TFT_eSPI and let the upstream Display + Sprite work.
+
+The lowest-risk move now: ship 9C as a fast path to a visible UI.
+Promote to 9A when the games / sprite-using screens become the
+next blocker. The stub Display.h from 9C is easy to throw away
+once 9A lands; the architecture isn't path-dependent.
+
+If you want me to start either of these, the work begins on a
+branch (same pattern as `mp24-shim-bringup`): write the headers,
+push, watch CI, fix-forward the inevitable issues.
