@@ -202,6 +202,36 @@ void display_fill_rect(int x, int y, int w, int h, uint16_t color)
     }
 }
 
+void display_blit_rect(int x, int y, int w, int h, const uint16_t *pixels)
+{
+    if (w <= 0 || h <= 0 || pixels == NULL) return;
+    if (x < 0 || y < 0) return;
+    if (x + w > TFT_WIDTH || y + h > TFT_HEIGHT) return;
+
+    set_window(x, y, x + w - 1, y + h - 1);
+
+    /* LVGL hands us host-endian RGB565 (LV_COLOR_FORMAT_RGB565); the
+     * ST7735 expects big-endian on the wire. Swap row-by-row into a
+     * scratch buffer so the input buffer stays untouched (LVGL might
+     * reuse it for the next flush). One row of 160 px = 320 bytes —
+     * stack-allocate, no heap pressure. */
+    uint16_t row[TFT_WIDTH];
+
+    gpio_set_level(PIN_TFT_DC, 1);
+    for (int rr = 0; rr < h; rr++) {
+        const uint16_t *src = pixels + (size_t)rr * w;
+        for (int i = 0; i < w; i++) {
+            uint16_t c = src[i];
+            row[i] = (uint16_t)((c >> 8) | (c << 8));
+        }
+        spi_transaction_t t = {
+            .length    = (size_t)w * 2 * 8,
+            .tx_buffer = row,
+        };
+        spi_device_polling_transmit(s_spi, &t);
+    }
+}
+
 /* ----------------------------------------------------------------- */
 /* 5x7 font + text rendering                                         */
 /* Glyph layout: 5 column bytes, bit 0 = top row.                    */

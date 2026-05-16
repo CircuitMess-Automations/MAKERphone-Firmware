@@ -34,6 +34,10 @@ idf_component_register(
         "hal/sms.c"
         "hal/calls.c"
         "hal/audio_i2s2.c"
+        # S-MP16b: LVGL ↔ hal/display glue. Initialises LVGL,
+        # registers the flush callback (pixels go through
+        # display_blit_rect), wires the esp_timer-based tick.
+        "lvgl_glue.c"
     INCLUDE_DIRS
         "."
     REQUIRES
@@ -46,9 +50,14 @@ idf_component_register(
         log
         freertos
         esp_common
+        esp_timer                  # lvgl_glue tick callback
         circuitos_shim
         circuitos
         chatter_library
+        lvgl__lvgl                 # S-MP16: managed-component name
+                                   # uses '<namespace>__<name>'
+                                   # double-underscore form (same
+                                   # pattern as arduino-esp32)
         # arduino-esp32 is pulled in by idf_component.yml as
         # "espressif/arduino-esp32"; when the IDF Component Manager
         # installs it, the directory becomes

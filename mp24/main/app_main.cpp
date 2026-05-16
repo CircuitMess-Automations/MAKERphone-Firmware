@@ -47,6 +47,12 @@
 #include <Display/Sprite.h>
 #include <Battery/BatteryService.h>
 #include <Chatter.h>
+#include <lvgl.h>
+
+extern "C" {
+#include "lvgl_glue.h"
+}
+
 __attribute__((used))
 static void disp_smoketest_never_called()
 {
@@ -68,6 +74,16 @@ static void disp_smoketest_never_called()
      * transitively — but keeping them is cheap and traceable. */
     (void)Battery.getPercentage();
     (void)Battery.getVoltage();
+
+    /* S-MP16b smoke test: prove the LVGL glue links + LVGL widgets
+     * resolve. None of this runs at boot — once integration lands
+     * in S-MP16c, app_main will call lvgl_glue_init() at the right
+     * point in the boot sequence. */
+    lvgl_glue_init();
+    lv_obj_t *label = lv_label_create(lv_screen_active());
+    lv_label_set_text(label, "MP2.4 LVGL");
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
+    lvgl_glue_run();
 }
 
 extern "C" {

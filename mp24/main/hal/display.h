@@ -59,6 +59,15 @@ void display_fill(uint16_t color);
 /* Flood-fill an axis-aligned rectangle. Clipped on x/y and w/h. */
 void display_fill_rect(int x, int y, int w, int h, uint16_t color);
 
+/* Push a buffer of RGB565 pixels to the panel inside an axis-aligned
+ * rectangle. The buffer is host-endian RGB565 (LVGL's
+ * LV_COLOR_FORMAT_RGB565 default) — display_blit_rect handles the
+ * byte-swap to ST7735's big-endian wire format internally.
+ *
+ * The buffer must contain exactly w*h pixels. No clipping is done
+ * (LVGL only flushes inside the panel bounds by construction). */
+void display_blit_rect(int x, int y, int w, int h, const uint16_t *pixels);
+
 /* Render a null-terminated ASCII string in the bundled 5x7 font.
  * Each glyph is 6px wide (5 + 1 spacing) by 7px tall. Returns the
  * x coordinate one pixel past the final glyph (useful for chaining). */
