@@ -61,9 +61,16 @@ partition, E=button alias remap to joystick/A/B/C/D, F=USB CDC console).
             the ESP32-S3 USB-OTG VBUS-sense register directly
             (separate session, conflicts with USB-Serial/JTAG
             console pin ownership).
-      - [ ] **Idle-dim** — Decision-C blank-display behaviour;
-            needs an "idle" timeout policy (e.g. no key press
-            for 30 s). Next session.
+      - [x] **Idle-dim** — Decision-C blank-display behaviour
+            implemented in app_main's dashboard loop. After 30 s
+            without a keypad or power-button press the display is
+            cleared to black (`display_fill(0x0000)`) and the
+            update_dashboard call is skipped. Any subsequent press
+            (tracked via the existing `s_press_count` atomic and
+            `power_button_press_count()` getter) restores the boot
+            screen + dashboard. Backlight stays on the whole time
+            since it's hardware-biased to always-on, so the user
+            sees a black-but-lit screen during idle.
       - **TL431 / CALIB_EN** stays deferred *permanently* —
             schematic shows `CALIB_EN` only as `input` on every
             sheet with no driver, eFuse cal is already ±20 mV

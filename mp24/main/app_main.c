@@ -337,10 +337,51 @@ void app_main(void)
     ESP_LOGI(TAG, "Entering live dashboard loop.");
     bool led_on = false;
     TickType_t last_wake = xTaskGetTickCount();
+
+    /* Idle-dim (Decision C): blank the display after IDLE_TIMEOUT_MS
+     * of no key/power-button activity. The backlight is hardware-on
+     * (no software dimming possible), so "dim" really means "draw
+     * black over the dashboard". Any keypad or power-button press
+     * wakes the display back to the live dashboard. */
+    const TickType_t IDLE_TIMEOUT = pdMS_TO_TICKS(30 * 1000);   /* 30 s */
+    TickType_t       last_activity = xTaskGetTickCount();
+    uint32_t         last_keypad_n = (uint32_t) atomic_load(&s_press_count);
+    uint32_t         last_power_n  = power_button_press_count();
+    bool             blanked       = false;
+
     for (;;) {
         led_on = !led_on;
         aw9523b_set_leds(led_on);
-        update_dashboard();
+
+        /* Activity detection: any new press on either input bumps
+         * the timer and wakes from blank. Reading the keypad press
+         * count via the atomic that the listener already maintains
+         * avoids hooking another callback for this. */
+        uint32_t k = (uint32_t) atomic_load(&s_press_count);
+        uint32_t p = power_button_press_count();
+        if (k != last_keypad_n || p != last_power_n) {
+            last_keypad_n = k;
+            last_power_n  = p;
+            last_activity = xTaskGetTickCount();
+            if (blanked) {
+                ESP_LOGI(TAG, "Idle wake — redrawing dashboard");
+                draw_boot_screen();
+                blanked = false;
+            }
+        }
+
+        TickType_t now = xTaskGetTickCount();
+        if (!blanked && (now - last_activity) > IDLE_TIMEOUT) {
+            ESP_LOGI(TAG, "Idle %lu ms — blanking display",
+                     (unsigned long) ((now - last_activity) * portTICK_PERIOD_MS));
+            display_fill(0x0000);   /* black */
+            blanked = true;
+        }
+
+        if (!blanked) {
+            update_dashboard();
+        }
+
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(200));   /* 5 fps */
     }
 }
