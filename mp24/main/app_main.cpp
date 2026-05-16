@@ -360,6 +360,19 @@ extern "C" void app_main(void)
         draw_boot_screen();
     }
 
+    /* S-MP16b: initialise LVGL (boot — but do NOT start the task yet).
+     * lvgl_glue_init() calls lv_init(), registers the display + flush
+     * callback against hal/display, and arms the esp_timer-based tick
+     * source. The actual frame pump (lvgl_glue_run()) is gated to a
+     * later commit — running it concurrently with the dashboard's
+     * manual draws would race for the SPI bus. Calling init here is
+     * harmless: LVGL just sits idle until a task drives it. */
+    if (lvgl_glue_init() != ESP_OK) {
+        ESP_LOGE(TAG, "LVGL init failed — continuing without UI");
+    } else {
+        ESP_LOGI(TAG, "LVGL initialised (frame pump deferred)");
+    }
+
     if (i2c_bus_init() != ESP_OK) {
         ESP_LOGE(TAG, "I²C init failed — halting");
         for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
