@@ -26,6 +26,12 @@ idf_component_register(
         "circuitos_shim_stub.c"
         # S-MP14a
         "MP24Input.cpp"
+        # S-MP13d (Decision 9C): minimal Display + Sprite shims so
+        # `<Display/Display.h>` and `<Display/Sprite.h>` resolve to
+        # OUR copies (in include/Display/) instead of upstream's
+        # TFT_eSPI-coupled originals.
+        "MP24Display.cpp"
+        "MP24Sprite.cpp"
     INCLUDE_DIRS
         "include"
         # The hal/ headers live under main/ for the legacy
@@ -35,7 +41,9 @@ idf_component_register(
     REQUIRES
         log
         circuitos                  # base Input / Vector / LoopListener
+                                   #  + upstream Color.h via angle-bracket
         espressif__arduino-esp32   # Arduino types via -include Arduino.h
+        esp_psram                  # MP24Sprite framebuffer goes in PSRAM
 )
 
 # Same -include Arduino.h trick as the CircuitOS component — our

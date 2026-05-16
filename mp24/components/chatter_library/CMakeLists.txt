@@ -44,6 +44,11 @@ idf_component_register(
         "${CHATTER_LIB_SRC_DIR}"  # so '#include <Notes.h>' etc. work
     REQUIRES
         espressif__arduino-esp32  # Arduino.h types
+        circuitos_shim            # MP2.4 Display/Sprite shims — MUST
+                                  # come before circuitos so OUR
+                                  # <Display/Display.h> wins the
+                                  # include search over the
+                                  # TFT_eSPI-coupled upstream copy
         circuitos                 # Util/Settings, Loop/LoopManager
 )
 

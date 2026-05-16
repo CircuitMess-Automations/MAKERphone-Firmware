@@ -37,6 +37,24 @@
                          // Display, Util/Vector, Sync/Mutex) become
                          // reachable now that this links.
 
+// S-MP13d smoke test: include the shim Display.h and force at least
+// one symbol reference so the linker has to instantiate the class
+// (and therefore prove the implementation compiles+links cleanly).
+// `__attribute__((used))` keeps the function past --gc-sections.
+// Once MP24Chatter (S-MP14d) actually instantiates a Display, this
+// smoke test can be removed.
+#include <Display/Display.h>
+#include <Display/Sprite.h>
+__attribute__((used))
+static void disp_smoketest_never_called()
+{
+    Display d(160, 128, -1, 3);
+    d.begin();
+    d.clear(0x0000);
+    (void)d.getBaseSprite();
+    (void)d.getWidth();
+}
+
 extern "C" {
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
