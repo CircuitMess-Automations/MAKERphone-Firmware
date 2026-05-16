@@ -47,6 +47,7 @@ idf_component_register(
         freertos
         esp_common
         circuitos_shim
+        circuitos
         # arduino-esp32 is pulled in by idf_component.yml as
         # "espressif/arduino-esp32"; when the IDF Component Manager
         # installs it, the directory becomes

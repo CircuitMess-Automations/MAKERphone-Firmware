@@ -32,6 +32,10 @@
                          // Arduino-shaped types the rest of the phone
                          // firmware depends on. Pulls in <stdint.h>,
                          // <FreeRTOS.h>, esp_log etc. transitively.
+#include <CircuitOS.h>   // umbrella; right now just brings in Arduino.h
+                         // but real CircuitOS classes (LoopManager,
+                         // Display, Util/Vector, Sync/Mutex) become
+                         // reachable now that this links.
 
 extern "C" {
 #include "freertos/FreeRTOS.h"
