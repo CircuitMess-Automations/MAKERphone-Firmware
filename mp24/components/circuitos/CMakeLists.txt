@@ -22,6 +22,55 @@ file(GLOB_RECURSE CIRCUITOS_SRCS
 # is set. Defensive filter in case glob accidentally pulled any.
 list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "\\.impl$")
 
+# Exclude subsystems we don't use OR that pull dependencies we
+# haven't wired up yet. Each grouping explained:
+#
+#   Display/, UI/, Elements/    Depend on TFT_eSPI which we don't
+#                               vendor. The phone firmware drives
+#                               the screen via LVGL anyway, with
+#                               CircuitOS Display only used to
+#                               grab the TFT_eSPI handle. We'll
+#                               replace that call site with a
+#                               direct LVGL→hal/display flush in
+#                               S-MP16. Until then these stay out.
+#
+#   Support/                    Context, ContextTransition, Modal,
+#                               ModalTransition all reference
+#                               Screen/Sprite from UI/. Excluded
+#                               for the same reason.
+#
+#   Devices/Matrix/             IS31FL3731 LED matrix — not on
+#                               MP2.4 hardware. Matrix.cpp also
+#                               fails -Werror=reorder under our
+#                               strict-error toolchain.
+#
+#   Devices/Motion/             ICM20948 / MPU6050 IMU — not on
+#                               MP2.4 hardware.
+#
+#   Devices/SerialFlash/        External SPI flash adapter — we
+#                               use the in-package flash directly.
+#
+#   Devices/ShiftOutput.cpp     References an undeclared 'GPIO'
+#                               symbol; designed for AVR. Not used
+#                               by the phone firmware.
+#
+#   Network/                    Wi-Fi networking — replaced by
+#                               cellular. CIRCUITOS_NET is unset
+#                               but Network/Net.cpp file itself
+#                               isn't fully guarded.
+#
+#   Motion/                     MPU fusion — depends on IMU.
+list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Display/")
+list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/UI/")
+list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Elements/")
+list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Support/")
+list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Devices/Matrix/")
+list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Devices/Motion/")
+list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Devices/SerialFlash/")
+list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Devices/ShiftOutput\\.cpp$")
+list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Network/")
+list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Motion/")
+
 idf_component_register(
     SRCS
         ${CIRCUITOS_SRCS}
