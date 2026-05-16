@@ -148,6 +148,26 @@ idf_component_register(
         "${SRC_DIR}/Screens/PhoneCalculator.cpp"
         "${SRC_DIR}/Screens/PhoneCalendar.cpp"
 
+        # S-MP18g: games + utilities batch — 14 more screens that
+        # pass the same dep audit. These are mini-apps (puzzle
+        # games, calculators, utility tools) deliberately
+        # self-contained for their tile-launcher pattern in the
+        # upstream firmware.
+        "${SRC_DIR}/Screens/Phone2048.cpp"
+        "${SRC_DIR}/Screens/PhoneAirHockey.cpp"
+        "${SRC_DIR}/Screens/PhoneBantumi.cpp"
+        "${SRC_DIR}/Screens/PhoneBounce.cpp"
+        "${SRC_DIR}/Screens/PhoneBrickBreaker.cpp"
+        "${SRC_DIR}/Screens/PhoneBubbleSmile.cpp"
+        "${SRC_DIR}/Screens/PhoneCoinFlip.cpp"
+        "${SRC_DIR}/Screens/PhoneConnectFour.cpp"
+        "${SRC_DIR}/Screens/PhoneCurrencyConverter.cpp"
+        "${SRC_DIR}/Screens/PhoneDiceRoller.cpp"
+        "${SRC_DIR}/Screens/PhoneAsciiArt.cpp"
+        "${SRC_DIR}/Screens/PhoneAvatarEditor.cpp"
+        "${SRC_DIR}/Screens/PhoneDrumKitScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneExpenses.cpp"
+
         # S-MP18d: first screen that USES the status bar + soft-key
         # bar + wallpaper combo. 113 LOC, takes an uppercase app
         # name in the ctor, renders 'NOT YET BUILT' under it. We're
