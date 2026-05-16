@@ -24,13 +24,15 @@ dependencies:
   espressif/arduino-esp32:
     version: "^3.3.8"
 
-  # S-MP16: LVGL 9.x for the phone UI. The legacy phone firmware
-  # was written against LVGL (lock screen, MainMenu, dialer,
-  # messages, contacts — all LVGL widgets). We use the latest 9.x
-  # so we get the modern `lv_display_create` + `lv_indev_create`
-  # APIs and current widget set. The Espressif esp_lvgl_port helper
-  # is intentionally NOT included — it's wired to esp_lcd-based
-  # panels, while our hal/display uses the older SPI driver
-  # directly. We write a small lv_port_disp.c instead.
+  # S-MP16: LVGL 8.x for the phone UI. We were on 9.5 initially but
+  # the existing 506-file phone firmware was written against LVGL 8
+  # (lv_indev_drv_t in callback signatures, event->user_data direct
+  # field access, the older style + layout APIs). Patching every
+  # screen for 9-style APIs was less economical than rewriting our
+  # ~50-line glue against 8.x, so we pinned to ^8.4 — the last 8.x
+  # release line, well-supported and matches what the legacy code
+  # expects. Note: API surface is similar but NOT identical between
+  # 8 and 9; bumping to 9 later means revisiting both the glue and
+  # every screen .cpp that uses the affected APIs.
   lvgl/lvgl:
-    version: "^9.5"
+    version: "^8.4"

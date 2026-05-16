@@ -49,6 +49,12 @@ esp_err_t lvgl_glue_init(void);
  * because we call lv_group_set_default() in init. */
 lv_group_t *lvgl_glue_get_group(void);
 
+/* The single keypad lv_indev. Legacy code (e.g. LVScreen.cpp via
+ * InputLVGL::getInstance()->getIndev()) wants this handle so it
+ * can call lv_indev_set_group() to point the indev at a screen-
+ * specific group when the screen activates. */
+lv_indev_t *lvgl_glue_get_indev(void);
+
 /* Start the LVGL task. After this call, all LVGL API access has to
  * happen from inside the LVGL task — use lv_async_call() or similar
  * to schedule UI changes from other contexts. */

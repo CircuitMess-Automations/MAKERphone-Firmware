@@ -73,38 +73,12 @@ static_assert(BATTERY_PIN == 3,
               "Pins.hpp override regressed — BATTERY_PIN must be "
               "GPIO3 (ADC1_CH2) on MP2.4");
 
-__attribute__((used))
-static void disp_smoketest_never_called()
-{
-    /* S-MP14d smoke test: drive the whole singleton chain from
-     * Chatter.begin() outward — Display, MP24Input, Battery,
-     * Settings — and confirm each method's symbol resolves at
-     * link time. */
-    Chatter.begin();
-    (void)Chatter.getDisplay();
-    (void)Chatter.getInput();
-    Chatter.setBrightness(255);
-    Chatter.fadeIn();
-    Chatter.fadeOut();
-    Chatter.backlightOff();
-    (void)Chatter.backlightPowered();
-
-    /* The Display + Battery direct probes earlier in the function
-     * are now redundant — Chatter.begin() exercises them
-     * transitively — but keeping them is cheap and traceable. */
-    (void)Battery.getPercentage();
-    (void)Battery.getVoltage();
-
-    /* S-MP16b smoke test: prove the LVGL glue links + LVGL widgets
-     * resolve. None of this runs at boot — once integration lands
-     * in S-MP16c, app_main will call lvgl_glue_init() at the right
-     * point in the boot sequence. */
-    lvgl_glue_init();
-    lv_obj_t *label = lv_label_create(lv_screen_active());
-    lv_label_set_text(label, "MP2.4 LVGL");
-    lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
-    lvgl_glue_run();
-}
+/* (Smoke test removed in S-MP16-lvgl8: the real boot path now calls
+ * Chatter.begin() inside MP24Chatter and lvgl_glue_init() +
+ * lv_label_create / lv_btn_create directly in app_main, so the
+ * separate never-called diagnostic function is redundant. The
+ * static_asserts above still catch include-order regressions on
+ * Pins.hpp.) */
 
 extern "C" {
 #include "freertos/FreeRTOS.h"
@@ -427,7 +401,7 @@ extern "C" void app_main(void)
     } else {
         ESP_LOGI(TAG, "LVGL initialised, building boot UI");
 
-        lv_obj_t *scr = lv_screen_active();
+        lv_obj_t *scr = lv_scr_act();
         lv_obj_set_style_bg_color(scr,
                                   lv_color_hex(0x140C24),   /* MP_BG */
                                   LV_PART_MAIN);
@@ -443,15 +417,18 @@ extern "C" void app_main(void)
         lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 4);
 
         /* S-MP16d: focusable button column to visually demonstrate
-         * keypad navigation. Three lv_button widgets stacked
-         * vertically, each auto-added to the default group
-         * (created in lvgl_glue_init), so JOY_UP/DOWN should move
-         * the focus highlight and JOY_CLICK should fire the click
-         * event. With no event handler attached the click just
-         * visually pulses the button — that pulse is the proof. */
+         * keypad navigation. Three lv_btn widgets stacked vertically,
+         * each auto-added to the default group (created in
+         * lvgl_glue_init), so JOY_UP/DOWN move the focus highlight
+         * and JOY_CLICK fires the click event. With no event handler
+         * attached the click just visually pulses the button — that
+         * pulse is the proof.
+         *
+         * LVGL 8 spells this 'lv_btn_create' (LVGL 9 added the
+         * 'lv_button_create' alias). We're on 8.4. */
         const char *menu_items[] = { "Messages", "Contacts", "Settings" };
         for (int i = 0; i < 3; ++i) {
-            lv_obj_t *btn = lv_button_create(scr);
+            lv_obj_t *btn = lv_btn_create(scr);
             lv_obj_set_size(btn, 140, 26);
             lv_obj_align(btn, LV_ALIGN_TOP_MID, 0, 22 + i * 30);
 
