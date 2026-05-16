@@ -88,6 +88,21 @@ idf_component_register(
         "${SRC_DIR}/Elements/PhoneSynthwaveBg.cpp"
         "${SRC_DIR}/Screens/PhoneWelcomeScreen.cpp"
 
+        # S-MP18c: universal-UI Elements + the service one of them
+        # depends on. PhoneStatusBar (top strip with time, battery,
+        # signal indicators) and PhoneSoftKeyBar (bottom strip with
+        # softkey labels) appear in 105 callers each — once these
+        # compile most screens are unblocked.
+        #
+        # PhoneIdleDim is a service PhoneSoftKeyBar pulls for the
+        # input-activity timestamp it uses to dim the soft keys
+        # after N seconds of no input. Tiny (~260 LOC), zero new
+        # external deps (just LoopListener + InputListener +
+        # Settings, all of which are already in our build).
+        "${SRC_DIR}/Services/PhoneIdleDim.cpp"
+        "${SRC_DIR}/Elements/PhoneStatusBar.cpp"
+        "${SRC_DIR}/Elements/PhoneSoftKeyBar.cpp"
+
         # Our replacement for src/InputLVGL.cpp. The upstream one is
         # intentionally NOT listed.
         "shim/InputLVGL.cpp"
