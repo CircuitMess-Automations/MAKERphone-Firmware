@@ -46,9 +46,21 @@ partition, E=button alias remap to joystick/A/B/C/D, F=USB CDC console).
             output (`uPOWER_OFF` on GPIO1) left high-Z this
             session — polarity unverified, driving wrong cuts
             our own supply. Phase 2 wires actual shutdown.
-      - [ ] **USB detect** — needs reconciliation between stale
-            `pin_config.h` (U5 P0.4) and `dashboard.c`'s button
-            map (which uses that same bit). Next session.
+      - [~] **USB detect** — *not implementable on v2.4 hardware.*
+            Schematic trace: `uUSB_DETECT` label exists but both
+            endpoints (top sheet + Screen_and_buttons sub-sheet)
+            connect to dead-end wires with no driver and no
+            receiver. `pin_config.h`'s claim of "U5 P0.4 =
+            USB_DETECT" is stale — `dashboard.c`'s hardware-
+            verified `k_buttons[]` shows that bit is the `#`
+            keypad button. The Power_supply sub-sheet has
+            CHRG_IN / CHRG_OUT labels for the charger IC but
+            they're local to that sheet (not exposed to ESP32).
+            Future revisions could route USB-VBUS to a free
+            expander pin; current option on v2.4 is to query
+            the ESP32-S3 USB-OTG VBUS-sense register directly
+            (separate session, conflicts with USB-Serial/JTAG
+            console pin ownership).
       - [ ] **Idle-dim** — Decision-C blank-display behaviour;
             needs an "idle" timeout policy (e.g. no key press
             for 30 s). Next session.
