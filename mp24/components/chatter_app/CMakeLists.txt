@@ -66,6 +66,28 @@ idf_component_register(
         # Battery.getLevel() and updating an lv_img if changed.
         "${SRC_DIR}/Elements/BatteryElement.cpp"
 
+        # S-MP18a: theme + fonts + foundational service + the
+        # background widget every "real-looking" screen uses, plus
+        # the first lean screen that consumes them.
+        #
+        # The whole stack is dependency-clean: MakerphoneTheme is
+        # ~3500 LOC of pure data tables with no service or model
+        # deps. The fonts are LVGL binary font data in .c files,
+        # also zero deps. PhoneClock is a ~150 LOC RAM-only wall-
+        # clock service (S54 backing for the Date & Time screen),
+        # no SPIFFS / NVS / RTC. PhoneSynthwaveBg builds on those
+        # three; PhoneWelcomeScreen builds on PhoneSynthwaveBg.
+        #
+        # No instantiation in TestScreen yet — this commit just
+        # proves the compile path; runtime use of PhoneWelcomeScreen
+        # lands when we wire it as a real boot destination.
+        "${SRC_DIR}/MakerphoneTheme.cpp"
+        "${SRC_DIR}/Fonts/pixelbasic7.c"
+        "${SRC_DIR}/Fonts/pixelbasic16.c"
+        "${SRC_DIR}/Services/PhoneClock.cpp"
+        "${SRC_DIR}/Elements/PhoneSynthwaveBg.cpp"
+        "${SRC_DIR}/Screens/PhoneWelcomeScreen.cpp"
+
         # Our replacement for src/InputLVGL.cpp. The upstream one is
         # intentionally NOT listed.
         "shim/InputLVGL.cpp"
