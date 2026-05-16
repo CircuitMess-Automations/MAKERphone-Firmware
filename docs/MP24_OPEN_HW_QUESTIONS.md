@@ -3,67 +3,35 @@
 Items that need physical-board observation or KiCad GUI tracing to
 close. The firmware can't proceed on these without ground truth.
 
-## Q1 — SPH0645 mic DATA pin (gates S-MP10c)
+## Q1 — SPH0645 mic DATA pin ✓ RESOLVED 2026-05-16
 
-**Need:** the ESP32 GPIO that connects to `uI2S1_DATA_MIC` (the
-SPH0645LM4H-B microphone's DOUT line).
+**Answer: `uI2S1_DATA_MIC` = GPIO41 (MTDI / JTAG TDI pad).**
 
-**What we know from text-mode schematic inspection:**
+Confirmed from KiCad schematic screenshots:
+- Root sheet ESP32-S3 pinout shows MTDI (chip pad 47) wired to net
+  `uI2S1_DATA_MIC`. MTDI is GPIO41 in the ESP32-S3 IO_MUX.
+- Audio sub-sheet shows `uI2S1_DATA_MIC` connecting to pin 6 (DOUT)
+  of MK2 = SPH0645LM4H-B.
+- The SPH0645's SELECT pin (pin 2) is tied LOW — the mic outputs on
+  the LEFT slot of the WS frame, so I²S RX should read MONO LEFT
+  (or filter the L channel from a stereo stream).
 
-- `pins.h` has only `PIN_I2S1_BCLK=39`, `PIN_I2S1_WS=40`, and
-  `PIN_I2S1_DOUT=38`. The mic pin is missing.
-- `pin_config.h` (from the hw_test project) also only declares the
-  BCLK pin (`#define PIN_I2S_BCLK 39`).
-- The schematic top-level (`Makerphone_v2_4.kicad_sch`) has a label
-  `uI2S1_DATA_MIC` at coordinate `(139.7, 90.17)` — that's on the
-  right-of-chip wire rail, same column as known I²S1 labels.
-- The ESP32-S3FH4R2 instance is anchored at `(95.25, 77.47)`. Its
-  right-side pin column at `X=118.11` only contains GPIO34, 35, 36,
-  37, 38 (= DATA_SPK) and 46. The first three Y rows below GPIO38
-  (Y=82.55) are occupied by `uI2S1_CLK_MIC_AMP` (Y=85.09), `uI2S1_WS`
-  (Y=87.63), and `uI2S1_DATA_MIC` (Y=90.17). But the chip's
-  right-side column ends at GPIO46 (Y=85.09).
-- That means `uI2S1_WS` and `uI2S1_DATA_MIC` must route via wires that
-  leave the right rail and go to pins on other sides of the chip —
-  most likely the bottom or left side. The text-parsing approach can't
-  follow this without a wire-graph implementation.
+Pin landed in `mp24/main/hal/pins.h` as `PIN_I2S1_DIN_MIC = 41`.
+Driver in `mp24/main/hal/audio_i2s.{c,h}` is now full-duplex on
+I²S NUM 0: TX channel to the speaker amp + RX channel from the mic,
+sharing BCLK and WS. Slot width raised to 32 bits explicitly so BCLK
+lands at ~1.41 MHz, inside the SPH0645's 1.024–4.096 MHz window.
 
-**Candidate GPIOs by elimination:**
-
-GPIOs the ESP32-S3 schematic symbol exposes that are not yet allocated
-in `pins.h`:
-
-```
-GPIO0   — strapping pin (BOOT)
-GPIO15  — currently unused
-GPIO33  — currently unused
-GPIO34  — currently unused
-GPIO35  — currently unused
-GPIO36  — currently unused
-GPIO37  — currently unused
-GPIO45  — currently unused
-GPIO46  — currently unused (strapping)
-```
-
-Of these, the most plausible for an I²S MIC data line are the ones
-physically adjacent to known I²S1 pins on the QFN footprint. GPIO45
-sits next to GPIO38 on the chip's pad ordering and is a common
-choice. GPIO34–37 are also adjacent on the right side.
-
-**Resolution path:**
-
-1. Open `Makerphone_v2_4.kicad_sch` in KiCad in GUI mode.
-2. Click the label `uI2S1_DATA_MIC` at (139.7, 90.17).
-3. Follow the wire visually to the ESP32 chip pad and read off the
-   GPIO number from the pin name.
-4. Update `mp24/main/hal/pins.h` with `PIN_I2S1_DIN_MIC` and document
-   it in the comment block.
-
-Once the pin is locked, S-MP10c can ship: extend `hal/audio_i2s.c` to
-add an RX channel on the same I²S NUM 0 port (full-duplex shares BCLK
-and WS with the existing TX path; only DIN gets added). Sample-rate
-conversion (8 kHz mono ↔ 22.05 kHz stereo for the modem↔speaker
-bridge) and the bidirectional buffer hand-off complete the work.
+What still needs hardware time:
+- Verify `audio_i2s_mic_read()` actually returns sample data when the
+  mic is started.
+- Sample-rate conversion (22.05 kHz → 8 kHz) + buffer hand-off from
+  the I²S1 RX path to the modem audio uplink. The latter depends on
+  whether the Quectel I²S2 bus supports a TX direction at all — our
+  current schematic only shows one DATA wire (RX into ESP32). If
+  the modem expects PCM TX over a separate pin we haven't traced
+  yet, or via TDM on the same wire, that determines the bridge
+  design.
 
 ## Q2 — uPOWER_OFF (GPIO1) polarity (gates real shutdown)
 

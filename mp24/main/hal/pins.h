@@ -5,6 +5,11 @@
  * Authoritative source: /mnt/project/pin_config.h (PCB-netlist-derived)
  * cross-checked against schematics + dashboard.c hardware verification.
  *
+ * Final pin-by-pin verification against the v2.4 KiCad schematic
+ * screenshots (kicanvas.org, 2026-05-16) confirmed every assignment
+ * below matches the netlist exactly, with one addition: the SPH0645
+ * mic data line (uI2S1_DATA_MIC) is on GPIO41 (MTDI).
+ *
  * IMPORTANT: pin_config.h's COMMENT BLOCK at the bottom (about which
  * XL9555 bit maps to which button) is STALE — it reflects the original
  * schematic, which was discovered to be wrong on the actual PCB. The
@@ -56,7 +61,13 @@
 #define PIN_I2S1_DOUT          38    /* uI2S1_DATA_SPK → amp DIN */
 #define PIN_I2S1_BCLK          39    /* uI2S1_CLK_MIC_AMP (JTAG MTCK) */
 #define PIN_I2S1_WS            40    /* uI2S1_WS (JTAG MTDO) */
-/* MIC data-in line — to be confirmed from schematic in S-MP10 */
+#define PIN_I2S1_DIN_MIC       41    /* uI2S1_DATA_MIC ← SPH0645 DOUT
+                                      * (JTAG MTDI; confirmed from
+                                      * Audio.kicad_sch screenshot
+                                      * 2026-05-16). SPH0645 SELECT
+                                      * is tied LOW so the mic outputs
+                                      * on the LEFT slot of the WS
+                                      * frame — read as MONO LEFT. */
 
 /* SD_MODE for the amp lives on AW9523B P1_1, not on the MCU. */
 #define AW9523B_PIN_SD_MODE     9    /* P1_1 in 0..15 numbering (P0=0..7, P1=8..15) */
@@ -69,7 +80,9 @@
  * y-axis convention. No conflicts with existing pin assignments. */
 #define PIN_MODEM_UART_TX      17    /* ESP32 → modem RX (uUART1_GSM_TX) */
 #define PIN_MODEM_UART_RX      18    /* modem TX → ESP32 (uUART1_GSM_RX) */
-#define PIN_MODEM_PWR_KEY      12    /* uGSM_PWR_KEY — active-high pulse to toggle power */
+#define PIN_MODEM_PWR_KEY      12    /* uGSM_PWR_KEY — active-LOW pulse (≥2 s low) per
+                                      * Quectel EG912U-GL HW Design V1.1 §3.4.1.
+                                      * Idle held HIGH; pulse fix in commit 11d7aa7. */
 #define PIN_MODEM_RESET_N      16    /* uGSM_RESET_N — XTAL_32K_N pin (chip pad #22) in IO_MUX, used as GPIO; active-low */
 #define PIN_MODEM_PSM_INT      11    /* uGSM_PSM_EXT_INT — wake-from-PSM interrupt (deferred to PSM session) */
 
