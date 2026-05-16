@@ -81,6 +81,16 @@ list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Devices/ShiftOutput\\.cpp$")
 list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Network/")
 list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Motion/")
 list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/FS/")
+# Util/Timer.cpp: 'typedef struct hw_timer_s hw_timer_t' conflicts
+#   with arduino-esp32's hw_timer_t. Upstream Timer wraps an
+#   ESP32-era HAL that the S3 doesn't expose the same way.
+# Util/HWRevision.cpp: references EFUSE_BLK3_* / EFUSE_ADC1_TP_* /
+#   esp_efuse_burn_new_values — all original-ESP32 efuse register
+#   names. ESP32-S3 has a completely different efuse layout. The
+#   board-rev concept that this implements doesn't apply to MP2.4
+#   (we have one revision).
+list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Util/Timer\\.cpp$")
+list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Util/HWRevision\\.cpp$")
 
 idf_component_register(
     SRCS
