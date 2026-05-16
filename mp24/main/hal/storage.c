@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 #include <dirent.h>
 #include <sys/stat.h>
 
@@ -23,6 +24,13 @@ static size_t s_file_count = 0;
 #define READDIR_LIMIT  256
 #define SENTINEL_NAME  "hello.txt"
 
+/* POSIX NAME_MAX is 255, so a path of "/spiffs/<name>" can run up to
+ * sizeof(BASE_PATH) (incl. NUL) + 1 (slash) + NAME_MAX + 1 (NUL).
+ * SPIFFS itself caps filenames at 31 chars by default, but the
+ * compiler's -Werror=format-truncation analysis uses the POSIX bound,
+ * so we size buffers to silence it without sprinkling pragmas. */
+#define MP_PATH_MAX    (sizeof(BASE_PATH) + 1 + NAME_MAX + 1)
+
 /* ----------------------------------------------------------------- */
 
 static void enumerate_and_log(void)
@@ -37,7 +45,7 @@ static void enumerate_and_log(void)
     while ((ent = readdir(d)) != NULL && s_file_count < READDIR_LIMIT) {
         /* Stat the file to surface its size in the log. SPIFFS is
          * flat so we don't need to recurse. */
-        char path[96];
+        char path[MP_PATH_MAX];
         snprintf(path, sizeof(path), "%s/%s", BASE_PATH, ent->d_name);
         struct stat st;
         if (stat(path, &st) == 0) {
@@ -112,7 +120,7 @@ ssize_t storage_read_file(const char *name, void *buf, size_t buf_len)
 {
     if (!s_mounted || !name || !buf || buf_len == 0) return -1;
 
-    char path[96];
+    char path[MP_PATH_MAX];
     if (snprintf(path, sizeof(path), "%s/%s", BASE_PATH, name)
         >= (int) sizeof(path)) {
         ESP_LOGW(TAG, "path too long: %s", name);
