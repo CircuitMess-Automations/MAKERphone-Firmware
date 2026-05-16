@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-mp24:
+  build:
     runs-on: [self-hosted, bit-flash]
     defaults:
       run:
@@ -145,17 +145,94 @@ jobs:
             mp24/build/flash_args
           if-no-files-found: warn
 
-      - name: Flash to device (if connected)
+  # ----------------------------------------------------------------
+  # Flash the freshly-built artifact onto a physically-connected
+  # MAKERphone v2.4. Runs on the dedicated 'flasher' self-hosted
+  # runner — the MacBook that has the device wired to its USB-C.
+  #
+  # We use esptool directly rather than `idf.py flash` so the flasher
+  # machine does NOT need a full ESP-IDF install. Just esptool
+  # (`brew install esptool` once on the runner) and Python.
+  #
+  # PRs from forks would be a security risk (untrusted code → real
+  # hardware), so flash is restricted to push events on this repo and
+  # to explicit workflow_dispatch runs.
+  # ----------------------------------------------------------------
+  flash:
+    needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, flasher]
+    steps:
+      - name: Download firmware artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mp24-firmware
+          path: firmware
+
+      - name: Add Homebrew bin dirs to PATH
+        shell: bash
+        run: |
+          # Same trick as the build job — GitHub Actions launches bash
+          # without sourcing ~/.zprofile, so Homebrew isn't on PATH by
+          # default on a fresh runner.
+          for b in /opt/homebrew/bin /usr/local/bin; do
+            if [ -d "$b" ]; then
+              echo "$b" >> "$GITHUB_PATH"
+              export PATH="$b:$PATH"
+            fi
+          done
+
+      - name: Ensure esptool.py is available
         shell: bash
         run: |
           set -euo pipefail
-          # shellcheck disable=SC1091
-          source "$IDF_PATH/export.sh"
-          PORT=$(ls /dev/cu.usbmodem* /dev/cu.usbserial* /dev/cu.SLAB* \
-                    2>/dev/null | head -1 || true)
-          if [ -n "$PORT" ]; then
-            echo "Flashing to $PORT"
-            idf.py -p "$PORT" -b 460800 flash
-          else
-            echo "No device connected — skipping flash"
+          if ! command -v esptool.py >/dev/null 2>&1; then
+            echo "esptool.py not found; installing via Homebrew..."
+            if command -v brew >/dev/null 2>&1; then
+              brew install esptool
+            else
+              echo "ERROR: esptool.py missing and Homebrew unavailable."
+              echo "On the flasher runner, run once: brew install esptool"
+              exit 1
+            fi
           fi
+          esptool.py version
+
+      - name: Detect MAKERphone serial port
+        shell: bash
+        run: |
+          set -euo pipefail
+          # ESP32-S3 enumerates either via USB-Serial-JTAG (boot ROM)
+          # or our firmware's USB CDC console; both show up under
+          # /dev/cu.usbmodem*. Also accept legacy USB-serial chips
+          # just in case a UART adapter is in use.
+          PORT=$(ls /dev/cu.usbmodem* /dev/cu.usbserial* /dev/cu.SLAB* \
+                   2>/dev/null | head -1 || true)
+          if [ -z "$PORT" ]; then
+            echo "::error::No MAKERphone serial device found at /dev/cu.usb*."
+            echo "Plug the board in via USB-C, then re-run this workflow."
+            exit 1
+          fi
+          echo "Found device: $PORT"
+          echo "MP24_PORT=$PORT" >> "$GITHUB_ENV"
+
+      - name: Flash firmware
+        shell: bash
+        working-directory: firmware
+        run: |
+          set -euo pipefail
+          echo "=== Artifact contents ==="
+          ls -la
+          echo "=== flash_args ==="
+          cat flash_args
+          echo "========================"
+          # `@flash_args` expands to the ESP-IDF-generated command line
+          # (flash mode/freq/size + 3 offset/file pairs). Working
+          # directory is the artifact root so the relative paths
+          # inside flash_args resolve correctly.
+          esptool.py --chip esp32s3 --port "$MP24_PORT" --baud 460800 \
+            --before default_reset --after hard_reset \
+            write_flash @flash_args
+          echo ""
+          echo "✓ Flash complete. The MAKERphone should now be running"
+          echo "  the new firmware. Open USB-CDC serial to view logs."
