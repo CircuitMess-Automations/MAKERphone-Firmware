@@ -60,6 +60,16 @@ list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "\\.impl$")
 #                               isn't fully guarded.
 #
 #   Motion/                     MPU fusion — depends on IMU.
+#
+#   FS/                         CompressedFile needs heatshrink
+#                               (not vendored); PGMFile + RamFile
+#                               use legacy Arduino-FS abstract
+#                               classes that fail under our newer
+#                               libstdc++ (construct_at on abstract
+#                               types). Re-enable when porting
+#                               screens that actually need these
+#                               adapters (most use plain SPIFFS
+#                               File from arduino-esp32 anyway).
 list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Display/")
 list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/UI/")
 list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Elements/")
@@ -70,6 +80,7 @@ list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Devices/SerialFlash/")
 list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Devices/ShiftOutput\\.cpp$")
 list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Network/")
 list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/Motion/")
+list(FILTER CIRCUITOS_SRCS EXCLUDE REGEX "/src/FS/")
 
 idf_component_register(
     SRCS
