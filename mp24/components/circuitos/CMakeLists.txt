@@ -100,9 +100,22 @@ idf_component_register(
 # don't own this source — silence those locally to keep our own
 # compile warnings audible.
 target_compile_options(${COMPONENT_LIB} PRIVATE
+    # Force-include Arduino.h on every translation unit. The upstream
+    # was written for the Arduino IDE which implicitly does this for
+    # every sketch + library source. Without it, types like 'uint',
+    # 'byte', and 'String' are undeclared. We added arduino-esp32 as
+    # a managed component in S-MP13a so the header is on the
+    # include path; this just makes the implicit prepend.
+    "SHELL:-include Arduino.h"
+    # Suppress noisy warnings we don't own:
     -Wno-missing-field-initializers
     -Wno-sign-compare
     -Wno-unused-variable
     -Wno-unused-but-set-variable
     -Wno-format
+    # Downgrade errors that are legitimate but pervasive in upstream:
+    -Wno-error=reorder              # member init order vs declaration order
+    -Wno-error=maybe-uninitialized  # GCC-14 false-positives on some paths
+    -Wno-error=uninitialized
+    -Wno-error=return-type          # rare paths missing explicit return
 )
