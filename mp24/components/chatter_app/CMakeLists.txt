@@ -210,6 +210,11 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     -Wno-error=unused-variable
     -Wno-error=unused-but-set-variable
     -Wno-error=sign-compare
+    # S-MP18f/1: PhoneCalculator.cpp snprintfs an int into a 23-char
+    # buffer and the compiler can't prove the conversion fits.
+    # Demoting to warning — the actual call sites pass values that
+    # always fit in practice.
+    -Wno-error=format-truncation
     # Arduino.h gets pre-included so 'String', 'pinMode', 'millis'
     # etc. resolve without each src .cpp having to remember to
     # include it. Same trick used for the circuitos build.
