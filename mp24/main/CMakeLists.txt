@@ -28,6 +28,7 @@ idf_component_register(
         "hal/power.c"
         "hal/sms.c"
         "hal/calls.c"
+        "hal/audio_i2s2.c"
     INCLUDE_DIRS
         "."
     REQUIRES

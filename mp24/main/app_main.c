@@ -39,6 +39,7 @@
 #include "hal/power.h"
 #include "hal/sms.h"
 #include "hal/calls.h"
+#include "hal/audio_i2s2.h"
 
 static const char *TAG = "MP24";
 
@@ -251,6 +252,15 @@ static void sms_boot_task(void *arg)
     r = calls_init(5000);
     if (r != ESP_OK) {
         ESP_LOGW(TAG, "Call control not started (err: %s)",
+                 esp_err_to_name(r));
+    }
+
+    /* I²S2 modem voice bus: AT+QDAI=4 then bring up our slave RX.
+     * Idle until a call goes ACTIVE; calls.c flips audio_i2s2_start
+     * and _stop in the pump task. */
+    r = audio_i2s2_init(5000);
+    if (r != ESP_OK) {
+        ESP_LOGW(TAG, "I²S2 modem audio not started (err: %s)",
                  esp_err_to_name(r));
     }
     vTaskDelete(NULL);

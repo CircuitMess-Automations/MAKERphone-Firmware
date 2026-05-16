@@ -24,6 +24,7 @@
 
 #include "hal/calls.h"
 #include "hal/modem.h"
+#include "hal/audio_i2s2.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -171,10 +172,20 @@ static void pump_task(void *arg)
 
             case PUMP_CONNECT:
                 set_state(CALL_ACTIVE);
+                /* Bring the modem-side audio bus online. Best-effort:
+                 * if audio_i2s2 isn't initialised (e.g. modem never
+                 * came up so init was skipped) this just returns
+                 * ESP_ERR_INVALID_STATE and we carry on call-state-
+                 * wise. */
+                audio_i2s2_start();
                 fire_user(CALL_EVT_CONNECTED);
                 break;
 
             case PUMP_HANGUP:
+                /* Stop reading from the modem's PCM bus before the
+                 * modem itself tears down — avoids the RX driver
+                 * hanging on clocks that suddenly stop. */
+                audio_i2s2_stop();
                 set_state(CALL_TERMINATED);
                 fire_user(CALL_EVT_HANGUP);
                 /* Brief settle so back-to-back events don't race on
@@ -276,6 +287,7 @@ esp_err_t calls_answer(void)
         /* CONNECT URC may or may not arrive depending on modem config;
          * pre-emptively set ACTIVE so UI is responsive. */
         set_state(CALL_ACTIVE);
+        audio_i2s2_start();
         fire_user(CALL_EVT_CONNECTED);
     }
     return r;
@@ -286,6 +298,7 @@ esp_err_t calls_hangup(void)
     if (!s_inited) return ESP_ERR_INVALID_STATE;
     if (atomic_load(&s_state) == CALL_IDLE) return ESP_OK;
 
+    audio_i2s2_stop();
     esp_err_t r = modem_at_send("H", NULL, 0, 3000);
     if (r == ESP_OK) {
         set_state(CALL_TERMINATED);

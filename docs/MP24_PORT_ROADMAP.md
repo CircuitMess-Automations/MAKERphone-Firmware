@@ -114,9 +114,16 @@ partition, E=button alias remap to joystick/A/B/C/D, F=USB CDC console).
       TERMINATED → IDLE). +CLIP turned on so inbound calls
       carry the caller number. Counters + remote-number snapshot
       exposed for the dashboard.
-      Audio bridge (PCM forwarding I²S1 mic ↔ I²S2 modem ↔ I²S1
-      speaker, AT+QDAI configuration) deferred to S-MP10b — needs
-      hardware tuning that's pointless without working RX path.
+- [~] **S-MP10b** I²S2 modem voice RX — `hal/audio_i2s2.{c,h}`.
+      Issues `AT+QDAI=4` to put the modem in PCM master mode @
+      8 kHz / 16-bit / mono, opens an I²S slave RX channel on
+      BCLK=GPIO14 / WS=GPIO21 / DIN=GPIO13, and runs an internal
+      sampler task that maintains a 10 Hz RMS value (cheap dash
+      meter). Auto-starts on CALL_ACTIVE transition and stops on
+      hangup. Read API for downstream consumers. Mic→modem and
+      modem→speaker routing (sample-rate conversion, channel
+      doubling, buffer hand-off to I²S1) defer to S-MP10c — needs
+      working call audio in either direction to tune against.
 
 ## CI & bring-up
 
