@@ -104,6 +104,12 @@ idf_component_register(
         # LoopManager defer → onStart pipeline works at runtime.
         "screens/TestScreen.cpp"
 
+        # S-MP18b: factory wrapper that wires PhoneWelcomeScreen
+        # into the boot path. Pre-populates Settings.ownerName so
+        # the greeting label has content, then constructs +
+        # starts the screen.
+        "screens/WelcomeFactory.cpp"
+
     INCLUDE_DIRS
         # Nothing exported to other components yet. Screens will be
         # invoked from chatter_app's own entry point eventually.
