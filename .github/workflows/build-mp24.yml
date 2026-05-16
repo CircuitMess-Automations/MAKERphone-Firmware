@@ -182,21 +182,26 @@ jobs:
             fi
           done
 
-      - name: Ensure esptool.py is available
+      - name: Ensure esptool is available
         shell: bash
         run: |
           set -euo pipefail
-          if ! command -v esptool.py >/dev/null 2>&1; then
-            echo "esptool.py not found; installing via Homebrew..."
+          # esptool v5+ ships the command as `esptool` (the legacy
+          # `esptool.py` alias is deprecated and removed in some pkgs).
+          # Probe both names so the install check works on older and
+          # newer Homebrew formulas.
+          if ! command -v esptool >/dev/null 2>&1 && \
+             ! command -v esptool.py >/dev/null 2>&1; then
+            echo "esptool not found; installing via Homebrew..."
             if command -v brew >/dev/null 2>&1; then
               brew install esptool
             else
-              echo "ERROR: esptool.py missing and Homebrew unavailable."
+              echo "ERROR: esptool missing and Homebrew unavailable."
               echo "On the flasher runner, run once: brew install esptool"
               exit 1
             fi
           fi
-          esptool.py version
+          (esptool version 2>/dev/null) || esptool.py version
 
       - name: Detect MAKERphone serial port
         shell: bash
@@ -226,13 +231,22 @@ jobs:
           echo "=== flash_args ==="
           cat flash_args
           echo "========================"
+          # --before usb-reset uses the ESP32-S3's built-in USB-Serial/
+          # JTAG controller to force the chip into download mode at the
+          # ROM level, regardless of what firmware (if any) is running
+          # on the chip. This is the only reliable path on the MAKERphone
+          # because SW24 (the BOOT-pin button) is an SMD switch under the
+          # case, not user-accessible. Without --before usb-reset, a
+          # halted/bricked firmware that owns USB-OTG blocks esptool's
+          # default RTS/DTR-based reset sequence.
+          #
           # `@flash_args` expands to the ESP-IDF-generated command line
           # (flash mode/freq/size + 3 offset/file pairs). Working
-          # directory is the artifact root so the relative paths
-          # inside flash_args resolve correctly.
-          esptool.py --chip esp32s3 --port "$MP24_PORT" --baud 460800 \
-            --before default_reset --after hard_reset \
-            write_flash @flash_args
+          # directory is the artifact root so the relative paths inside
+          # flash_args resolve correctly.
+          esptool --chip esp32s3 --port "$MP24_PORT" --baud 460800 \
+            --before usb-reset --after hard-reset \
+            write-flash @flash_args
           echo ""
           echo "✓ Flash complete. The MAKERphone should now be running"
           echo "  the new firmware. Open USB-CDC serial to view logs."
