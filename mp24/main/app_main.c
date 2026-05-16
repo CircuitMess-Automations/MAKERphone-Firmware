@@ -33,6 +33,7 @@
 #include "hal/buttons.h"
 #include "hal/input_keypad.h"
 #include "hal/piezo.h"
+#include "hal/battery.h"
 
 static const char *TAG = "MP24";
 
@@ -91,7 +92,7 @@ static void print_banner(void)
     esp_chip_info_t info;
     esp_chip_info(&info);
     ESP_LOGI(TAG, "==========================================");
-    ESP_LOGI(TAG, " MAKERphone v2.4 firmware — S-MP05 audio");
+    ESP_LOGI(TAG, " MAKERphone v2.4 firmware — S-MP06 battery");
     ESP_LOGI(TAG, " IDF=%s  chip=%s rev%d  cores=%d",
              esp_get_idf_version(),
              (info.model == CHIP_ESP32S3) ? "ESP32-S3" : "?",
@@ -118,8 +119,8 @@ static void draw_boot_screen(void)
     display_fill_rect(0, 0, TFT_WIDTH, 14, MP_ACCENT);
     display_str(4, 4, "MAKERphone v2.4", MP_BG, MP_ACCENT);
 
-    display_str(4, 22, "S-MP05  audio + input",  MP_TEXT, MP_BG);
-    display_str(4, 34, "23 btns, I2S piezo amp", MP_DIM,  MP_BG);
+    display_str(4, 22, "S-MP06  battery monitor",  MP_TEXT, MP_BG);
+    display_str(4, 34, "23 btns, I2S, ADC1_CH2",    MP_DIM,  MP_BG);
 
     /* Chroma stripe stays — visual confidence in every boot. */
     const int bar_y = 50;
@@ -130,12 +131,12 @@ static void draw_boot_screen(void)
     display_fill_rect(2 * bar_w, bar_y, bar_w, bar_h, COLOR_BLUE);
     display_fill_rect(3 * bar_w, bar_y, bar_w, bar_h, COLOR_WHITE);
 
-    /* Labels for live values. */
-    display_str(4, 64,  "Last :",        MP_DIM, MP_BG);
-    display_str(4, 76,  "Events:",       MP_DIM, MP_BG);
-    display_str(4, 88,  "Tone :",        MP_DIM, MP_BG);
-    display_str(4, 100, "U5 raw:",       MP_DIM, MP_BG);
-    display_str(4, 112, "U9 raw:",       MP_DIM, MP_BG);
+    /* Labels for live values — tight 12-px rows, six visible. */
+    display_str(4, 62,  "Last :",   MP_DIM, MP_BG);
+    display_str(4, 74,  "Events:",  MP_DIM, MP_BG);
+    display_str(4, 86,  "Tone :",   MP_DIM, MP_BG);
+    display_str(4, 98,  "Batt :",   MP_DIM, MP_BG);
+    display_str(4, 110, "U5/U9 :",  MP_DIM, MP_BG);
 }
 
 /* Erase a fixed strip first so changing-width values don't leave
@@ -148,7 +149,7 @@ static void redraw_value(int x, int y, const char *s, uint16_t fg, uint16_t bg)
 
 static void update_dashboard(void)
 {
-    char buf[32];
+    char buf[40];
 
     /* "Last :" line */
     uint32_t evt = atomic_load(&s_last_event_packed);
@@ -157,26 +158,41 @@ static void update_dashboard(void)
         bool   was_p  = (evt & EVT_PRESSED) != 0;
         snprintf(buf, sizeof(buf), "%s %s",
                  was_p ? "PRESS" : "REL  ", btn_name(btn));
-        redraw_value(46, 64, buf, was_p ? MP_HILITE : MP_TEXT, MP_BG);
+        redraw_value(54, 62, buf, was_p ? MP_HILITE : MP_TEXT, MP_BG);
     }
 
     /* "Events: N press / N rel" */
     uint32_t p = (uint32_t) atomic_load(&s_press_count);
     uint32_t r = (uint32_t) atomic_load(&s_release_count);
     snprintf(buf, sizeof(buf), "%lu/%lu", (unsigned long)p, (unsigned long)r);
-    redraw_value(58, 76, buf, MP_TEXT, MP_BG);
+    redraw_value(54, 74, buf, MP_TEXT, MP_BG);
 
     /* "Tone : 880 Hz" or "Tone : --" */
     uint32_t freq = piezo_current_freq();
     if (freq > 0) snprintf(buf, sizeof(buf), "%lu Hz", (unsigned long)freq);
     else          snprintf(buf, sizeof(buf), "--");
-    redraw_value(46, 88, buf, freq > 0 ? MP_HILITE : MP_DIM, MP_BG);
+    redraw_value(54, 86, buf, freq > 0 ? MP_HILITE : MP_DIM, MP_BG);
 
-    /* Raw 16-bit cached state per chip. */
-    snprintf(buf, sizeof(buf), "0x%04X", input_keypad_raw(0));
-    redraw_value(58, 100, buf, MP_TEXT, MP_BG);
-    snprintf(buf, sizeof(buf), "0x%04X", input_keypad_raw(1));
-    redraw_value(58, 112, buf, MP_TEXT, MP_BG);
+    /* "Batt : 3.85 V (74%)" — colour-coded by SOC.
+     * Renders even before the first ADC sample (shows "..."). */
+    if (!battery_ready()) {
+        redraw_value(54, 98, "...", MP_DIM, MP_BG);
+    } else {
+        float volts = battery_voltage();
+        int   pct   = battery_percent();
+        uint16_t batt_col = MP_TEXT;
+        if      (pct <= 10) batt_col = COLOR_RED;
+        else if (pct <= 25) batt_col = display_rgb(255, 180, 60);    /* amber */
+        else                batt_col = display_rgb(120, 220, 120);   /* green */
+        snprintf(buf, sizeof(buf), "%.2f V (%d%%)", volts, pct);
+        redraw_value(54, 98, buf, batt_col, MP_BG);
+    }
+
+    /* Combined raw register read of both keypad expanders on one row,
+     * frees a line for the battery row above. */
+    snprintf(buf, sizeof(buf), "0x%04X 0x%04X",
+             input_keypad_raw(0), input_keypad_raw(1));
+    redraw_value(54, 110, buf, MP_TEXT, MP_BG);
 }
 
 /* ----------------------------------------------------------------- */
@@ -242,6 +258,15 @@ void app_main(void)
         vTaskDelay(pdMS_TO_TICKS(150));
         piezo_tone(784, 200);   /* G5 */
         vTaskDelay(pdMS_TO_TICKS(220));
+    }
+
+    /* Battery: takes a synchronous first sample before returning, so
+     * the dashboard's "Batt :" row never shows zero. Spawns a 1 Hz
+     * background sampler for ongoing updates. Non-fatal: a firmware
+     * with no battery readout still demonstrates the rest of the
+     * stack. */
+    if (battery_init() != ESP_OK) {
+        ESP_LOGW(TAG, "Battery monitor init failed (continuing)");
     }
 
     ESP_LOGI(TAG, "Entering live dashboard loop.");

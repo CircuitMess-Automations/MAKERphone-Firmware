@@ -35,9 +35,17 @@ partition, E=button alias remap to joystick/A/B/C/D, F=USB CDC console).
       PhoneRingtoneEngine / PhoneSystemTones bring-up — is left for
       the next audio-side session once the shim component starts
       being populated.
-- [ ] **S-MP06** Battery + power — ADC1_CH2 on GPIO 3, TL431-calibrated
-      via CALIB_EN. Power button → ShutdownService. USB detect →
-      ChargeChime. Brightness no-op + idle-dim = blank.
+- [x] **S-MP06** Battery monitor — ADC1_CH2 on GPIO 3, eFuse
+      curve-fit calibration, 1 Hz background sampler, Li-Po SOC
+      curve, dashboard renders `Batt : X.XX V (N%)` with red/amber/
+      green colour. Deferred to follow-up sessions (Decision F-2
+      pending): power button → shutdown service (need uBUTTON_PWR
+      schematic trace), USB detect → charge chime (need to find
+      USB_DETECT bit on expanders), TL431/CALIB_EN calibration
+      (schematic shows CALIB_EN only as `input` to sub-sheets —
+      nothing drives it on v2.4 PCB, eFuse cal is ±20 mV which is
+      sufficient), idle-dim = blank display (need to define what
+      "idle" means first).
 
 ## Transport (GSM modem)
 

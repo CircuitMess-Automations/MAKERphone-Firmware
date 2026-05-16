@@ -47,6 +47,8 @@
 /* ----------------------------------------------------------------- */
 #define PIN_ADC_BATTERY         3    /* ADC1_CH2 — divider 2.0× to VBAT */
 #define VBAT_DIVIDER_RATIO      2.0f
+#define ADC_UNIT_BATTERY        ADC_UNIT_1
+#define ADC_CHANNEL_BATTERY     ADC_CHANNEL_2
 
 /* ----------------------------------------------------------------- */
 /* I²S 1 (speaker amp MAX98357A + MEMS mic SPH0645)                  */
