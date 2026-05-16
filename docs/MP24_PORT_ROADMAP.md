@@ -120,6 +120,29 @@ partition, E=button alias remap to joystick/A/B/C/D, F=USB CDC console).
 
 ## CI & bring-up
 
-- [ ] **S-MP11** CI — verify `build-mp24.yml` produces a flashable image
-      on every push that touches `mp24/**`. SPIFFS image artifact upload.
+- [x] **S-MP11** CI — verified continuously across S-MP06..S-MP10.
+      `build-mp24.yml` runs build + flash jobs on every push to
+      `mp24/**`. Build job on the `bit-flash` runner produces a
+      versioned firmware artifact containing bootloader.bin, the
+      app, partition-table.bin, flash_args, AND the SPIFFS image
+      (`mp24/build/spiffs.bin`, added in commit 0f52d3a). Flash
+      job on the `flasher` runner uses `esptool --before usb-reset
+      --after hard-reset write-flash @flash_args` for an unbrick-
+      able flash path that survives any firmware state on the chip.
+      Path filter limits the workflow to mp24-touching commits so
+      legacy Chatter builds aren't disturbed.
 - [ ] **S-MP12+** Hardware bring-up shakeout. One commit per fix.
+      Active items pending physical-hardware access:
+      - Modem boot doesn't reach READY. Most likely candidates:
+        PWR_KEY polarity (current: active-high pulse), VBAT_RF/
+        VBAT_BB rails not enabled, modem TX/RX line wiring.
+        Diagnose by capturing the boot log over USB-Serial/JTAG
+        (`screen /dev/cu.usbmodem2101 115200`) and checking
+        whether the RX task sees any bytes during the AT probe.
+      - SMS send/receive end-to-end test once modem is up.
+      - Voice-call inbound RING flow + outbound dial test.
+      - S-MP10b: I²S2 PCM audio bridge between modem voice and
+        speaker/mic.
+      - Power button shutdown polarity verify on `uPOWER_OFF`
+        (GPIO1) — currently left high-Z to avoid cutting our own
+        supply mid-test.
