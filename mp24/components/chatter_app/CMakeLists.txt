@@ -958,6 +958,55 @@ idf_component_register(
         "${SRC_DIR}/Games/Pong/PauseState.cpp"
         "${SRC_DIR}/Games/Pong/Bonk.cpp"
 
+        # S-MP20/10b: fourth game implementation lands -- SpaceRocks
+        # (Asteroids). Two game TUs plus the shared Games/Common
+        # Hearts.cpp + Score.cpp helpers SpaceRocks uses for its
+        # HUD overlay.
+        #
+        # Audit found a single net-new transitive dep vs. the
+        # Snake / SpaceInvaders / Bonk landings:
+        #
+        #   - SpaceRocks.cpp line 211 calls
+        #       spriteRC->getSprite()->fillRoundRect(0, 0, 4, 4, 1, TFT_WHITE);
+        #     which is the Bodmer 6-arg shape; the shim addition
+        #     in /10a (TFT_eSPI::fillRoundRect + drawRoundRect)
+        #     closes the gap.
+        #
+        # Player.cpp (~25 LOC) is a tiny helper -- just rotates
+        # the player GameObject via setRot. Player.h forward-
+        # declares an ObjPtr = shared_ptr<GameObject> typedef and
+        # relies entirely on GameObject's already-in-SRCS surface.
+        #
+        # Hearts.cpp + Score.cpp (Games/Common) wrap a SpriteRC
+        # into a HUD overlay GameObject -- one shows a row of
+        # heart icons via drawIcon(File, ...) (proven by /4d),
+        # the other prints a score via printf into a sprite
+        # (proven by /6d + /7f3/1's print/printf overloads).
+        # SpaceRocks is the first in-SRCS caller of either;
+        # neither Snake / SpaceInvaders / Bonk use them.
+        #
+        # SpaceRocks's Game-class API surface is a strict subset
+        # of what Snake / SpaceInvaders already exercised: Game
+        # ctor with a resource list, pop() for state transitions,
+        # Audio.play({chirps}) via ChirpSystem, addObject /
+        # removeObject for GameObject lifecycle, collision.addPair
+        # / removePair / wallsAll for collision callbacks. All
+        # proven by the /5 + /6 + /6c + /7f3 scaffolding.
+        #
+        # The wrapWalls struct uses RectCC (/4 collision leaf),
+        # the player uses PolygonCC (/4 collision leaf) and AnimRC
+        # (/4f animated render component), bullets use CircleCC
+        # and SpriteRC with a runtime fillRoundRect.
+        #
+        # No instantiation site for SpaceRocks in the in-SRCS set
+        # yet -- the GamesScreen wiring lands in /11 + /12 -- so
+        # --gc-sections drops all four TUs at link time. Expected
+        # binary delta: 0 bytes. Compile-and-link validation only.
+        "${SRC_DIR}/Games/Common/Hearts.cpp"
+        "${SRC_DIR}/Games/Common/Score.cpp"
+        "${SRC_DIR}/Games/Space/Player.cpp"
+        "${SRC_DIR}/Games/Space/SpaceRocks.cpp"
+
         # S-MP20/6b: pre-emptive Game.cpp runtime stubs.
         # Defines the symbols Game.cpp's start() / stop() / loop()
         # bodies reference -- InputChatter::getInputInstance() and
