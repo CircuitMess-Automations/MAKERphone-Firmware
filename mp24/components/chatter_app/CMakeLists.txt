@@ -356,7 +356,8 @@ idf_component_register(
         "${SRC_DIR}/Screens/PhoneCountdown.cpp"
         "${SRC_DIR}/Screens/PhoneFindFriendsRadar.cpp"
         "${SRC_DIR}/Screens/PhoneGalleryScreen.cpp"
-        "${SRC_DIR}/Screens/PhoneGamesScreen.cpp"
+        # PhoneGamesScreen.cpp also pulls Games/GameEngine →
+        # glm.h, same reason as MainMenu. Held back.
         "${SRC_DIR}/Screens/PhoneHabits.cpp"
         "${SRC_DIR}/Screens/PhoneHelicopter.cpp"
         "${SRC_DIR}/Screens/PhoneKaraokeScreen.cpp"
