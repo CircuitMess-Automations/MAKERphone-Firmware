@@ -276,10 +276,9 @@ jobs:
           set -uo pipefail
           sleep 2
           echo "=== Capturing 20s from $MP24_PORT @ 115200 ==="
-          # Use python's pyserial to read; tolerant of disconnect
-          # mid-read (chip resets cycle the USB enumeration on
-          # crash-loop firmware).
-          timeout 20 python3 - <<'PYEOF' > boot.log 2>&1 || true
+          # macOS doesn't have GNU `timeout` by default — python's
+          # own time-bound loop handles the 20s cap.
+          python3 - <<'PYEOF' > boot.log 2>&1 || true
           import sys, time
           try:
               import serial
