@@ -201,6 +201,34 @@ idf_component_register(
         # provides the public ABI as no-ops.
         "shim/MessageServiceStub.cpp"
 
+        # S-MP18o: real (not stubbed) services with clean deps.
+        # All compile against Audio/Piezo (CircuitOS) + Notes.h
+        # (chatter_library) + Settings.h (chatter_library) +
+        # LoopListener.h + MessageService.h (stubbed).
+        #
+        # PhoneOwnerEmoji        — emoji picker state. Self-contained.
+        # PhoneLvglCost          — LVGL frame-cost telemetry.
+        # PhoneSoftKeyTone       — softkey click-tone library.
+        # PhoneRingtoneEngine    — base ringtone player.
+        # PhoneSystemTones       — melody data table for ringtones
+        #                          (2159 LOC, mostly note arrays).
+        # PhoneMusicLibrary      — music asset index.
+        # PhoneMusicPlaylists    — playlist editor backing service.
+        # BuzzerService          — soft-key + msg-received beeps.
+        #
+        # These unblock five previously-deferred screens
+        # (PhoneOwnerEmojiScreen, PhoneSoftKeyToneScreen,
+        # PhonePlaylistsScreen, PhoneDiagScreen, ConvoScreen) plus
+        # any code that uses BuzzerService for haptic feedback.
+        "${SRC_DIR}/Services/PhoneOwnerEmoji.cpp"
+        "${SRC_DIR}/Services/PhoneLvglCost.cpp"
+        "${SRC_DIR}/Services/PhoneSoftKeyTone.cpp"
+        "${SRC_DIR}/Services/PhoneRingtoneEngine.cpp"
+        "${SRC_DIR}/Services/PhoneSystemTones.cpp"
+        "${SRC_DIR}/Services/PhoneMusicLibrary.cpp"
+        "${SRC_DIR}/Services/PhoneMusicPlaylists.cpp"
+        "${SRC_DIR}/Services/BuzzerService.cpp"
+
         # S-MP18m: services + modals + elements that compile
         # cleanly now that LoRaService is stubbed. ProfileService
         # is the canary — its .cpp does `#include "LoRaService.h"`
