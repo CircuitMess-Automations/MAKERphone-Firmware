@@ -829,6 +829,44 @@ idf_component_register(
         # all GameEngine .cpp's grouped.
         "${SRC_DIR}/Games/GameEngine/Highscore.cpp"
 
+        # S-MP20/6c: TextInput.cpp -- compile-only validation
+        # leaf for the GameEngine subsystem.
+        #
+        # TextInput is a CircuitOS-style InputListener +
+        # LoopListener used by every game subclass (Snake /
+        # Bonk / SpaceInvaders / SpaceRocks) for the
+        # "enter your initials" high-score screen. Game
+        # subclasses own a `TextInput* input` member, new'd up
+        # in onStart() and deleted in onStop(); without
+        # TextInput.cpp in SRCS the linker will fail with
+        # undefined references to TextInput::stop() and the
+        # implicit dtor as soon as Snake.cpp lands in /7.
+        #
+        # The audit at S-MP20/6b -> /6c confirmed TextInput.cpp
+        # is safe to compile directly:
+        #   - Its only "exotic" include is <Pins.hpp>, which
+        #     via REQUIRES circuitos_shim resolves to the
+        #     MP2.4 shim Pins.hpp -- that pulls hal/buttons.h
+        #     so every BTN_* identifier in the keyMap
+        #     initialiser (BTN_0..BTN_9) and in the body
+        #     (BTN_L, BTN_LEFT, BTN_RIGHT, BTN_ENTER, BTN_BACK,
+        #     BTN_R) is defined as the corresponding btn_id_t
+        #     enum value via Decision-E aliases.
+        #   - Input::getInstance() / addListener / removeListener
+        #     resolve against the Input singleton provided by
+        #     circuitos_shim's MP24Input. Same for
+        #     LoopManager::add/removeListener.
+        #   - No FS, no FSLVGL, no glm, no Chatter -- the only
+        #     transitive deps are STL (<functional>, <map>,
+        #     <utility>) and circuitos's Input/Loop headers.
+        #
+        # Expected runtime impact: ZERO. Game subclasses are
+        # not yet in SRCS, so no in-SRCS TU references
+        # TextInput's symbols, so --gc-sections drops the whole
+        # TU at link time. Binary size delta should be 0 bytes,
+        # matching the /6b stubs' pattern.
+        "${SRC_DIR}/Games/GameEngine/TextInput.cpp"
+
         # S-MP20/6b: pre-emptive Game.cpp runtime stubs.
         # Defines the symbols Game.cpp's start() / stop() / loop()
         # bodies reference -- InputChatter::getInputInstance() and
