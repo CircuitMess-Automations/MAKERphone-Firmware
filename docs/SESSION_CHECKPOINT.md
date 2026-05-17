@@ -8,18 +8,18 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-17 ~17:15
-* **HEAD on `main`:** `a1817c4` (`feat(mp24): S-MP20/6b --
-  pre-emptive InputChatter + FSLVGL stubs`). A docs checkpoint
+* **Date (UTC):** 2026-05-17 ~17:27
+* **HEAD on `main`:** `a1b60d1` (`feat(mp24): S-MP20/6c -- land
+  TextInput.cpp via parallel-safe SRCS add`). A docs checkpoint
   commit on top of this one will be outside the CI path filter,
   so the green build state is preserved.
-* **Build status:** GREEN. Run `25997398734` -- build job
+* **Build status:** GREEN. Run `25997637537` -- build job
   `success`, flash job `success`. Zero fix-forwards this fire --
-  both new stub TUs compiled clean on first push. Eleven clean
-  landings in a row on the GameEngine subsystem (S-MP20/4b + /4c
-  + /4d + /4e + /4f + /5 + /6 + now /6b).
+  TextInput.cpp compiled clean on first push. **Twelve** clean
+  landings in a row on the GameEngine subsystem (S-MP20/4b +
+  /4c + /4d + /4e + /4f + /5 + /6 + /6b + now /6c).
 * **Device boot status:** HEALTHY. boot.log from artifact
-  `7044422873` (40 lines, 0 crash markers) is byte-for-byte
+  `7044493542` (40 lines, 0 crash markers) is byte-for-byte
   identical in shape to the prior fire's boot.log:
 
       STORE: mounted; 2 files, 1757 / 1860161 bytes used (0%)
@@ -32,117 +32,107 @@ does not consume a build.
   `panic`, `abort`, or backtrace anywhere in the log.
 * **Flasher status:** ONLINE and reliable.
 * **Binary size:** 883408 bytes / 2 MB partition (43% used, 1.16
-  MB free). **Identical to the prior fire's 883408** -- both
-  new stub TUs gc-sections'd at link time as predicted. No
-  in-SRCS file currently references their symbols (Game.cpp's
-  start / stop / loop bodies are themselves gc'd because no
-  game subclass references Game's vtable / ctor). Compile-only
-  validation pattern from S-MP20/2 -> /3 -> /4 -> /4b -> /4c ->
-  /4d -> /4e -> /4f -> /5 -> /6 -> /6b holds. Eleven consecutive
-  clean landings.
+  MB free). **Identical to the prior fire's 883408** -- TextInput
+  TU gc-sections'd at link time as predicted. No in-SRCS file
+  currently references TextInput's symbols (Game subclasses are
+  not yet in SRCS). Compile-only validation pattern from S-MP20/2
+  -> /3 -> /4 -> /4b -> /4c -> /4d -> /4e -> /4f -> /5 -> /6 ->
+  /6b -> /6c holds. Twelve consecutive clean landings.
 
-## What S-MP20/6b actually shipped (in commit `a1817c4`)
+## What S-MP20/6c actually shipped (in commit `a1b60d1`)
 
-Two new shim TUs in `mp24/components/chatter_app/shim/` plus the
-SRCS-list patch that lands them:
+Single-line SRCS addition + comment block in
+`mp24/components/chatter_app/CMakeLists.txt`:
 
-  - `shim/InputChatterStub.cpp` (~130 LOC): provides storage for
-    `InputChatter::keyMap` (empty) and `InputChatter::instance`
-    (nullptr), the InputChatter ctor (forwards to InputLVGL
-    with LV_INDEV_TYPE_ENCODER, sets instance), the three
-    required virtual overrides (`read`, `buttonPressed`,
-    `buttonReleased`) all as no-ops, and `getInputInstance()`
-    which lazily news up a singleton InputChatter on first call.
+  - Added `"${SRC_DIR}/Games/GameEngine/TextInput.cpp"` to SRCS
+    in a new slot between Highscore.cpp (the /6 leaf) and the
+    InputChatter+FSLVGL stub block (/6b).
+  - 38-line comment block explaining why TextInput.cpp can
+    compile cleanly without any shim work:
+      * <Pins.hpp> resolves to the MP2.4 shim Pins.hpp via the
+        REQUIRES circuitos_shim chain. The shim Pins.hpp pulls
+        hal/buttons.h which defines BTN_0..BTN_9 as enum values
+        and BTN_L/BTN_LEFT/BTN_RIGHT/BTN_ENTER/BTN_BACK/BTN_R as
+        Decision-E alias macros to BTN_FACE_A / BTN_JOY_LEFT /
+        BTN_JOY_RIGHT / BTN_JOY_CLICK / BTN_FACE_C / BTN_FACE_B
+        respectively. All keyMap initialiser tokens resolve.
+      * Input::getInstance / addListener / removeListener
+        resolve via circuitos_shim's MP24Input.
+        LoopManager::add/removeListener resolves via upstream
+        circuitos.
+      * No FS, no FSLVGL, no glm, no Chatter. Only STL +
+        Input/Loop headers.
 
-  - `shim/FSLVGLStub.cpp` (~90 LOC): provides storage for the
-    three static members `cacheLoaded` / `cache` / `specialCache`
-    plus `loadCache()` and `unloadCache()` as no-ops. Skips
-    `cached[]` (not referenced from any in-SRCS TU) and the
-    non-static members (no in-SRCS code constructs an FSLVGL
-    instance).
+Net diff: 1 file, +38 / -0 lines.
 
-  - `chatter_app/CMakeLists.txt` (+35 lines): adds both files to
-    SRCS in a new slot between Highscore.cpp (the /6 leaf) and
-    the S-MP18j StorageStub.cpp group, with a comment block
-    explaining why we stub rather than landing the upstream .cpp
-    files (Pins.hpp coverage + InputLVGL indev ownership for
-    InputChatter; RamFile pure-virtual issue for FSLVGL --
-    same blocker that gated StorageStub).
+## Why this fire chose /6c rather than going straight to /7
 
-Net diff: 3 files, +252 / -0 lines.
+Audit of Snake.cpp's transitive deps found that Snake's
+`onStop()` body calls `input->stop(); delete input;` on a
+`TextInput* input` member. Without TextInput.cpp in SRCS, the
+link would fail with undefined references to TextInput::stop()
+and the implicit dtor as soon as Snake.cpp lands.
 
-## Why this fire chose /6b rather than going straight to /7
+Three options to fix:
+  1. Land TextInput.cpp + Snake.cpp together in /7.
+  2. Land TextInput.cpp first as /6c (compile-only validation
+     leaf, gc-sections'd, zero binary delta) -- then /7 ships
+     Snake.cpp cleanly.
+  3. Stub TextInput in shim/.
 
-Per the previous fire's checkpoint guidance, audit InputChatter +
-FSLVGL + Chatter before adding any game subclass:
-
-  - InputChatter.cpp -- NOT in chatter_app SRCS. Source file at
-    src/InputChatter.cpp. Adding it directly fails because its
-    keyMap initialiser uses BTN_UP/DOWN/A/B and our shim
-    Chatter.h does NOT pull <Pins.hpp> (those macros are
-    defined in hal/buttons.h, only reachable through the shim
-    Pins.hpp which Chatter.h omits). Beyond that, the upstream
-    buttonPressed/Released bodies route events into the indev
-    InputLVGL owns; on MP2.4 lvgl_glue owns the keypad indev
-    so this routing is dead-end anyway.
-  - FSLVGL.cpp -- NOT in chatter_app SRCS. Source file at
-    src/FSLVGL.cpp. Includes <FS/RamFile.h> which is the same
-    blocker that gated the upstream Storage layer at S-MP18i
-    (RamFile inherits from fs::FileImpl in arduino-esp32 3.3.8
-    but doesn't override all pure virtuals -- std::make_shared
-    fails as abstract). Stub is the correct treatment.
-  - Chatter (global `Chatter` ChatterImpl instance) -- ALREADY
-    provided by circuitos_shim/MP24Chatter.cpp which is in
-    chatter_app's REQUIRES chain. No work needed.
-
-Two of three need shim work -> shim work goes first as /6b.
+Option 2 wins on the established pattern: small, well-scoped,
+proven gc-section behaviour, preserves the streak of clean
+landings, and removes a class of risk from the upcoming /7
+landing without taking on the risk of /7 itself in this fire.
 
 ## What the next fire should do
 
 Pick ONE of these. Roughly ordered by risk-adjusted payoff.
 
 1. **S-MP20/7 -- First game implementation (Snake).** This is
-   now unblocked -- the externs Game.cpp's start/stop/loop
-   bodies reference will resolve cleanly via the /6b stubs.
-   Snake is the simplest of the four upstream games.
+   now genuinely unblocked: Game.cpp/GameSystem.cpp are in
+   SRCS (/5), InputChatter + FSLVGL stubs are in SRCS (/6b),
+   TextInput.cpp is in SRCS (/6c), Highscore.cpp is in SRCS
+   (/6). Snake.cpp pulls all four cleanly.
 
    What to expect:
-     - Snake.cpp pulls Game.h (transitively pulls
-       Games/GameEngine/Game.h + ResourceManager.h +
-       GameObject.h + Collision/CollisionSystem.h +
-       Rendering/RenderSystem.h + Interface/LVScreen.h +
-       <Loop/LoopListener.h> + <Audio/ChirpSystem.h>). All of
-       these are either in SRCS or transitively pulled by
-       existing SRCS files -- spot-check via grep before adding.
-     - Snake.cpp pulls Highscore.h (already in SRCS as /6).
-     - Snake.cpp may pull other Snake-specific headers
-       (Pawn / Field / etc. depending on the upstream layout).
-       Audit src/Games/Snake/ to see what files Snake.cpp's
-       includes resolve to and which need to land alongside.
-     - Once Snake.cpp lands in SRCS, Snake's vtable pulls
-       Game's vtable, which pulls Game::loop / Game::~Game.
-       Game::loop body references FSLVGL::loadCache (now
-       resolved via stub). Game::start / Game::stop are NOT
-       virtual so they remain gc'd until something explicitly
-       calls them (typically GamesScreen / PhoneGamesScreen).
-     - Expected binary delta: nonzero this time -- Game.cpp's
-       reachable section grows, plus Snake.cpp itself.
+     - Snake.cpp's transitive includes (Game.h ->
+       LVScreen.h / LoopListener.h / Highscore.h / ChirpSystem
+       / Display) are all resolvable.
+     - Snake.h declares `Sprite* baseSprite;`, `Input* buttons;`,
+       `Display* display;` -- types from circuitos/UI/Sprite.h,
+       circuitos/Input/Input.h, circuitos/Display/Display.h.
+       Spot-check via `grep` for any header that Snake.h pulls
+       transitively that isn't already covered.
+     - Snake.cpp may pull <Chatter.h> directly. The shim
+       circuitos_shim/include/Chatter.h is what resolves. As
+       discovered in /6b: that shim does NOT include
+       <Pins.hpp>, so any BTN_* token used DIRECTLY in
+       Snake.cpp (without #include <Pins.hpp>) will be
+       undefined. Audit Snake.cpp for naked BTN_* before
+       landing.
+     - Once Snake.cpp lands, Game's vtable gets pulled,
+       Game::loop body executes references to
+       InputChatter::getInputInstance + FSLVGL::loadCache
+       (resolved via /6b stubs), TextInput::stop + ~TextInput
+       (resolved via /6c).
+     - Expected binary delta: nonzero. Snake.cpp itself plus
+       reachable parts of Game.cpp's body get linked in. First
+       real bytes added to the image since /5.
 
-   Budget: probably needs the full 30-min fire with one
-   fix-forward.
+   Budget: full 30-min fire, expect one fix-forward for any
+   naked BTN_* in Snake.cpp.
 
-2. **S-MP20/7b -- Smaller game first (Bonk).** If Snake.cpp
-   audit shows too many cascading deps, pick the simplest of
-   the four (Bonk and Snake are usually neck-and-neck). The
-   point of /7 is to flush out the first round of game-leaf
-   surprises; pick whichever has the fewest external deps.
+2. **S-MP20/6d -- Audit pass over the four game .cpp files.**
+   If /7 looks too risky, do a static audit: for each of
+   Snake.cpp / SpaceInvaders.cpp / Bonk.cpp / SpaceRocks.cpp,
+   list every direct include, every BTN_* / KEY_* token used,
+   and every external symbol referenced. Pick the cleanest
+   one to be /7's target.
 
-3. **S-MP20/6c -- More compile-only validation leaves.** If
-   neither game-subclass options look clean, look for other
-   src/Games/GameEngine/ files that haven't landed yet. The
-   GameEngine subsystem .cpp coverage was supposed to be
-   complete after /6, but a fresh scan of src/Games/GameEngine/
-   may surface stragglers.
+3. **S-MP20/7b -- Bonk first instead of Snake.** Bonk is
+   usually the simplest of the four; if Snake's audit shows
+   surprises, swap to Bonk.
 
 ## Helper script note carried from prior fires
 
@@ -150,17 +140,17 @@ Pick ONE of these. Roughly ordered by risk-adjusted payoff.
   recreated each fire from the brief; the new sandbox doesn't
   preserve `/home/claude/`. In this sandbox the user's home
   directory has restricted permissions and the repo lives at
-  `/sessions/<id>/repo/mp_firmware` instead. The full
-  helper-script invocation is impractical inside the 45-second
-  bash tool timeout -- poll the GitHub Actions REST API directly
-  in shorter chunks (`sleep 35 && curl .../jobs`). This fire
-  used the chunked approach: ~3 polls of 35-40s each got us
+  `/tmp/claude/repo/mp_firmware` instead. The full helper-script
+  invocation is impractical inside the 45-second bash tool
+  timeout -- poll the GitHub Actions REST API directly in
+  shorter chunks (`sleep 35 && curl .../jobs`). This fire
+  used the chunked approach: ~4 polls of 40s each got us
   past build (5-6 min) and flash (10-30s).
 * The CI workflow triggers on push automatically via the
   `mp24/**` path filter -- no manual `workflow_dispatch` needed.
 * `pyelftools` was not needed this fire (no crash to decode).
-* The repo lives at `/sessions/<id>/repo/mp_firmware`. `git
-  clone --depth 50` works fine (~25 MB).
+* The repo lives at `/tmp/claude/repo/mp_firmware`. `git
+  clone --depth 100` works fine (~25 MB).
 
 ## Open items unchanged from the brief
 
@@ -193,10 +183,12 @@ Pick ONE of these. Roughly ordered by risk-adjusted payoff.
     GameEngine subsystem .cpp coverage complete
   * /6: Highscore.cpp landed via parallel-safe SRCS add
     (commit `9b42710`)
-  * **/6b: pre-emptive InputChatter + FSLVGL stubs (commit
-    `a1817c4`) <-- THIS FIRE -- stubs the symbols Game.cpp's
-    start/stop/loop bodies reference, so /7 can land Snake
-    without a link failure**
+  * /6b: pre-emptive InputChatter + FSLVGL stubs (commit
+    `a1817c4`)
+  * **/6c: TextInput.cpp landed via parallel-safe SRCS add
+    (commit `a1b60d1`) <-- THIS FIRE -- ensures TextInput
+    symbols are resolvable when Snake's onStop() body refers
+    to them in the upcoming /7 landing**
   * /7+: four game implementations, GamesScreen wiring, dialer
 * **S-MP21** -- not started (modem hardware bring-up)
 * **S-MP22+** -- not started
