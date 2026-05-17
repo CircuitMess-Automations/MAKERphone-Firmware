@@ -110,7 +110,7 @@ void UnlockSlide::setOnArmTimeout(std::function<void()> cb){
 	onArmTimeout = std::move(cb);
 }
 
-void UnlockSlide::loop(uint32_t dt){
+void UnlockSlide::loop(uint dt){
 	float speed  = 1.0f;
 	float target = 1.0f;
 	switch(state){

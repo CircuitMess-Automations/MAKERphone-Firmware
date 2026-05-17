@@ -28,7 +28,7 @@ public:
 	void setOnArmTimeout(std::function<void()> cb);
 
 private:
-	void loop(uint32_t dt);
+	void loop(uint micros) override;
 
 	enum State {
 		Idle, Shake, Slide,
