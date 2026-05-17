@@ -66,6 +66,16 @@
 #define TFT_SILVER      0xC618
 #define TFT_SKYBLUE     0x867D
 #define TFT_VIOLET      0x915C
+/*
+ * S-MP20/4d: canonical Bodmer/TFT_eSPI sentinel value for
+ * "transparent" -- the colour key meaning "do not blit this pixel".
+ * Upstream Sprite.cpp default-initialises chromaKey to this value,
+ * GIFAnimatedSprite uses it as the clear-colour for the temp
+ * sprite during pushRotateZoomWithAA, and StaticRC.cpp passes it
+ * to drawIcon + pushRotateZoomWithAA as the maskingColor. Value is
+ * byte-for-byte from Bodmer's library.
+ */
+#define TFT_TRANSPARENT 0x0120
 #endif
 
 class TFT_eSPI {

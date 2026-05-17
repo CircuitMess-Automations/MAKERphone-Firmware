@@ -18,6 +18,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <FS.h>           /* S-MP20/4d: <File> type for drawIcon(File, ...) */
 #include <TFT_eSPI.h>
 #include <Display/Color.h>
 
@@ -67,6 +68,27 @@ public:
     void drawIcon(const Pixel *icon, int16_t x, int16_t y,
                   uint16_t width, uint16_t height,
                   uint8_t scale = 1, int32_t maskingColor = -1);
+    /* S-MP20/4d: File-backed icon blit. Upstream Sprite::drawIcon
+     * with a File argument reads RGB565 pixels straight off disk
+     * (typically SPIFFS) and blits them. In our 9C shim there is
+     * no actual blit -- the call is a no-op. Signature matches
+     * upstream Sprite.h (FS.h's `File` is forward-declared by the
+     * <FS.h> include above; the type is complete for callers
+     * that build against arduino-esp32's filesystem stack). */
+    void drawIcon(File icon, int16_t x, int16_t y,
+                  uint16_t width, uint16_t height,
+                  uint8_t scale = 1, int32_t maskingColor = -1);
+
+    /* S-MP20/4d: rotate+zoom self-blit with anti-aliasing. The
+     * real TFT_eSprite implementation pushes this sprite onto its
+     * parent (chosen at construction) with the given rotation
+     * (radians), per-axis scale, and a chroma-key for transparency.
+     * We provide a no-op for the 9C shim -- the upstream
+     * GIFAnimatedSprite + StaticRC + SpriteRC consumers compile
+     * against this signature, but the visual rendering path is
+     * silent until Decision 9A vendors real TFT_eSPI. */
+    void pushRotateZoomWithAA(int16_t x, int16_t y, float rot,
+                              float sx, float sy, uint16_t chroma);
 
     /* Centered text helpers used by IntroScreen + friends. */
     void printCenter(const char *text);

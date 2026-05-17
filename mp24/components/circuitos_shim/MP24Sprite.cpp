@@ -175,6 +175,19 @@ void Sprite::drawIcon(const unsigned short *, int16_t, int16_t,
 void Sprite::drawIcon(const Pixel *, int16_t, int16_t,
                       uint16_t, uint16_t, uint8_t, int32_t) {}
 
+/* S-MP20/4d: File-backed icon blit -- no-op shim. The real call
+ * reads RGB565 pixels off disk and writes them into the
+ * framebuffer at (x, y); for 9C the framebuffer is left
+ * untouched. Argument names suppressed since none are used. */
+void Sprite::drawIcon(File, int16_t, int16_t,
+                      uint16_t, uint16_t, uint8_t, int32_t) {}
+
+/* S-MP20/4d: pushRotateZoomWithAA -- no-op shim. Real call rotates
+ * + zooms self onto the parent sprite (set at ctor); we don't have
+ * a software rasteriser for that yet. */
+void Sprite::pushRotateZoomWithAA(int16_t, int16_t, float,
+                                  float, float, uint16_t) {}
+
 /* -------- centred text stubs -------- */
 
 void Sprite::printCenter(const char *)  {}

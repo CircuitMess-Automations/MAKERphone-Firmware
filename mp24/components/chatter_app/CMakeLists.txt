@@ -650,6 +650,26 @@ idf_component_register(
         # Compile-only validation, same pattern as the prior leaves.
         "${SRC_DIR}/Games/GameEngine/Rendering/RenderSystem.cpp"
 
+        # S-MP20/4d: StaticRC.cpp -- third Rendering leaf. Wraps a
+        # File-backed RGB565 icon at fixed dimensions; push()
+        # branches on rot == 0 to either drawIcon-direct or
+        # drawIcon-into-a-temp-Sprite-then-pushRotateZoomWithAA.
+        # External deps (each addressed by the shim diff in this
+        # commit):
+        #   - File overload of Sprite::drawIcon (added to Sprite.h
+        #     + MP24Sprite.cpp, no-op shim).
+        #   - Sprite::pushRotateZoomWithAA(x, y, rot, sx, sy, t)
+        #     (same -- declared in Sprite.h, no-op definition in
+        #     MP24Sprite.cpp).
+        #   - TFT_TRANSPARENT 0x0120 sentinel (added to TFT_eSPI.h
+        #     shim alongside the existing canonical Bodmer
+        #     palette).
+        # The TU is still gc'd at link time -- nothing in SRCS
+        # instantiates a StaticRC yet (only Game.h chain instantiates
+        # the Rendering leaves, and Game.h is not in SRCS). Compile-
+        # only validation, same pattern as the prior leaves.
+        "${SRC_DIR}/Games/GameEngine/Rendering/StaticRC.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
