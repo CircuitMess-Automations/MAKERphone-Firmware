@@ -647,6 +647,12 @@ idf_component_register(
         # available as the easy revert path.
         "screens/AppStubFactory.cpp"
 
+        # S-MP18z: factory for PhoneHomeScreen — the Sony-Ericsson
+        # silhouette homescreen, the most representative MP2.4
+        # screen we have. No navigation callbacks set, so buttons
+        # flash but don't navigate (smoke-test only).
+        "screens/HomeFactory.cpp"
+
     INCLUDE_DIRS
         # Nothing exported to other components yet. Screens will be
         # invoked from chatter_app's own entry point eventually.

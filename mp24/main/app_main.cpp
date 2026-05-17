@@ -431,25 +431,32 @@ extern "C" void app_main(void)
     } else {
         ESP_LOGI(TAG, "LVGL initialised, instantiating TestScreen");
 
-        /* S-MP18d: replaced PhoneWelcomeScreen with
-         * PhoneAppStubScreen as the boot destination. AppStubScreen
-         * is the leanest upstream screen that instantiates the
-         * universal-UI trio: PhoneSynthwaveBg wallpaper +
-         * PhoneStatusBar (top) + PhoneSoftKeyBar (bottom). Running
-         * it forces all three into the link graph and exercises
-         * them at runtime on real hardware.
+        /* S-MP18z: replaced PhoneAppStubScreen with PhoneHomeScreen
+         * as the boot destination. PhoneHomeScreen is the Sony-
+         * Ericsson-silhouette homescreen — the most representative
+         * MAKERphone 2.0 screen we have compiled. It composes the
+         * universal-UI trio (PhoneSynthwaveBg + PhoneStatusBar +
+         * PhoneSoftKeyBar) plus PhoneClockFace (running clock),
+         * plus overlay widgets (PhoneIdleHint, PhoneTipBanner,
+         * PhoneNotificationToast, PhoneYawnOverlay, PhoneChargeBars,
+         * PhoneChargingOverlay, PhoneOperatorBanner, PhoneConfetti
+         * Overlay) — basically a full Element showcase.
          *
-         * WelcomeFactory + chatter_app_start_welcome_screen stay
-         * in the build for one-line revert.
+         * No navigation callbacks are set, so soft-keys flash on
+         * press but don't actually navigate. Sufficient for a
+         * visual smoke test of the home screen.
+         *
+         * Earlier factories (Welcome / AppStub / Test) stay in
+         * the build for one-line revert.
          *
          * Order constraint: same as before — lvgl_glue_init first
          * (LVGL state ready), screen instantiation second
          * (constructor uses LVGL API on app_main task), then
          * lvgl_glue_run (LVGL task starts, processes the queued
          * screen load on its first iteration). */
-        extern void chatter_app_start_appstub_screen(void);
-        chatter_app_start_appstub_screen();
-        ESP_LOGI(TAG, "PhoneAppStubScreen instantiated + start()ed");
+        extern void chatter_app_start_home_screen(void);
+        chatter_app_start_home_screen();
+        ESP_LOGI(TAG, "PhoneHomeScreen instantiated + start()ed");
 
         /* The mp24_status_timer for the 'btn:N' counter is no
          * longer hooked to any visible widget — TestScreen owns
