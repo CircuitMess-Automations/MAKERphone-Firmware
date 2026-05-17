@@ -191,6 +191,22 @@ idf_component_register(
         # provides the public ABI as no-ops.
         "shim/MessageServiceStub.cpp"
 
+        # S-MP18j: Storage layer stub. Replaces upstream's
+        # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
+        # + PhoneContacts.cpp, none of which we list in SRCS. The
+        # stub provides Repo<T> template definitions + explicit
+        # instantiations for Friend/PhoneContact/Message/Convo,
+        # MessageRepo/ConvoRepo write/read overrides, the global
+        # Repositories Storage instance, and the 28-function
+        # PhoneContacts namespace.
+        #
+        # Why stubbed: upstream Repo.cpp pulls FS/RamFile.h, and
+        # RamFile inherits fs::FileImpl which has more pure
+        # virtuals than RamFile overrides under our toolchain
+        # (S-MP18i investigation). All-no-op semantics are correct
+        # for a fresh device with no saved messages / contacts.
+        "shim/StorageStub.cpp"
+
         # S-MP18i attempted to compile the upstream Storage chain
         # (Repo<T> + MessageRepo + ConvoRepo + PhoneContacts +
         # the RamFile dep) and confirmed the exclusion comment on
