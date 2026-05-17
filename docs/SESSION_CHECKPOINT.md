@@ -8,80 +8,94 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-18 ~22:32 UTC
-* **HEAD on `main`:** `d9968a0` (`feat(mp24): S-MP21/2 --
-  rate-limit modem boot probe log + add FAIL triage`). One
+* **Date (UTC):** 2026-05-18 ~22:55 UTC
+* **HEAD on `main`:** `c1adca8` (`feat(mp24): S-MP23/1 --
+  explicit nvs_flash_init() before Settings/Storage`). One
   feature commit, GREEN on first build with zero fix-forwards.
-* **Build status:** GREEN at HEAD `d9968a0` (run
-  `26004546942`, both `build` and `flash` jobs completed/
+* **Build status:** GREEN at HEAD `c1adca8` (run
+  `26004993323`, both `build` and `flash` jobs completed/
   success).
 * **Device boot status:** HEALTHY. boot.log scan: 0 crash
-  markers. NEW cleaner boot sequence in this fire:
+  markers (panic/guru/abort/Backtrace count = 0). Boot shape
+  unchanged from prior green baseline:
 
+      BATT: curve-fitting cal active
+      BATT: first sample: 1218 mV (1.22 V)
+      STORE:   README.txt                       919 B
+      STORE:   hello.txt                        140 B
+      STORE: sentinel hello.txt missing or unreadable
       STORE: mounted; 2 files, 1757 / 1860161 bytes used (0%)
       POWER: polling GPIO2 at 50 Hz, debounce 3 ticks
       MP24: Entering background-tasks-only loop (LVGL owns the panel).
       MODEM: state -> POWER
       MODEM: state -> BOOT
-      MODEM: boot probe... (0 s elapsed)
-      MODEM: boot probe... (5 s elapsed)
-      MODEM: boot probe... (10 s elapsed)
-      MODEM: boot probe... (15 s elapsed)
+      MODEM: boot probe... (0 s elapsed) ... (15 s elapsed)
 
-  Boot probe log dropped from ~36 lines/20s capture to 4. The
-  20 s boot capture window ends before the 30 s MODEM_FAILED
-  timeout, so the new FAIL triage hints remain latent but in
-  place. The post-READY SIM/signal/operator probes from
-  S-MP21/1 are likewise unreached -- same hardware blocker as
-  before (no SIM, modem firmware never gets to "OK").
+  The new "NVS flash initialised" log line happens BEFORE the
+  flasher's USB-CDC capture window opens (it's logged at boot
+  time ~30-200 ms in, well before the BATT line at 2.3 s), so
+  it's not visible in boot.log. Absence of crashes plus a
+  normally-progressing boot through STORE / POWER / MODEM is
+  strong evidence the NVS init runs cleanly -- a corrupt-NVS
+  path would have crashed in nvs_flash_erase / reinit or
+  surfaced ESP_ERROR_CHECK aborts.
 * **Flasher status:** ONLINE and reliable.
-* **Binary size:** unchanged within noise -- patch adds ~6
-  short ESP_LOG strings.
+* **Binary size:** +~250 B for the nvs_flash component init,
+  well within noise.
 
 ## What this fire actually shipped (net)
 
-S-MP21 has its second incremental step landed.
+S-MP23 has its foundation step landed.
 
-1. **`d9968a0` -- S-MP21/2.** Two small improvements to
-   `mp24/main/hal/modem.c` `modem_sm_task()`:
+1. **`c1adca8` -- S-MP23/1.** Explicit `nvs_flash_init()` in
+   `mp24/main/app_main.cpp` right after `initArduino()` and
+   before any other HAL bring-up.
 
-   - **Rate-limit the boot-probe log to once per 5 elapsed
-     seconds** (plus one line on entry). Previously the probe
-     loop fired `ESP_LOGI("boot probe... (N s elapsed)")` on
-     every iteration -- once per 500 ms -- yielding ~60 lines
-     of essentially identical log noise during the 30 s
-     timeout window when the modem doesn't respond. Now a
-     healthy boot.log shows at most ~7 boot-probe lines. The
-     probe rate itself stays at 500 ms; only the log line is
-     throttled. Robust against scheduler delays: uses
-     `elapsed_s >= last + 5` instead of `% 5 == 0`.
+   Discovered while preparing for the S-MP23 StorageStub.cpp ->
+   NVS-backed Repo<T> migration: `Settings.begin()` (called
+   inside `Chatter.begin()`) does `nvs_open("CircuitOS", ...)`
+   which silently fails with `ESP_ERR_NVS_NOT_INITIALIZED`
+   unless `nvs_flash_init()` has run first. arduino-esp32 v3.x
+   does NOT call it from `initArduino()` -- it deferred that
+   to Preferences::begin / WiFi.begin consumers we don't use.
+   On MP2.4 the Settings call has been a no-op since S-MP14.
 
-   - **Add a four-line triage hint on the 30 s timeout** (the
-     `MODEM_FAILED` path), pointing at the four hardware
-     checks from Q3 in `docs/MP24_OPEN_HW_QUESTIONS.md`:
-     VBAT_RF/VBAT_BB rails, PWR_KEY trace, RESET_N idle level,
-     UART1 wiring. Makes the FAIL log actionable the moment
-     it appears.
+   The fix: standard ESP-IDF idiom -- `nvs_flash_init()`, fall
+   into `nvs_flash_erase()` + reinit on `NO_FREE_PAGES` /
+   `NEW_VERSION_FOUND`, log success/failure. One INFO line on
+   the happy path, one WARN+reinit-cycle if the partition is
+   ever corrupted.
 
-   Net change: 23 insertions, 7 deletions, single file. No
-   behavior change in the happy path: when the modem responds
-   within seconds, the probe loop logs at most once before
-   exiting.
+   Also added `nvs_flash` to `mp24/main/CMakeLists.txt`
+   REQUIRES so `#include "nvs_flash.h"` resolves without
+   leaning on transitive exposure through circuitos.
 
-   Empirically verified in run `26004546942` -- boot.log
-   shrunk from 40 lines (prior fire's snapshot) to 12 lines
-   over the same 20 s capture window. Same MODEM state
-   transitions, just legible now.
+   Files: `mp24/main/app_main.cpp` (+33 -0),
+   `mp24/main/CMakeLists.txt` (+1 -0). Two-file commit.
 
-## Why this fire was uneventful
+   This is the FOUNDATION step for S-MP23 proper. The next
+   incremental commits will start replacing StorageStub's
+   `Repo<T>::add/get/all/remove/exists` no-ops with NVS-blob
+   reads/writes keyed by per-type-prefix + numeric uid (e.g.
+   `cnt_<uid>` for PhoneContact, `frd_<uid>` for Friend,
+   `msg_<uid>` for Message, `cnv_<uid>` for Convo).
 
-The prior two fires already landed the structurally big pieces:
-S-MP20 (games engine + glm + dialer wiring -- DONE) and
-S-MP21/1 (post-READY SIM/signal/operator probes). The board is
-still in the no-SIM / no-modem-response state, so neither set
-of probes has anything to surface. This fire took the obvious
-follow-up: tame the noise so the *next* hardware bring-up
-session can read the log at a glance.
+## Why this fire shipped a foundation step instead of a feature
+
+Two reasons:
+
+1. The previous fire's "what next" guidance recommended
+   pivoting to S-MP23 (StorageStub -> NVS) on the assumption
+   the modem-bring-up Q3 path stays hardware-blocked. It does
+   (boot.log still shows no AT response).
+2. Auditing the StorageStub.cpp surface area before writing
+   any NVS-backed replacements turned up the prerequisite gap:
+   the firmware was running with NVS uninitialised the whole
+   time. Fixing that first is a one-commit foundation that
+   unblocks both the Settings path (which has been a no-op
+   since S-MP14) AND the upcoming Repo<T> migration. Shipping
+   it standalone keeps the next-fire diffs focused on the
+   actual storage-layer work.
 
 ## Open hardware questions still outstanding
 
@@ -99,36 +113,26 @@ Same as before -- none resolved this fire:
 
 ## What the next fire should do
 
-Two viable paths, depending on hardware state:
+S-MP23 is now in flight -- continue it with `S-MP23/2`:
 
-1. **If the user inserts a SIM into the test device before the
-   next fire**, the new probes will reveal SIM/signal/operator
-   state in boot.log, unblocking S-MP21 proper:
-     * Confirm `AT+CPIN?` returns `READY`.
-     * Confirm `AT+CSQ` shows real RSSI (not 99).
-     * Use `AT+CMGS` / SMS path to send a test message
-       (exercises `mp24/main/hal/sms.c`).
-     * Add an `AT+COPS?` follow-up that retries every 5s
-       in a background task until registered.
+1. **S-MP23/2 -- back PhoneContacts namespace with NVS.**
+   The PhoneContacts namespace's 28 functions in
+   `mp24/components/chatter_app/shim/StorageStub.cpp` are the
+   smallest, most-bounded slice of the Storage surface: they
+   take primitives (UID_t, uint8_t, const char*, bool) keyed
+   by UID. Replace the no-op bodies with NVS reads/writes
+   under a `"pc_"` namespace (one nvs_handle, key pattern
+   `<field>_<uid>` e.g. `name_42`, `fav_42`). Keep the Repo<T>
+   templates as no-ops in this commit -- that's S-MP23/3.
 
-2. **If still no SIM** (most likely -- this is a multi-fire
-   blocker on hardware action), pivot to **S-MP23 -- replace
-   `StorageStub.cpp` with NVS-backed `Repo<T>`**. This is
-   independent of modem bring-up and a small, well-scoped
-   change:
-     * Locate `StorageStub.cpp` in `mp24/components/chatter_app/
-       shim/`.
-     * For each `Repo<T>::add/remove/forEach`, key NVS records
-       by a per-type prefix (e.g. `cnt_` for contacts) + a
-       numeric id.
-     * Confirm via a single contact-add + reset-and-reboot
-       that the entry survives.
+2. **S-MP23/3 -- back Repo<T> with NVS.** Each Friend /
+   PhoneContact / Message / Convo serialised as an NVS blob
+   keyed by `<type>_<uid>`. The all() listing maintains an
+   index blob (`idx_<type>`) containing the UID list.
+   Slightly more involved -- defer to its own fire.
 
-   Or, alternatively, **S-MP26 polish-and-verify** -- walk
-   every menu destination once in chat, compile a punch-list
-   of which downstream screens visibly render vs. which are
-   still LVGL-blank-screen stubs. Cheap, informational, and
-   informs what to prioritize in S-MP22-25.
+Alt path if a SIM gets inserted between fires: pivot back to
+S-MP21/3 (post-READY probes will surface SIM state).
 
 ## Helper script note carried from prior fires
 
@@ -136,19 +140,14 @@ Two viable paths, depending on hardware state:
   recreated each fire from the brief; the sandbox doesn't
   preserve `/home/claude/` (in fact, `/home/claude/` is not
   writable -- `mkdir: cannot create directory '/home/claude':
-  Permission denied`). The brief's `if [[ ! -d /home/claude/
-  repo/mp_firmware ]]` check therefore always fires and the
-  clone command fails on the missing parent.
-* This fire's sandbox: user was `epic-admiring-pasteur`,
-  `$HOME` was `/sessions/epic-admiring-pasteur`, and
-  `/sessions/...` was 100% full again (9.8G/9.8G -- it
-  appears to be a shared filesystem across all parallel
-  sessions). Even `mkdir` inside `$HOME` fails on it.
-  `/tmp/` (the root-FS tmp) was owned by `nobody` from
-  a previous session and not writable for this user.
-  The writable scratch path used was `/var/tmp/` (885 MB
-  free under `/`). The repo cloned to
-  `/var/tmp/claude/repo/mp_firmware/` (16 MB).
+  Permission denied`).
+* This fire's sandbox: user was `magical-inspiring-mayer`,
+  `$HOME` was `/sessions/magical-inspiring-mayer`, and
+  `/sessions/...` was 100% full again (9.8G/9.8G -- shared
+  across parallel sessions). Even `mkdir` inside `$HOME`
+  fails. The writable scratch path used was
+  `/tmp/mp24-${USER}/repo/mp_firmware/`, with the root FS
+  having 859 MB free.
 * As before, the bash tool's 45-second timeout makes the
   helper scripts impractical to run end-to-end in one call;
   this fire used the chunked GH API approach (poll jobs every
@@ -158,4 +157,3 @@ Two viable paths, depending on hardware state:
   `mp24/**` / `src/**` path filter -- no manual
   `workflow_dispatch` is needed for code changes. Docs-only
   commits (like this checkpoint) do NOT trigger a build.
-
