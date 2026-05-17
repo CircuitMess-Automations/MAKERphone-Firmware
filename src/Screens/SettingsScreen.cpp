@@ -451,7 +451,7 @@ SettingsScreen::SettingsScreen() : LVScreen(){
 			nvs_flash_erase();
 			Settings.reset();
 			Chatter.fadeOut();
-			ledcDetachPin(PIN_BUZZ);
+			ledcDetach(PIN_BUZZ);
 			ESP.restart();
 		}, EV_PROMPT_YES, nullptr);
 		prompt->start();

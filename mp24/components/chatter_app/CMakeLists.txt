@@ -229,6 +229,15 @@ idf_component_register(
         "${SRC_DIR}/Services/PhoneMusicPlaylists.cpp"
         "${SRC_DIR}/Services/BuzzerService.cpp"
 
+        # S-MP18w: 5 independent services + 8 Elements with
+        # clean deps. Unblocks the alarm/call/composer/dialer/
+        # home-screen cluster of screens in subsequent commits.
+        "${SRC_DIR}/Services/MissedCallLog.cpp"
+        "${SRC_DIR}/Services/PhoneRingtoneLibrary.cpp"
+        "${SRC_DIR}/Services/PhoneVibrationEngine.cpp"
+        "${SRC_DIR}/Services/PhoneVibrationLibrary.cpp"
+        "${SRC_DIR}/Services/PhoneVirtualPet.cpp"
+
         # S-MP18m: services + modals + elements that compile
         # cleanly now that LoRaService is stubbed. ProfileService
         # is the canary — its .cpp does `#include "LoRaService.h"`
@@ -321,6 +330,21 @@ idf_component_register(
         "${SRC_DIR}/Elements/PhoneT9Input.cpp"
         "${SRC_DIR}/Elements/EmojiMenu.cpp"
         "${SRC_DIR}/Elements/NotificationElement.cpp"
+
+        # S-MP18w (continued): 8 Elements with clean deps. Unblock
+        # PhoneHangman / PhoneWordle (T9Vocab), PhoneMainMenu
+        # (MenuGrid), PhoneDialerScreen (DialerPad — though that
+        # screen is still gated on Games), LockScreen + PhoneHomeScreen
+        # (ChargeBars, ConfettiOverlay, OperatorBanner, YawnOverlay,
+        # UnlockSlide).
+        "${SRC_DIR}/Elements/PhoneT9Vocab.cpp"
+        "${SRC_DIR}/Elements/PhoneMenuGrid.cpp"
+        "${SRC_DIR}/Elements/PhoneDialerPad.cpp"
+        "${SRC_DIR}/Elements/PhoneChargeBars.cpp"
+        "${SRC_DIR}/Elements/UnlockSlide.cpp"
+        "${SRC_DIR}/Elements/PhoneOperatorBanner.cpp"
+        "${SRC_DIR}/Elements/PhoneConfettiOverlay.cpp"
+        "${SRC_DIR}/Elements/PhoneYawnOverlay.cpp"
 
         # The original ProfileScreen target — compiles after all
         # the above land. Pulls ProfileService (just added) +
