@@ -59,6 +59,8 @@
  * state we have today. Persistence work lands later.
  */
 
+#include "nvs.h"
+#include <cstring>
 #include "Storage/Storage.h"
 #include "Storage/Repo.h"
 #include "Storage/MessageRepo.h"
@@ -227,62 +229,349 @@ void Repositories::begin()
 }
 
 /* ------------------------------------------------------------------
- * PhoneContacts namespace — 28 functions, all no-ops.
+ * PhoneContacts namespace — NVS-backed implementation (S-MP23/2).
  *
- * Header in src/Storage/PhoneContacts.h declares each. Most are
- * either getters (return default) or mutators (return false).
+ * Replaces the previous all-no-op stub. Records live in NVS under
+ * the "pc" namespace, one blob per contact (the full PhoneContact
+ * struct). The key is a 14-byte base32-encoded UID ('c' prefix +
+ * 13 base32 chars = 14 chars, well under NVS_KEY_NAME_MAX_SIZE=15
+ * usable). The Repo<PhoneContact> template stays a no-op — the
+ * upstream PhoneContacts.cpp implementation goes through
+ * Storage.PhoneContacts.exists/get/add/update/remove (Repo<T>),
+ * but in this shim the namespace skips Repo<T> entirely and talks
+ * to NVS directly. S-MP23/3 will fold the Repo<T> templates onto
+ * the same backing store + add a UID index for all().
+ *
+ * Header in src/Storage/PhoneContacts.h declares each function.
+ * Semantics match upstream: getters return defaults / fallbacks
+ * when no record is stored, setters read-modify-write the record
+ * and persist on every call. Flag bits (ContactFlag_*) decide
+ * whether a stored field is "set" or just zero-initialised.
+ *
+ * NVS commit policy: every mutator commits immediately so a power
+ * loss right after a successful return preserves the change. The
+ * record is tiny (~40 B) so the write amplification is fine.
  * ------------------------------------------------------------------ */
+
+namespace {
+
+// NVS namespace where every PhoneContact blob lives.
+constexpr const char *kPCNamespace = "pc";
+
+// Encode a 64-bit UID into a 14-char NVS key: 'c' + 13 base32 chars
+// covering all 65 bits worth of input (we waste 1 bit; fine). Keys
+// must fit in NVS_KEY_NAME_MAX_SIZE-1 = 15 chars, so 14 leaves
+// plenty of headroom for future prefix changes.
+static void uidToKey(UID_t uid, char out[16])
+{
+    static const char alphabet[] = "0123456789abcdefghijklmnopqrstuv"; // base32
+    out[0] = 'c';
+    for (int i = 0; i < 13; ++i) {
+        unsigned shift = i * 5;
+        out[1 + (12 - i)] = alphabet[(uid >> shift) & 0x1F];
+    }
+    out[14] = '\0';
+}
+
+// Try to read the record for `uid` into `out`. Returns true on
+// successful read AND when the stored uid matches the requested
+// one (defensive in case of a hypothetical hash collision down
+// the road). Opens nvs in READONLY; doesn't auto-create the
+// namespace if it doesn't exist yet (callers handle the empty
+// case the same way they handled the all-no-op stub).
+static bool loadRecord(UID_t uid, PhoneContact &out)
+{
+    nvs_handle_t h;
+    if (nvs_open(kPCNamespace, NVS_READONLY, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    uidToKey(uid, key);
+    size_t sz = sizeof(PhoneContact);
+    esp_err_t err = nvs_get_blob(h, key, &out, &sz);
+    nvs_close(h);
+    if (err != ESP_OK || sz != sizeof(PhoneContact)) {
+        return false;
+    }
+    if (out.uid != uid) {
+        // Defensive: stored blob's uid disagrees with the lookup
+        // key. Treat as missing rather than returning bogus data.
+        return false;
+    }
+    return true;
+}
+
+// Write `c` to NVS keyed by c.uid. Opens nvs in READWRITE (which
+// creates the namespace on first call) and commits immediately
+// so a crash right after the function returns preserves the
+// change.
+static bool saveRecord(const PhoneContact &c)
+{
+    nvs_handle_t h;
+    if (nvs_open(kPCNamespace, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    uidToKey(c.uid, key);
+    esp_err_t err = nvs_set_blob(h, key, &c, sizeof(PhoneContact));
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    return err == ESP_OK;
+}
+
+static bool eraseRecord(UID_t uid)
+{
+    nvs_handle_t h;
+    if (nvs_open(kPCNamespace, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    uidToKey(uid, key);
+    esp_err_t err = nvs_erase_key(h, key);
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    // NOT_FOUND is treated as success — the contract is "record is
+    // gone after this call", which is already the case if it was
+    // never written.
+    return err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND;
+}
+
+}  // anonymous namespace
 
 namespace PhoneContacts {
 
 PhoneContact getOrDefault(UID_t uid)
 {
     PhoneContact c{};
+    if (loadRecord(uid, c)) {
+        return c;
+    }
+    c = PhoneContact{};
     c.uid = uid;
     return c;
 }
 
-bool exists(UID_t /*uid*/)              { return false; }
-bool upsert(const PhoneContact &)       { return false; }
-bool remove(UID_t /*uid*/)              { return false; }
-
-const char *displayNameOf(UID_t /*uid*/) { return ""; }
-uint8_t avatarSeedOf(UID_t /*uid*/)      { return 0; }
-uint8_t ringtoneOf(UID_t /*uid*/)        { return 0; }
-
-bool setDisplayName(UID_t, const char *) { return false; }
-bool clearDisplayName(UID_t)             { return false; }
-bool setAvatarSeed(UID_t, uint8_t)       { return false; }
-bool setRingtone(UID_t, uint8_t)         { return false; }
-bool setFavorite(UID_t, bool)            { return false; }
-bool setMuted(UID_t, bool)               { return false; }
-bool setGroup(UID_t, uint8_t)            { return false; }
-
-bool isFavorite(UID_t)                   { return false; }
-bool isMuted(UID_t)                      { return false; }
-
-bool markInteraction(UID_t)              { return false; }
-bool markInteractionAt(UID_t, uint32_t)  { return false; }
-
-bool setBirthday(UID_t, uint8_t, uint8_t)        { return false; }
-bool clearBirthday(UID_t)                        { return false; }
-bool hasBirthday(UID_t)                          { return false; }
-bool birthdayOf(UID_t, uint8_t *outMonth, uint8_t *outDay)
+bool exists(UID_t uid)
 {
-    if (outMonth) *outMonth = 0;
-    if (outDay)   *outDay   = 0;
-    return false;
+    PhoneContact c{};
+    return loadRecord(uid, c);
 }
 
-bool setWallpaper(UID_t, uint8_t)        { return false; }
-bool clearWallpaper(UID_t)               { return false; }
-bool hasWallpaper(UID_t)                 { return false; }
-uint8_t wallpaperOf(UID_t)               { return 0; }
+bool upsert(const PhoneContact &contact)
+{
+    return saveRecord(contact);
+}
+
+bool remove(UID_t uid)
+{
+    // Upstream returns false if the record never existed. Match
+    // that semantics so callers that branch on the return value
+    // (e.g. "did we actually delete something?") keep working.
+    PhoneContact tmp{};
+    if (!loadRecord(uid, tmp)) return false;
+    return eraseRecord(uid);
+}
+
+const char *displayNameOf(UID_t uid)
+{
+    static char scratch[DisplayNameMax + 1] = {0};
+    PhoneContact c{};
+    if (loadRecord(uid, c) &&
+        (c.flags & ContactFlag_HasDisplayName) &&
+        c.displayName[0] != 0) {
+        strncpy(scratch, c.displayName, DisplayNameMax);
+        scratch[DisplayNameMax] = 0;
+        return scratch;
+    }
+    // No Friend fallback in the shim — Storage.Friends is still
+    // the no-op Repo<Friend>, so the upstream "fall back to
+    // f.profile.nickname" branch would always miss. Return empty
+    // string for now; callers that want a placeholder ("Contact")
+    // should layer it on themselves. S-MP23/3 will restore the
+    // Friend fallback once Repo<Friend> is NVS-backed too.
+    return "";
+}
+
+uint8_t avatarSeedOf(UID_t uid)
+{
+    PhoneContact c{};
+    if (loadRecord(uid, c) && (c.flags & ContactFlag_HasAvatarSeed)) {
+        return c.avatarSeed;
+    }
+    return deriveSeed(uid);
+}
+
+uint8_t ringtoneOf(UID_t uid)
+{
+    PhoneContact c{};
+    if (loadRecord(uid, c)) {
+        return c.ringtoneId;
+    }
+    return 0;
+}
+
+bool setDisplayName(UID_t uid, const char *name)
+{
+    if (name == nullptr) return false;
+    PhoneContact c = getOrDefault(uid);
+    strncpy(c.displayName, name, sizeof(c.displayName) - 1);
+    c.displayName[sizeof(c.displayName) - 1] = 0;
+    c.flags |= ContactFlag_HasDisplayName;
+    return saveRecord(c);
+}
+
+bool clearDisplayName(UID_t uid)
+{
+    PhoneContact c{};
+    if (!loadRecord(uid, c)) return true;  // nothing to clear
+    memset(c.displayName, 0, sizeof(c.displayName));
+    c.flags &= ~ContactFlag_HasDisplayName;
+    return saveRecord(c);
+}
+
+bool setAvatarSeed(UID_t uid, uint8_t seed)
+{
+    PhoneContact c = getOrDefault(uid);
+    c.avatarSeed = seed;
+    c.flags |= ContactFlag_HasAvatarSeed;
+    return saveRecord(c);
+}
+
+bool setRingtone(UID_t uid, uint8_t ringtoneId)
+{
+    PhoneContact c = getOrDefault(uid);
+    c.ringtoneId = ringtoneId;
+    return saveRecord(c);
+}
+
+bool setFavorite(UID_t uid, bool favorite)
+{
+    PhoneContact c = getOrDefault(uid);
+    c.favorite = favorite ? 1 : 0;
+    return saveRecord(c);
+}
+
+bool setMuted(UID_t uid, bool muted)
+{
+    PhoneContact c = getOrDefault(uid);
+    if (muted) c.flags |= ContactFlag_Muted;
+    else       c.flags &= ~ContactFlag_Muted;
+    return saveRecord(c);
+}
+
+bool setGroup(UID_t uid, uint8_t group)
+{
+    PhoneContact c = getOrDefault(uid);
+    c.group = group;
+    return saveRecord(c);
+}
+
+bool isFavorite(UID_t uid)
+{
+    PhoneContact c{};
+    return loadRecord(uid, c) && c.favorite != 0;
+}
+
+bool isMuted(UID_t uid)
+{
+    PhoneContact c{};
+    return loadRecord(uid, c) && (c.flags & ContactFlag_Muted) != 0;
+}
+
+bool markInteraction(UID_t uid)
+{
+    return markInteractionAt(uid, millis());
+}
+
+bool markInteractionAt(UID_t uid, uint32_t timestamp)
+{
+    PhoneContact c = getOrDefault(uid);
+    c.lastInteraction = timestamp;
+    return saveRecord(c);
+}
+
+bool setBirthday(UID_t uid, uint8_t month, uint8_t day)
+{
+    if (month < 1 || month > 12) return false;
+    if (day   < 1 || day   > 31) return false;
+    PhoneContact c = getOrDefault(uid);
+    c.birthdayMonth = month;
+    c.birthdayDay   = day;
+    c.flags |= ContactFlag_HasBirthday;
+    return saveRecord(c);
+}
+
+bool clearBirthday(UID_t uid)
+{
+    PhoneContact c{};
+    if (!loadRecord(uid, c)) return true;  // nothing to clear
+    c.birthdayMonth = 0;
+    c.birthdayDay   = 0;
+    c.flags &= ~ContactFlag_HasBirthday;
+    return saveRecord(c);
+}
+
+bool hasBirthday(UID_t uid)
+{
+    PhoneContact c{};
+    if (!loadRecord(uid, c)) return false;
+    if ((c.flags & ContactFlag_HasBirthday) == 0) return false;
+    if (c.birthdayMonth < 1 || c.birthdayMonth > 12) return false;
+    if (c.birthdayDay   < 1 || c.birthdayDay   > 31) return false;
+    return true;
+}
+
+bool birthdayOf(UID_t uid, uint8_t *outMonth, uint8_t *outDay)
+{
+    if (!hasBirthday(uid)) return false;
+    PhoneContact c{};
+    if (!loadRecord(uid, c)) return false;
+    if (outMonth != nullptr) *outMonth = c.birthdayMonth;
+    if (outDay   != nullptr) *outDay   = c.birthdayDay;
+    return true;
+}
+
+bool setWallpaper(UID_t uid, uint8_t styleByte)
+{
+    PhoneContact c = getOrDefault(uid);
+    c.wallpaperStyle = styleByte;
+    c.flags |= ContactFlag_HasWallpaper;
+    return saveRecord(c);
+}
+
+bool clearWallpaper(UID_t uid)
+{
+    PhoneContact c{};
+    if (!loadRecord(uid, c)) return true;  // nothing to clear
+    c.wallpaperStyle = 0;
+    c.flags &= ~ContactFlag_HasWallpaper;
+    return saveRecord(c);
+}
+
+bool hasWallpaper(UID_t uid)
+{
+    PhoneContact c{};
+    if (!loadRecord(uid, c)) return false;
+    return (c.flags & ContactFlag_HasWallpaper) != 0;
+}
+
+uint8_t wallpaperOf(UID_t uid)
+{
+    PhoneContact c{};
+    if (loadRecord(uid, c) && (c.flags & ContactFlag_HasWallpaper)) {
+        return c.wallpaperStyle;
+    }
+    return 0;
+}
 
 uint8_t deriveSeed(UID_t uid)
 {
     /* Small deterministic hash so PhonePixelAvatar gets a stable
-     * visual per UID even in stub mode. Mirrors upstream's
+     * visual per UID even with no override. Mirrors upstream's
      * fold-and-xor pattern without depending on any persistence. */
     uint64_t x = static_cast<uint64_t>(uid);
     x ^= x >> 33;

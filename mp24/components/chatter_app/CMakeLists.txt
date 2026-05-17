@@ -1240,6 +1240,7 @@ idf_component_register(
         lvgl__lvgl               # <lvgl.h>
         circuitos                # <Loop/LoopManager.h>, <Input/...>
         log
+        nvs_flash                # S-MP23/2: NVS-backed PhoneContacts in StorageStub.cpp
 )
 
 # Soften a few warnings that are pervasive in the legacy code and
