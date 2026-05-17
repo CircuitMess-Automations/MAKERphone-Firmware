@@ -916,6 +916,48 @@ idf_component_register(
         "${SRC_DIR}/Games/Invaders/Star.cpp"
         "${SRC_DIR}/Games/Invaders/SpaceInvaders.cpp"
 
+        # S-MP20/9b: third game implementation lands -- Bonk
+        # (Pong) -- with its four state-machine helpers
+        # (State.cpp + TitleState.cpp + GameState.cpp +
+        # PauseState.cpp). Audit found two net-new transitive
+        # deps vs. Snake / SpaceInvaders:
+        #
+        #   - Pong/GameState.cpp calls
+        #       display->setTextWrap(false, false);
+        #     which is the LovyanGFX 2-arg shape; the shim
+        #     addition in /9a (Sprite::setTextWrap overloads)
+        #     closes the gap.
+        #
+        #   - Pong/GameState.cpp + Pong/TitleState.cpp have a
+        #     vestigial '#include <SD.h>' (unused); the empty
+        #     <SD.h> in /9a (circuitos_shim/include/SD.h)
+        #     resolves it.
+        #
+        # State.cpp is a single-line TU (~50 bytes) for the
+        # base-class dtor. State.hpp is header-only and pulled
+        # by every Pong/.cpp via the Bonk namespace.
+        #
+        # Bonk's Game-class API surface is a strict subset of
+        # Snake's (Game ctor with empty resource list, pop(),
+        # Audio.play({chirps}) via the protected ChirpSystem
+        # member), so the Game.cpp + GameSystem.cpp + Highscore.cpp
+        # + TextInput.cpp scaffolding from /5 + /6 + /6c covers
+        # the engine path without further additions.
+        #
+        # bonk_title.hpp is a header-only PROGMEM bitmap; not
+        # a TU.
+        #
+        # No instantiation site for Bonk in the in-SRCS set
+        # yet -- the GamesScreen wiring lands in /11 + /12 --
+        # so --gc-sections drops all five Pong TUs at link time.
+        # Expected binary delta: 0 bytes. Compile-and-link
+        # validation only.
+        "${SRC_DIR}/Games/Pong/State.cpp"
+        "${SRC_DIR}/Games/Pong/TitleState.cpp"
+        "${SRC_DIR}/Games/Pong/GameState.cpp"
+        "${SRC_DIR}/Games/Pong/PauseState.cpp"
+        "${SRC_DIR}/Games/Pong/Bonk.cpp"
+
         # S-MP20/6b: pre-emptive Game.cpp runtime stubs.
         # Defines the symbols Game.cpp's start() / stop() / loop()
         # bodies reference -- InputChatter::getInputInstance() and
