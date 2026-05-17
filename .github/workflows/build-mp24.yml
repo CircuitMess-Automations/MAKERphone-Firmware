@@ -5,11 +5,15 @@ on:
     branches: [ master, main ]
     paths:
       - 'mp24/**'
+      - 'src/**'
+      - 'libraries/Chatter-Library/**'
       - '.github/workflows/build-mp24.yml'
   pull_request:
     branches: [ master, main ]
     paths:
       - 'mp24/**'
+      - 'src/**'
+      - 'libraries/Chatter-Library/**'
       - '.github/workflows/build-mp24.yml'
   workflow_dispatch:
 
