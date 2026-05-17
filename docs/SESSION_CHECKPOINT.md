@@ -8,18 +8,15 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-17 ~18:35-18:47
-* **HEAD on `main`:** `75174b4` (`fix(build): S-MP20/8b/1 -- soften
-  -Werror=sequence-point for SpaceInvaders.cpp`). This fire shipped
-  THREE commits, all on `main`:
-    - `b4b92c4` -- fix(mp24): S-MP20/8a -- shim TFT_eSPI gains
-      TomThumb / GFXfont / setFreeFont + 7-arg drawBitmap.
-    - `4c2f416` -- feat(mp24): S-MP20/8b -- add Star.cpp +
-      SpaceInvaders.cpp to chatter_app SRCS. (Build initially RED
-      with one error.)
-    - `75174b4` -- fix(build): S-MP20/8b/1 -- soften
-      -Werror=sequence-point for SpaceInvaders.cpp. **GREEN.**
-* **Build status:** GREEN at HEAD `75174b4` (run `25999482601`,
+* **Date (UTC):** 2026-05-17 ~18:52-19:02
+* **HEAD on `main`:** `1eeb9d0` (`feat(mp24): S-MP20/9b -- land
+  Bonk (Pong) + four state TUs in SRCS`). This fire shipped TWO
+  commits, both on `main`, both clean on the first build:
+    - `b819c86` -- feat(mp24): S-MP20/9a -- shim Sprite
+      setTextWrap(bool,bool) + empty SD.h.
+    - `1eeb9d0` -- feat(mp24): S-MP20/9b -- land Bonk (Pong) +
+      four state TUs in SRCS. **GREEN on the first push.**
+* **Build status:** GREEN at HEAD `1eeb9d0` (run `25999786525`,
   both `build` and `flash` jobs completed/success).
 * **Device boot status:** HEALTHY. boot.log scan: 0 crash markers.
   Same boot sequence as prior fires' green HEADs:
@@ -31,113 +28,138 @@ does not consume a build.
 
 * **Flasher status:** ONLINE and reliable.
 * **Binary size:** `makerphone_mp24.bin` is **883,408 bytes** at
-  HEAD `75174b4` -- EXACTLY UNCHANGED from prior fire's `a561c51`
-  (883,408). Both Snake.cpp and SpaceInvaders.cpp TUs compile +
-  link but --gc-sections drops them at link time because no in-
-  SRCS instantiation site references their symbols yet. Binary
-  delta as predicted: 0 bytes.
+  HEAD `1eeb9d0` -- EXACTLY UNCHANGED from `75174b4` and `a561c51`.
+  Snake / SpaceInvaders / Bonk TUs all compile + link but
+  --gc-sections drops them at link time because no in-SRCS
+  instantiation site references their symbols yet. Binary delta
+  as predicted: 0 bytes.
 
 ## What this fire actually shipped (net)
 
-Three commits, all GREEN at the final HEAD:
+Two commits, both GREEN at the final HEAD (no fix-forwards):
 
-1. **`b4b92c4` -- S-MP20/8a.** Pre-emptive shim additions to
-   prepare for SpaceInvaders.cpp landing. Added to
-   `mp24/components/circuitos_shim/include/TFT_eSPI.h`:
-     * `struct GFXglyph {};` and `struct GFXfont {};` empty
-       Adafruit-GFX-shaped stubs.
-     * `inline constexpr GFXfont TomThumb{};` at namespace scope
-       (C++17 external-linkage pattern, mirrors `fonts::Font0`).
-     * `void setFreeFont(const GFXfont*)` no-op on `TFT_eSPI`
-       (inherited into `TFT_eSprite`, then `Sprite`).
-     * 7-arg `drawBitmap(x, y, bitmap, w, h, color, scale)`
-       overload on `TFT_eSprite` -- matches SpaceInvaders's
-       helper signature exactly.
-   All four additions are DEAD until /8b lands; binary delta 0.
-   Build + flash green.
+1. **`b819c86` -- S-MP20/9a.** Pre-emptive shim additions to
+   prepare for Bonk landing. Two surface-level additions, both
+   driven by an audit of `src/Games/Pong/{Bonk,State,TitleState,
+   GameState,PauseState}.{h,cpp}`:
 
-2. **`4c2f416` -- S-MP20/8b.** Added
-   `"${SRC_DIR}/Games/Invaders/Star.cpp"` and
-   `"${SRC_DIR}/Games/Invaders/SpaceInvaders.cpp"` to the
-   chatter_app SRCS list, immediately after Snake.cpp in the
-   Games section. **Build FAILED** with ONE error at
-   SpaceInvaders.cpp:486 -- `-Werror=sequence-point` flagged the
-   line `invaderframe[invaderctr] = ++invaderframe[invaderctr] %
-   2;` (writes same lvalue twice between sequence points).
+     * Added two-arg `Sprite::setTextWrap(bool wrap_x, bool wrap_y)`
+       (plus a one-arg form for completeness) as no-op overloads in
+       `mp24/components/circuitos_shim/include/Display/Sprite.h`.
+       Pong/GameState.cpp line 82 calls
+       `display->setTextWrap(false, false)` -- the LovyanGFX 2-arg
+       shape. Real Bodmer/TFT_eSPI exposes only a 1-arg form;
+       LovyanGFX added the per-axis variant. Same dead-method
+       pattern as the rest of the LovyanGFX text API stubs landed
+       in /6d.
 
-3. **`75174b4` -- S-MP20/8b/1 (fix-forward).** Diagnosis: classic
-   gcc -Wsequence-point UB pattern in upstream code; the original
-   Chatter toolchain didn't promote it to an error. Fix: added
-   `-Wno-error=sequence-point` to the `target_compile_options`
-   list in `mp24/components/chatter_app/CMakeLists.txt`,
-   following the same softening pattern as /4/1
-   (`-Wno-error=unused-local-typedefs` for CollisionSystem.cpp).
-   Build + flash GREEN. **SpaceInvaders.cpp's TU is now in the
-   binary**, but --gc-sections still drops it because no
-   instantiation site exists yet. Binary size unchanged at
+     * Added empty `mp24/components/circuitos_shim/include/SD.h`
+       header. Pong/GameState.cpp + Pong/TitleState.cpp have a
+       vestigial `#include <SD.h>` carried over from the original
+       Chatter codebase -- but neither TU references any SD-
+       related symbol. The `SD` global is never touched, no
+       `SD.begin()` / `SD.open()` calls exist. The include is
+       dead weight; an empty shim header resolves it without
+       requiring an upstream patch. The `SD` global is
+       intentionally absent so any latent caller will fail loud
+       at link time rather than silently mis-routing.
+
+   Both additions are DEAD until /9b lands; binary delta 0.
+   Build + flash + boot all GREEN.
+
+2. **`1eeb9d0` -- S-MP20/9b.** Added five Pong/.cpp files to
+   chatter_app SRCS, immediately after SpaceInvaders.cpp in the
+   Games section:
+
+     * `${SRC_DIR}/Games/Pong/State.cpp`        (~1 line: base dtor)
+     * `${SRC_DIR}/Games/Pong/TitleState.cpp`   (~60 LOC)
+     * `${SRC_DIR}/Games/Pong/GameState.cpp`    (~175 LOC)
+     * `${SRC_DIR}/Games/Pong/PauseState.cpp`   (~50 LOC)
+     * `${SRC_DIR}/Games/Pong/Bonk.cpp`         (~70 LOC)
+
+   Build GREEN on the first push. Bonk.cpp's Game subclass API
+   surface is a strict subset of Snake's (Game ctor with empty
+   resource list, pop(), Audio.play({chirps}) through the
+   protected ChirpSystem member), so the Game.cpp + GameSystem.cpp
+   + Highscore.cpp + TextInput.cpp scaffolding from /5 + /6 + /6c
+   covers the engine path with no further additions. All five
+   Pong TUs compile + link + gc-section'd; binary unchanged at
    883,408 bytes.
 
-## Why this fire could finish /8 cleanly
+## Why this fire could finish /9 cleanly in one push
 
-The 30-minute fire budget was enough for three CI cycles (~3-5
-min build each + ~30s flash + 20s boot capture, ~6-8 min per
-cycle). The audit-first approach paid off: I read SpaceInvaders.h
-+ Snake.h side-by-side and observed their #include sets are
-IDENTICAL, so the only new transitive deps were the local
-`Star.h`/`Star.cpp` pair and a handful of new API calls that the
-Snake shim work hadn't touched (TomThumb / setFreeFont / 7-arg
-drawBitmap). The single build error in /8b was a 1-line UB
-pattern with a well-known softening recipe, so /8b/1 was a
-1-line fix-forward.
+The 30-minute fire budget covered one CI cycle (~6 min total --
+3-4 min build, ~30s flash, 20s boot capture, ~1 min artifact
+download) with plenty of head room. The audit-first approach
+identified the entire delta in ~5 minutes of Reading:
+
+  * Bonk.h / Bonk.cpp / GameState.cpp / TitleState.cpp /
+    PauseState.cpp / State.{hpp,cpp} -- read end-to-end.
+  * Diffed include sets vs Snake.h / SpaceInvaders.h -- only
+    two net-new transitive deps surfaced.
+  * Cross-checked every `display->...` method call against the
+    existing shim Sprite.h -- one missing overload.
+  * Confirmed `<SD.h>` was unused (zero references to the `SD`
+    symbol in any Bonk file).
+
+Three of four games are now in SRCS. SpaceRocks is the last
+remaining game (S-MP20/10).
 
 ## What the next fire should do
 
-**S-MP20/9 -- third game implementation lands: Bonk (Pong).**
+**S-MP20/10 -- fourth game implementation lands: SpaceRocks
+(Asteroids).**
 
-Two of four games are now in SRCS. Recipe is established:
+Files at `src/Games/Space/`:
+  * `Player.h` + `Player.cpp` (~25 LOC -- player class)
+  * `SpaceRocks.h` (~3.5 KB) + `SpaceRocks.cpp` (~12.6 KB) --
+    main Game subclass
 
-1. **Audit `src/Games/Pong/Bonk.{h,cpp}`** (the upstream codename
-   appears to be "Bonk" per the roadmap, but the directory is
-   `src/Games/Pong/`). Compare its `#include` set to Snake.h /
-   SpaceInvaders.h to identify net-new transitive deps. Likely
-   smaller than SpaceInvaders since Pong is simpler.
-2. **Audit `baseSprite->...` method calls** in Bonk.cpp.
-   Anything not already on the shim Sprite / TFT_eSprite needs a
-   no-op stub.
-3. **Audit `setFreeFont(&XXX)` etc. for unfamiliar font symbols.**
-   If Bonk uses a different font than TomThumb / fonts::Font0 /
-   fonts::Font2, add the symbol to the shim TFT_eSPI as another
-   `inline constexpr GFXfont`.
-4. **Audit -Wsequence-point and similar warnings-as-errors.** If
-   Bonk has analogous UB patterns, the soften list in
-   chatter_app/CMakeLists.txt may need another entry.
-5. **First commit** (`/9a`): all shim additions (DEAD until /9b).
-6. **Second commit** (`/9b`): add Bonk.cpp + any helper .cpp's
-   to chatter_app SRCS. Compile-and-link validation only; binary
+Recipe (now fully established by /7f3, /8b, /9):
+
+1. **Audit `src/Games/Space/{Player,SpaceRocks}.{h,cpp}`** vs
+   Snake / SpaceInvaders / Bonk. Read every `#include` and
+   compare to the shim coverage we already have. Asteroids
+   likely uses the same baseSprite drawing surface as Bonk
+   (fillRect / drawString / drawBitmap) plus possibly
+   `drawCircle` for the player ship or asteroids -- which is
+   already on the shim.
+2. **Audit any `setFreeFont(&XXX)` for unfamiliar font symbols.**
+   If SpaceRocks uses a font beyond `TomThumb` / `fonts::Font0`
+   / `fonts::Font2`, add an inline constexpr GFXfont stub.
+3. **Audit warnings-as-errors triggers.** Eyeball SpaceRocks.cpp
+   for any obvious UB patterns (++x % 2 on the same lvalue, etc.)
+   that might re-trip a different warning than the ones we've
+   already softened.
+4. **First commit (`/10a`):** all shim additions (DEAD until
+   /10b). If the audit reveals zero gaps, this commit can be
+   skipped entirely.
+5. **Second commit (`/10b`):** add Player.cpp + SpaceRocks.cpp
+   to chatter_app SRCS. Compile + link validation only; binary
    delta should be 0 because no instantiation site.
-7. If a fix-forward is needed for `/9b`, use commit suffix `/9b/1`
-   etc. -- limit to THREE fix-forwards before reverting (per the
-   brief's hard rule).
 
-If /9 lands cleanly, **S-MP20/10** is SpaceRocks (`src/Games/
-Space/`). Same recipe. After SpaceRocks, all four games are in
-SRCS and we move on to **S-MP20/11** -- adding GamesScreen.cpp +
-PhoneGamesScreen.cpp to SRCS. /11 is the moment --gc-sections
-stops dropping the game TUs (because GamesScreen instantiates
-them) and the binary grows by ~20-60 KB.
+If /10 lands cleanly, **S-MP20/11** is the moment --gc-sections
+stops dropping the game TUs. /11 adds GamesScreen.cpp +
+PhoneGamesScreen.cpp to SRCS, which instantiate each game in
+their switch cases, and the binary grows by an estimated
+~20-60 KB (4 games x ~5-15 KB each).
 
 **S-MP20/12** wires `PhoneMainMenu`'s Games tile to push the
 GamesScreen instance, and `PhoneHomeScreen::setOnLeftSoftKey` to
 push a new `PhoneDialerScreen`. After /12, S-MP20 is done and we
 move on to S-MP21 (modem hardware bring-up).
 
-### Alternative path
+### Alternative path if /10 hits trouble
 
-If Bonk surfaces something nasty (e.g. a missing FileSystem or
-Highscore-persistence requirement), the next fire can skip to:
-  * **S-MP20/10** -- try SpaceRocks next (likely simpler than
-    Bonk if Bonk has a network-multiplayer Chatter dependency).
-  * **S-MP21** -- jump ahead to modem hardware bring-up.
+If SpaceRocks surfaces something nasty (e.g. a missing
+ResourceManager-backed asset load, an unfamiliar networking
+hook, or a runtime dependency on a feature that's still stubbed),
+the next fire can:
+  * Skip to **S-MP21** -- modem hardware bring-up, which is the
+    next session in the roadmap and is decoupled from games-engine
+    work; or
+  * Revert /10 and document the blocker in this checkpoint for
+    later investigation.
 
 ## Helper script note carried from prior fires
 
@@ -146,11 +168,10 @@ Highscore-persistence requirement), the next fire can skip to:
   preserve `/home/claude/` (in fact, `/home/claude/` is not even
   writable -- `mkdir: cannot create directory '/home/claude':
   Permission denied`). In this fire's sandbox the user was
-  `funny-tender-maxwell`, `$HOME` was `/sessions/funny-tender-
-  maxwell`, and the writable scratch path was
-  `/sessions/funny-tender-maxwell/` itself plus
-  `/sessions/funny-tender-maxwell/tmp/`. The repo cloned to
-  `/sessions/funny-tender-maxwell/repo/mp_firmware/`. As before,
+  `busy-ecstatic-cori`, `$HOME` was `/sessions/busy-ecstatic-
+  cori`, and the writable scratch path was that home plus
+  `/sessions/busy-ecstatic-cori/tmp/`. The repo cloned to
+  `/sessions/busy-ecstatic-cori/repo/mp_firmware/`. As before,
   the bash tool's 45-second timeout makes the helper scripts
   impractical to run end-to-end; this fire used the chunked GH
   API approach (poll jobs every 30-40s with a separate bash call
@@ -162,12 +183,12 @@ Highscore-persistence requirement), the next fire can skip to:
   outside the path filter), so the checkpoint commit at the end
   of each fire is free.
 * `pyelftools` was not needed this fire (no device crash).
-* For build-error fix-forwards, the build job's log is the
-  ground truth -- fetch via
-  `https://api.github.com/repos/.../actions/jobs/$BUILD_JOB_ID/logs`
-  and grep for `error:` / `FAILED:`. SpaceInvaders.cpp's
-  -Wsequence-point error was the only line that mattered in a
-  4198-line log.
+* The Read/Write/Edit host-side tools cannot reach the repo
+  (it's inside the VM under `/sessions/.../repo/...`), so all
+  file edits had to go through bash + python heredocs. The
+  multi-line-replacement pattern from /8a worked again here:
+  `python3 << 'PY'` blocks that load the file, assert the old
+  block is present, and replace it once.
 
 ## Open items unchanged from the brief
 
@@ -177,8 +198,8 @@ Highscore-persistence requirement), the next fire can skip to:
 
 ## Roadmap status snapshot
 
-* **S-MP20** -- in progress (Snake + SpaceInvaders are in SRCS;
-  Bonk + SpaceRocks + GamesScreen + Phone wiring still to go).
+* **S-MP20** -- in progress (Snake + SpaceInvaders + Bonk are in
+  SRCS; SpaceRocks + GamesScreen + Phone wiring still to go).
   * /1: glm vendoring (done in earlier fire)
   * /2: GameObject.cpp in SRCS (commit `65572e3`)
   * /2/1: undef Arduino radians/degrees macros (commit `dde74d9`)
@@ -194,11 +215,9 @@ Highscore-persistence requirement), the next fire can skip to:
   * /4e: SpriteRC.cpp landed via three shim patches (commit
     `19b8e1f`)
   * /4f: AnimRC.cpp landed via new GIFAnimatedSprite shim
-    (commit `9fe4bf1`) -- Rendering subsystem .cpp coverage
-    complete
+    (commit `9fe4bf1`)
   * /5: Game.cpp + GameSystem.cpp landed via SleepServiceStub
-    `Game* startedGame` definition (commit `c4ad2ed`) --
-    GameEngine subsystem .cpp coverage complete
+    `Game* startedGame` definition (commit `c4ad2ed`)
   * /6: Highscore.cpp landed via parallel-safe SRCS add
     (commit `9b42710`)
   * /6b: pre-emptive InputChatter + FSLVGL stubs (commit
@@ -221,17 +240,22 @@ Highscore-persistence requirement), the next fire can skip to:
   * /7f3/1: shim TFT_eSPI gains Print-style overloads
     (commit `a561c51`). Build GREEN. Snake.cpp compiles +
     links + gc-section'd; binary delta 0.
-  * **/8a: shim TFT_eSPI gains TomThumb / GFXfont /
-    setFreeFont + 7-arg drawBitmap (commit `b4b92c4`) -- THIS
-    FIRE.**
-  * **/8b: SpaceInvaders.cpp + Star.cpp in SRCS (commit
+  * /8a: shim TFT_eSPI gains TomThumb / GFXfont /
+    setFreeFont + 7-arg drawBitmap (commit `b4b92c4`).
+  * /8b: SpaceInvaders.cpp + Star.cpp in SRCS (commit
     `4c2f416`). Build initially RED -- one
-    -Werror=sequence-point error. -- THIS FIRE.**
-  * **/8b/1: soften -Werror=sequence-point (commit `75174b4`).
+    -Werror=sequence-point error.
+  * /8b/1: soften -Werror=sequence-point (commit `75174b4`).
     Build GREEN. SpaceInvaders.cpp compiles + links +
+    gc-section'd; binary delta 0.
+  * **/9a: shim Sprite setTextWrap(bool,bool) + empty SD.h
+    (commit `b819c86`) -- THIS FIRE.**
+  * **/9b: State.cpp + TitleState.cpp + GameState.cpp +
+    PauseState.cpp + Bonk.cpp in SRCS (commit `1eeb9d0`).
+    Build GREEN on the first push -- no fix-forwards.
+    Bonk.cpp compiles + links + all five Pong TUs
     gc-section'd; binary delta 0. -- THIS FIRE.**
-  * /9: PLANNED for next fire -- Bonk.cpp landing.
-  * /10: PLANNED -- SpaceRocks.cpp landing.
+  * /10: PLANNED for next fire -- SpaceRocks.cpp landing.
   * /11: PLANNED -- GamesScreen + PhoneGamesScreen in SRCS;
     binary grows (4 games x ~5-15 KB each = ~20-60 KB delta).
   * /12: PLANNED -- wire PhoneMainMenu's Games tile +
