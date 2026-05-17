@@ -31,32 +31,80 @@
 #include "Screens/PhoneHomeScreen.h"
 #include "Screens/PhoneMainMenu.h"
 #include "Screens/LockScreen.h"
+#include "Screens/InboxScreen.h"
+#include "Screens/FriendsScreen.h"
+#include "Screens/PhoneMusicPlayer.h"
+#include "Screens/PhoneCameraScreen.h"
+#include "Screens/PhoneSettingsScreen.h"
+#include "Elements/PhoneIconTile.h"
+
+#include "esp_log.h"
+
+static const char *TAG = "HomeFactory";
 
 static PhoneHomeScreen *s_home = nullptr;
 
+/* Forward decls so the helper functions can reference each other. */
+static void on_menu_softkey(PhoneHomeScreen *self);
+static void on_lock_hold(PhoneHomeScreen *self);
+static void on_menu_select(PhoneMainMenu *menu);
+
 static void on_menu_softkey(PhoneHomeScreen * /*self*/)
 {
-    /* Right softkey = MENU. Heap-allocate a new PhoneMainMenu
-     * and push it. */
+    /* Right softkey = MENU. Heap-allocate a new PhoneMainMenu,
+     * wire its SELECT dispatcher, then push. */
     auto *menu = new PhoneMainMenu();
+    menu->setOnSelect(on_menu_select);
     s_home->push(menu);
 }
 
 static void on_lock_hold(PhoneHomeScreen * /*self*/)
 {
-    /* Long-press BTN_BACK = lock. Same push pattern. */
     auto *lock = new LockScreen();
     s_home->push(lock);
+}
+
+/* S-MP19/2: dispatch the SELECT softkey on PhoneMainMenu to the
+ * matching app screen. Eight tiles in the icon enum; mapping:
+ *
+ *   Phone     → (no destination — PhoneDialerScreen needs glm)
+ *   Messages  → InboxScreen
+ *   Contacts  → FriendsScreen
+ *   Music     → PhoneMusicPlayer
+ *   Camera    → PhoneCameraScreen
+ *   Games     → (no destination — GamesScreen needs glm)
+ *   Settings  → PhoneSettingsScreen
+ *   Mail      → InboxScreen (mail tile reuses inbox in MP2.4)
+ *
+ * Each pushed screen handles its own BACK via either explicit
+ * pop() in its buttonPressed handler or the default
+ * PhoneTransitions::pop() pattern. */
+static void on_menu_select(PhoneMainMenu *menu)
+{
+    using Icon = PhoneIconTile::Icon;
+    LVScreen *target = nullptr;
+    switch (menu->getSelectedIcon()) {
+        case Icon::Phone:    /* not compiled */                  break;
+        case Icon::Messages: target = new InboxScreen();         break;
+        case Icon::Contacts: target = new FriendsScreen();       break;
+        case Icon::Music:    target = new PhoneMusicPlayer();    break;
+        case Icon::Camera:   target = new PhoneCameraScreen();   break;
+        case Icon::Games:    /* not compiled */                  break;
+        case Icon::Settings: target = new PhoneSettingsScreen(); break;
+        case Icon::Mail:     target = new InboxScreen();         break;
+    }
+    if (target) {
+        menu->push(target);
+    } else {
+        ESP_LOGI(TAG, "icon %u has no compiled destination",
+                 (unsigned)menu->getSelectedIcon());
+    }
 }
 
 extern "C" void chatter_app_start_home_screen(void)
 {
     s_home = new PhoneHomeScreen();
-
-    /* S-MP19: wire MENU and lock-hold callbacks. CALL (BTN_LEFT)
-     * deliberately stays unwired pending the dialer screen. */
     s_home->setOnRightSoftKey(on_menu_softkey);
     s_home->setOnLockHold(on_lock_hold);
-
     s_home->start(false);
 }
