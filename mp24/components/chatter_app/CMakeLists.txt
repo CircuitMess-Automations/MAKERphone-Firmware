@@ -621,6 +621,11 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     # legitimate on the original toolchain but flagged as
     # -Werror=delete-non-virtual-dtor in modern GCC. Demoting.
     -Wno-error=delete-non-virtual-dtor
+    # S-MP18w/1: UnlockSlide.cpp declares loop() (no args) which
+    # hides LoopListener::loop(uint). Upstream pattern, harmless
+    # in practice (caller invokes the (uint) overload via base
+    # pointer; the no-arg member is just an internal helper).
+    -Wno-error=overloaded-virtual
     # Arduino.h gets pre-included so 'String', 'pinMode', 'millis'
     # etc. resolve without each src .cpp having to remember to
     # include it. Same trick used for the circuitos build.
