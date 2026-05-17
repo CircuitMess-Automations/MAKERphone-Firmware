@@ -8,87 +8,111 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-17 ~13:20
-* **HEAD on `main`:** `fafeef9` (`feat(mp24): S-MP20/1 -- vendor glm 1.0.1 + Arduino-GLM glm.h shim`)
-* **Build status:** GREEN. CI build job succeeded on both the push-triggered
-  run (`25991728759`) and the manual re-dispatch (`25991869162`).
-* **Device boot status:** UNKNOWN. Both runs above failed on the
-  `flash` job with 8 consecutive `esptool` connection retries hitting
-  `Failed to connect to ESP32-S3: No serial data received.`
-  The flasher Mac's own diagnostic message ends with:
+* **Date (UTC):** 2026-05-17 ~13:55
+* **HEAD on `main`:** `dde74d9` (`fix(build): S-MP20/2/1 -- undef Arduino's radians/degrees macros before glm`)
+* **Build status:** GREEN. Run `25992715543` build job `success`. The
+  prior run `25992610037` (commit `65572e3`, just the SRCS addition
+  without the macro fix) was the one and only fix-forward needed.
+* **Device boot status:** STILL UNKNOWN, but the failure mode
+  IMPROVED. The `flasher` runner (`AlberttekiMacBook-Pro`) was
+  *offline* at the start of this fire and *online* by the end
+  -- it picked up the flash job for `dde74d9` and failed at the
+  earlier "Detect MAKERphone serial port" step with:
 
-      All 8 flash attempts failed -- device is unrecoverable
-      via esptool. Most likely cause: firmware in flash
-      is crashing too early for ROM USB-Serial/JTAG to
-      respond. Physical recovery needed (SW24 BOOT pin).
+      No MAKERphone serial device found at /dev/cu.usb*.
+      Plug the board in via USB-C, then re-run this workflow.
 
-  The `boot-log` artifact uploaded by each of those failed runs is a
-  stale 40-line capture from a *previous* (successful) run still
-  sitting in the flasher's `firmware/` working directory -- it is
-  NOT evidence that S-MP20/1's binary booted. The 12:24 UTC runs
-  on `bd9a54c` *did* boot cleanly; nothing post-12:24 has been
-  confirmed on hardware.
+  This is a clearer, more actionable signal than the previous
+  fafeef9 runs (which got past port detection and then died in
+  esptool retry storms). The board appears unplugged or
+  un-enumerating; the runner itself is healthy.
 
-## What S-MP20/1 actually shipped
+## What S-MP20/2 + S-MP20/2/1 actually shipped
 
-A pure-headers vendor of `g-truc/glm` 1.0.1 into
-`mp24/components/chatter_app/shim_includes/glm/` (428 files, ~3.2 MB)
-plus a one-file Arduino-GLM compatibility shim at
-`mp24/components/chatter_app/shim_includes/glm.h` that forwards
-`<glm.h>` to `<glm/glm.hpp>` + `<glm/ext.hpp>`.
+S-MP20/2 (`65572e3`) added a single TU to chatter_app SRCS:
 
-Nothing in `chatter_app`'s SRCS currently includes glm, so this
-commit changes ZERO compiled TUs. The output binary is essentially
-identical to `bd9a54c`'s -- which is why "build green, device
-unflashable" is consistent with the commit being correct: the
-flash failure is a hardware / runner-side condition, not a
-code regression.
+    "${SRC_DIR}/Games/GameEngine/GameObject.cpp"
 
-## Why I did not revert
+This is the smallest leaf .cpp in the games engine. Its only
+non-stdlib includes are GameObject.h + RenderComponent.h +
+PixelDim.hpp + CollisionComponent.h. PixelDim.hpp pulls
+`<glm.h>` (the Arduino-GLM compat shim), which forwards to
+`<glm/glm.hpp>` + `<glm/ext.hpp>`. The body only move-
+constructs shared_ptrs and assigns `glm::vec2` / `float` --
+no constructor calls into RenderSystem or CollisionSystem,
+so the link closure stays small.
 
-The brief's revert policy (`docs above`, §2.3) triggers on
-*runtime* crashes (`flash_iter.sh` exit 2) after up to 3
-fix-forwards. The current situation is `esptool` cannot connect
-at all -- there is no runtime to crash and no fix any commit can
-make. Reverting to `bd9a54c` would not change the device's
-responsiveness to `esptool`; the same hardware is now mute to
-the runner regardless of which binary the build job produced.
+The build of `65572e3` failed because Arduino.h (pre-included
+into every chatter_app TU via `-include Arduino.h`) defines
+`radians`, `degrees`, `sq`, `constrain`, `round`, `bit` as
+preprocessor macros. glm declares same-named free functions in
+the `glm::` namespace; the preprocessor textually rewrites
+glm's declarations and the parser dies with
+
+    error: macro 'radians' passed 3 arguments, but takes just 1
+    error: macro 'degrees' passed 3 arguments, but takes just 1
+
+S-MP20/2/1 (`dde74d9`) fixes this by adding a tiny compat header
+
+    mp24/components/chatter_app/shim_includes/arduino_glm_compat.h
+
+that `#undef`s the six colliding macros, and force-includes it
+via `target_compile_options(... "SHELL:-include ${dir}/.../arduino_glm_compat.h")`
+AFTER `-include Arduino.h`. Subsequent `<glm/...>` parses see
+the macros already gone.
+
+Intentionally PRESERVED macros: `abs` (used in 3 upstream call
+sites: JigHWTest.cpp:187, Pong/GameState.cpp x2), `min`, `max`
+(heavily used as Arduino macros; glm never declares them at
+namespace scope so no collision).
 
 ## What the next fire should do
 
-1. Re-run `flash_iter.sh --no-dispatch` first. The device may
-   have recovered on its own (USB renumeration, watchdog reset,
-   user re-plug). Two cases:
-   * Exit 0 with a fresh boot.log (with the `ESP-ROM:esp32s3-...`
-     banner -- NOT just the stale `STORE:` lines this fire saw)
-     -> proceed with S-MP20/2 below.
-   * Still flash=failure -> stop, leave a note. The user needs
-     to physically tap SW24 BOOT to drop the chip into download
-     mode, or replug USB. Don't pile more commits.
+1. Re-run `flash_iter.sh --no-dispatch` first to read the most
+   recent run. Possible states:
+   * `dde74d9` flash now succeeded -> proceed with S-MP20/3
+     (add the next GameEngine .cpp pair: `Game.cpp` +
+     `GameSystem.cpp`). Game.cpp pulls in `render(this, Sprite*)`
+     + `collision(this)` constructor calls into RenderSystem +
+     CollisionSystem; those .cpp files are NOT yet in SRCS, so
+     adding `Game.cpp` alone produces undefined references at
+     link. Either add `Game.cpp` + `GameSystem.cpp` + the
+     RenderSystem.cpp + CollisionSystem.cpp .cpp implementations
+     in the same commit, OR start with the smaller leaf pair
+     `Rendering/RenderComponent.cpp` + `Collision/CollisionComponent.cpp`
+     (look these up first -- their bodies may also be empty
+     enough that they link with no new symbols).
+   * `dde74d9` flash still failing on port detection -> user
+     needs to physically replug the MAKERphone USB-C cable.
+     Leave repo as-is; do not pile commits.
+2. Once a real boot.log lands for `dde74d9`, sanity-check that
+   the binary still boots cleanly (it should -- GameObject.cpp
+   only adds dead symbols, none of which are referenced by
+   anything in the current link closure).
+3. Continue down the S-MP20 punch list once the engine .cpp's
+   compile:
+   * Snake / SpaceInvaders / Bonk / SpaceRocks game impls
+   * GamesScreen.cpp, PhoneGamesScreen.cpp, PhoneDialerScreen.cpp
+   * Wire PhoneHomeScreen::setOnLeftSoftKey (CALL) -> push
+     PhoneDialerScreen
+   * Wire PhoneMainMenu::Phone and ::Games tiles
 
-2. **Known `flash_iter.sh` bug to fix when convenient**: the
-   script gates only on `BUILD_CONCL`, never on `FLASH_CONCL`.
-   That meant the boot-log scan ran on the stale 40-line log
-   and almost reported "device healthy" despite the flash job
-   conclusively failing. Add a `[[ "$FLASH_CONCL" != "success" ]]
-   && exit 1` check between the build-success guard and the
-   artifact download. (Helper script lives in `/home/claude/`,
-   not the repo, so this fix is on the agent side, not a commit.)
+## Helper script update applied this fire (not committed)
 
-3. **S-MP20/2** (when CI is trustable again): add
-   `src/Games/GameEngine/Game.cpp` + `GameObject.cpp` (smallest
-   leaf pair) to `chatter_app`'s SRCS to validate the glm
-   include path under real compilation. If that builds, append
-   `Rendering/*.cpp`, then `Collision/*.cpp`, then the four
-   game implementations -- one or two SRCS files per commit so
-   build/link errors stay diagnosable.
+`/home/claude/flash_iter.sh` previously gated only on
+`BUILD_CONCL` and skipped checking `FLASH_CONCL`. That meant a
+flash failure would still proceed to the boot.log scan and could
+falsely report "device healthy" off a stale log. This fire added
 
-4. **S-MP20 wiring**: once the engine + four games compile,
-   add `GamesScreen.cpp` + `PhoneGamesScreen.cpp` +
-   `PhoneDialerScreen.cpp` to SRCS and wire the
-   `PhoneHomeScreen::setOnLeftSoftKey` (CALL) ->
-   `PhoneDialerScreen` push, and the `PhoneMainMenu` Phone /
-   Games tiles.
+    [[ "$FLASH_CONCL" != "success" ]] && {
+        echo "Flash failed (device unresponsive or runner issue)";
+        exit 1;
+    }
+
+between the build-success guard and the artifact-scan step.
+The helper lives outside the repo, so this is an agent-side fix
+that persists across fires only if the helper file is recreated
+from this checkpoint's notes.
 
 ## Open items unchanged from the brief
 
