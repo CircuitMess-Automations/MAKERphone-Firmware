@@ -273,6 +273,29 @@ idf_component_register(
         "${SRC_DIR}/Elements/PhoneEnvelopeFly.cpp"
         "${SRC_DIR}/Elements/UserWithMessage.cpp"
 
+        # S-MP18w: Elements unblocked by Service additions and
+        # base-Element availability. Each has clean deps against
+        # current SRCS.
+        #
+        #   PhoneChargeBars       cell-style charge-bar widget
+        #                         (used by PhoneHomeScreen)
+        #   PhoneConfettiOverlay  birthday/celebrate confetti
+        #   PhoneOperatorBanner   carrier name banner (SIM info)
+        #   PhoneYawnOverlay      idle "yawn" animation
+        #   PhoneMenuGrid         3x3 icon-tile grid for menus
+        #   PhoneDialerPad        12-key dialer pad
+        "${SRC_DIR}/Elements/PhoneChargeBars.cpp"
+        "${SRC_DIR}/Elements/PhoneConfettiOverlay.cpp"
+        "${SRC_DIR}/Elements/PhoneOperatorBanner.cpp"
+        "${SRC_DIR}/Elements/PhoneYawnOverlay.cpp"
+        "${SRC_DIR}/Elements/PhoneMenuGrid.cpp"
+        "${SRC_DIR}/Elements/PhoneDialerPad.cpp"
+
+        # PhoneVirtualPet — single virtual-pet state service.
+        # Self-contained (LoopListener + PhoneClock + nvs only).
+        # Unblocks SettingsScreen which references it.
+        "${SRC_DIR}/Services/PhoneVirtualPet.cpp"
+
         # S-MP18s: composition Elements unblocked by what's
         # already compiled.
         #
@@ -331,6 +354,14 @@ idf_component_register(
         # S-MP18t: ConvoScreen — pulls ConvoBox + ConvoView,
         # both gated by the source patch in this session.
         "${SRC_DIR}/Screens/ConvoScreen.cpp"
+
+        # S-MP18w: four core flow screens unblocked by the
+        # six new Elements + PhoneVirtualPet + SleepService stub
+        # added above.
+        "${SRC_DIR}/Screens/PhoneHomeScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneMainMenu.cpp"
+        "${SRC_DIR}/Screens/PhoneDialerScreen.cpp"
+        "${SRC_DIR}/Screens/SettingsScreen.cpp"
 
         # S-MP18u: bulk batch of 19 screens that the strict audit
         # script (/tmp/audit.sh) shows have full include closure
@@ -458,6 +489,16 @@ idf_component_register(
         # (S-MP18j), most upstream screens should now have all
         # their service deps satisfied.
         "shim/LoRaServiceStub.cpp"
+
+        # S-MP18w: SleepService stub. Upstream SleepService.cpp
+        # pulls Games/GameEngine/Game.h + LockScreen.h + FSLVGL,
+        # all of which transitively need glm.h or Lock-flow
+        # Elements we don't have yet. Same pattern as the other
+        # service stubs — no-op public API, no-op global Sleep
+        # singleton. Behaviour: device stays awake indefinitely.
+        # Acceptable for compile coverage; real power management
+        # lands in S-MP15 territory.
+        "shim/SleepServiceStub.cpp"
 
         # S-MP18d: first screen that USES the status bar + soft-key
         # bar + wallpaper combo. 113 LOC, takes an uppercase app
