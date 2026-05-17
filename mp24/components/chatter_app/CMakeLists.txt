@@ -689,11 +689,20 @@ idf_component_register(
         # replace unavailable third-party libraries. Currently:
         #   RadioLib.h  - empty LLCC68 class to satisfy
         #                 LoRaService.h's 'LLCC68 radio' member.
+        #   glm/        - mainline header-only OpenGL Mathematics
+        #                 (g-truc/glm 1.0.1), vendored at S-MP20/1
+        #                 so <glm/vec2.hpp>, <glm/ext.hpp>,
+        #                 <glm/gtx/matrix_transform_2d.hpp>, and
+        #                 <glm/gtx/vector_angle.hpp> resolve.
+        #   glm.h       - Arduino-GLM compatibility shim that
+        #                 forwards to <glm/glm.hpp> + <glm/ext.hpp>
+        #                 so upstream src/Games/ files written
+        #                 against the Arduino fork keep building.
         # Listed after src/ in case any future shim header has
         # the same name as a src/ file — src/ wins by being
-        # first. The current RadioLib.h has no upstream copy on
-        # any include path, so ordering doesn't actually matter
-        # for it.
+        # first. None of the current shim headers have a same-
+        # named counterpart on any other include path, so
+        # ordering doesn't actually matter for them.
         "${CMAKE_CURRENT_LIST_DIR}/shim_includes"
 
     REQUIRES
