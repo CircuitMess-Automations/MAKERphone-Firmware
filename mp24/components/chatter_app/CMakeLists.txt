@@ -491,6 +491,20 @@ idf_component_register(
         # games session began. Initial relanding of the 6907b78
         # wiring that S-MP20/11 had to revert.
         "${SRC_DIR}/Screens/PhoneGamesScreen.cpp"
+
+        # S-MP20/13: PhoneDialerScreen.cpp lands. Was the last
+        # screen held back by the games-engine blocker -- its
+        # *#GAME (76253) cheat code does a direct `new Snake(...)`
+        # and pulls Games/Snake/Snake.h. All seven additional
+        # screen deps (PhoneImeiRevealScreen, PhoneFirmwareInfo
+        # Screen, PhoneFlashlight, PhoneFortuneCookie,
+        # PhoneDrumKitScreen, PhoneBeatMaker, PhoneMemoryAudit)
+        # are already in SRCS, and Snake / FSLVGL / LoopManager
+        # all resolve cleanly post-S-MP20/12. Wiring from
+        # PhoneMainMenu::Phone tile + PhoneHomeScreen left-
+        # softkey (CALL) lands in the same series.
+        "${SRC_DIR}/Screens/PhoneDialerScreen.cpp"
+
         "${SRC_DIR}/Screens/PhoneHabits.cpp"
         "${SRC_DIR}/Screens/PhoneHelicopter.cpp"
         "${SRC_DIR}/Screens/PhoneKaraokeScreen.cpp"
