@@ -40,6 +40,25 @@
 #include <Loop/LoopListener.h>
 #include <Input/Input.h>
 #include <Battery/BatteryService.h>
+/*
+ * S-MP20/6d: pull <Pins.hpp> transitively.
+ *
+ * Upstream Chatter games (Snake/SpaceInvaders/Bonk/SpaceRocks)
+ * include <Chatter.h> but NOT <Pins.hpp>, then use BTN_* tokens
+ * directly in setBtnPressCallback() arguments. The Decision-E
+ * BTN_LEFT / BTN_A / BTN_UP / BTN_1..9 aliases live in
+ * hal/buttons.h; the shim <Pins.hpp> is what pulls hal/buttons.h
+ * into a TU. Including it here once makes BTN_* visible to every
+ * .cpp that goes through the shim Chatter.h -- the games compile
+ * unchanged.
+ *
+ * Safe addition for the existing 9 in-SRCS files that pull
+ * <Chatter.h>: each of those that uses BTN_* already includes
+ * <Pins.hpp> directly (PhoneBrightnessScreen, PhoneFlashlight,
+ * SettingsScreen), and the others don't reference any of the
+ * Pins.hpp macros. No redefinition / no new symbols leak. */
+#include <Pins.hpp>
+
 
 class ChatterImpl {
 public:

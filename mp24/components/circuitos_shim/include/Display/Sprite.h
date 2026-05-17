@@ -148,6 +148,14 @@ public:
     void setTextSize(uint8_t s);
     void setTextDatum(uint8_t datum);
     void setTextFont(uint8_t font);
+    /* S-MP20/6d: LovyanGFX-style text API overloads.
+     * Upstream Snake / SpaceInvaders / Pong pass a `textdatum_t`
+     * enum value (defined in our TFT_eSPI shim) and the address
+     * of a `fonts::IFont` selector to setTextDatum / setFont.
+     * Both forms are silent no-ops; we keep the parameter shapes
+     * so the upstream .cpp files parse + link. */
+    void setTextDatum(textdatum_t datum) { (void)datum; }
+    void setFont(const fonts::IFont *font) { (void)font; }
     int  textWidth(const char *s) { (void)s; return 0; }
     int  textWidth(String s)      { (void)s; return 0; }
     int  fontHeight()             { return 8; }

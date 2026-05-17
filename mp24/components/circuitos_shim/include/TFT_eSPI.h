@@ -78,6 +78,60 @@
 #define TFT_TRANSPARENT 0x0120
 #endif
 
+/*
+ * S-MP20/6d: LovyanGFX-style text API stubs.
+ *
+ * The upstream Chatter games (Snake, SpaceInvaders, Pong/Bonk
+ * sub-states) were written against the LovyanGFX (LGFX) text
+ * API rather than Bodmer/TFT_eSPI. They reference:
+ *
+ *   - the `textdatum_t` enum class (top_center, middle_center,
+ *     bottom_center, ...), to set text alignment;
+ *   - the `fonts::IFont` family of font selectors (fonts::Font0,
+ *     fonts::Font2) passed to setFont via pointer;
+ *   - method names that don't exist on Bodmer's API:
+ *     setTextDatum(textdatum_t) and setFont(const IFont*).
+ *
+ * To let those .cpp files parse + link cleanly without dragging
+ * in real LovyanGFX (Decision 9C — no software rasteriser yet),
+ * we provide minimal LGFX-shaped stubs here. The enum is real,
+ * the font selectors are addressable inline-constexpr empties,
+ * and the actual Sprite methods that take these types are added
+ * as no-op overloads in Display/Sprite.h. Visual output is silent
+ * until 9A lands.
+ *
+ * Values are not preserved bit-for-bit from LovyanGFX -- this
+ * shim only needs the symbols to exist; the games' usage doesn't
+ * depend on the numeric values.
+ */
+enum class textdatum_t : uint8_t {
+    top_left = 0,
+    top_center,
+    top_right,
+    middle_left,
+    middle_center,
+    middle_right,
+    bottom_left,
+    bottom_center,
+    bottom_right,
+    baseline_left,
+    baseline_center,
+    baseline_right,
+};
+
+namespace fonts {
+    /* Opaque marker type. The shim never inspects its contents;
+     * Snake/SpaceInvaders take the address of `fonts::Font0` /
+     * `fonts::Font2` and pass it to setFont, which discards. */
+    struct IFont {};
+    /* C++17 inline constexpr gives external linkage with one
+     * definition across translation units, and the lvalue is
+     * still addressable (`&fonts::Font0` is well-defined). */
+    inline constexpr IFont Font0{};
+    inline constexpr IFont Font2{};
+}
+
+
 class TFT_eSPI {
 public:
     TFT_eSPI() = default;
