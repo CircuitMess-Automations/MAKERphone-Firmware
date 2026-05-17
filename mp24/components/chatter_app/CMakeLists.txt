@@ -273,6 +273,25 @@ idf_component_register(
         "${SRC_DIR}/Elements/PhoneEnvelopeFly.cpp"
         "${SRC_DIR}/Elements/UserWithMessage.cpp"
 
+        # S-MP18s: Interface/ConvoView + the remaining message-
+        # composition Elements. ConvoView is the FIRST .cpp from
+        # Interface/ we compile beyond the base layer; it sits
+        # between MessageService and the visual ConvoBox.
+        #
+        # ConvoMessage      pixel-bubble line in a conversation
+        # ConvoBox          scrolling list of ConvoMessages
+        # PicMenu           sticker / canned-pic picker modal
+        # PhoneT9Input      T9-keypad text composer (~730 LOC)
+        # EmojiMenu         emoji picker
+        # NotificationElement  unread badge over status bar
+        "${SRC_DIR}/Interface/ConvoView.cpp"
+        "${SRC_DIR}/Elements/ConvoMessage.cpp"
+        "${SRC_DIR}/Elements/ConvoBox.cpp"
+        "${SRC_DIR}/Elements/PicMenu.cpp"
+        "${SRC_DIR}/Elements/PhoneT9Input.cpp"
+        "${SRC_DIR}/Elements/EmojiMenu.cpp"
+        "${SRC_DIR}/Elements/NotificationElement.cpp"
+
         # The original ProfileScreen target — compiles after all
         # the above land. Pulls ProfileService (just added) +
         # Modals (just added) + Elements (just added) + Storage
@@ -301,6 +320,11 @@ idf_component_register(
         "${SRC_DIR}/Screens/InboxScreen.cpp"
         "${SRC_DIR}/Screens/FriendsScreen.cpp"
         "${SRC_DIR}/Screens/PhoneCallEnded.cpp"
+
+        # S-MP18s: ConvoScreen — the messaging-flow workhorse —
+        # unblocked by ConvoView + ConvoBox + PicMenu + T9Input +
+        # the existing BuzzerService + LoRaService stubs.
+        "${SRC_DIR}/Screens/ConvoScreen.cpp"
 
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
