@@ -8,87 +8,98 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-17 ~19:04-19:14
-* **HEAD on `main`:** `cd0094d` (`feat(mp24): S-MP20/10b -- land
-  SpaceRocks (Asteroids) + Hearts/Score helpers in SRCS`). This
-  fire shipped TWO commits, both on `main`, both clean on the
-  first build:
-    - `95d6745` -- feat(mp24): S-MP20/10a -- shim TFT_eSPI
-      fillRoundRect + drawRoundRect.
-    - `cd0094d` -- feat(mp24): S-MP20/10b -- land SpaceRocks
-      (Asteroids) + Hearts/Score helpers in SRCS. **GREEN on
-      the first push.**
-* **Build status:** GREEN at HEAD `cd0094d` (run `26000043276`,
-  both `build` and `flash` jobs completed/success).
-* **Device boot status:** HEALTHY. boot.log scan: 0 crash markers.
-  Same boot sequence as prior fires' green HEADs:
+* **Date (UTC):** 2026-05-17 ~21:42 UTC
+* **HEAD on `main`:** `29c6eeb` (`feat(mp24): S-MP20/14 -- wire
+  PhoneDialerScreen from home + menu`). This fire shipped TWO
+  commits, both on `main`, both GREEN on the first build with
+  zero fix-forwards:
+    - `c073518` -- feat(mp24): S-MP20/13 -- land
+      PhoneDialerScreen.cpp in SRCS (compile-only; binary
+      delta near-zero because no entry point references it).
+    - `29c6eeb` -- feat(mp24): S-MP20/14 -- wire
+      PhoneDialerScreen from home + menu. Binary GROWS
+      ~415 KB (firmware artifact size 11704867 -> 12119504
+      bytes) because HomeFactory.cpp now instantiates
+      PhoneDialerScreen, dragging it through --gc-sections.
+* **Build status:** GREEN at HEAD `29c6eeb` (run
+  `26003757848`, both `build` and `flash` jobs completed/
+  success).
+* **Device boot status:** HEALTHY. boot.log scan: 0 crash
+  markers. Same boot sequence as prior fires' green HEADs:
 
+      BATT: curve-fitting cal active
       STORE: mounted; 2 files, 1757 / 1860161 bytes used (0%)
       POWER: polling GPIO2 at 50 Hz, debounce 3 ticks
       MP24: Entering background-tasks-only loop (LVGL owns the panel).
       MODEM: state -> POWER -> BOOT -> boot probe... (up to 16 s)
 
 * **Flasher status:** ONLINE and reliable.
-* **Binary size:** `makerphone_mp24.bin` is **883,408 bytes** at
-  HEAD `cd0094d` -- EXACTLY UNCHANGED from `1eeb9d0` and earlier
-  green HEADs. Snake / SpaceInvaders / Bonk / SpaceRocks TUs (and
-  the new Common/Hearts.cpp + Common/Score.cpp helpers) all
-  compile + link cleanly, but --gc-sections drops them at link
-  time because no in-SRCS instantiation site references their
-  symbols yet. Binary delta as predicted: 0 bytes.
+* **Binary size:** `mp24-firmware` artifact is 12,119,504 bytes
+  at HEAD `29c6eeb` (up from 11,704,867 at `c073518`). The
+  ~415 KB jump comes from PhoneDialerScreen + the seven
+  transitive screens it references being kept alive at link
+  time once `HomeFactory.cpp` instantiates it. Final firmware
+  payload (the `.bin` itself; the artifact zip also bundles
+  ELF + map) is still well under the 2 MB app partition.
 
 ## What this fire actually shipped (net)
 
-Two commits, both GREEN at the final HEAD (no fix-forwards):
+S-MP20 is **DONE** as of this fire. Two commits, both GREEN
+at the final HEAD (no fix-forwards):
 
-1. **`95d6745` -- S-MP20/10a.** Pre-emptive shim additions to
-   prepare for SpaceRocks.cpp landing. Single net-new transitive
-   dep surfaced during the audit:
+1. **`c073518` -- S-MP20/13.** Added one line to
+   `mp24/components/chatter_app/CMakeLists.txt`:
 
-     * SpaceRocks.cpp line 211 calls
-       `spriteRC->getSprite()->fillRoundRect(0, 0, 4, 4, 1, TFT_WHITE);`
-       which is the Bodmer 6-arg shape (x, y, w, h, radius,
-       color). Added `void fillRoundRect(...)` as a silent no-op
-       on the TFT_eSPI shim base class (which Sprite inherits
-       via TFT_eSprite). Also added `void drawRoundRect(...)`
-       with the same signature for symmetry, even though only
-       fillRoundRect is currently referenced -- the pair always
-       ships together in real Bodmer/TFT_eSPI.
+     * `${SRC_DIR}/Screens/PhoneDialerScreen.cpp` (784 LOC)
 
-   Addition is DEAD until /10b lands; binary delta 0.
-   Build + flash + boot all GREEN.
+   PhoneDialerScreen was the last upstream screen held back by
+   the games-engine blocker -- its `*#GAME` (76253) Easter-egg
+   cheat-code path does a direct `new Snake(...)` and pulls
+   `<Games/Snake/Snake.h>`. With Snake landed at /7f3 and
+   the games-engine wiring landed through /12, the entire
+   include chain now resolves. All seven additional screen
+   #includes (PhoneImeiRevealScreen, PhoneFirmwareInfoScreen,
+   PhoneFlashlight, PhoneFortuneCookie, PhoneDrumKitScreen,
+   PhoneBeatMaker, PhoneMemoryAudit) were already in SRCS
+   post-S-MP18; FSLVGL is provided by FSLVGLStub.cpp; Loop
+   Manager is in chatter_library. Binary delta near-zero
+   (--gc-sections drops the file because nothing instantiates
+   PhoneDialerScreen yet).
 
-2. **`cd0094d` -- S-MP20/10b.** Added four .cpp files to
-   chatter_app SRCS, immediately after the Pong/Bonk block in
-   the Games section:
+2. **`29c6eeb` -- S-MP20/14.** Replaced
+   `mp24/components/chatter_app/screens/HomeFactory.cpp` to
+   add two new navigation hooks atop S-MP19's existing
+   PhoneMainMenu / LockScreen wiring:
 
-     * `${SRC_DIR}/Games/Common/Hearts.cpp`     (~30 LOC)
-     * `${SRC_DIR}/Games/Common/Score.cpp`      (~30 LOC)
-     * `${SRC_DIR}/Games/Space/Player.cpp`      (~25 LOC)
-     * `${SRC_DIR}/Games/Space/SpaceRocks.cpp`  (~420 LOC)
+     * `s_home->setOnLeftSoftKey(on_call_softkey)` --
+       BTN_LEFT (CALL softkey) now pushes a fresh
+       `PhoneDialerScreen()`.
+     * `Icon::Phone` in `on_menu_select()` no longer hits
+       the "no compiled destination" branch -- it pushes
+       `PhoneDialerScreen()` exactly like Games / Messages /
+       etc. do.
 
-   Build GREEN on the first push. SpaceRocks's Game-class API
-   surface is a strict subset of Snake / SpaceInvaders (Game
-   ctor with a resource list, `pop()`, `Audio.play({chirps})`
-   via the protected ChirpSystem member, addObject /
-   removeObject for GameObject lifecycle, collision.addPair /
-   removePair / wallsAll for callbacks). All proven by the
-   /5 + /6 + /6c + /7f3 scaffolding.
+   Same heap-leak caveat as every other handler in
+   HomeFactory.cpp: the pushed dialer becomes LVGL-owned and
+   is not freed on BACK; the deferred fix lives in S-MP25.
 
-   The wrapWalls struct uses RectCC (/4 collision leaf), the
-   player uses PolygonCC + AnimRC (/4 + /4f), asteroids use
-   CircleCC + StaticRC (/4 + /4d), and bullets use CircleCC +
-   SpriteRC with the new fillRoundRect.
+   Final navigation set after this fire:
 
-   Hearts.cpp + Score.cpp are the shared Games/Common HUD
-   helpers. They are also new to SRCS; Snake / SpaceInvaders /
-   Bonk do not use them (they roll their own baseSprite-print()
-   scoring). Hearts uses `drawIcon(File, ...)` (proven by /4d)
-   and Score uses `sprite->printf` + `setCursor` +
-   `setTextColor` (proven by /6d + /7f3/1).
+     - BTN_LEFT  (CALL)        -> push PhoneDialerScreen
+     - BTN_RIGHT (MENU)        -> push PhoneMainMenu
+     - BTN_BACK hold (lock)    -> push LockScreen
+     - PhoneMainMenu Phone     -> push PhoneDialerScreen
+     - PhoneMainMenu Messages  -> push InboxScreen
+     - PhoneMainMenu Contacts  -> push FriendsScreen
+     - PhoneMainMenu Music     -> push PhoneMusicPlayer
+     - PhoneMainMenu Camera    -> push PhoneCameraScreen
+     - PhoneMainMenu Games     -> push PhoneGamesScreen
+     - PhoneMainMenu Settings  -> push PhoneSettingsScreen
+     - PhoneMainMenu Mail      -> push InboxScreen
 
-   All four TUs compile + link + gc-section'd; binary unchanged
-   at 883,408 bytes.
+   Every PhoneIconTile in the main-menu enum now has a real
+   compiled destination. Every PhoneHomeScreen softkey has a
+   real handler. S-MP20 is structurally done.
 
 ## Why this fire could finish /10 cleanly in one push
 
@@ -117,63 +128,70 @@ phase end-to-end.
 
 ## What the next fire should do
 
-**S-MP20/11 -- wire up the GamesScreen + PhoneGamesScreen
-instantiation sites.** This is the moment --gc-sections stops
-dropping the four game TUs at link time. Binary will grow by
-an estimated ~20-60 KB (4 games x ~5-15 KB each, depending on
-how aggressive --gc-sections is on each game's transitive
-unused-symbol set).
+**S-MP21 -- modem hardware bring-up.** With S-MP20 done, the
+next non-trivial blocker is the cellular modem. Every fire so
+far has logged the same modem trace:
 
-Files at `src/Phone/`:
-  * `GamesScreen.h` + `GamesScreen.cpp` -- the tile picker
-    for the four games.
-  * `PhoneGamesScreen.h` + `PhoneGamesScreen.cpp` -- the
-    wrapper that pushes the picker from PhoneMainMenu's Games
-    tile.
+    MODEM: state -> POWER
+    MODEM: state -> BOOT
+    MODEM: boot probe... (0 s elapsed)
+    MODEM: boot probe... (1 s elapsed)
+    ...
+    MODEM: boot probe... (16 s elapsed)  <-- log capture ends here
 
-Recipe:
+i.e. the modem never leaves BOOT -- `AT` never returns a
+response. Two likely causes (already enumerated in the brief):
 
-1. **Audit `src/Phone/GamesScreen.{h,cpp}` and
-   `PhoneGamesScreen.{h,cpp}`** end-to-end. Identify every
-   `#include`, every `new <GameType>(...)` call, every menu
-   tile / image asset, and every method invoked on the four
-   game subclasses. Compare against the in-SRCS coverage.
-2. **Audit any new transitive deps.** Likely candidates:
-   - A new ImageLoader / icon asset class for the menu tiles.
-   - A new ScreenStack push pattern that we haven't seen yet.
-   - Maybe a SettingsService dependency for "Games disabled"
-     toggle (Chatter has this; MP24 may not).
-3. **First commit (`/11a`):** all shim / new-stub additions
-   (DEAD until /11b). If the audit reveals zero gaps, skip /11a.
-4. **Second commit (`/11b`):** add GamesScreen.cpp +
-   PhoneGamesScreen.cpp to chatter_app SRCS. **Binary will
-   grow** because GamesScreen's switch cases will keep the
-   game subclasses alive through --gc-sections.
+1. SIM not physically inserted (the most likely answer; the
+   flasher Mac just has a bare PCB plugged in).
+2. PWR_KEY (GPIO 12) polarity wrong -- the Quectel datasheet
+   wants a 2.5 s LOW pulse with the line idle HIGH; double-
+   check `hal/modem.c` against the schematic.
 
-If /11 hits a wall (e.g. transitive deps explode), the next
-fire can:
-  * Revert /11 and fall back to **S-MP20/12** (the simpler
-    final wiring step -- PhoneMainMenu's Games tile +
-    PhoneDialerScreen wiring); or
-  * Skip directly to **S-MP21** (modem hardware bring-up),
-    which is decoupled from games-engine work.
+The next fire should:
 
-Once /11 + /12 both land, S-MP20 is done -- four games are
-playable through the menu, plus the dialer is wired to the
-left soft key -- and we advance to S-MP21.
+* Read `mp24/main/hal/modem.c` end-to-end, especially the
+  PWR_KEY pulse code.
+* Cross-check against `GSM_module.kicad_sch` -- verify the
+  PWR_KEY net polarity matches the code's assumption.
+* If polarity is correct, log an explicit `AT+CPIN?` /
+  `AT+COPS?` retry loop after the boot probe to make the
+  "no SIM" failure mode visible in boot.log (currently we
+  only see the silence).
+* Punt the actual SIM insertion to the user via a clear
+  log message + a memory note. This is the first feature
+  that's gated on the physical hardware state.
+
+**Smaller-budget alternatives** if S-MP21 looks too large for
+a single fire:
+
+* **Walk every menu destination once in chat** -- compile a
+  punch-list of which downstream screens visibly render vs.
+  which are still LVGL-blank-screen stubs. This is the
+  S-MP26 polish-and-verify pass and could be done now to
+  inform what gets fixed in S-MP22-25.
+* **Start S-MP23 -- StorageStub.cpp -> NVS-backed
+  Repo<T>.** This is independent of modem bring-up and a
+  small, well-scoped change.
 
 ## Helper script note carried from prior fires
 
 * The helpers (`flash_iter.sh`, `addr2line.py`) need to be
-  recreated each fire from the brief; the new sandbox doesn't
+  recreated each fire from the brief; the sandbox doesn't
   preserve `/home/claude/` (in fact, `/home/claude/` is not
   writable -- `mkdir: cannot create directory '/home/claude':
-  Permission denied`). In this fire's sandbox the user was
-  `practical-confident-carson`, `$HOME` was `/sessions/
-  practical-confident-carson`, and `/sessions/...` was 100%
-  full (`9.8G/9.8G`), so the writable scratch path used was
-  `/tmp/work/` (1.1 GB free under `/`). The repo cloned to
-  `/tmp/work/repo/mp_firmware/`. As before, the bash tool's
+  Permission denied`). The brief's `if [[ ! -d /home/claude/
+  repo/mp_firmware ]]` check therefore always fires and the
+  clone command fails on the missing parent. In this fire's
+  sandbox the user was `tender-magical-knuth`, `$HOME` was
+  `/sessions/tender-magical-knuth`, and `/sessions/...` was
+  100% full again (9.8G/9.8G -- it appears to be a shared
+  filesystem across all parallel sessions), so the writable
+  scratch path used was `/tmp/` (903 MB free under `/`).
+  The repo cloned to `/tmp/mp_firmware/`. `pyelftools` had
+  to be installed with `PYTHONUSERBASE=/tmp/pylocal pip
+  install --user --no-cache-dir pyelftools` to avoid the
+  default install path on the full `/sessions` filesystem. As before, the bash tool's
   45-second timeout makes the helper scripts impractical to
   run end-to-end; this fire used the chunked GH API approach
   (poll jobs every 40s with a separate bash call each time)
@@ -200,8 +218,12 @@ left soft key -- and we advance to S-MP21.
 
 ## Roadmap status snapshot
 
-* **S-MP20** -- in progress (all four games compile + link;
-  GamesScreen wiring + Phone menu wiring still to go).
+* **S-MP20** -- DONE. Games engine + glm + four games (Snake,
+  SpaceInvaders, Bonk, SpaceRocks) all compile + link;
+  PhoneGamesScreen wired via PhoneMainMenu Games tile;
+  PhoneDialerScreen wired via Home left softkey AND
+  PhoneMainMenu Phone tile. All eight menu tiles now have
+  real compiled destinations. (See /11-/14 below.)
   * /1: glm vendoring (done in earlier fire)
   * /2: GameObject.cpp in SRCS (commit `65572e3`)
   * /2/1: undef Arduino radians/degrees macros (commit `dde74d9`)
@@ -264,10 +286,25 @@ left soft key -- and we advance to S-MP21.
     `cd0094d`). Build GREEN on the first push -- no
     fix-forwards. All four TUs compile + link + gc-section'd;
     binary delta 0. -- THIS FIRE.**
-  * /11: PLANNED for next fire -- GamesScreen +
-    PhoneGamesScreen in SRCS; binary GROWS (4 games x
-    ~5-15 KB each = ~20-60 KB delta).
-  * /12: PLANNED -- wire PhoneMainMenu's Games tile +
-    PhoneDialerScreen. After /12, S-MP20 is done.
+  * /11: PhoneGamesScreen wired -- REVERTED (commit
+    `6907b78` shipped, `9b92e41` reverted). ResourceManager
+    undef references at link.
+  * /12a: ResourceManagerShim.cpp -- SPIFFS-only stub for
+    Game-engine resource loading (commit `b24ff16`).
+  * /12: re-land PhoneGamesScreen + PhoneMainMenu Games-tile
+    wiring atop ResourceManagerShim (commit `7a4c015`).
+    Build GREEN. Binary unchanged (still no PhoneDialerScreen
+    in SRCS, so HomeFactory's leftover stub branch keeps
+    things small).
+  * **/13: PhoneDialerScreen.cpp added to SRCS (commit
+    `c073518`). Build GREEN on the first push -- no
+    fix-forwards. Binary delta near-zero (no instantiation
+    site yet). -- THIS FIRE.**
+  * **/14: Wire PhoneDialerScreen from PhoneHomeScreen left
+    softkey + PhoneMainMenu Phone tile via HomeFactory.cpp
+    (commit `29c6eeb`). Build GREEN on the first push.
+    Binary grows ~415 KB as PhoneDialerScreen and its seven
+    Phone-feature dependency screens stop getting dropped
+    by --gc-sections. S-MP20 is DONE. -- THIS FIRE.**
 * **S-MP21** -- not started (modem hardware bring-up)
 * **S-MP22+** -- not started
