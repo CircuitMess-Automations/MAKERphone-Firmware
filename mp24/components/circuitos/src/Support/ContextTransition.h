@@ -2,7 +2,7 @@
 #define CIRCUITOS_CONTEXTTRANSITION_H
 
 #include "../Loop/LoopListener.h"
-#include "../Display/Display.h"
+#include <Display/Display.h>
 
 class Context;
 
