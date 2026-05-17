@@ -8,17 +8,17 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-17 ~15:11
-* **HEAD on `main`:** `853c344` (`feat(mp24): S-MP20/4d -- land
-  StaticRC.cpp via shim patches`). The docs checkpoint commit on
-  top of that is outside the CI path filter, so the green build
-  state is preserved.
-* **Build status:** GREEN. Run `25994466122` -- build job
+* **Date (UTC):** 2026-05-17 ~15:32
+* **HEAD on `main`:** `19b8e1f` (`feat(mp24): S-MP20/4e -- land
+  SpriteRC.cpp via three shim patches`). A docs checkpoint
+  commit on top of this one will be outside the CI path filter,
+  so the green build state is preserved.
+* **Build status:** GREEN. Run `25994949457` -- build job
   `success`, flash job `success`. Zero fix-forwards this fire --
   the feat commit landed clean on first try (same pattern as
-  S-MP20/4b + S-MP20/4c).
+  S-MP20/4b + S-MP20/4c + S-MP20/4d).
 * **Device boot status:** HEALTHY. boot.log from artifact
-  `7043542391` (42 lines, 0 crash markers) shows the same shape
+  `7043691390` (42 lines, 0 crash markers) shows the same shape
   as the prior fires:
 
       STORE: mounted; 2 files, 1757 / 1860161 bytes used (0%)
@@ -30,79 +30,89 @@ does not consume a build.
   territory: SIM presence + PWR_KEY polarity). No `Guru`,
   `panic`, `abort`, or backtrace anywhere in the log.
 * **Flasher status:** ONLINE and reliable.
-* **Binary size:** 883296 bytes / 2 MB partition (43% used, 1.16
-  MB free). **Identical byte-count** to the prior two fires'
-  images (S-MP20/4b + S-MP20/4c), which confirms `--gc-sections`
-  discarded `StaticRC.cpp` whole at link time exactly as
-  predicted -- the TU compiled cleanly but its symbols are
-  unreferenced (no screen instantiates any StaticRC yet, and
-  Game.h is not in SRCS), so the linker dropped them. Likewise
-  the new shim no-op overloads (`Sprite::drawIcon(File, ...)` +
-  `Sprite::pushRotateZoomWithAA`) are gc'd. Established
-  "compile-only validation" pattern from S-MP20/2 -> /3 -> /4 ->
-  /4b -> /4c.
+* **Binary size:** 883408 bytes / 2 MB partition (43% used, 1.16
+  MB free). +112 bytes vs the prior fire's 883296 -- explained
+  by the new `Sprite : public TFT_eSprite` inheritance (vtable
+  layout extends to include the inherited TFT_eSprite vtable
+  entries) plus the two new no-op method symbols
+  (`pushRotateZoomWithAA` 7-arg overload + the TFT_eSprite-base
+  ctor calls in two Sprite ctors). The SpriteRC.cpp TU itself
+  was still gc'd at link time as predicted: nothing in SRCS
+  instantiates a SpriteRC -- only Game.h's chain does, and
+  Game.h is not in SRCS. Compile-only validation pattern from
+  S-MP20/2 -> /3 -> /4 -> /4b -> /4c -> /4d holds.
 
-## What S-MP20/4d actually shipped (in commit `853c344`)
+## What S-MP20/4e actually shipped (in commit `19b8e1f`)
 
-The third leaf of the Rendering subsystem:
-`src/Games/GameEngine/Rendering/StaticRC.cpp` (31 lines). It
-wraps a File-backed RGB565 icon at fixed PixelDim, with `push()`
-branching on rotation: `rot == 0` calls `parent->drawIcon(file,
-pos.x, pos.y, dim.x, dim.y)` direct; non-zero rot allocates a
-temp Sprite, drawIcon's into it with TFT_TRANSPARENT mask, then
-`pushRotateZoomWithAA(x, y, rot, 1, 1, TFT_TRANSPARENT)` on the
-temp.
+The fourth leaf of the Rendering subsystem:
+`src/Games/GameEngine/Rendering/SpriteRC.cpp` (18 lines). Owns
+a `std::shared_ptr<Sprite>` built via `std::make_shared<Sprite>(
+(Sprite*)nullptr, dim.x, dim.y)`; `push()` branches on `rot == 0`
+to either a direct `sprite->push(parent, x, y)` or a
+`sprite->pushRotateZoomWithAA(parent, mid_x, mid_y, rot, 1, 1,
+TFT_TRANSPARENT)` self-blit around the sprite mid-point.
 
 Three shim diffs ship in the same commit so the TU compiles:
 
-  - `circuitos_shim/include/TFT_eSPI.h` -- adds `TFT_TRANSPARENT
-    0x0120` to the canonical Bodmer palette block. Same pattern
-    as the TFT_BLACK / TFT_RED / ... macros landed in S-MP20/4.
-  - `circuitos_shim/include/Display/Sprite.h` -- adds `#include
-    <FS.h>` (for the `File` type), a `drawIcon(File, ...)`
-    overload, and `pushRotateZoomWithAA(x, y, rot, sx, sy,
-    chroma)` -- the 6-arg no-parent variant. The SpriteRC 7-arg
-    with-parent variant is NOT added; held back for S-MP20/4e.
-  - `circuitos_shim/MP24Sprite.cpp` -- no-op definitions for both
-    new methods, matching the 9C-shim drawing-stub policy.
+  - `circuitos_shim/include/Display/Sprite.h`
+      * `class Sprite : public TFT_eSprite` -- restores the
+        inheritance the upstream Sprite class uses, so the
+        `static_cast<TFT_eSprite*>(sprite.get())
+        ->setSwapBytes(false)` line in the SpriteRC ctor
+        compiles. `setSwapBytes` is inherited from TFT_eSPI and
+        remains a no-op stub.
+      * `int16_t width()` / `int16_t height()` accessors --
+        upstream SpriteRC calls `.width()` / `.height()` (not
+        the CircuitOS `getWidth()` / `getHeight()` pair) to
+        compute the rotation mid-point. Both names now coexist.
+      * 7-arg `pushRotateZoomWithAA(Sprite*, int16_t, int16_t,
+        float, float, float, uint16_t)` overload -- the
+        WITH-parent variant used by SpriteRC's non-zero-rot
+        branch. The 6-arg variant landed in S-MP20/4d.
 
-CMakeLists.txt grew by one SRCS entry + a 20-line comment block
-explaining the shim diff set and the gc-sections gambit. Net
-diff: 4 files, +65 lines, 0 lines removed.
+  - `circuitos_shim/MP24Sprite.cpp`
+      * Two non-delegating Sprite ctors (`TFT_eSPI*, ...`) and
+        (`Sprite*, ...`) now forward the parent argument to the
+        TFT_eSprite base via the member-init list.
+      * No-op definition for the new 7-arg pushRotateZoomWithAA.
+
+  - `chatter_app/CMakeLists.txt`
+      * Adds SpriteRC.cpp to SRCS, with a comment block
+        explaining the shim diff set and the gc-sections gambit.
+
+Net diff: 3 files, +67 lines, -3 lines.
 
 ## What the next fire should do
 
 Pick ONE of these. Roughly ordered by risk-adjusted payoff.
 
-1. **S-MP20/4e -- Land `SpriteRC.cpp`** (18 lines). Pulls
-   `std::make_shared<Sprite>`, `Sprite::pushRotateZoomWithAA(
-   parent, x, y, rot, sx, sy, t)` -- the 7-arg WITH-parent
-   variant (this fire only added the 6-arg variant), and
-   `setSwapBytes` via TFT_eSprite cast. The
-   `setSwapBytes` call already has a TFT_eSPI stub (no-op).
-   Expect 1 fix-forward (the 7-arg pushRotateZoomWithAA overload
-   if I haven't pre-added it). **Recommended next.**
+1. **S-MP20/4f -- Vendor `<Display/GIFAnimatedSprite.h>` +
+   land `AnimRC.cpp`** (5th and last Rendering leaf). AnimRC
+   holds a `std::unique_ptr<GIFAnimatedSprite>` and its `push()`
+   calls `gif->push(parent, x, y)` and `gif->pushRotate(parent,
+   x, y, rot)`. We need to:
+   - Add a new shim header `circuitos_shim/include/Display/
+     GIFAnimatedSprite.h` that forward-declares a
+     `GIFAnimatedSprite` class with `push(Sprite*, int16_t,
+     int16_t)` + `pushRotate(Sprite*, int16_t, int16_t, float)`
+     + a ctor that accepts a `File`.
+   - Add no-op definitions in a new shim TU (or piggy-back on
+     MP24Sprite.cpp).
+   - Inspect upstream AnimRC.cpp/h to confirm the call
+     signatures + ctor shape before sketching the shim.
+   **Recommended next.** Same gc-sections gambit -- nothing in
+   SRCS instantiates AnimRC.
 
-2. **S-MP20/4f -- Vendor `<Display/GIFAnimatedSprite.h>`** before
-   AnimRC.cpp can land. Inspect the existing
-   `mp24/components/circuitos_shim/include/Display/` layout
-   (just `Display.h`, `Sprite.h`; Color.h is supplied by
-   upstream circuitos) and add a `GIFAnimatedSprite.h`
-   forwarding to an empty class with the same shape upstream
-   has. AnimRC's `gif->push(parent, x, y)` and
-   `gif->pushRotate(parent, x, y, rot)` need stubs too.
+2. **S-MP20/5 -- Land `Game.cpp` + `GameSystem.cpp`** (gated on
+   /4f). With all five Rendering leaves having .cpp coverage,
+   Game.cpp's `render(this, ...)` and `collision(this)` member-
+   init lines should resolve cleanly at link time even with
+   --gc-sections. Still need `extern Game* startedGame` defined
+   somewhere -- the prior plan recommended SleepServiceStub.cpp
+   alongside the existing `gameStarted` extern.
 
-3. **S-MP20/5 -- Land `Game.cpp` + `GameSystem.cpp`.** With both
-   GameEngine systems (Collision + Rendering) now having every
-   leaf .cpp compiling clean (5 of 5 leaves landed), Game.cpp's
-   `render(this, ...)` and `collision(this)` member-init lines
-   should resolve at link time even with --gc-sections. Still
-   need `extern Game* startedGame` defined somewhere -- the
-   prior plan recommended SleepServiceStub.cpp alongside the
-   existing `gameStarted` extern.
-
-4. **S-MP20/6 -- Highscore.cpp** (parallel-safe leaf -- can
-   land any time, doesn't touch the engine wiring).
+3. **S-MP20/6 -- Highscore.cpp** (parallel-safe leaf -- can land
+   any time, doesn't touch the engine wiring).
 
 ## Helper script note carried from prior fires
 
@@ -116,13 +126,13 @@ Pick ONE of these. Roughly ordered by risk-adjusted payoff.
   timeout. Workaround: poll the GitHub Actions REST API directly
   in shorter bash calls (`sleep 35 && curl .../jobs`). The full
   helper-script invocation is impractical -- do it manually in
-  chunks.
+  chunks. This fire used the chunked approach successfully.
 * `pyelftools` must be installed each fire:
   `pip install --break-system-packages --quiet pyelftools`.
   (Skip if no crash to decode -- this fire didn't need it.)
-* The repo lives at `$HOME/repo/mp_firmware`. Clone with
-  `--depth=50` to avoid blowing the /sessions disk quota (~538
-  MB free at session start).
+* The repo lives at `$HOME/repo/mp_firmware`. Plain `git clone`
+  with no `--depth` was fine on the ~538 MB /sessions disk in
+  this fire; the .git ended up at ~16 MB.
 
 ## Open items unchanged from the brief
 
@@ -145,15 +155,13 @@ Pick ONE of these. Roughly ordered by risk-adjusted payoff.
     `96d76f6`)
   * /4b: RenderComponent.cpp in SRCS (commit `1fa9321`)
   * /4c: RenderSystem.cpp in SRCS (commit `1109bb5`)
-  * **/4d: StaticRC.cpp landed via shim patches (commit
-    `853c344`) <-- THIS FIRE**
-  * /4e: SpriteRC.cpp (next fire)
-  * /4f: AnimRC.cpp + GIFAnimatedSprite shim (later)
-  * /5: Game.cpp + GameSystem.cpp -- both engine subsystems'
-    leaves now have full .cpp coverage, so the
-    render(this,...) + collision(this) member-init lines should
-    link cleanly. Still gated on extern Game* startedGame being
-    defined.
+  * /4d: StaticRC.cpp landed via shim patches (commit `853c344`)
+  * **/4e: SpriteRC.cpp landed via three shim patches (commit
+    `19b8e1f`) <-- THIS FIRE**
+  * /4f: AnimRC.cpp + GIFAnimatedSprite shim (next fire)
+  * /5: Game.cpp + GameSystem.cpp -- gated on /4f finishing the
+    Rendering leaf set. Still also gated on extern Game*
+    startedGame being defined somewhere.
   * /6: Highscore.cpp (parallel-safe)
   * /7+: four game implementations, GamesScreen wiring, dialer
 * **S-MP21** -- not started (modem hardware bring-up)
