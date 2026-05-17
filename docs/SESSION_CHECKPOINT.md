@@ -8,18 +8,18 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-17 ~15:50
-* **HEAD on `main`:** `9fe4bf1` (`feat(mp24): S-MP20/4f -- land
-  AnimRC.cpp via new GIFAnimatedSprite shim`). A docs checkpoint
+* **Date (UTC):** 2026-05-17 ~16:42
+* **HEAD on `main`:** `c4ad2ed` (`feat(mp24): S-MP20/5 -- land
+  Game.cpp + GameSystem.cpp via shim patch`). A docs checkpoint
   commit on top of this one will be outside the CI path filter,
   so the green build state is preserved.
-* **Build status:** GREEN. Run `25995428897` -- build job
+* **Build status:** GREEN. Run `25996590264` -- build job
   `success`, flash job `success`. Zero fix-forwards this fire --
-  the feat commit landed clean on first try (same pattern as
-  S-MP20/4b + /4c + /4d + /4e -- 5-in-a-row clean landings on
-  the Rendering subsystem).
+  the feat commit landed clean on first try, making it six clean
+  landings in a row on the GameEngine subsystem (S-MP20/4b + /4c
+  + /4d + /4e + /4f + /5).
 * **Device boot status:** HEALTHY. boot.log from artifact
-  `7043838875` (40 lines, 0 crash markers) shows the same shape
+  `7044185429` (40 lines, 0 crash markers) shows the same shape
   as the prior fires:
 
       STORE: mounted; 2 files, 1757 / 1860161 bytes used (0%)
@@ -32,97 +32,101 @@ does not consume a build.
   `panic`, `abort`, or backtrace anywhere in the log.
 * **Flasher status:** ONLINE and reliable.
 * **Binary size:** 883408 bytes / 2 MB partition (43% used, 1.16
-  MB free). **Identical to the prior fire's 883408** -- AnimRC.cpp
-  TU + the seven new no-op GIFAnimatedSprite symbols get gc'd at
-  link time, exactly as predicted. Nothing in SRCS instantiates
-  AnimRC, so the linker drops the TU and everything reachable
-  only from it. Compile-only validation pattern from S-MP20/2 ->
-  /3 -> /4 -> /4b -> /4c -> /4d -> /4e -> /4f holds.
+  MB free). **Identical to the prior fire's 883408** -- Game.cpp
+  + GameSystem.cpp TUs get gc'd at link time as predicted.
+  Nothing in the 229-entry SRCS list pulls Game.h directly or
+  transitively (audit verified), so --gc-sections drops both
+  TUs and all their external references (InputChatter::
+  getInputInstance, FSLVGL::loadCache, Chatter, ChirpSystem::
+  stop, the friend Game::objects access from GameSystem).
+  Compile-only validation pattern from S-MP20/2 -> /3 -> /4 ->
+  /4b -> /4c -> /4d -> /4e -> /4f -> /5 holds.
 
-## What S-MP20/4f actually shipped (in commit `9fe4bf1`)
+## What S-MP20/5 actually shipped (in commit `c4ad2ed`)
 
-The fifth and last leaf of the Rendering subsystem:
-`src/Games/GameEngine/Rendering/AnimRC.cpp` (48 lines). Owns a
-`std::unique_ptr<GIFAnimatedSprite>` built via
-`std::make_unique<GIFAnimatedSprite>(nullptr, file)`. push()
-branches on `rot == 0` between `gif->push(parent, pos.x, pos.y)`
-and `gif->pushRotate(parent, pos.x, pos.y, rot)`. Also exercises
-start/stop/reset/setLoopMode/setLoopDoneCallback on the gif.
+The engine core: `src/Games/GameEngine/Game.cpp` (~120 LOC) and
+`src/Games/GameEngine/GameSystem.cpp` (4 LOC). Together they
+provide the Game base class (LVScreen-host pattern + LoopListener
+ticking + load/start/stop/pop lifecycle + ResourceManager-backed
+asset loading + CollisionSystem + RenderSystem ownership) and
+the GameSystem base class (ctor + friend-accessed
+Game::objects getter).
 
-Three pieces in the commit, all required for AnimRC.cpp to link:
+Two pieces in the commit:
 
-  - **NEW** `circuitos_shim/include/Display/GIFAnimatedSprite.h`
-    -- 80 lines. Forward declares a `GIFAnimatedSprite` class
-    with the ctor `(Sprite*, const fs::File&)` plus six methods
-    (`start/stop/reset/push/pushRotate/setLoopMode/
-    setLoopDoneCallback`). Pulled in via angle-brackets from
-    chatter_app, where `circuitos_shim` is FIRST in REQUIRES so
-    its include path preempts the upstream
-    `circuitos/src/Display/GIFAnimatedSprite.h` (whose impl
-    can't link because the circuitos Display/ subtree is
-    excluded from the build). Transitively brings `<Util/GIF.h>`
-    in for the `GIF::LoopMode { Auto, Single, Infinite }` enum.
+  - `chatter_app/CMakeLists.txt` -- adds Game.cpp + GameSystem.cpp
+    to SRCS with a comment block explaining the audit (only six
+    upstream files include Game.h: PhoneDialerScreen,
+    PhoneGamesScreen, MainMenu, GamesScreen, ShutdownService,
+    SleepService -- all six excluded from SRCS) and the gc-
+    sections gambit. Slot is between AnimRC.cpp (the /4f leaf)
+    and the S-MP18j Storage stub group.
 
-  - `circuitos_shim/MP24Sprite.cpp` -- piggy-backs seven no-op
-    definitions onto the existing Sprite TU. One ctor + six
-    methods, all trivial: ctor is empty, dtor is empty,
-    start/stop/reset/setLoopMode/setLoopDoneCallback are
-    empty, push/pushRotate accept-args-and-do-nothing.
+  - `chatter_app/shim/SleepServiceStub.cpp` -- defines
+    `Game* startedGame = nullptr;` alongside the existing
+    `bool gameStarted = false;`. Forward-declared `class Game;`
+    is sufficient; the pointer is never derefed in this TU.
+    Belt-and-braces: if gc-sections ever fails to drop Game.cpp,
+    this satisfies the `extern Game* startedGame;` reference
+    from Game.cpp's start()/stop() bodies.
 
-  - `chatter_app/CMakeLists.txt` -- adds AnimRC.cpp to SRCS with
-    a comment block explaining the dep chain + the gc-sections
-    gambit. Slot is between SpriteRC.cpp (the /4e leaf) and the
-    S-MP18j Storage stub group.
-
-Net diff: 3 files, +191 lines, -0 lines.
+Net diff: 2 files, +63 lines, -0 lines.
 
 ## What the next fire should do
 
 Pick ONE of these. Roughly ordered by risk-adjusted payoff.
 
-1. **S-MP20/5 -- Land `Game.cpp` + `GameSystem.cpp`.** Rendering
-   subsystem .cpp coverage is now complete
-   (RenderComponent + RenderSystem + StaticRC + SpriteRC +
-   AnimRC). Game.cpp's member-init `render(this, ...)` and
-   `collision(this)` lines should resolve cleanly at link time
-   even with --gc-sections. Still gated on `extern Game*
-   startedGame` being defined somewhere -- the prior plan
-   recommended putting it in `SleepServiceStub.cpp` alongside
-   the existing `gameStarted` extern.
-   **Recommended next.** Audit Game.h + GameSystem.h to find
-   any further externs / unresolved dependencies before the
-   commit; do the audit in a single fire chunk if uncertain
-   rather than risk a fix-forward chain.
+1. **S-MP20/6 -- Land `Highscore.cpp`.** Parallel-safe leaf that
+   provides per-game high-score persistence. Header is at
+   `src/Games/GameEngine/Highscore.h`; the .cpp is small (~80
+   LOC). Audit its deps first: it likely pulls Settings.h
+   (chatter_library, available) and ResourceManager.h (already
+   reachable since Game.h pulls it). If the audit is clean it
+   compiles + gc's the same way the /4* leaves did.
+   **Recommended next.**
 
-2. **S-MP20/6 -- Highscore.cpp** (parallel-safe leaf -- can land
-   any time, doesn't touch the engine wiring). Worth taking
-   first if S-MP20/5 audit surfaces an unknown.
+2. **S-MP20/7 -- First game implementation (Snake).** Snake is
+   the simplest of the four upstream games. Pulls Game.h
+   transitively (via `Snake : public Game`). Once Snake.cpp is
+   in SRCS, the linker *will* retain Game.cpp + GameSystem.cpp
+   + the Rendering + Collision leaves because Snake's ctor
+   chains into Game's ctor which in turn instantiates
+   RenderSystem + CollisionSystem. That's a much bigger leap
+   than /5 -- expect compile + link surprises (InputChatter::
+   getInputInstance not defined; FSLVGL::loadCache not defined;
+   etc.). Plan for a 30-min budget of audit + maybe one fix-
+   forward.
 
-3. **S-MP20/7 -- First game implementation (Snake, simplest of
-   the four).** Pulls in Game.cpp + GameSystem.cpp transitively,
-   so it's effectively gated on /5 landing. Defer until /5 is
-   green.
+3. **Audit InputChatter + FSLVGL availability before /7.** Game.
+   cpp's start() / stop() call `InputChatter::getInputInstance()`
+   and pop() calls `FSLVGL::loadCache()`. Neither InputChatter.cpp
+   nor FSLVGL.cpp is in SRCS. If Snake.cpp's link path retains
+   Game.cpp, those will be unresolved externals. Decide whether
+   to stub them (no-op shim, same pattern as the other Stubs)
+   or to land the real .cpp's first.
 
 ## Helper script note carried from prior fires
 
 * The helpers (`flash_iter.sh`, `addr2line.py`) need to be
   recreated each fire from the brief; the new sandbox doesn't
   preserve `/home/claude/`. In this sandbox `$HOME` is
-  `/sessions/<id>/`. Place them at `$HOME/flash_iter.sh` +
-  `$HOME/addr2line.py` and adjust internal path references.
+  `/sessions/<id>/`. Place them at `$HOME/work/flash_iter.sh` +
+  `$HOME/work/addr2line.py` and adjust internal path
+  references.
 * `flash_iter.sh` polls in 30-second intervals up to 12 minutes,
   which exceeds the 45-second `mcp__workspace__bash` tool
   timeout. Workaround: poll the GitHub Actions REST API directly
   in shorter bash calls (`sleep 35 && curl .../jobs`). The full
   helper-script invocation is impractical -- do it manually in
   chunks. This fire used the chunked approach successfully again
-  (build ~4 min, flash ~30 s, all polled in 35-40 s chunks).
+  (build ~2.5 min, flash ~30 s, all polled in 35-40 s chunks).
+* The CI workflow triggers on push automatically via the
+  `mp24/**` path filter -- no manual `workflow_dispatch` needed.
 * `pyelftools` must be installed each fire:
   `pip install --break-system-packages --quiet pyelftools`.
   (Skip if no crash to decode -- this fire didn't need it.)
-* The repo lives at `$HOME/repo/mp_firmware`. `git clone --depth
-  50` is sufficient to fit comfortably on the ~1.3 GB /sessions
-  disk; the .git ended up at ~5 MB shallow.
+* The repo lives at `$HOME/work/repo/mp_firmware`. `git clone`
+  (no --depth flag works fine on this sandbox; ~50 MB).
 
 ## Open items unchanged from the brief
 
@@ -148,14 +152,12 @@ Pick ONE of these. Roughly ordered by risk-adjusted payoff.
   * /4d: StaticRC.cpp landed via shim patches (commit `853c344`)
   * /4e: SpriteRC.cpp landed via three shim patches (commit
     `19b8e1f`)
-  * **/4f: AnimRC.cpp landed via new GIFAnimatedSprite shim
-    (commit `9fe4bf1`) <-- THIS FIRE -- Rendering subsystem
-    .cpp coverage complete**
-  * /5: Game.cpp + GameSystem.cpp -- now unblocked from the
-    Rendering-deps angle. Still gated on `extern Game*
-    startedGame` being defined somewhere (recommended host:
-    SleepServiceStub.cpp alongside the existing `gameStarted`
-    extern).
+  * /4f: AnimRC.cpp landed via new GIFAnimatedSprite shim
+    (commit `9fe4bf1`) -- Rendering subsystem .cpp coverage
+    complete
+  * **/5: Game.cpp + GameSystem.cpp landed via SleepServiceStub
+    `Game* startedGame` definition (commit `c4ad2ed`) <-- THIS
+    FIRE -- GameEngine subsystem .cpp coverage complete**
   * /6: Highscore.cpp (parallel-safe)
   * /7+: four game implementations, GamesScreen wiring, dialer
 * **S-MP21** -- not started (modem hardware bring-up)
