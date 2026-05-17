@@ -251,9 +251,36 @@ jobs:
           # (flash mode/freq/size + 3 offset/file pairs). Working
           # directory is the artifact root so the relative paths inside
           # flash_args resolve correctly.
-          esptool --chip esp32s3 --port "$MP24_PORT" --baud 460800 \
-            --before usb-reset --after hard-reset \
-            write-flash @flash_args
+          # esptool can fail with "No serial data received" when
+          # the firmware in flash is in a tight crash loop — the
+          # chip resets faster than esptool can establish sync.
+          # `--before usb-reset` SHOULD recover it, but if the
+          # crash happens too early the chip never sits in ROM
+          # long enough to respond.
+          #
+          # Retry up to 8 times with a 3-second pause between
+          # attempts; the cumulative resets eventually catch the
+          # chip during a longer ROM-mode window. Each attempt
+          # is otherwise identical.
+          OK=0
+          for attempt in 1 2 3 4 5 6 7 8; do
+            echo "=== Flash attempt $attempt/8 ==="
+            if esptool --chip esp32s3 --port "$MP24_PORT" --baud 460800 \
+                 --before usb-reset --after hard-reset \
+                 write-flash @flash_args; then
+              OK=1
+              break
+            fi
+            echo "Attempt $attempt failed; sleeping 3s before retry..."
+            sleep 3
+          done
+          if [ $OK -ne 1 ]; then
+            echo "All 8 flash attempts failed — device is unrecoverable"
+            echo "via esptool. Most likely cause: firmware in flash"
+            echo "is crashing too early for ROM USB-Serial/JTAG to"
+            echo "respond. Physical recovery needed (SW24 BOOT pin)."
+            exit 2
+          fi
           echo ""
           echo "✓ Flash complete. The MAKERphone should now be running"
           echo "  the new firmware. Open USB-CDC serial to view logs."
