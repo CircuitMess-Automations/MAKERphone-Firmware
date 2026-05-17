@@ -296,6 +296,12 @@ idf_component_register(
         "${SRC_DIR}/Screens/PhonePlaylistsScreen.cpp"
         "${SRC_DIR}/Screens/PhoneDiagScreen.cpp"
 
+        # S-MP18r: three core messaging screens, unblocked by
+        # the S-MP18q Element batch.
+        "${SRC_DIR}/Screens/InboxScreen.cpp"
+        "${SRC_DIR}/Screens/FriendsScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneCallEnded.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
