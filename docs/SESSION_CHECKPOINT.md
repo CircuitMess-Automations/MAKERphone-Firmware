@@ -8,83 +8,80 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-18 ~22:11 UTC
-* **HEAD on `main`:** `abff9ed` (`feat(mp24): S-MP21/1 -- post-
-  READY SIM/signal/operator probes`). One feature commit, GREEN
-  on first build with zero fix-forwards.
-* **Build status:** GREEN at HEAD `abff9ed` (run
-  `26004109536`, both `build` and `flash` jobs completed/
+* **Date (UTC):** 2026-05-18 ~22:32 UTC
+* **HEAD on `main`:** `d9968a0` (`feat(mp24): S-MP21/2 --
+  rate-limit modem boot probe log + add FAIL triage`). One
+  feature commit, GREEN on first build with zero fix-forwards.
+* **Build status:** GREEN at HEAD `d9968a0` (run
+  `26004546942`, both `build` and `flash` jobs completed/
   success).
 * **Device boot status:** HEALTHY. boot.log scan: 0 crash
-  markers. Same boot sequence as prior fires:
+  markers. NEW cleaner boot sequence in this fire:
 
-      BATT: curve-fitting cal active
       STORE: mounted; 2 files, 1757 / 1860161 bytes used (0%)
       POWER: polling GPIO2 at 50 Hz, debounce 3 ticks
       MP24: Entering background-tasks-only loop (LVGL owns the panel).
-      MODEM: state -> POWER -> BOOT -> boot probe... (up to 16 s)
+      MODEM: state -> POWER
+      MODEM: state -> BOOT
+      MODEM: boot probe... (0 s elapsed)
+      MODEM: boot probe... (5 s elapsed)
+      MODEM: boot probe... (10 s elapsed)
+      MODEM: boot probe... (15 s elapsed)
 
-  The new SIM/signal/operator probes do **not** appear in this
-  fire's boot.log because the modem is still stuck in BOOT --
-  never reaches READY -- so the post-`AT+CGMM` code path is
-  unreached. That's the expected current hardware state (bare
-  PCB, no SIM, modem-firmware probe never returns OK). The new
-  probes are in place and will fire the moment the modem comes
-  alive.
+  Boot probe log dropped from ~36 lines/20s capture to 4. The
+  20 s boot capture window ends before the 30 s MODEM_FAILED
+  timeout, so the new FAIL triage hints remain latent but in
+  place. The post-READY SIM/signal/operator probes from
+  S-MP21/1 are likewise unreached -- same hardware blocker as
+  before (no SIM, modem firmware never gets to "OK").
 * **Flasher status:** ONLINE and reliable.
-* **Binary size:** `mp24-firmware` artifact is 12,120,420 bytes
-  at HEAD `abff9ed` (up from 12,119,504 at `29c6eeb` -- a
-  +916 byte delta from the ~25 lines of new logic + format
-  strings). Still well under the 2 MB app partition.
+* **Binary size:** unchanged within noise -- patch adds ~6
+  short ESP_LOG strings.
 
 ## What this fire actually shipped (net)
 
-S-MP21 has its first incremental step landed.
+S-MP21 has its second incremental step landed.
 
-1. **`abff9ed` -- S-MP21/1.** Extended `mp24/main/hal/modem.c`
-   `modem_sm_task()` to add three best-effort AT probes after
-   the existing `AT+CGMM` model query, before `vTaskDelete`:
+1. **`d9968a0` -- S-MP21/2.** Two small improvements to
+   `mp24/main/hal/modem.c` `modem_sm_task()`:
 
-     * `AT+CPIN?` (3s timeout) -- SIM state: `READY`, `SIM PIN`,
-       or `+CME ERROR: 10` (no SIM). Logged as `SIM: <state>`.
-       If `modem_at_send` returns non-OK, logs an explicit
-       hint that the modem likely returned no-SIM/locked.
-     * `AT+CSQ` (2s timeout) -- RSSI/BER, e.g. `+CSQ: 18,99`.
-       Logged as `signal: <value>`. Doesn't require
-       registration; only the modem firmware to be up.
-     * `AT+COPS?` (8s timeout) -- current operator name.
-       Logged as `operator: <value>`. The 8 s timeout
-       accommodates an in-progress network re-scan; if the
-       modem is unregistered it returns `+COPS: 0` quickly
-       anyway.
+   - **Rate-limit the boot-probe log to once per 5 elapsed
+     seconds** (plus one line on entry). Previously the probe
+     loop fired `ESP_LOGI("boot probe... (N s elapsed)")` on
+     every iteration -- once per 500 ms -- yielding ~60 lines
+     of essentially identical log noise during the 30 s
+     timeout window when the modem doesn't respond. Now a
+     healthy boot.log shows at most ~7 boot-probe lines. The
+     probe rate itself stays at 500 ms; only the log line is
+     throttled. Robust against scheduler delays: uses
+     `elapsed_s >= last + 5` instead of `% 5 == 0`.
 
-   Each probe is wrapped in an `if (modem_at_send(...) == ESP_OK)`
-   block with a `else { ESP_LOGW(...) }` fallback so a single
-   ERROR / timeout never aborts the others. `resp` buffer
-   bumped 64 -> 96 bytes for longer operator-name responses
-   like `+COPS: 0,0,"T-Mobile Hrvatska",7`.
+   - **Add a four-line triage hint on the 30 s timeout** (the
+     `MODEM_FAILED` path), pointing at the four hardware
+     checks from Q3 in `docs/MP24_OPEN_HW_QUESTIONS.md`:
+     VBAT_RF/VBAT_BB rails, PWR_KEY trace, RESET_N idle level,
+     UART1 wiring. Makes the FAIL log actionable the moment
+     it appears.
 
-   The change is a strict superset of S-MP20's modem behavior:
-   if the modem never wakes up (today's case), the boot.log
-   looks identical. The moment AT starts responding, the next
-   three lines of boot.log will tell us EXACTLY which of the
-   "no SIM / no signal / unregistered" failure modes we're in.
+   Net change: 23 insertions, 7 deletions, single file. No
+   behavior change in the happy path: when the modem responds
+   within seconds, the probe loop logs at most once before
+   exiting.
+
+   Empirically verified in run `26004546942` -- boot.log
+   shrunk from 40 lines (prior fire's snapshot) to 12 lines
+   over the same 20 s capture window. Same MODEM state
+   transitions, just legible now.
 
 ## Why this fire was uneventful
 
-The previous fire (S-MP20/14, HEAD `29c6eeb`) had already
-finished the games-engine compile validation. S-MP20 is
-structurally DONE. This fire moved to S-MP21 (modem hardware
-bring-up) from the roadmap and shipped the smallest useful
-diagnostic step: post-READY visibility.
-
-The 30-minute fire budget covered one CI cycle with room to
-spare. Audit-first approach: read `modem.h` + `modem.c`
-end-to-end (~5 minutes), confirmed PWR_KEY polarity matches
-Quectel V1.1 §3.4.1 in software (idle HIGH, 2.5 s LOW pulse,
-back to HIGH), confirmed UART pins match `pins.h`, identified
-the post-`AT+CGMM` insertion point, wrote the patch (25 lines),
-push -> wait for CI -> boot.log scan.
+The prior two fires already landed the structurally big pieces:
+S-MP20 (games engine + glm + dialer wiring -- DONE) and
+S-MP21/1 (post-READY SIM/signal/operator probes). The board is
+still in the no-SIM / no-modem-response state, so neither set
+of probes has anything to surface. This fire took the obvious
+follow-up: tame the noise so the *next* hardware bring-up
+session can read the log at a glance.
 
 ## Open hardware questions still outstanding
 
