@@ -593,7 +593,25 @@ idf_component_register(
         "${SRC_DIR}/Games/GameEngine/Collision/CircleCC.cpp"
         "${SRC_DIR}/Games/GameEngine/Collision/RectCC.cpp"
         "${SRC_DIR}/Games/GameEngine/Collision/PolygonCC.cpp"
-        "${SRC_DIR}/Games/GameEngine/Collision/CollisionSystem.cpp"
+        # S-MP20/3/1 fix-forward: CollisionSystem.cpp is held back.
+        # Three issues surfaced under our toolchain:
+        #   (1) it includes <glm/gtx/matrix_transform_2d.hpp> and
+        #       <glm/gtx/vector_angle.hpp>, both of which are
+        #       GLM "experimental" extensions and #error out
+        #       unless GLM_ENABLE_EXPERIMENTAL is defined first;
+        #   (2) drawDebug() references TFT_GREEN / TFT_RED, which
+        #       are TFT_eSPI color macros not present in our
+        #       circuitos_shim Sprite header;
+        #   (3) drawPolygon() calls Sprite::drawPixel(x,y) with
+        #       just two args, but our shim's signature is
+        #       drawPixel(int32_t x, int32_t y, uint16_t color).
+        # All three are real diffs from the upstream toolchain
+        # and need patches in either the .cpp or the shim. The
+        # other four Collision/* leaves compile clean, so they
+        # land here and CollisionSystem.cpp is deferred to a
+        # follow-up commit that adds the patches together with a
+        # GLM_ENABLE_EXPERIMENTAL define in arduino_glm_compat.h.
+        #"${SRC_DIR}/Games/GameEngine/Collision/CollisionSystem.cpp"
 
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
