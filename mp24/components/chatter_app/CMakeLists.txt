@@ -803,6 +803,11 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     # in practice (caller invokes the (uint) overload via base
     # pointer; the no-arg member is just an internal helper).
     -Wno-error=overloaded-virtual
+    # S-MP20/4/1: CollisionSystem::drawPolygon declares
+    # `typedef glm::vec2 Point;` and never references the alias.
+    # Modern gcc -Wunused-local-typedefs flags this as an error
+    # under our -Werror=all default. Upstream code, harmless.
+    -Wno-error=unused-local-typedefs
     # Arduino.h gets pre-included so 'String', 'pinMode', 'millis'
     # etc. resolve without each src .cpp having to remember to
     # include it. Same trick used for the circuitos build.
