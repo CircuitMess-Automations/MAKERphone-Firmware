@@ -8,18 +8,18 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-17 ~14:55
-* **HEAD on `main`:** `1109bb5` (`feat(mp24): S-MP20/4c -- add
-  Games/GameEngine/Rendering/RenderSystem.cpp to SRCS`). The
-  docs checkpoint commit on top of that is outside the CI path
-  filter, so the green build state is preserved.
-* **Build status:** GREEN. Run `25994067792` -- build job
+* **Date (UTC):** 2026-05-17 ~15:11
+* **HEAD on `main`:** `853c344` (`feat(mp24): S-MP20/4d -- land
+  StaticRC.cpp via shim patches`). The docs checkpoint commit on
+  top of that is outside the CI path filter, so the green build
+  state is preserved.
+* **Build status:** GREEN. Run `25994466122` -- build job
   `success`, flash job `success`. Zero fix-forwards this fire --
   the feat commit landed clean on first try (same pattern as
-  S-MP20/4b).
+  S-MP20/4b + S-MP20/4c).
 * **Device boot status:** HEALTHY. boot.log from artifact
-  `7043422785` (42 lines, 0 crash markers) shows the same shape
-  as the prior fire:
+  `7043542391` (42 lines, 0 crash markers) shows the same shape
+  as the prior fires:
 
       STORE: mounted; 2 files, 1757 / 1860161 bytes used (0%)
       POWER: polling GPIO2 at 50 Hz, debounce 3 ticks
@@ -31,87 +31,77 @@ does not consume a build.
   `panic`, `abort`, or backtrace anywhere in the log.
 * **Flasher status:** ONLINE and reliable.
 * **Binary size:** 883296 bytes / 2 MB partition (43% used, 1.16
-  MB free). **Identical byte-count** to the prior fire's image,
-  which confirms `--gc-sections` discarded `RenderSystem.cpp`
-  whole at link time exactly as predicted -- the TU compiled
-  cleanly but its symbols are unreferenced (no screen instantiates
-  any RenderSystem yet, and Game.h is not in SRCS), so the
-  linker dropped them. This is the established
-  "compile-only validation" pattern from S-MP20/2 + S-MP20/3 +
-  S-MP20/4 + S-MP20/4b (GameObject, Collision/*,
-  CollisionSystem, RenderComponent).
+  MB free). **Identical byte-count** to the prior two fires'
+  images (S-MP20/4b + S-MP20/4c), which confirms `--gc-sections`
+  discarded `StaticRC.cpp` whole at link time exactly as
+  predicted -- the TU compiled cleanly but its symbols are
+  unreferenced (no screen instantiates any StaticRC yet, and
+  Game.h is not in SRCS), so the linker dropped them. Likewise
+  the new shim no-op overloads (`Sprite::drawIcon(File, ...)` +
+  `Sprite::pushRotateZoomWithAA`) are gc'd. Established
+  "compile-only validation" pattern from S-MP20/2 -> /3 -> /4 ->
+  /4b -> /4c.
 
-## What S-MP20/4c actually shipped (in commit `1109bb5`)
+## What S-MP20/4d actually shipped (in commit `853c344`)
 
-The second leaf of the Rendering subsystem:
-`src/Games/GameEngine/Rendering/RenderSystem.cpp` (34 lines).
-This is the canvas-iterator -- `update(deltaMicros)` walks
-`getObjects()`, buckets each visible RenderComponent by layer,
-sorts the layer set, then per-layer dispatches
-`RenderComponent::push(canvas, pos, rot)`.
+The third leaf of the Rendering subsystem:
+`src/Games/GameEngine/Rendering/StaticRC.cpp` (31 lines). It
+wraps a File-backed RGB565 icon at fixed PixelDim, with `push()`
+branching on rotation: `rot == 0` calls `parent->drawIcon(file,
+pos.x, pos.y, dim.x, dim.y)` direct; non-zero rot allocates a
+temp Sprite, drawIcon's into it with TFT_TRANSPARENT mask, then
+`pushRotateZoomWithAA(x, y, rot, 1, 1, TFT_TRANSPARENT)` on the
+temp.
 
-Its only external includes:
+Three shim diffs ship in the same commit so the TU compiles:
 
-  - `<set>`, `<map>` -- stdlib, already exercised by
-    `CollisionSystem.cpp` (S-MP20/4).
-  - `"RenderSystem.h"` -> `<Display/Sprite.h>` (shimmed) +
-    `GameSystem.h` (header-only) + `GameObject.h` (validated by
-    S-MP20/2).
+  - `circuitos_shim/include/TFT_eSPI.h` -- adds `TFT_TRANSPARENT
+    0x0120` to the canonical Bodmer palette block. Same pattern
+    as the TFT_BLACK / TFT_RED / ... macros landed in S-MP20/4.
+  - `circuitos_shim/include/Display/Sprite.h` -- adds `#include
+    <FS.h>` (for the `File` type), a `drawIcon(File, ...)`
+    overload, and `pushRotateZoomWithAA(x, y, rot, sx, sy,
+    chroma)` -- the 6-arg no-parent variant. The SpriteRC 7-arg
+    with-parent variant is NOT added; held back for S-MP20/4e.
+  - `circuitos_shim/MP24Sprite.cpp` -- no-op definitions for both
+    new methods, matching the 9C-shim drawing-stub policy.
 
-The key risk flagged by the prior checkpoint -- that
-RenderSystem.cpp's body calls `GameSystem::getObjects()` whose
-definition lives in `GameSystem.cpp` (NOT in SRCS) and could
-trip an unresolved-symbol link error if --gc-sections didn't
-drop the TU -- DID NOT FIRE. Verified by:
-
-  - CI build job `success` (no unresolved-symbol diagnostics).
-  - Binary size unchanged at 883296 bytes (identical to S-MP20/4b
-    image, byte-for-byte).
-  - Map file shows zero `RenderSystem`-decorated symbols
-    anywhere -- the TU was discarded whole.
-
-CMakeLists.txt grew by one SRCS entry + a 22-line comment block
-explaining the gc-sections gambit and the documented revert path
-if it had failed.
+CMakeLists.txt grew by one SRCS entry + a 20-line comment block
+explaining the shim diff set and the gc-sections gambit. Net
+diff: 4 files, +65 lines, 0 lines removed.
 
 ## What the next fire should do
 
 Pick ONE of these. Roughly ordered by risk-adjusted payoff.
 
-1. **S-MP20/4d -- Land `StaticRC.cpp`** (31 lines). Pulls
-   `Sprite::drawIcon(File, x, y, w, h)`, `drawIcon` with the
-   6-arg `(scale, transparent)` overload,
-   `Sprite::pushRotateZoomWithAA(x, y, rot, sx, sy, t)`, and
-   `TFT_TRANSPARENT`. Each may or may not be in the shim Sprite.
-   Expect 1-3 fix-forwards if the shim is missing entries -- same
-   shape as S-MP20/4's drawPixel/TFT_eSPI palette
-   pre-emptive additions. **Recommended next.**
+1. **S-MP20/4e -- Land `SpriteRC.cpp`** (18 lines). Pulls
+   `std::make_shared<Sprite>`, `Sprite::pushRotateZoomWithAA(
+   parent, x, y, rot, sx, sy, t)` -- the 7-arg WITH-parent
+   variant (this fire only added the 6-arg variant), and
+   `setSwapBytes` via TFT_eSprite cast. The
+   `setSwapBytes` call already has a TFT_eSPI stub (no-op).
+   Expect 1 fix-forward (the 7-arg pushRotateZoomWithAA overload
+   if I haven't pre-added it). **Recommended next.**
 
-2. **S-MP20/4e -- Land `SpriteRC.cpp`** (18 lines). Listed by the
-   prior plan as having possible `drawString` / `setTextColor`
-   signature mismatches. Smaller surface than StaticRC; could be
-   the safer bet of the two if /4d hits too many shim gaps.
-   Check shim Sprite first.
-
-3. **S-MP20/4f -- Vendor `<Display/GIFAnimatedSprite.h>`** before
+2. **S-MP20/4f -- Vendor `<Display/GIFAnimatedSprite.h>`** before
    AnimRC.cpp can land. Inspect the existing
-   `mp24/components/circuitos_shim/include/Display/` layout (just
-   `Display.h`, `Sprite.h`, `Color.h`) and add a
-   `GIFAnimatedSprite.h` following the same pattern.
+   `mp24/components/circuitos_shim/include/Display/` layout
+   (just `Display.h`, `Sprite.h`; Color.h is supplied by
+   upstream circuitos) and add a `GIFAnimatedSprite.h`
+   forwarding to an empty class with the same shape upstream
+   has. AnimRC's `gif->push(parent, x, y)` and
+   `gif->pushRotate(parent, x, y, rot)` need stubs too.
 
-4. **S-MP20/5 -- Land `Game.cpp` + `GameSystem.cpp`.** Still gated
-   on Rendering subsystem being available, since `Game.cpp`'s
-   constructor calls `render(this, ...)` and `collision(this)`.
-   With RenderSystem.cpp now compiling clean as of S-MP20/4c the
-   `render(this, ...)` half is unblocked from the engine side
-   (still gated on `Sprite* canvas` source-of-truth -- the
-   upstream allocator lives in `Game.cpp` itself, so this is
-   just a Game-shape question once Game.cpp lands).
-   ALSO needs `extern Game* startedGame` to be defined somewhere
-   -- recommend SleepServiceStub.cpp alongside the existing
-   `gameStarted` extern.
+3. **S-MP20/5 -- Land `Game.cpp` + `GameSystem.cpp`.** With both
+   GameEngine systems (Collision + Rendering) now having every
+   leaf .cpp compiling clean (5 of 5 leaves landed), Game.cpp's
+   `render(this, ...)` and `collision(this)` member-init lines
+   should resolve at link time even with --gc-sections. Still
+   need `extern Game* startedGame` defined somewhere -- the
+   prior plan recommended SleepServiceStub.cpp alongside the
+   existing `gameStarted` extern.
 
-5. **S-MP20/6 -- Highscore.cpp** (parallel-safe leaf -- can
+4. **S-MP20/6 -- Highscore.cpp** (parallel-safe leaf -- can
    land any time, doesn't touch the engine wiring).
 
 ## Helper script note carried from prior fires
@@ -130,7 +120,9 @@ Pick ONE of these. Roughly ordered by risk-adjusted payoff.
 * `pyelftools` must be installed each fire:
   `pip install --break-system-packages --quiet pyelftools`.
   (Skip if no crash to decode -- this fire didn't need it.)
-* The repo lives at `$HOME/repo/mp_firmware`.
+* The repo lives at `$HOME/repo/mp_firmware`. Clone with
+  `--depth=50` to avoid blowing the /sessions disk quota (~538
+  MB free at session start).
 
 ## Open items unchanged from the brief
 
@@ -152,13 +144,16 @@ Pick ONE of these. Roughly ordered by risk-adjusted payoff.
   * /4/1: soften `-Werror=unused-local-typedefs` (commit
     `96d76f6`)
   * /4b: RenderComponent.cpp in SRCS (commit `1fa9321`)
-  * **/4c: RenderSystem.cpp in SRCS (commit `1109bb5`) <--
-    THIS FIRE**
-  * /4d-/4f: Rendering subsystem leaves remaining (next fire)
-  * /5: Game.cpp + GameSystem.cpp (Rendering side now unblocked
-    from a header-compile standpoint; CollisionSystem still
-    landed -- both base ctors will resolve once GameSystem.cpp
-    also lands alongside Game.cpp)
+  * /4c: RenderSystem.cpp in SRCS (commit `1109bb5`)
+  * **/4d: StaticRC.cpp landed via shim patches (commit
+    `853c344`) <-- THIS FIRE**
+  * /4e: SpriteRC.cpp (next fire)
+  * /4f: AnimRC.cpp + GIFAnimatedSprite shim (later)
+  * /5: Game.cpp + GameSystem.cpp -- both engine subsystems'
+    leaves now have full .cpp coverage, so the
+    render(this,...) + collision(this) member-init lines should
+    link cleanly. Still gated on extern Game* startedGame being
+    defined.
   * /6: Highscore.cpp (parallel-safe)
   * /7+: four game implementations, GamesScreen wiring, dialer
 * **S-MP21** -- not started (modem hardware bring-up)
