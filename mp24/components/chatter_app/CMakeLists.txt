@@ -332,6 +332,32 @@ idf_component_register(
         # both gated by the source patch in this session.
         "${SRC_DIR}/Screens/ConvoScreen.cpp"
 
+        # S-MP18u: bulk batch of 20 screens that the strict audit
+        # script (/tmp/audit.sh) shows have full include closure
+        # in the current chatter_app SRCS. Top-level Element /
+        # Service / Modal includes all resolve. Transitive issues
+        # surface in CI if any.
+        "${SRC_DIR}/Screens/MainMenu.cpp"
+        "${SRC_DIR}/Screens/PhoneAboutScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneActiveCall.cpp"
+        "${SRC_DIR}/Screens/PhoneBirthdayReminders.cpp"
+        "${SRC_DIR}/Screens/PhoneBootSplash.cpp"
+        "${SRC_DIR}/Screens/PhoneCameraScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneContactDetail.cpp"
+        "${SRC_DIR}/Screens/PhoneContactEdit.cpp"
+        "${SRC_DIR}/Screens/PhoneContactWallpaperPicker.cpp"
+        "${SRC_DIR}/Screens/PhoneContactsScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneCountdown.cpp"
+        "${SRC_DIR}/Screens/PhoneFindFriendsRadar.cpp"
+        "${SRC_DIR}/Screens/PhoneGalleryScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneGamesScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneHabits.cpp"
+        "${SRC_DIR}/Screens/PhoneHelicopter.cpp"
+        "${SRC_DIR}/Screens/PhoneKaraokeScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneLunarLander.cpp"
+        "${SRC_DIR}/Screens/PhoneMagic8Ball.cpp"
+        "${SRC_DIR}/Screens/PhoneMemoryAudit.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
