@@ -558,6 +558,23 @@ idf_component_register(
         "${SRC_DIR}/Screens/PhoneVirtualPet.cpp"
         "${SRC_DIR}/Screens/PhoneWordle.cpp"
 
+        # S-MP20/2: smallest first user of the glm vendor landed
+        # at S-MP20/1. GameObject.cpp is a leaf -- its only
+        # non-stdlib includes are GameObject.h + RenderComponent.h
+        # + PixelDim.hpp + CollisionComponent.h. PixelDim.hpp
+        # pulls <glm.h>, which our Arduino-GLM shim forwards to
+        # <glm/glm.hpp> + <glm/ext.hpp>. Its body only move-
+        # constructs shared_ptrs and assigns glm::vec2 / float --
+        # no constructor calls into RenderSystem/CollisionSystem,
+        # so the link closure stays small: nothing new is
+        # required at link time.
+        #
+        # If this builds + links, the glm include path is
+        # validated under real compilation and the rest of the
+        # GameEngine .cpp files can be added one (or two) at a
+        # time without further surprises in the glm path itself.
+        "${SRC_DIR}/Games/GameEngine/GameObject.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
