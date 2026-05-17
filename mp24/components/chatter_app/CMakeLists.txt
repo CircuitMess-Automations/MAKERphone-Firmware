@@ -229,6 +229,31 @@ idf_component_register(
         "${SRC_DIR}/Services/PhoneMusicPlaylists.cpp"
         "${SRC_DIR}/Services/BuzzerService.cpp"
 
+        # S-MP18w: 13 more services. All real upstream code with
+        # clean closure against current SRCS + transitive
+        # header-only references into Screens/ (PhoneComposer.h,
+        # PhoneCallHistory.h, PhoneBeatMaker.h — all three pull
+        # only LVScreen + InputListener which we already have).
+        #
+        # Composer family (RTTTL + playback + storage):
+        "${SRC_DIR}/Services/PhoneComposerRtttl.cpp"
+        "${SRC_DIR}/Services/PhoneComposerPlayback.cpp"
+        "${SRC_DIR}/Services/PhoneComposerStorage.cpp"
+        # Ringtone family:
+        "${SRC_DIR}/Services/PhoneRingtoneLibrary.cpp"
+        "${SRC_DIR}/Services/PhoneAlarmTone.cpp"
+        "${SRC_DIR}/Services/PhoneContactRingtone.cpp"
+        # Vibration family:
+        "${SRC_DIR}/Services/PhoneVibrationEngine.cpp"
+        "${SRC_DIR}/Services/PhoneVibrationLibrary.cpp"
+        # Storage-backed services (NVS):
+        "${SRC_DIR}/Services/PhoneCallHistoryStorage.cpp"
+        "${SRC_DIR}/Services/PhoneBeatMakerStorage.cpp"
+        # Stand-alone services:
+        "${SRC_DIR}/Services/MissedCallLog.cpp"
+        "${SRC_DIR}/Services/PhoneVirtualPet.cpp"
+        "${SRC_DIR}/Services/PhoneAlarmService.cpp"
+
         # S-MP18w: 5 independent services + 8 Elements with
         # clean deps. Unblocks the alarm/call/composer/dialer/
         # home-screen cluster of screens in subsequent commits.
@@ -330,6 +355,30 @@ idf_component_register(
         "${SRC_DIR}/Elements/PhoneT9Input.cpp"
         "${SRC_DIR}/Elements/EmojiMenu.cpp"
         "${SRC_DIR}/Elements/NotificationElement.cpp"
+
+        # S-MP18w: 11 more Elements with clean closure.
+        #   PhoneT9Vocab            — T9-input vocabulary tries
+        #   GameItem                — tile in GamesScreen menu
+        #   PhoneEqualizerVisualiser  bars from ringtone playback
+        #   PhoneChargeBars         — animated battery during charge
+        #   PhoneNotificationPreview  inbox / missed-call preview
+        #   UnlockSlide             — lock-screen swipe gesture
+        #   PhoneConfettiOverlay    — birthday / level-up confetti
+        #   PhoneYawnOverlay        — idle-mood yawn animation
+        #   PhoneOperatorBanner     — carrier name strip
+        #   PhoneMenuGrid           — icon grid for PhoneMainMenu
+        #   PhoneDialerPad          — keypad for PhoneDialerScreen
+        "${SRC_DIR}/Elements/PhoneT9Vocab.cpp"
+        "${SRC_DIR}/Elements/GameItem.cpp"
+        "${SRC_DIR}/Elements/PhoneEqualizerVisualiser.cpp"
+        "${SRC_DIR}/Elements/PhoneChargeBars.cpp"
+        "${SRC_DIR}/Elements/PhoneNotificationPreview.cpp"
+        "${SRC_DIR}/Elements/UnlockSlide.cpp"
+        "${SRC_DIR}/Elements/PhoneConfettiOverlay.cpp"
+        "${SRC_DIR}/Elements/PhoneYawnOverlay.cpp"
+        "${SRC_DIR}/Elements/PhoneOperatorBanner.cpp"
+        "${SRC_DIR}/Elements/PhoneMenuGrid.cpp"
+        "${SRC_DIR}/Elements/PhoneDialerPad.cpp"
 
         # S-MP18w (continued): 8 Elements with clean deps. Unblock
         # PhoneHangman / PhoneWordle (T9Vocab), PhoneMainMenu
