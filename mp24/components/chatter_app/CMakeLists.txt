@@ -379,12 +379,15 @@ idf_component_register(
         # both gated by the source patch in this session.
         "${SRC_DIR}/Screens/ConvoScreen.cpp"
 
-        # S-MP18w: four core flow screens unblocked by the
+        # S-MP18w: three core flow screens unblocked by the
         # six new Elements + PhoneVirtualPet + SleepService stub
-        # added above.
+        # added above. PhoneDialerScreen was originally a fourth
+        # but its .cpp includes Games/Snake/Snake.h (cheat-code
+        # for a hidden snake game when dialing *#GAME), which
+        # pulls Games/GameEngine → glm.h. Held back for the
+        # games-engine session.
         "${SRC_DIR}/Screens/PhoneHomeScreen.cpp"
         "${SRC_DIR}/Screens/PhoneMainMenu.cpp"
-        "${SRC_DIR}/Screens/PhoneDialerScreen.cpp"
         "${SRC_DIR}/Screens/SettingsScreen.cpp"
 
         # S-MP18u: bulk batch of 19 screens that the strict audit
