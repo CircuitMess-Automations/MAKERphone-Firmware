@@ -461,6 +461,297 @@ void Repo<Friend>::clear()
     cache.clear();
 }
 
+
+/* ------------------------------------------------------------------
+ * Repo<PhoneContact> NVS-backed (S-MP23/4)
+ *
+ * Same pattern as Repo<Friend> in S-MP23/3 -- one blob per record
+ * keyed by base32 of the UID, plus an index blob holding the packed
+ * array of stored UIDs. The differences:
+ *
+ *   - NVS namespace is `"pc"`, shared with the PhoneContacts
+ *     namespace's per-contact records from S-MP23/2. Keeping both
+ *     in one namespace avoids fragmenting the contact store across
+ *     two NVS namespaces; the actual blobs don't collide because:
+ *       * PhoneContacts namespace writes keys `"c<base32>"`,
+ *       * Repo<PhoneContact> writes keys `"p<base32>"`,
+ *       * the index lives at `"__idx"` (reserved, no record key
+ *         starts with `_`).
+ *     The two layers therefore each maintain their own per-UID
+ *     blob; in normal use both layers get poked at the same UIDs
+ *     by upstream code, but the storage paths are independent.
+ *
+ *   - PhoneContact is POD (Entity + char[24] + 6*uint8 + uint32 +
+ *     3*uint8 + uint8[5] = ~52 bytes once aligned), no internal
+ *     pointers or std::* members. Raw `nvs_set_blob` over
+ *     `&PhoneContact` is correct on xtensa-esp-elf.
+ *
+ *   - Partial-failure semantics mirror the Friend code: on remove,
+ *     erase the blob first; if the index save fails afterwards, the
+ *     index briefly points to a missing record and pcRepoLoad()
+ *     returns false (defensive uid mismatch check), so the orphan
+ *     degrades to "PhoneContact looks missing" rather than corruption.
+ *
+ *   - The PhoneContacts namespace's `upsert`/`remove` from S-MP23/2
+ *     does NOT update the Repo<PhoneContact> index, and vice versa.
+ *     Upstream code that walks `Storage.PhoneContacts.all()` via the
+ *     Repo<PhoneContact> path sees only what Repo::add() recorded;
+ *     code that calls `PhoneContacts::exists(uid)` directly still
+ *     works against its own keystore. Unifying the two layers (so
+ *     PhoneContacts::upsert auto-maintains the Repo index) is a
+ *     separate fire -- the existing call sites today either go
+ *     through one path or the other, not both, so leaving them
+ *     independent doesn't break any current consumer.
+ * ------------------------------------------------------------------ */
+
+namespace {
+
+// NVS namespace shared with the PhoneContacts namespace (S-MP23/2).
+constexpr const char *kPCRepoNamespace = "pc";
+
+// Index key inside kPCRepoNamespace -- holds a packed array of
+// UID_t. Reserved prefix `_` means no record key can collide.
+constexpr const char *kPCRepoIndexKey = "__idx";
+
+// 'p' + 13 base32 chars = 14-char key, comfortably under
+// NVS_KEY_NAME_MAX_SIZE-1 = 15. The prefix differs from the
+// PhoneContacts namespace's `'c'` so the two layers don't shadow
+// each other's blobs inside the shared `"pc"` namespace.
+static void pcRepoKey(UID_t uid, char out[16])
+{
+    static const char alphabet[] = "0123456789abcdefghijklmnopqrstuv";
+    out[0] = 'p';
+    for (int i = 0; i < 13; ++i) {
+        unsigned shift = i * 5;
+        out[1 + (12 - i)] = alphabet[(uid >> shift) & 0x1F];
+    }
+    out[14] = '\0';
+}
+
+static bool pcRepoLoad(UID_t uid, PhoneContact &out)
+{
+    nvs_handle_t h;
+    if (nvs_open(kPCRepoNamespace, NVS_READONLY, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    pcRepoKey(uid, key);
+    size_t sz = sizeof(PhoneContact);
+    esp_err_t err = nvs_get_blob(h, key, &out, &sz);
+    nvs_close(h);
+    if (err != ESP_OK || sz != sizeof(PhoneContact)) {
+        return false;
+    }
+    if (out.uid != uid) {
+        // Defensive: stored blob disagrees with key. Treat as miss.
+        return false;
+    }
+    return true;
+}
+
+static bool pcRepoSave(const PhoneContact &c)
+{
+    nvs_handle_t h;
+    if (nvs_open(kPCRepoNamespace, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    pcRepoKey(c.uid, key);
+    esp_err_t err = nvs_set_blob(h, key, &c, sizeof(PhoneContact));
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    return err == ESP_OK;
+}
+
+static bool pcRepoErase(UID_t uid)
+{
+    nvs_handle_t h;
+    if (nvs_open(kPCRepoNamespace, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    pcRepoKey(uid, key);
+    esp_err_t err = nvs_erase_key(h, key);
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    // NOT_FOUND treated as success (contract: "record is gone").
+    return err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND;
+}
+
+// Read the index blob. Returns true on clean read (including the
+// "no index yet" case → empty vector). Returns false only on
+// unexpected NVS errors so callers can refuse to corrupt it.
+static bool pcRepoIdxLoad(std::vector<UID_t> &out)
+{
+    out.clear();
+    nvs_handle_t h;
+    esp_err_t open = nvs_open(kPCRepoNamespace, NVS_READONLY, &h);
+    if (open == ESP_ERR_NVS_NOT_FOUND) {
+        return true;  // namespace doesn't exist yet → empty repo
+    }
+    if (open != ESP_OK) {
+        return false;
+    }
+    size_t sz = 0;
+    esp_err_t err = nvs_get_blob(h, kPCRepoIndexKey, nullptr, &sz);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        nvs_close(h);
+        return true;  // empty index
+    }
+    if (err != ESP_OK) {
+        nvs_close(h);
+        return false;
+    }
+    if (sz == 0 || (sz % sizeof(UID_t)) != 0) {
+        nvs_close(h);
+        return false;  // corrupt blob -- bail loudly
+    }
+    out.resize(sz / sizeof(UID_t));
+    err = nvs_get_blob(h, kPCRepoIndexKey, out.data(), &sz);
+    nvs_close(h);
+    if (err != ESP_OK) {
+        out.clear();
+        return false;
+    }
+    return true;
+}
+
+static bool pcRepoIdxSave(const std::vector<UID_t> &v)
+{
+    nvs_handle_t h;
+    if (nvs_open(kPCRepoNamespace, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    esp_err_t err;
+    if (v.empty()) {
+        err = nvs_erase_key(h, kPCRepoIndexKey);
+        if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+    } else {
+        err = nvs_set_blob(h, kPCRepoIndexKey, v.data(),
+                           v.size() * sizeof(UID_t));
+    }
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    return err == ESP_OK;
+}
+
+static bool pcRepoIdxContains(const std::vector<UID_t> &v, UID_t uid)
+{
+    for (UID_t u : v) {
+        if (u == uid) return true;
+    }
+    return false;
+}
+
+}  // anonymous namespace (S-MP23/4)
+
+/* ------------------------------------------------------------------
+ * Per-method specializations for Repo<PhoneContact>.
+ *
+ * Mirrors Repo<Friend> from S-MP23/3 verbatim apart from the type
+ * and helper names. Non-specialized members (begin/reserve/write/
+ * read/getPath) fall through to the primary template, which is
+ * fine: write/read are protected and unused, begin/reserve are
+ * no-ops by design (we never use the cache member -- reads always
+ * hit NVS).
+ * ------------------------------------------------------------------ */
+
+template <>
+bool Repo<PhoneContact>::add(const PhoneContact &object)
+{
+    std::vector<UID_t> idx;
+    if (!pcRepoIdxLoad(idx)) return false;
+    if (!pcRepoIdxContains(idx, object.uid)) {
+        idx.push_back(object.uid);
+        if (!pcRepoIdxSave(idx)) return false;
+    }
+    return pcRepoSave(object);
+}
+
+template <>
+bool Repo<PhoneContact>::update(const PhoneContact &object)
+{
+    // Upstream Repo<T>::update only persists if the record exists;
+    // mirror that so callers branching on the return can detect
+    // "tried to update a missing contact".
+    std::vector<UID_t> idx;
+    if (!pcRepoIdxLoad(idx)) return false;
+    if (!pcRepoIdxContains(idx, object.uid)) return false;
+    return pcRepoSave(object);
+}
+
+template <>
+bool Repo<PhoneContact>::remove(UID_t uid)
+{
+    std::vector<UID_t> idx;
+    if (!pcRepoIdxLoad(idx)) return false;
+    if (!pcRepoIdxContains(idx, uid)) {
+        return false;  // already gone -- match upstream
+    }
+    // Erase blob first; on partial failure (blob gone, index still
+    // referencing) pcRepoLoad() returns false because the missing
+    // blob no longer satisfies sz/uid checks, so the orphan
+    // degrades to "PhoneContact looks missing" not corruption.
+    if (!pcRepoErase(uid)) return false;
+    idx.erase(std::remove(idx.begin(), idx.end(), uid), idx.end());
+    return pcRepoIdxSave(idx);
+}
+
+template <>
+PhoneContact Repo<PhoneContact>::get(UID_t uid, bool /*bypassCache*/)
+{
+    PhoneContact c{};
+    if (pcRepoLoad(uid, c)) {
+        return c;
+    }
+    // Match the no-op stub: default-constructed PhoneContact on
+    // miss. Upstream Repo<T>::get also returns T{} after warning.
+    // The uid field stays 0, which call sites tolerate (they
+    // check exists() first in practice).
+    return PhoneContact{};
+}
+
+template <>
+std::vector<UID_t> Repo<PhoneContact>::all(bool /*bypassCache*/)
+{
+    std::vector<UID_t> idx;
+    if (!pcRepoIdxLoad(idx)) {
+        return std::vector<UID_t>{};
+    }
+    return idx;
+}
+
+template <>
+bool Repo<PhoneContact>::exists(UID_t uid)
+{
+    std::vector<UID_t> idx;
+    if (!pcRepoIdxLoad(idx)) return false;
+    return pcRepoIdxContains(idx, uid);
+}
+
+template <>
+void Repo<PhoneContact>::clear()
+{
+    // Walk the index, erase each blob, then clear the index.
+    // Per-key helpers keep each commit atomic; the extra commit
+    // cost is negligible for a "clear all contacts" operation.
+    std::vector<UID_t> idx;
+    if (pcRepoIdxLoad(idx)) {
+        for (UID_t u : idx) {
+            (void)pcRepoErase(u);
+        }
+    }
+    std::vector<UID_t> empty;
+    (void)pcRepoIdxSave(empty);
+    cache.clear();
+}
+
 /* Explicit instantiation — the linker needs each symbol concrete. */
 template class Repo<Friend>;
 template class Repo<PhoneContact>;
