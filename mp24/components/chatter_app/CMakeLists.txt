@@ -168,6 +168,29 @@ idf_component_register(
         "${SRC_DIR}/Screens/PhoneDrumKitScreen.cpp"
         "${SRC_DIR}/Screens/PhoneExpenses.cpp"
 
+        # S-MP18h: Model layer + LoRaPacket struct data + the
+        # MessageService stub. This is the gating step for every
+        # message-related screen and any Element that pulls in
+        # the Notification chain.
+        #
+        # Model classes — small, self-contained, no external deps:
+        "${SRC_DIR}/Model/Message.cpp"
+        # LoRaPacket.cpp provides the .pack/.unpack vtable
+        # definitions for MessagePacket / TextMessage / PicMessage
+        # / AckPacket / PairPacket. The header is included by
+        # MessageService.h so any consumer transitively needs the
+        # struct definitions. Easier to compile the upstream .cpp
+        # (no external deps) than to stub a dozen vtable entries.
+        "${SRC_DIR}/Services/LoRaPacket.cpp"
+
+        # Stub for MessageService — replaces upstream's .cpp
+        # which would pull in LoRaService → RadioLib → Util/Task
+        # chain we don't want. Same pattern as shim/InputLVGL.cpp:
+        # upstream header unchanged, upstream .cpp excluded from
+        # the build (just not listed in SRCS), our .cpp here
+        # provides the public ABI as no-ops.
+        "shim/MessageServiceStub.cpp"
+
         # S-MP18d: first screen that USES the status bar + soft-key
         # bar + wallpaper combo. 113 LOC, takes an uppercase app
         # name in the ctor, renders 'NOT YET BUILT' under it. We're
