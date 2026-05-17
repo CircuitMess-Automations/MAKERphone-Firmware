@@ -8,20 +8,19 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-17 ~17:53
-* **HEAD on `main`:** `ffae1ba` (`revert(mp24): S-MP20/7 -- back
-  out Snake.cpp landing (Sprite redefinition)`). Last
-  forward-progress commit is `fda498b` (`feat(mp24): S-MP20/6d --
-  LovyanGFX-style text API stubs + Pins.hpp transitive include`).
-  A docs checkpoint commit on top of this one will be outside the
-  CI path filter, so the green build state is preserved.
-* **Build status:** GREEN at HEAD `ffae1ba`. Run `25998256465` --
-  build job `success`, flash job `success`. /6d was also green
-  on its own (run `25997992243`). /7 attempt at `358bad7` failed
-  to build and was reverted (run `25998099252`).
-* **Device boot status:** HEALTHY. boot.log from artifact
-  `7044683009` (40 lines, 0 crash markers). Byte-identical in
-  shape to prior fires' boot.log:
+* **Date (UTC):** 2026-05-17 ~18:08
+* **HEAD on `main`:** `5cca539` (`revert(mp24): S-MP20/7e -- back
+  out Snake.cpp landing`). Last forward-progress commit on disk
+  is still `fda498b` (S-MP20/6d) -- this fire attempted /7e on top
+  of that, the attempt failed, and the revert restored the
+  pre-/7e tree. Net effect on disk: identical to commit
+  `1695f5a` (the prior fire's checkpoint HEAD).
+* **Build status:** GREEN expected at HEAD `5cca539` (revert
+  restores byte-identical contents to known-green pre-/7e state).
+  /7e attempt at `4999a7b` failed to build (run `25998582162`,
+  build failure on `src/Games/Snake/Snake.cpp.obj`).
+* **Device boot status:** HEALTHY. Same boot log shape as prior
+  fires:
 
       STORE: mounted; 2 files, 1757 / 1860161 bytes used (0%)
       POWER: polling GPIO2 at 50 Hz, debounce 3 ticks
@@ -30,199 +29,202 @@ does not consume a build.
 
 * **Flasher status:** ONLINE and reliable.
 * **Binary size:** 883408 bytes / 2 MB partition (43% used, 1.16
-  MB free). **Identical to the prior fire's 883408** -- /6d's
-  three header additions are pure header expansion, zero binary
-  delta as predicted (no in-SRCS file currently references the
-  new `textdatum_t` enum, `fonts::IFont` selectors, or
-  setTextDatum/setFont overloads, so `--gc-sections` drops them).
+  MB free) -- unchanged from the prior fire (revert restores
+  identical disk contents).
 
 ## What this fire actually shipped (net)
 
-Two commits added forward progress, one reverted /7:
+Two commits, the second reverts the first:
 
-1. **`fda498b` -- S-MP20/6d** (preserved on top of the revert)
-   Three header additions to circuitos_shim:
-     - `include/TFT_eSPI.h`: new `enum class textdatum_t : uint8_t`
-       (top_*/middle_*/bottom_*/baseline_*) + `namespace fonts`
-       with `struct IFont`, `inline constexpr IFont Font0{}` /
-       `Font2{}`. C++17 inline constexpr -> single addressable
-       definition across TUs.
-     - `include/Display/Sprite.h`: new inline overloads
-       `void setTextDatum(textdatum_t)` and
-       `void setFont(const fonts::IFont*)` -- both silent no-op,
-       coexist with existing `setTextDatum(uint8_t)` /
-       `setTextFont(uint8_t)` (pure overload additions).
-     - `include/Chatter.h`: new `#include <Pins.hpp>` so any TU
-       that pulls `<Chatter.h>` gets the Decision-E BTN_LEFT /
-       BTN_A / BTN_UP / BTN_1..9 macro aliases transitively.
+1. **`4999a7b` -- S-MP20/7e (REVERTED in `5cca539`)** -- attempted
+   to re-land Snake.cpp by patching one line in
+   `mp24/components/circuitos/src/UI/Element.h`:
 
-2. **`358bad7` -- S-MP20/7 (REVERTED in `ffae1ba`)**
-   Single SRCS add: `${SRC_DIR}/Games/Snake/Snake.cpp`. Failed
-   to build. See diagnosis below.
+       -#include "../Display/Sprite.h"
+       +#include <Display/Sprite.h>
 
-3. **`ffae1ba` -- revert(mp24): S-MP20/7** -- backs out 358bad7.
-   Net effect on disk: identical to `fda498b`.
+   Premise: bracket include routes through INCLUDE_DIRS, where
+   circuitos_shim is FIRST in chatter_app's REQUIRES, so the
+   SHIM Sprite class would win for any TU that transitively
+   pulls upstream UI/Element.h.
 
-## Why S-MP20/7 failed -- DIAGNOSIS for the next fire
+   FAILED at build: the patch addresses only ONE of the chains
+   pulling upstream Sprite.h. Snake.cpp also pulls upstream
+   Sprite via `<Support/Context.h>`:
+       Snake.h:10 <Support/Context.h>
+         Context.h:5 "ContextTransition.h"
+           ContextTransition.h:5 "../Display/Display.h"     <-- upstream
+             Display.h:10 "Sprite.h"                        <-- upstream Sprite (FIRST)
+       Snake.h:11 <UI/Image.h>
+         ... eventually Element.h:6 <Display/Sprite.h>      <-- now SHIM
+                                                                (DUPLICATE)
 
-Build run `25998099252` produced these errors against Snake.cpp:
+   Build run `25998582162` reported "redefinition of 'class
+   Sprite'" + "redefinition of 'class Display'" + downstream
+   "no member named readPixel / printf / drawFastHLine".
 
-      mp24/.../circuitos_shim/include/Display/Sprite.h:27:
-        error: redefinition of 'class Sprite'
-      mp24/.../circuitos_shim/include/Display/Display.h:27:
-        error: redefinition of 'class Display'
-      src/Games/Snake/Snake.cpp:77:
-        'class Sprite' has no member named 'setTextDatum'
-      src/Games/Snake/Snake.cpp:81:
-        'class Sprite' has no member named 'setFont'
-      src/Games/Snake/Snake.cpp:83:
-        'class Sprite' has no member named 'drawString'
-      src/Games/Snake/Snake.cpp:83:
-        'class Sprite' has no member named 'width'
-      src/Games/Snake/Snake.cpp:208:
-        'class Sprite' has no member named 'drawRect'
-      src/Games/Snake/Snake.cpp:209:
-        'class Sprite' has no member named 'drawPixel'
-      src/Games/Snake/Snake.cpp:216:
-        'class Sprite' has no member named 'fillRect'
-      (plus many more 'no matching function' for setTextColor(int))
+2. **`5cca539` -- revert(mp24): S-MP20/7e** -- backs out 4999a7b.
+   Net effect on disk: identical to `1695f5a`.
 
-Root cause (chain traced from the build log):
+## Why S-MP20/7e failed -- FULL DIAGNOSIS for the next fire
 
-1. Snake.h includes `<UI/Image.h>`. UI/Image.h exists ONLY at
-   `mp24/components/circuitos/src/UI/Image.h` (upstream). The
-   bracket include resolves through INCLUDE_DIRS to upstream
-   (circuitos_shim has no UI/Image.h).
+Two distinct ROOT causes need fixing, in order:
 
-2. Upstream UI/Image.h pulls "SpriteElement.h" (relative quoted
-   include) -> upstream SpriteElement.h. Which pulls
-   "ElementContainer.h" (relative) -> upstream. Which pulls
-   "Element.h" (relative) -> upstream. Which does:
+### Root cause A: dual `class Sprite` and dual `class Display`
 
-       #include "../Display/Sprite.h"   <-- RELATIVE QUOTED
+The patch on `UI/Element.h` only handled the Snake.h:11
+`<UI/Image.h>` chain. The OTHER chain via Snake.h:10
+`<Support/Context.h>` still pulls upstream `Display.h` via
+relative `"../Display/Display.h"` in `Support/ContextTransition.h`,
+and upstream `Display.h` line 10 then pulls upstream `Sprite.h`
+via the relative same-dir `"Sprite.h"`.
 
-   Relative quoted includes bypass INCLUDE_DIRS and resolve
-   against the source file's directory. So this resolves to
-   `mp24/components/circuitos/src/Display/Sprite.h` -- the
-   UPSTREAM Sprite class definition gets pulled into Snake's TU.
+To fix this, the next fire needs ALSO this patch:
 
-3. Snake.cpp ALSO includes `<Chatter.h>` (the shim, after the
-   bracket lookup hits circuitos_shim first via REQUIRES). Shim
-   Chatter.h pulls `<Display/Display.h>` -> SHIM Display.h.
-   SHIM Display.h only forward-declares Sprite, so by itself
-   it doesn't trigger a Sprite redefinition.
+    mp24/components/circuitos/src/Support/ContextTransition.h:5
+      -#include "../Display/Display.h"
+      +#include <Display/Display.h>
 
-4. BUT Snake's full transitive include set also pulls
-   `<Display/Sprite.h>` via bracket include (e.g. via
-   Game.h -> Rendering/RenderSystem.h, or any other in-SRCS
-   header that goes through SpriteRC.h-style chains). Bracket
-   `<Display/Sprite.h>` resolves through INCLUDE_DIRS to the
-   SHIM Sprite.h. So both shim Sprite.h AND upstream Sprite.h
-   get included in Snake's TU.
+That routes Display.h's pull to the SHIM `Display.h` (which uses
+`#pragma once` and does NOT pull upstream `Sprite.h` via a
+relative include). Upstream `Display.h` would never enter the
+TU, so its `#include "Sprite.h"` (line 10) never fires either.
 
-5. Header guards do not deduplicate them:
-     - Shim Sprite.h uses `#pragma once` (path-based dedup).
-     - Upstream Sprite.h uses `#ifndef SWTEST_SPRITE_H` macro.
-   Different keys, so the C preprocessor sees them as distinct
-   files -> two `class Sprite : public TFT_eSprite { ... }`
-   definitions enter the TU -> redefinition error.
+Risk analysis: Support/ContextTransition.h is upstream-circuitos
+code. Audit of all in-SRCS .cpp files in chatter_app:
 
-6. Same root cause for Display.h (`#pragma once` vs
-   `SWTEST_DISPLAY_H`).
+* `Support/Context.h` is included by `src/Games/Snake/Snake.h`,
+  `src/Games/Pong/Bonk.h`, and `src/Games/Invaders/SpaceInvaders.h`
+  -- all three game headers. None of these games are in SRCS
+  today, so the patch is a no-op for the currently-compiling
+  set.
+* `Support/ContextTransition.h` itself is NOT directly included
+  by anything in `src/`. It's pulled only transitively via
+  `Context.h:5`. (`grep -rln Support/ContextTransition\.h src/`
+  returns zero hits.)
 
-7. The "no member named setTextDatum / setFont / ..." errors
-   are downstream consequences. After the redefinition errors,
-   the compiler keeps going and resolves `baseSprite->...`
-   against the UPSTREAM Sprite class (whichever was seen
-   first) -- which has none of the methods our shim provides
-   (drawString, drawRect, drawPixel, fillRect, width(), etc.
-   live ONLY on the shim Sprite class).
+So patching ContextTransition.h is risk-free for current SRCS.
 
-Why the existing in-SRCS GameEngine TUs (Game.cpp,
-GameSystem.cpp, Highscore.cpp, TextInput.cpp,
-RenderComponent.cpp, RenderSystem.cpp, StaticRC.cpp,
-SpriteRC.cpp, AnimRC.cpp) don't hit this:
-  - None of them transitively pull `<UI/Image.h>`. They go
-    through bracket `<Display/Sprite.h>` only, which routes
-    to the SHIM. The upstream relative-include chain via
-    `"../Display/Sprite.h"` never fires for these TUs because
-    nothing pulls upstream UI/Element.h.
+### Root cause B: shim Sprite is missing methods Snake.cpp uses
+
+Even AFTER both Sprite + Display dual-class definitions are
+eliminated, Snake.cpp still fails because the shim Sprite is
+missing five methods Snake calls:
+
+* `uint16_t Sprite::readPixel(int32_t x, int32_t y)` -- 5 call
+  sites (Snake collision-detect logic). Reads a pixel from the
+  framebuffer; on the 9C shim this can be a stub returning 0
+  (collision detection will misbehave silently, fine for compile
+  + link validation).
+* `int Sprite::printf(const char* fmt, ...)` -- 3 call sites
+  (Snake status overlay). Need a printf-style stub; safe to
+  forward-declare without implementation (no-op variadic) or
+  redirect to `print()` via vsnprintf into a stack buffer.
+* `Sprite::drawFastHLine(int32_t x, int32_t y, int32_t w,
+   uint16_t color)` -- 1 call site (Snake border). Stub by
+  forwarding to existing `drawLine(x, y, x+w, y, color)` or
+  no-op.
+
+The `setTextColor(uint16_t)` confusion at Snake.cpp lines 613 /
+637 / 737 / 739 / 741 is reported as
+`invalid conversion from 'uint16_t' to 'const char*'`. Likely
+side-effect of the class confusion (compiler picked upstream
+Sprite, which has a different overload set). Should disappear
+once root cause A is fixed; if not, the shim already has both
+1-arg and 2-arg `setTextColor` overloads, so a fresh CI run
+will clarify.
 
 ## What the next fire should do
 
-Pick ONE of these. Roughly ordered by risk-adjusted payoff.
+**S-MP20/7f -- second Snake.cpp landing attempt.**
 
-1. **S-MP20/7 retry via header-guard alignment.** Add an
-   `#define SWTEST_SPRITE_H 1` (and `SWTEST_DISPLAY_H`,
-   `SWTEST_COLOR_H` if needed) to the TOP of the corresponding
-   shim header, BEFORE the `class Sprite` definition. Combined
-   with ensuring the SHIM is included FIRST in Snake's TU, this
-   makes the upstream copy's `#ifndef SWTEST_SPRITE_H` skip on
-   second include (shim wins).
+Three commits, in this order:
 
-   To force shim-first inclusion for Snake.cpp ONLY (not for
-   the 232 other TUs in chatter_app):
+1. **`fix(mp24): S-MP20/7f1 -- patch ContextTransition.h to bracket include`**
+   * `mp24/components/circuitos/src/Support/ContextTransition.h:5`:
+     `"../Display/Display.h"` -> `<Display/Display.h>`
+   * Push. Expect green (no in-SRCS change, just a header path
+     adjustment that no current SRCS member walks).
 
-       set_source_files_properties(
-           "${SRC_DIR}/Games/Snake/Snake.cpp"
-           PROPERTIES COMPILE_FLAGS
-           "-include Display/Sprite.h -include Display/Display.h"
-       )
+2. **`fix(mp24): S-MP20/7f2 -- add readPixel/printf/drawFastHLine stubs to shim Sprite`**
+   * In `mp24/components/circuitos_shim/include/Display/Sprite.h`,
+     add declarations:
+       ```
+       uint16_t readPixel(int32_t x, int32_t y);
+       int      printf(const char* fmt, ...);
+       void     drawFastHLine(int32_t x, int32_t y,
+                              int32_t w, uint16_t color);
+       ```
+   * In `mp24/components/circuitos_shim/src/MP24Sprite.cpp` (or
+     wherever the existing Sprite method stubs live -- check
+     `grep -l 'Sprite::drawPixel' mp24/components/circuitos_shim/`),
+     add the no-op bodies. `readPixel` returns `0`. `printf`
+     returns `0`. `drawFastHLine` either no-ops or forwards to
+     `drawLine`.
+   * Push. Expect green (binary delta: a few hundred bytes for
+     the new methods, but they're unreferenced by any in-SRCS
+     TU so `--gc-sections` drops them).
 
-   This forces the shim copies to be the first thing the
-   compiler sees for Snake.cpp's TU. The `<Display/Sprite.h>`
-   bracket resolves through INCLUDE_DIRS to circuitos_shim
-   (since it's FIRST in REQUIRES).
+3. **`feat(mp24): S-MP20/7f3 -- land Snake.cpp via combined fixes`**
+   * Re-apply the `Element.h` bracket-include patch (from `4999a7b`).
+   * Re-add the Snake.cpp block to `chatter_app/CMakeLists.txt`
+     (from `4999a7b`).
+   * Push. Expect Snake.cpp's TU to compile (because the dual-
+     Sprite/Display redefinitions are gone AND the missing
+     method stubs now exist). Binary delta: 0 -- nothing
+     instantiates Snake yet, so `--gc-sections` drops it.
 
-   Budget: full 30-min fire, one or two fix-forwards expected.
+If any of 7f1 / 7f2 / 7f3 fails, follow the standard
+fix-forward-or-revert rule. 7f1 in particular is super low-risk
+and is the foundation; if it fails, something is very wrong with
+my analysis.
 
-2. **S-MP20/7 retry via Element.h patch.** Edit
-   `mp24/components/circuitos/src/UI/Element.h`:
+If Snake.cpp's setTextColor errors persist after the dual-class
+fix, the next-next fire adds an explicit 1-arg overload that
+takes precedence (the shim already has both 1-arg and 2-arg
+forms, but the upstream-Sprite-bound compiler may have been
+picking a different overload than we expect).
 
-       #include "../Display/Sprite.h"   ->   #include <Display/Sprite.h>
+### Alternative path if 7f1 or 7f2 fails
 
-   Bracket include routes through INCLUDE_DIRS -> SHIM Sprite.h.
-   This eliminates the dual-Sprite condition entirely. Touches
-   upstream circuitos source (which is rare but not forbidden).
-   Net effect across the codebase: any TU that previously pulled
-   upstream Sprite.h via Element.h's relative include now gets
-   SHIM Sprite.h instead. Cross-check: list every in-SRCS .cpp
-   that transitively pulls Element.h; verify their compile is
-   unaffected by the swap.
+If the ContextTransition.h patch breaks something we didn't
+predict, the next fire can fall back to:
 
-   Budget: full 30-min fire, careful audit step before push.
+* **S-MP20/7g** -- skip games for now; do GamesScreen wiring
+  + PhoneDialerScreen WITHOUT pulling Snake.h transitively.
+  Audit each phone-screen .cpp for whether its header pulls
+  any of `<UI/Image.h>`, `<Support/Context.h>`,
+  `<Games/Snake/Snake.h>`, etc.
+* **S-MP21** -- jump ahead to modem hardware bring-up; this
+  doesn't depend on games at all.
 
-3. **S-MP20/7b -- pick Bonk instead of Snake.** Audit Bonk.h /
-   Bonk.cpp transitive includes; if they don't pull UI/Image.h
-   (they probably don't -- Bonk uses Sprite via Game.h's
-   forward decl, doesn't need Image), Bonk lands cleanly under
-   the existing /6d shims. Bonk has sub-state files
-   (GameState.cpp, TitleState.cpp, PauseState.cpp) but those
-   would land in /7c, /7d, /7e separately.
+## Why this fire could not finish the work
 
-4. **S-MP20/8 -- skip games for now, do PhoneDialerScreen
-   first.** PhoneDialerScreen.cpp is in the brief's S-MP20
-   roadmap (".../Phone/PhoneDialerScreen.cpp to SRCS"). It's
-   probably less entangled with the dual-Sprite problem.
-   Defer the four game .cpp files until a later fire.
+The 30-minute fire budget allows ~3-4 CI cycles at 5-8 min each.
+This fire used one CI cycle on the failed /7e attempt and one
+on the revert. That left no budget for the larger /7f sequence,
+which is 3 commits / 3 CI cycles = ~20+ min. Better to ship the
+diagnosis and let the next fire start clean with a clear plan.
 
 ## Helper script note carried from prior fires
 
 * The helpers (`flash_iter.sh`, `addr2line.py`) need to be
   recreated each fire from the brief; the new sandbox doesn't
-  preserve `/home/claude/`. In this sandbox the user's home
-  directory has restricted permissions and the repo lives at
-  `/tmp/repo/mp_firmware`. The full helper-script invocation is
-  impractical inside the 45-second bash tool timeout -- poll
-  the GitHub Actions REST API directly in shorter chunks
-  (`sleep 35-40 && curl .../jobs`). This fire used the chunked
-  approach successfully across three CI runs.
+  preserve `/home/claude/`. In this sandbox the working
+  directory is `/tmp/work_mp24/mp_firmware`, the user's
+  `/tmp/claude/` path from a previous fire is owned by
+  `nobody:nogroup` (different namespace) and is not writable.
+  The full helper-script invocation is impractical inside the
+  45-second bash tool timeout -- poll the GitHub Actions REST
+  API directly in shorter chunks (`sleep 35-40 && curl
+  .../jobs`). This fire used the chunked approach successfully.
 * The CI workflow triggers on push automatically via the
   `mp24/**` / `src/**` path filter -- no manual
   `workflow_dispatch` needed.
-* `pyelftools` was not needed this fire (no crash to decode).
-* The repo lives at `/tmp/repo/mp_firmware`. `git clone --depth
-  100` works fine (~25 MB).
+* `pyelftools` was not needed this fire (no device crash).
+* `git config --global --add safe.directory <path>` is needed
+  if any leftover `/tmp/claude/repo/mp_firmware` from a prior
+  fire shows up but is owned by a different user.
 
 ## Open items unchanged from the brief
 
@@ -232,8 +234,9 @@ Pick ONE of these. Roughly ordered by risk-adjusted payoff.
 
 ## Roadmap status snapshot
 
-* **S-MP20** -- in progress (Snake.cpp blocked on dual-Sprite
-  redefinition; /6d header shims in place + green)
+* **S-MP20** -- in progress (Snake.cpp blocked on dual-Sprite +
+  missing-method chain; /6d header shims in place + green;
+  /7 and /7e both failed and reverted; /7f sequence planned)
   * /1: glm vendoring (done in earlier fire)
   * /2: GameObject.cpp in SRCS (commit `65572e3`)
   * /2/1: undef Arduino radians/degrees macros (commit `dde74d9`)
@@ -260,19 +263,18 @@ Pick ONE of these. Roughly ordered by risk-adjusted payoff.
     `a1817c4`)
   * /6c: TextInput.cpp landed via parallel-safe SRCS add
     (commit `a1b60d1`)
-  * **/6d: LovyanGFX-style text API stubs + <Pins.hpp>
-    transitive in shim Chatter.h (commit `fda498b`) <-- THIS
-    FIRE -- new `textdatum_t` enum, `fonts::IFont` selectors,
-    setTextDatum(textdatum_t) / setFont(const IFont*) overloads
-    on Sprite, and shim Chatter.h now pulls <Pins.hpp> so any
-    .cpp that goes through it gets BTN_* macros transitively.
-    Zero binary delta. Verified green: run 25997992243 and
-    25998256465.**
-  * **/7: Snake.cpp landing attempt -- REVERTED (commits
-    `358bad7` shipped, `ffae1ba` reverted). Dual-Sprite class
-    redefinition issue caused by Snake.h pulling UI/Image.h
-    which transitively pulls upstream Sprite.h via relative
-    quoted include. See diagnosis section above for the path
-    forward.**
+  * /6d: LovyanGFX-style text API stubs + <Pins.hpp> transitive
+    in shim Chatter.h (commit `fda498b`)
+  * /7: Snake.cpp landing attempt -- REVERTED (commits
+    `358bad7` shipped, `ffae1ba` reverted). Diagnosis: dual
+    Sprite class because UI/Image.h chain pulls upstream Sprite.
+  * **/7e: Second Snake.cpp landing attempt with UI/Element.h
+    bracket-include patch -- REVERTED (commits `4999a7b`
+    shipped, `5cca539` reverted). Diagnosis: ContextTransition.h
+    chain ALSO pulls upstream Display + Sprite, AND shim Sprite
+    is missing readPixel/printf/drawFastHLine. THIS FIRE.**
+  * /7f: PLANNED for next fire -- ContextTransition.h patch +
+    shim Sprite method stubs + Snake.cpp landing, in three
+    commits with one CI cycle each.
 * **S-MP21** -- not started (modem hardware bring-up)
 * **S-MP22+** -- not started
