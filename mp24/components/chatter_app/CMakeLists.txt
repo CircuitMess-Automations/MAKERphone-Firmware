@@ -168,6 +168,24 @@ idf_component_register(
         "${SRC_DIR}/Screens/PhoneDrumKitScreen.cpp"
         "${SRC_DIR}/Screens/PhoneExpenses.cpp"
 
+        # S-MP18k: 13 more screens unblocked by the Storage stub
+        # (S-MP18j) + MessageService stub (S-MP18h). All
+        # dep-audited clean — every Element they include is
+        # already in the build.
+        "${SRC_DIR}/Screens/ProfileScreen.cpp"
+        "${SRC_DIR}/Screens/FriendsScreen.cpp"
+        "${SRC_DIR}/Screens/InboxScreen.cpp"
+        "${SRC_DIR}/Screens/ConvoScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneCallEnded.cpp"
+        "${SRC_DIR}/Screens/PhoneHomeLayoutScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneOwnerEmojiScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneLockWidgetScreen.cpp"
+        "${SRC_DIR}/Screens/PhonePlaylistsScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneHapticsScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneSoftKeyToneScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneDiagScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneImeiRevealScreen.cpp"
+
         # S-MP18h: Model layer + LoRaPacket struct data + the
         # MessageService stub. This is the gating step for every
         # message-related screen and any Element that pulls in
