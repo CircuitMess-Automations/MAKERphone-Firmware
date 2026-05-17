@@ -51,6 +51,7 @@ idf_component_register(
         freertos
         esp_common
         esp_timer                  # lvgl_glue tick callback
+        nvs_flash                  # S-MP23/1: nvs_flash_init() at boot
         circuitos_shim
         circuitos
         chatter_library

@@ -52,6 +52,7 @@
 
 extern "C" {
 #include "lvgl_glue.h"
+#include "nvs_flash.h"
 }
 
 /* S-MP14c compile-time assertion: prove the Pins.hpp that resolves
@@ -399,6 +400,38 @@ extern "C" void app_main(void)
      * peripheral pin assignments. */
     initArduino();
     ESP_LOGI(TAG, "Arduino layer initialised");
+
+    /* S-MP23/1 — explicit NVS flash bring-up.
+     *
+     * Settings.begin() (called from Chatter.begin() below) does
+     * nvs_open("CircuitOS", ...) and silently fails with
+     * ESP_ERR_NVS_NOT_INITIALIZED unless nvs_flash_init() has run
+     * first. arduino-esp32 v3 does NOT call nvs_flash_init() from
+     * initArduino(); it deferred it to consumers (Preferences,
+     * WiFi.begin) that we don't use. So we own it here.
+     *
+     * Idempotent: a second call returns ESP_OK without side
+     * effects. The recovery branch handles a corrupt or
+     * version-mismatched partition by erasing + reinitialising.
+     *
+     * This unblocks both the existing Settings path AND the
+     * upcoming Storage layer migration (S-MP23 proper, where
+     * StorageStub.cpp's Repo<T> methods will key NVS records by
+     * a per-type prefix + numeric uid). */
+    {
+        esp_err_t r = nvs_flash_init();
+        if (r == ESP_ERR_NVS_NO_FREE_PAGES ||
+            r == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+            ESP_LOGW(TAG, "NVS reinit (was: %s)", esp_err_to_name(r));
+            ESP_ERROR_CHECK(nvs_flash_erase());
+            r = nvs_flash_init();
+        }
+        if (r == ESP_OK) {
+            ESP_LOGI(TAG, "NVS flash initialised");
+        } else {
+            ESP_LOGE(TAG, "NVS flash init failed: %s", esp_err_to_name(r));
+        }
+    }
 
     if (display_init() != ESP_OK) {
         ESP_LOGE(TAG, "Display init failed — continuing headless");
