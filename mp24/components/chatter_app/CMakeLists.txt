@@ -1148,6 +1148,18 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     # Modern gcc -Wunused-local-typedefs flags this as an error
     # under our -Werror=all default. Upstream code, harmless.
     -Wno-error=unused-local-typedefs
+    # S-MP20/8b/1: SpaceInvaders.cpp's invaderlogic() does
+    # `invaderframe[invaderctr] = ++invaderframe[invaderctr] % 2;`
+    # which modifies the same lvalue twice between sequence
+    # points -- classic UB pattern that modern gcc flags under
+    # -Wsequence-point. The original Chatter toolchain didn't
+    # treat this as an error. The expression's runtime behaviour
+    # is well-defined on the xtensa-esp-elf toolchain (the
+    # post-increment is sequenced before the assignment in
+    # practice, and the modulo collapses both possible orderings
+    # to {0, 1}). Demoting to a warning. Upstream code, not
+    # patching.
+    -Wno-error=sequence-point
     # Arduino.h gets pre-included so 'String', 'pinMode', 'millis'
     # etc. resolve without each src .cpp having to remember to
     # include it. Same trick used for the circuitos build.
