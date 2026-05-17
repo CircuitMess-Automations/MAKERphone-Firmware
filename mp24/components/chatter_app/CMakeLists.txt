@@ -867,6 +867,34 @@ idf_component_register(
         # matching the /6b stubs' pattern.
         "${SRC_DIR}/Games/GameEngine/TextInput.cpp"
 
+        # S-MP20/7f3: first game implementation lands -- Snake.cpp.
+        # Third commit in the /7f sequence (after /7f1's
+        # ContextTransition.h bracket-include patch + /7f2's
+        # readPixel/printf/drawFastHLine shim Sprite methods).
+        # Together with the Element.h bracket-include patch in
+        # this same commit, the dual-Sprite + dual-Display
+        # redefinitions that blocked /7 and /7e are gone, and
+        # the three missing TFT_eSprite-style methods Snake calls
+        # now have shim no-op bodies.
+        #
+        # Snake's transitive dependencies are otherwise unchanged
+        # since the /7 attempt: Game.cpp + GameSystem.cpp
+        # (S-MP20/5), InputChatter + FSLVGL stubs (S-MP20/6b),
+        # Highscore.cpp (S-MP20/6), TextInput.cpp (S-MP20/6c),
+        # Sprite drawing API stubs + LovyanGFX-style text overloads
+        # (S-MP20/6d), <Pins.hpp> transitive in shim Chatter.h
+        # (S-MP20/6d).
+        #
+        # Important runtime note: nothing in the in-SRCS set
+        # currently does 'new Snake(...)' -- no GamesScreen entry
+        # routes to Snake yet. Without an instantiation site, the
+        # linker's --gc-sections drops Snake.cpp's TU at link
+        # time. Expected binary delta: 0 bytes. Compile-only
+        # validation; the runtime hookup is deferred to a later
+        # fire (after we add GamesScreen.cpp + the four
+        # game-instantiating switch cases).
+        "${SRC_DIR}/Games/Snake/Snake.cpp"
+
         # S-MP20/6b: pre-emptive Game.cpp runtime stubs.
         # Defines the symbols Game.cpp's start() / stop() / loop()
         # bodies reference -- InputChatter::getInputInstance() and

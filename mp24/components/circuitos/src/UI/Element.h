@@ -3,7 +3,7 @@
 
 
 #include "../Display/Color.h"
-#include "../Display/Sprite.h"
+#include <Display/Sprite.h>
 #include "ElementContainer.h"
 
 class ElementContainer;
