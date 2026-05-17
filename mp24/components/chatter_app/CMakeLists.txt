@@ -628,6 +628,28 @@ idf_component_register(
         # subsequent fires.
         "${SRC_DIR}/Games/GameEngine/Rendering/RenderComponent.cpp"
 
+        # S-MP20/4c: RenderSystem.cpp -- the second Rendering leaf
+        # (ctor + update() only; 34 lines). Inherits from
+        # GameSystem; update() iterates getObjects() and per-layer
+        # dispatches RenderComponent::push() onto a Sprite canvas.
+        # External deps:
+        #   - <set>, <map> -- stdlib, already exercised by
+        #     CollisionSystem.cpp (S-MP20/4).
+        #   - "RenderSystem.h" -> <Display/Sprite.h> + GameSystem.h
+        #     + GameObject.h (already pulled by RenderComponent.cpp
+        #     and the Collision/* leaves under SRCS).
+        # The gc-sections gambit: no file in SRCS references
+        # RenderSystem (verified by grep across the 212-entry SRCS
+        # list -- only Game.h pulls it, and Game.h is not in SRCS),
+        # so --gc-sections should drop the entire TU at link time.
+        # If, despite that, the linker retains RenderSystem::update,
+        # it will fail to resolve GameSystem::getObjects() (defined
+        # in GameSystem.cpp, NOT in SRCS) and GameSystem::GameSystem
+        # (same). In that case revert this commit and move to
+        # S-MP20/4d (StaticRC.cpp) per the prior fire's checkpoint.
+        # Compile-only validation, same pattern as the prior leaves.
+        "${SRC_DIR}/Games/GameEngine/Rendering/RenderSystem.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
