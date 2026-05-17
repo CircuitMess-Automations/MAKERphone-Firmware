@@ -744,6 +744,51 @@ idf_component_register(
         # cpp) is unblocked from the Rendering-deps angle.
         "${SRC_DIR}/Games/GameEngine/Rendering/AnimRC.cpp"
 
+        # S-MP20/5: Game.cpp + GameSystem.cpp -- the engine
+        # core. With all five Rendering leaves (RenderComponent
+        # + RenderSystem + StaticRC + SpriteRC + AnimRC) and all
+        # five Collision leaves (CollisionComponent + CircleCC +
+        # RectCC + PolygonCC + CollisionSystem) plus GameObject
+        # in SRCS, Game's ctor member-init list (`render(this,
+        # Chatter.getDisplay()->getBaseSprite()), collision(this)`)
+        # would resolve cleanly at link time IF the linker
+        # retained Game::Game.
+        #
+        # The gc-sections gambit still holds though: NO file in
+        # the 229-entry SRCS list pulls Game.h or any header
+        # that pulls Game.h (audit at S-MP20/5 confirmed --
+        # only PhoneDialerScreen.cpp + PhoneGamesScreen.cpp +
+        # MainMenu.cpp + GamesScreen.cpp + ShutdownService.cpp +
+        # SleepService.cpp pull it, and all six are excluded
+        # from SRCS -- the first four held back for the games
+        # session, the last two replaced by stubs). With nothing
+        # referencing Game's vtable / ctor / instance methods,
+        # --gc-sections drops both TUs and the binary stays at
+        # 883408 bytes.
+        #
+        # If, contrary to expectation, the linker retains the
+        # TUs, the only previously-unresolved external was
+        # `extern Game* startedGame;` from Game.cpp's start() /
+        # stop() bodies. The same commit defines it as
+        # `Game* startedGame = nullptr;` alongside the existing
+        # `bool gameStarted = false;` in SleepServiceStub.cpp
+        # (forward-declared `class Game;` -- never derefed in
+        # that TU). All other Game.cpp references (Chatter,
+        # InputChatter::getInputInstance, FSLVGL::loadCache,
+        # ChirpSystem::stop via Audio member) are at sites
+        # inside function bodies that go away with the TU.
+        #
+        # GameSystem.cpp is a four-line file: ctor + getObjects()
+        # which returns the Game::objects friend-accessed
+        # private set. Same gc-sections gambit.
+        #
+        # With Game.cpp + GameSystem.cpp landing, the engine
+        # surface is compile-complete. Next leaves (Highscore,
+        # then the four game implementations, then GamesScreen
+        # / PhoneGamesScreen wiring) build on top of this.
+        "${SRC_DIR}/Games/GameEngine/Game.cpp"
+        "${SRC_DIR}/Games/GameEngine/GameSystem.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The

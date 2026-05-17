@@ -54,6 +54,24 @@ static const char *TAG = "SleepService(stub)";
  * lands this definition moves out to its real home. */
 bool gameStarted = false;
 
+/* S-MP20/5: startedGame is a peer of gameStarted, set/cleared
+ * by Game::start() / Game::stop() to point at the currently
+ * running Game. BuzzerService.cpp, ShutdownService.cpp, and the
+ * Game pop-self-delete path all read it. With Game.cpp now in
+ * chatter_app SRCS (compile-only validation -- gc-sections still
+ * drops the TU at link time because nothing in SRCS instantiates
+ * a Game), Game.cpp's `extern Game* startedGame;` would become
+ * an unresolved external symbol if anything DID pull the start/
+ * stop bodies in. Define it here as nullptr so the symbol is
+ * always available, sized correctly, and trivially defined.
+ *
+ * Forward-declared `class Game;` is sufficient -- we never deref
+ * the pointer in this TU. Including Games/GameEngine/Game.h
+ * here would pull glm.h transitively, which we want to keep
+ * scoped to the chatter_app component. */
+class Game;
+Game* startedGame = nullptr;
+
 SleepService Sleep;
 
 SleepService::SleepService()
