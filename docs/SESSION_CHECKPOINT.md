@@ -8,18 +8,18 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-18 ~23:14 UTC
-* **HEAD on `main`:** `eafd088` (`feat(mp24): S-MP23/2 -- back
-  PhoneContacts namespace with NVS`). One feature commit, GREEN on
-  first build with zero fix-forwards.
-* **Build status:** GREEN at HEAD `eafd088` (run `26005461264`,
+* **Date (UTC):** 2026-05-18 ~23:30 UTC
+* **HEAD on `main`:** `34a8146` (`feat(mp24): S-MP23/3 -- Repo<Friend>
+  NVS-backed with index blob`). One feature commit, GREEN on first
+  build with zero fix-forwards.
+* **Build status:** GREEN at HEAD `34a8146` (run `26005892869`,
   both `build` and `flash` jobs completed/success).
 * **Device boot status:** HEALTHY. boot.log scan: 0 crash markers
   (panic/guru/abort/Backtrace count = 0). Boot shape unchanged
-  from prior green baseline (c1adca8):
+  from prior green baseline (`eafd088`):
 
       BATT: curve-fitting cal active
-      BATT: first sample: 1220 mV (1.22 V)
+      BATT: first sample: 1216 mV (1.22 V)
       STORE:   README.txt                       919 B
       STORE:   hello.txt                        140 B
       STORE: sentinel hello.txt missing or unreadable
@@ -30,74 +30,115 @@ does not consume a build.
       MODEM: state -> BOOT
       MODEM: boot probe... (0 s elapsed) ... (15 s elapsed)
 
-  No PhoneContacts mutations happen during the 20 s boot capture
+  No Repo<Friend> mutations happen during the 20 s boot capture
   window, so the new NVS code path isn't exercised at boot. The
   link is clean and the boot shape is byte-identical to the
   previous green baseline -- which is the meaningful evidence
-  this fire was after: that adding `nvs_flash` to chatter_app's
-  REQUIRES and including `nvs.h` from StorageStub.cpp doesn't
+  this fire was after: that specializing seven member functions
+  of Repo<Friend> and adding the index-blob helpers doesn't
   break anything at link time or runtime.
 * **Flasher status:** ONLINE and reliable.
-* **Binary size:** ~1.21 MB (unchanged within noise from prior
-  baseline; the new code path is tiny and most NVS surface is
-  already linked in by the S-MP23/1 init call).
+* **Binary size:** ~12.15 MB artifact bundle (firmware ~1.21 MB
+  app binary; within noise from prior baseline -- the new code
+  is tiny, +304 LOC of which roughly half is comments).
 
 ## What this fire actually shipped (net)
 
-1. **`eafd088` -- S-MP23/2.** PhoneContacts namespace in
-   `mp24/components/chatter_app/shim/StorageStub.cpp` is now
-   NVS-backed instead of all-no-op. All 28 functions read /
-   write the real PhoneContact struct under NVS namespace `"pc"`,
-   one blob per contact, keyed by a 14-byte base32 encoding of
-   the 64-bit UID (`'c' + 13 base32 chars`).
+1. **`34a8146` -- S-MP23/3.** `mp24/components/chatter_app/shim/
+   StorageStub.cpp` now provides per-method specializations for
+   Repo<Friend>::add/update/remove/get/all/exists/clear. Records
+   live in NVS namespace `"frd"`, one blob per Friend keyed by
+   14 chars (`'f' + 13 base32 chars` of the 64-bit UID, well under
+   `NVS_KEY_NAME_MAX_SIZE-1 = 15`). A separate `"__idx"` blob
+   holds the packed array of `UID_t`s needed by all().
 
-   Three anonymous-namespace helpers do the heavy lifting:
+   Anonymous-namespace helpers:
 
-       uidToKey(uid, out)   -- 14-char base32 NVS key
-       loadRecord(uid, out) -- READONLY open + nvs_get_blob
-                               + uid match (defensive)
-       saveRecord(c)        -- READWRITE open + nvs_set_blob
-                               + nvs_commit
-       eraseRecord(uid)     -- READWRITE open + nvs_erase_key
-                               + nvs_commit
+       friendKey(uid, out)    -- 14-char base32 NVS key
+       friendLoad(uid, out)   -- READONLY open + nvs_get_blob
+                                 + uid match (defensive)
+       friendSave(f)          -- READWRITE open + nvs_set_blob
+                                 + nvs_commit
+       friendErase(uid)       -- READWRITE open + nvs_erase_key
+                                 + nvs_commit
+       friendIdxLoad(vec)     -- read __idx into vector
+       friendIdxSave(vec)     -- write vector to __idx (empty
+                                 vector erases the key)
+       friendIdxContains(...) -- linear scan
 
-   Every public function now does the read-modify-write cycle
-   through these helpers. Behaviour matches upstream
-   PhoneContacts.cpp at the public-API boundary -- including
-   the "clearX returns true when nothing to clear" semantics
-   for clearBirthday/clearDisplayName/clearWallpaper, and the
-   ContactFlag_HasX gating for has* / *Of queries.
+   Partial-failure semantics: if blob erase succeeds but index
+   save fails, the index briefly points to a missing record;
+   friendLoad() returns false in that case so the orphan
+   degrades to "Friend looks missing" rather than corruption.
 
-   Difference from upstream worth noting: displayNameOf's fall-
-   back to Friend's broadcast nickname is dropped (returns "" on
-   miss) because Storage.Friends is still the no-op Repo<Friend>.
-   S-MP23/3 will restore the fallback once Repo<Friend> is NVS-
-   backed too.
+   Friend is POD/trivially-copyable on xtensa-esp-elf:
+   `{uint64_t uid; Profile{char[21], uint8, uint16}; uint8[32]}`
+   = 64 bytes with no internal padding (uid 8-aligned, Profile
+   24, encKey 32). Raw `nvs_set_blob` over `&Friend` is correct.
 
-   Also added `nvs_flash` to chatter_app/CMakeLists.txt REQUIRES
-   so `#include "nvs.h"` resolves without leaning on transitive
-   exposure through main/.
+   Also restored `PhoneContacts::displayNameOf()`'s Friend
+   fallback that S-MP23/2 dropped. The upstream "fall back to
+   `f.profile.nickname`" path now works because
+   `Storage.Friends.get(uid)` returns the real persisted record.
+
+   Added `<algorithm>` include for `std::remove` in the
+   index-removal path.
 
    Files: `mp24/components/chatter_app/shim/StorageStub.cpp`
-   (+322 -32), `mp24/components/chatter_app/CMakeLists.txt`
-   (+1 -0). Two-file commit.
+   (+304 -6). One-file commit.
 
-   On boot with an empty NVS partition, every `loadRecord`
-   returns false and behaviour is byte-identical to the
-   previous all-no-op stub (getters return defaults / derived
-   values, setters succeed and persist). The first time the
-   user edits a contact, that contact's state survives a reset
-   cycle.
+   Repo<PhoneContact> / Repo<Message> / Repo<Convo> remain the
+   all-no-op primary template. PhoneContacts namespace keeps its
+   own NVS-backed implementation from S-MP23/2; Message/Convo
+   need custom serialisation (non-POD members: `std::string` /
+   `std::vector` / `void*`) which is deferred.
 
-## Why this fire shipped the storage step (not modem)
+## Why this fire shipped Repo<Friend> (not the full S-MP23/3)
 
-The previous fire identified S-MP23 as the right next sub-step
-(hardware-blocked on modem-side Q3). PhoneContacts namespace was
-the smallest, most-bounded slice of the Storage surface as the
-brief suggested -- 28 functions over a single struct, no Repo<T>
-template complications. Pure read-modify-write through three
-helpers, clean NVS commit policy, byte-for-byte semantic match
-with upstream behaviour at the public-API boundary.
+The previous fire's checkpoint scoped S-MP23/3 as "Repo<Friend>,
+Repo<Message>, Repo<Convo>, Repo<PhoneContact> NVS-backed" -- all
+four in one step. That's too big for a 30-minute fire. This fire
+took the smallest atomic slice that delivers real value:
+
+* Friend is the only one of the four where Repo<T> is used
+  *directly* (the others go through MessageRepo / ConvoRepo
+  subclasses with custom serialisation, or through the
+  PhoneContacts namespace which already has its own NVS store).
+* Friend is the smallest POD of the four -- 64 fixed bytes,
+  no nested containers -- so the blob serialisation pattern
+  from PhoneContacts (S-MP23/2) ports almost verbatim.
+* Restoring `displayNameOf()`'s Friend fallback was the named
+  follow-on from S-MP23/2's checkpoint; doing it now closes
+  that loop and unblocks contact-list/dialer screens from
+  falling back to a paired peer's broadcast nickname when the
+  user hasn't entered a custom contact name.
+
+The future sub-steps stay roughly the same:
+
+* **S-MP23/4.** Repo<PhoneContact> NVS-backed. Mostly a
+  copy-rename of the Friend code with namespace `"pc"` and a
+  consolidation note: PhoneContacts namespace currently writes
+  keys `"c<base32>"` in `"pc"` -- to share the same store,
+  pick a key prefix `'p'` for Repo<PhoneContact>'s record key
+  (or a non-overlapping numeric range) and a `"__idx"` key for
+  the index. Both layers see the same blobs.
+* **S-MP23/5.** MessageRepo NVS-backed. Custom serialisation:
+  Message has `Type type`, `std::string text` for TEXT, or a
+  single `uint8_t picIndex` for PIC. Serialise to a packed
+  blob: `[uid:8 | convo:8 | flags:1 | type:1 | len:2 | data:N]`
+  with N=0 for NONE, N=string.size() for TEXT, N=1 for PIC.
+* **S-MP23/6.** ConvoRepo NVS-backed. Convo holds
+  `vector<UID_t> messages` (variable length) plus a `bool
+  unread`. Serialise as `[uid:8 | unread:1 | count:2 |
+  uids:count*8]`. UID matches the Friend UID by convention
+  (see Convo.hpp comment), so the convo key can be the same
+  base32 scheme.
+* **S-MP23/7.** Audit every call site of `Storage.*` and
+  `PhoneContacts::*` for "now-true" assertions that the all-
+  no-op stub previously masked. Contact-list screens may now
+  see a populated list where they previously saw empty;
+  recents sort may now matter; LoRaService's `encKeyMap` walk
+  is still gated by the LoRa stub, so it stays dormant.
 
 ## Open hardware questions still outstanding
 
@@ -114,31 +155,10 @@ Same as before -- none resolved this fire:
 
 ## What the next fire should do
 
-S-MP23 momentum continues with `S-MP23/3` -- back Repo<T> with
-NVS:
-
-1. **S-MP23/3 -- Repo<Friend>, Repo<Message>, Repo<Convo>,
-   Repo<PhoneContact> NVS-backed.** Each upstream `T` gets
-   serialised as one NVS blob keyed by `<type><base32_uid>`
-   under separate per-type NVS namespaces ("frd", "msg",
-   "cnv", "pc"; the existing PhoneContacts namespace already
-   uses "pc" -- consolidate so Repo<PhoneContact> and the
-   namespace see the same store).
-
-   The Repo<T>::all() listing maintains an index blob
-   (`__idx`) per namespace -- a packed array of UID_t's --
-   kept in sync on add/remove. Repo<T>::get/exists do a
-   single nvs_get_blob; the additional uid match is already
-   in the PhoneContacts helpers and can be reused.
-
-   Once that lands, `displayNameOf`'s Friend fallback can be
-   restored.
-
-2. **S-MP23/4** -- audit every call site of `Storage.*` and
-   `PhoneContacts::*` for "now-true" assertions that were
-   guarded by the all-no-op stub. For example, contact-list
-   screens may now see a populated list where they previously
-   saw empty; recents sort may now matter, etc.
+Pick the next S-MP23 sub-step from the list above. Most natural
+continuation is **S-MP23/4 -- Repo<PhoneContact> NVS-backed**,
+which is mostly a copy-rename of this fire's Friend code with
+a consolidation against the existing PhoneContacts namespace.
 
 Alt path if a SIM gets inserted between fires: pivot back to
 S-MP21/3 (post-READY probes will surface SIM state).
@@ -150,23 +170,24 @@ S-MP21/3 (post-READY probes will surface SIM state).
   preserve `/home/claude/` (in fact, `/home/claude/` is not
   writable -- `mkdir: cannot create directory '/home/claude':
   Permission denied`).
-* This fire's sandbox: user was `brave-keen-albattani`,
-  `$HOME` was `/sessions/brave-keen-albattani`, and
+* This fire's sandbox: user was `awesome-focused-ritchie`,
+  `$HOME` was `/sessions/awesome-focused-ritchie`, and
   `/sessions/...` was 100% full again (9.8G/9.8G -- shared
-  across parallel sessions). Even `~/.gitconfig` write fails
-  on the default path; export `GIT_CONFIG_GLOBAL=/tmp/.gitconfig`
-  works around it. The writable scratch path used was
-  `/tmp/mp_work/mp_firmware/`, with the root FS having ~820 MB
-  free.
+  across parallel sessions). `~/repo` write fails on no-space;
+  used `/tmp/aw_mp24/repo/mp_firmware/` instead, with the
+  root FS having ~740 MB free.
 * As before, the bash tool's 45-second timeout makes the
   helper scripts impractical to run end-to-end in one call;
   this fire used chunked GH API polling (each `sleep 30-40` +
   status call in its own bash call) and it worked smoothly.
-  The build job took ~2.5 min and flash + boot capture took
-  ~1.5 min total for this commit.
+  The build job took ~2 min and flash + boot capture took
+  ~1 min total for this commit.
 * The CI workflow triggers on push automatically via the
   `mp24/**` / `src/**` path filter -- no manual
   `workflow_dispatch` is needed for code changes. Docs-only
   commits (like this checkpoint) do NOT trigger a build.
-* /tmp/flash_iter from prior sessions can have files owned by
-  `nobody`; either rm it or use a fresh dir name.
+* /tmp from prior sessions can have files owned by `nobody`;
+  either rm what you can or use a fresh dir name like
+  `/tmp/<initials>_mp24/`.
+* `git clone --depth 50` keeps the working tree tiny when
+  disk pressure is high.
