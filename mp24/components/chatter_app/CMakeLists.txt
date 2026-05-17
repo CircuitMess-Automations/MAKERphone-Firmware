@@ -254,6 +254,19 @@ idf_component_register(
         "${SRC_DIR}/Services/PhoneVirtualPet.cpp"
         "${SRC_DIR}/Services/PhoneAlarmService.cpp"
 
+        # S-MP19/3: Services/Pair state machine. Pulled into the
+        # link graph by FriendsScreen now that PhoneMainMenu's
+        # Contacts tile dispatches to FriendsScreen. All five
+        # files compile against the stubbed LoRaService /
+        # ProfileService / Storage; the pair-flow operates on
+        # empty repos so the state machine fires but never
+        # produces a match.
+        "${SRC_DIR}/Services/Pair/State.cpp"
+        "${SRC_DIR}/Services/Pair/BroadcastState.cpp"
+        "${SRC_DIR}/Services/Pair/RequestState.cpp"
+        "${SRC_DIR}/Services/Pair/AcknowledgeState.cpp"
+        "${SRC_DIR}/Services/Pair/PairService.cpp"
+
         # S-MP18w: 5 independent services + 8 Elements with
         # clean deps. Unblocks the alarm/call/composer/dialer/
         # home-screen cluster of screens in subsequent commits.
