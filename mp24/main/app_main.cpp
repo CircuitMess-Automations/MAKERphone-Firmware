@@ -429,7 +429,33 @@ extern "C" void app_main(void)
     if (lvgl_glue_init() != ESP_OK) {
         ESP_LOGE(TAG, "LVGL init failed — continuing without UI");
     } else {
-        ESP_LOGI(TAG, "LVGL initialised, instantiating TestScreen");
+        ESP_LOGI(TAG, "LVGL initialised, bringing up CircuitOS layer");
+
+        /* S-MP19/5: call Chatter.begin() BEFORE instantiating any
+         * screen. Chatter.begin() constructs MP24Input, which is
+         * the only path that sets the Input::instance singleton.
+         *
+         * Without this, PhoneHomeScreen's constructor crashes:
+         *   PhoneHomeScreen::PhoneHomeScreen()
+         *   → new PhoneIdleHint(obj)
+         *   → Input::getInstance()->addListener(this)
+         *   → null deref at offset 0xb4 (the listeners Vector)
+         *
+         * Diagnosed from boot.log backtrace (May 17):
+         *   PC 0x4208434b  Vector<InputListener*>::indexOf
+         *   PC 0x4202e6bc  Input::addListener
+         *   PC 0x4201abd5  PhoneIdleHint::PhoneIdleHint
+         *   PC 0x420106de  PhoneHomeScreen::PhoneHomeScreen
+         *   EXCVADDR 0x000000b4  (listeners vector at offset 0xb4)
+         *
+         * Chatter.begin() also instantiates Display, registers
+         * MP24Input with LoopManager, brings up Settings (NVS),
+         * and registers Battery — all of which downstream screens
+         * + LoopListeners assume are live. */
+        Chatter.begin();
+        ESP_LOGI(TAG, "Chatter.begin() done — Input singleton live");
+
+        ESP_LOGI(TAG, "Instantiating PhoneHomeScreen");
 
         /* S-MP18z: replaced PhoneAppStubScreen with PhoneHomeScreen
          * as the boot destination. PhoneHomeScreen is the Sony-
@@ -442,18 +468,19 @@ extern "C" void app_main(void)
          * PhoneChargingOverlay, PhoneOperatorBanner, PhoneConfetti
          * Overlay) — basically a full Element showcase.
          *
-         * No navigation callbacks are set, so soft-keys flash on
-         * press but don't actually navigate. Sufficient for a
-         * visual smoke test of the home screen.
+         * Navigation wired in S-MP19 (HomeFactory.cpp):
+         *   - BTN_RIGHT (MENU)    → push PhoneMainMenu
+         *   - BTN_BACK hold       → push LockScreen
          *
          * Earlier factories (Welcome / AppStub / Test) stay in
          * the build for one-line revert.
          *
-         * Order constraint: same as before — lvgl_glue_init first
-         * (LVGL state ready), screen instantiation second
-         * (constructor uses LVGL API on app_main task), then
-         * lvgl_glue_run (LVGL task starts, processes the queued
-         * screen load on its first iteration). */
+         * Order constraint: lvgl_glue_init first (LVGL state
+         * ready), Chatter.begin() second (Input singleton +
+         * Display + Settings + Battery), screen instantiation
+         * third (constructor uses LVGL API + Input on app_main
+         * task), then lvgl_glue_run (LVGL task starts, processes
+         * the queued screen load on its first iteration). */
         extern void chatter_app_start_home_screen(void);
         chatter_app_start_home_screen();
         ESP_LOGI(TAG, "PhoneHomeScreen instantiated + start()ed");
