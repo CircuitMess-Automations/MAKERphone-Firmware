@@ -253,6 +253,10 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     -Wno-error=unused-variable
     -Wno-error=unused-but-set-variable
     -Wno-error=sign-compare
+    # S-MP18h/1: LoRaPacket.cpp's unpack helpers have static
+    # analysis flags on `buffer` writes the compiler can't prove
+    # are after all read paths. Upstream code, not patching.
+    -Wno-error=uninitialized
     # S-MP18f/1: PhoneCalculator.cpp snprintfs an int into a 23-char
     # buffer and the compiler can't prove the conversion fits.
     # Demoting to warning — the actual call sites pass values that
