@@ -172,7 +172,12 @@ idf_component_register(
         # (S-MP18j) + MessageService stub (S-MP18h). All
         # dep-audited clean — every Element they include is
         # already in the build.
-        "${SRC_DIR}/Screens/ProfileScreen.cpp"
+        #
+        # ProfileScreen.cpp was originally in this batch but
+        # transitively pulls Services/ProfileService.h ->
+        # Services/LoRaService.h -> <RadioLib.h>. Removed —
+        # needs a ProfileService stub session before it can
+        # join.
         "${SRC_DIR}/Screens/FriendsScreen.cpp"
         "${SRC_DIR}/Screens/InboxScreen.cpp"
         "${SRC_DIR}/Screens/ConvoScreen.cpp"
