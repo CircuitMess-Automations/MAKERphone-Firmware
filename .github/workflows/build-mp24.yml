@@ -337,6 +337,54 @@ jobs:
           echo "=== boot.log (last 100 lines) ==="
           tail -100 boot.log
 
+      - name: Detect crash in boot log
+        shell: bash
+        working-directory: firmware
+        # Fail the job loudly if boot.log contains panic markers,
+        # so the workflow's success/failure status directly tracks
+        # device boot health. The boot-log + firmware artifacts
+        # are already uploaded by earlier steps (or via the
+        # `if: always()` on Upload boot log) so the diagnosis
+        # artifacts are available either way.
+        #
+        # Markers we treat as crashes:
+        #   "Guru Meditation"  — hardware exception (LoadProhibited, etc.)
+        #   "panic'ed"         — explicit panic call
+        #   "abort() was called" — assert / abort
+        #   "rst:0x" multiple times — multiple reboots within 20s
+        #     (indicates crash loop even if panic text was truncated)
+        #
+        # Healthy boot still produces some "rst:0x..." at the start
+        # (initial cold reset) so we tolerate one but flag 2+.
+        run: |
+          set -uo pipefail
+          if [[ ! -s boot.log ]]; then
+            echo "::warning::boot.log is empty — capture step likely failed."
+            echo "Continuing without crash detection."
+            exit 0
+          fi
+          panics=$(grep -cE "Guru Meditation|panic'ed|abort\\(\\) was called" boot.log || true)
+          resets=$(grep -cE "^rst:0x" boot.log || true)
+          backtraces=$(grep -cE "^Backtrace:" boot.log || true)
+          echo "=== Boot health summary ==="
+          echo "  Guru/panic/abort markers : $panics"
+          echo "  Reset count (rst:0x...)  : $resets"
+          echo "  Backtrace frames         : $backtraces"
+          if [[ "$panics" -gt 0 ]] || [[ "$resets" -gt 1 ]] || [[ "$backtraces" -gt 0 ]]; then
+            echo "::error::Device crashed on boot (panics=$panics resets=$resets backtraces=$backtraces)"
+            echo "First panic dump:"
+            awk '/Guru Meditation|panic.ed/,/Rebooting/' boot.log | head -30
+            exit 3
+          fi
+          # Also require that some MP24 module heartbeats appear —
+          # otherwise the boot probably hung silently before logging.
+          if ! grep -qE "MP24|STORE|MODEM|LVGL|POWER" boot.log; then
+            echo "::warning::No MP24 module heartbeats in boot.log."
+            echo "Device may have hung silently or capture missed window."
+            # Don't fail — capture race conditions cause this too.
+          fi
+          echo "✓ Device booted cleanly."
+
       - name: Upload boot log
         if: always()
         uses: actions/upload-artifact@v4
