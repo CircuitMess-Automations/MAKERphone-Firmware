@@ -173,6 +173,19 @@ public:
     int  textWidth(String s)      { (void)s; return 0; }
     int  fontHeight()             { return 8; }
 
+    /* S-MP20/9a: LovyanGFX-style 2-arg setTextWrap.
+     * Upstream Pong/GameState.cpp + JigHWTest.cpp call
+     *   display->setTextWrap(false, false);
+     * which is the LGFX shape (wrap_x, wrap_y). Bodmer/TFT_eSPI
+     * exposes only the 1-arg form; LovyanGFX added the per-axis
+     * variant. Our shim has no text rasteriser yet (Decision 9C),
+     * so wrap state is silently discarded. The 1-arg form is also
+     * provided for any upstream code that uses the legacy shape.
+     * Both are no-ops; visual rendering through this path remains
+     * silent until 9A vendors real TFT_eSPI. */
+    void setTextWrap(bool wrap_x)              { (void)wrap_x; }
+    void setTextWrap(bool wrap_x, bool wrap_y) { (void)wrap_x; (void)wrap_y; }
+
     /* Framebuffer access for raw blitting. */
     uint16_t *getFrameBuffer() { return framebuffer; }
 
