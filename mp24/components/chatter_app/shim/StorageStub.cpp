@@ -73,6 +73,7 @@
 #include "Model/PhoneContact.hpp"
 
 #include <vector>
+#include <algorithm>
 
 /* ------------------------------------------------------------------
  * Repo<T> template method definitions
@@ -170,6 +171,294 @@ template <typename T>
 String Repo<T>::getPath(UID_t /*uid*/)
 {
     return String{};
+}
+
+
+/* ------------------------------------------------------------------
+ * S-MP23/3 -- Repo<Friend> NVS-backed.
+ *
+ * The primary template above provides no-op defaults for every
+ * Repo<T>. Here we specialize the Friend instantiation to talk to
+ * NVS so paired Friends survive a reset. Records live in NVS
+ * namespace "frd", one blob per Friend keyed by 14-char base32
+ * ('f' + 13 chars). A separate "__idx" blob holds the packed array
+ * of UID_t's needed by Repo<Friend>::all().
+ *
+ * Friend is POD-trivially-copyable (Profile is POD; encKey is a
+ * uint8 array), so a raw nvs_set_blob over &Friend is correct.
+ * sizeof(Friend) is stable on xtensa-esp-elf because the only
+ * non-byte member, Profile::hue, is uint16_t which the platform
+ * lays out with no internal padding (uid + 8-aligned struct,
+ * Profile 24 bytes, encKey[32] = 64 bytes total).
+ *
+ * Repo<PhoneContact>, Repo<Message>, Repo<Convo> remain the all-
+ * no-op primary template -- the PhoneContacts namespace already
+ * has its own NVS-backed implementation (S-MP23/2), and
+ * Message/Convo need custom serialisation (they hold non-POD
+ * std::string / std::vector / void* members) which lands in a
+ * later sub-step.
+ *
+ * Note: this restores the displayNameOf() Friend fallback that
+ * S-MP23/2 dropped, since Storage.Friends.get(uid) now returns
+ * the real persisted Friend record.
+ * ------------------------------------------------------------------ */
+
+namespace {
+
+// NVS namespace + key scheme for Repo<Friend>.
+constexpr const char *kFriendNamespace = "frd";
+
+// Index key inside kFriendNamespace -- holds a packed array of
+// UID_t (uint64_t, little-endian on xtensa) listing every stored
+// friend. Kept in sync on add/remove. "__idx" is reserved and
+// will never collide with a 'f'-prefixed record key.
+constexpr const char *kFriendIndexKey = "__idx";
+
+// 'f' + 13 base32 chars = 14-char key, comfortably under
+// NVS_KEY_NAME_MAX_SIZE-1 = 15.
+static void friendKey(UID_t uid, char out[16])
+{
+    static const char alphabet[] = "0123456789abcdefghijklmnopqrstuv";
+    out[0] = 'f';
+    for (int i = 0; i < 13; ++i) {
+        unsigned shift = i * 5;
+        out[1 + (12 - i)] = alphabet[(uid >> shift) & 0x1F];
+    }
+    out[14] = '\0';
+}
+
+static bool friendLoad(UID_t uid, Friend &out)
+{
+    nvs_handle_t h;
+    if (nvs_open(kFriendNamespace, NVS_READONLY, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    friendKey(uid, key);
+    size_t sz = sizeof(Friend);
+    esp_err_t err = nvs_get_blob(h, key, &out, &sz);
+    nvs_close(h);
+    if (err != ESP_OK || sz != sizeof(Friend)) {
+        return false;
+    }
+    if (out.uid != uid) {
+        // Defensive: stored blob disagrees with key. Treat as miss.
+        return false;
+    }
+    return true;
+}
+
+static bool friendSave(const Friend &f)
+{
+    nvs_handle_t h;
+    if (nvs_open(kFriendNamespace, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    friendKey(f.uid, key);
+    esp_err_t err = nvs_set_blob(h, key, &f, sizeof(Friend));
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    return err == ESP_OK;
+}
+
+static bool friendErase(UID_t uid)
+{
+    nvs_handle_t h;
+    if (nvs_open(kFriendNamespace, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    friendKey(uid, key);
+    esp_err_t err = nvs_erase_key(h, key);
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    // NOT_FOUND treated as success (contract: "record is gone").
+    return err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND;
+}
+
+// Read the friend-index blob into `out`. Returns true on a clean
+// read (including the "no index yet" case, which yields an empty
+// vector). Returns false only on unexpected NVS errors so callers
+// can refuse to corrupt the index.
+static bool friendIdxLoad(std::vector<UID_t> &out)
+{
+    out.clear();
+    nvs_handle_t h;
+    esp_err_t open = nvs_open(kFriendNamespace, NVS_READONLY, &h);
+    if (open == ESP_ERR_NVS_NOT_FOUND) {
+        // Namespace doesn't exist yet -- empty repo.
+        return true;
+    }
+    if (open != ESP_OK) {
+        return false;
+    }
+    size_t sz = 0;
+    esp_err_t err = nvs_get_blob(h, kFriendIndexKey, nullptr, &sz);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        nvs_close(h);
+        return true;  // empty index, treated as no friends.
+    }
+    if (err != ESP_OK) {
+        nvs_close(h);
+        return false;
+    }
+    if (sz == 0 || (sz % sizeof(UID_t)) != 0) {
+        nvs_close(h);
+        return false;  // corrupt blob -- bail loudly rather than guess.
+    }
+    out.resize(sz / sizeof(UID_t));
+    err = nvs_get_blob(h, kFriendIndexKey, out.data(), &sz);
+    nvs_close(h);
+    if (err != ESP_OK) {
+        out.clear();
+        return false;
+    }
+    return true;
+}
+
+static bool friendIdxSave(const std::vector<UID_t> &v)
+{
+    nvs_handle_t h;
+    if (nvs_open(kFriendNamespace, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    esp_err_t err;
+    if (v.empty()) {
+        err = nvs_erase_key(h, kFriendIndexKey);
+        // NOT_FOUND is fine -- already gone.
+        if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+    } else {
+        err = nvs_set_blob(h, kFriendIndexKey, v.data(),
+                           v.size() * sizeof(UID_t));
+    }
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    return err == ESP_OK;
+}
+
+static bool friendIdxContains(const std::vector<UID_t> &v, UID_t uid)
+{
+    for (UID_t u : v) {
+        if (u == uid) return true;
+    }
+    return false;
+}
+
+}  // anonymous namespace (S-MP23/3)
+
+/* ------------------------------------------------------------------
+ * Per-method specializations for Repo<Friend>.
+ *
+ * The non-specialized members (begin, reserve, write, read,
+ * getPath) fall through to the primary template, which is fine --
+ * write/read are protected and unused here, getPath is unused, and
+ * begin/reserve are no-ops by design (the cache member exists but
+ * we don't use it; reads always hit NVS).
+ * ------------------------------------------------------------------ */
+
+template <>
+bool Repo<Friend>::add(const Friend &object)
+{
+    std::vector<UID_t> idx;
+    if (!friendIdxLoad(idx)) return false;
+    // Treat add-with-existing-uid as a no-op on the index side
+    // and as a blob overwrite on the record side. PairService
+    // checks exists() before calling add(), so the duplicate
+    // case is defensive only.
+    if (!friendIdxContains(idx, object.uid)) {
+        idx.push_back(object.uid);
+        if (!friendIdxSave(idx)) return false;
+    }
+    return friendSave(object);
+}
+
+template <>
+bool Repo<Friend>::update(const Friend &object)
+{
+    // Upstream Repo<T>::update only persists if the record exists;
+    // mirror that semantics so callers that branch on the return
+    // can detect "tried to update a missing friend".
+    std::vector<UID_t> idx;
+    if (!friendIdxLoad(idx)) return false;
+    if (!friendIdxContains(idx, object.uid)) return false;
+    return friendSave(object);
+}
+
+template <>
+bool Repo<Friend>::remove(UID_t uid)
+{
+    std::vector<UID_t> idx;
+    if (!friendIdxLoad(idx)) return false;
+    if (!friendIdxContains(idx, uid)) {
+        // Already gone -- upstream behaviour returns false.
+        return false;
+    }
+    // Erase blob first; if the blob erase succeeds but the index
+    // save fails, on next boot we'll have an index entry pointing
+    // to a missing record. friendLoad() handles that defensively
+    // (returns false), so a partial failure degrades to "Friend
+    // looks missing", not corruption.
+    if (!friendErase(uid)) return false;
+    idx.erase(std::remove(idx.begin(), idx.end(), uid), idx.end());
+    return friendIdxSave(idx);
+}
+
+template <>
+Friend Repo<Friend>::get(UID_t uid, bool /*bypassCache*/)
+{
+    Friend f{};
+    if (friendLoad(uid, f)) {
+        return f;
+    }
+    // Match the no-op stub: return a default-constructed Friend on
+    // miss. Upstream Repo<T>::get also returns T{} on a miss after
+    // logging a warning. The uid field stays 0, which call sites
+    // tolerate (e.g. PhoneCallService checks exists() first).
+    return Friend{};
+}
+
+template <>
+std::vector<UID_t> Repo<Friend>::all(bool /*bypassCache*/)
+{
+    std::vector<UID_t> idx;
+    if (!friendIdxLoad(idx)) {
+        return std::vector<UID_t>{};
+    }
+    return idx;
+}
+
+template <>
+bool Repo<Friend>::exists(UID_t uid)
+{
+    std::vector<UID_t> idx;
+    if (!friendIdxLoad(idx)) return false;
+    return friendIdxContains(idx, uid);
+}
+
+template <>
+void Repo<Friend>::clear()
+{
+    // Walk the index, erase each blob, then clear the index.
+    // We open the namespace in READWRITE once would be ideal, but
+    // the per-key helper already keeps each commit atomic; the
+    // cost (a few extra commits) is negligible for a "clear all
+    // friends" operation that essentially never runs.
+    std::vector<UID_t> idx;
+    if (friendIdxLoad(idx)) {
+        for (UID_t u : idx) {
+            (void)friendErase(u);
+        }
+    }
+    std::vector<UID_t> empty;
+    (void)friendIdxSave(empty);
+    cache.clear();
 }
 
 /* Explicit instantiation — the linker needs each symbol concrete. */
@@ -387,12 +676,21 @@ const char *displayNameOf(UID_t uid)
         scratch[DisplayNameMax] = 0;
         return scratch;
     }
-    // No Friend fallback in the shim — Storage.Friends is still
-    // the no-op Repo<Friend>, so the upstream "fall back to
-    // f.profile.nickname" branch would always miss. Return empty
-    // string for now; callers that want a placeholder ("Contact")
-    // should layer it on themselves. S-MP23/3 will restore the
-    // Friend fallback once Repo<Friend> is NVS-backed too.
+    // S-MP23/3 -- restored Friend fallback. Repo<Friend> is now
+    // NVS-backed, so a paired peer's broadcast nickname is the
+    // sensible second-tier display name when the user hasn't
+    // entered a custom contact name. Mirrors upstream
+    // PhoneContacts.cpp.
+    if (Storage.Friends.exists(uid)) {
+        Friend f = Storage.Friends.get(uid);
+        if (f.profile.nickname[0] != 0) {
+            strncpy(scratch, f.profile.nickname, DisplayNameMax);
+            scratch[DisplayNameMax] = 0;
+            return scratch;
+        }
+    }
+    // Last resort: empty string. Callers that want a placeholder
+    // ("Contact") should layer it on themselves.
     return "";
 }
 
