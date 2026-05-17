@@ -201,6 +201,35 @@ idf_component_register(
         # provides the public ABI as no-ops.
         "shim/MessageServiceStub.cpp"
 
+        # S-MP18m: services + modals + elements that compile
+        # cleanly now that LoRaService is stubbed. ProfileService
+        # is the canary — its .cpp does `#include "LoRaService.h"`
+        # which was the previous blocker.
+        "${SRC_DIR}/Services/ProfileService.cpp"
+
+        # Modals/ContextMenu + Prompt: 30+ screens import these
+        # for confirm/cancel flows. Both pull only Interface/ +
+        # already-compiled infrastructure.
+        "${SRC_DIR}/Modals/ContextMenu.cpp"
+        "${SRC_DIR}/Modals/Prompt.cpp"
+
+        # Elements unblocked by services-now-stubbed:
+        #   Avatar         — base for EditableAvatar; minimal deps
+        #   EditableAvatar — Avatar + InputLVGL
+        #   TextEntry      — InputLVGL + LVObject + Fonts; common
+        #                    on settings / profile / compose screens
+        #   ColorBox       — LVObject + InputLVGL; theme picker
+        "${SRC_DIR}/Elements/Avatar.cpp"
+        "${SRC_DIR}/Elements/EditableAvatar.cpp"
+        "${SRC_DIR}/Elements/TextEntry.cpp"
+        "${SRC_DIR}/Elements/ColorBox.cpp"
+
+        # The original ProfileScreen target — compiles after all
+        # the above land. Pulls ProfileService (just added) +
+        # Modals (just added) + Elements (just added) + Storage
+        # stub + MessageService stub. Should now be clean.
+        "${SRC_DIR}/Screens/ProfileScreen.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
