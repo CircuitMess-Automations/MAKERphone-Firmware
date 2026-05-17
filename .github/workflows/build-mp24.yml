@@ -144,6 +144,8 @@ jobs:
           name: mp24-firmware
           path: |
             mp24/build/makerphone_mp24.bin
+            mp24/build/makerphone_mp24.elf
+            mp24/build/makerphone_mp24.map
             mp24/build/bootloader/bootloader.bin
             mp24/build/partition_table/partition-table.bin
             mp24/build/flash_args
