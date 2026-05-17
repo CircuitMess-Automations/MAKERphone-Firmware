@@ -44,6 +44,16 @@
 
 static const char *TAG = "SleepService(stub)";
 
+/* S-MP19/4: gameStarted is normally defined inside the Games
+ * engine (Games/GameEngine/Game.cpp) which we don't compile —
+ * needs glm.h vendored. BuzzerService.cpp and SleepService.cpp
+ * both read it via 'extern bool gameStarted;' to suppress
+ * audio + sleep timers while a game is active.
+ *
+ * Define it here as 'permanently false'. Once the games engine
+ * lands this definition moves out to its real home. */
+bool gameStarted = false;
+
 SleepService Sleep;
 
 SleepService::SleepService()
