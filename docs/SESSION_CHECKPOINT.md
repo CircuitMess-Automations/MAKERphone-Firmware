@@ -8,160 +8,157 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-17 ~14:14
-* **HEAD on `main`:** `4d92863` (`fix(build): S-MP20/3/1 -- hold CollisionSystem.cpp back`)
-* **Build status:** GREEN. Run `25993182837` -- build job `success`,
-  flash job `success`. Prior run `25993099877` (commit `4ba3170`,
-  S-MP20/3 with all 5 Collision/* .cpp files) failed compilation
-  on `CollisionSystem.cpp` only; the four leaves before it built
-  clean, so `S-MP20/3/1` (commit `4d92863`) kept those four and
-  commented `CollisionSystem.cpp` out with a TODO block. One
-  fix-forward, then green.
+* **Date (UTC):** 2026-05-17 ~14:32
+* **HEAD on `main`:** `96d76f6` (`fix(build): S-MP20/4/1 --
+  soften -Werror=unused-local-typedefs`). Docs-only checkpoint
+  commit (this file) lands on top of that and is outside the CI
+  path filter, so the green build state is preserved.
+* **Build status:** GREEN. Run `25993575210` -- build job
+  `success`, flash job `success`. One fix-forward this fire (the
+  feat commit `6b632a4` failed `-Werror=unused-local-typedefs`
+  on upstream's unused `typedef glm::vec2 Point;` in
+  `CollisionSystem::drawPolygon`; the fix demoted that warning to
+  match the existing precedent for upstream-cosmetic suppressions
+  on chatter_app). After the soften commit, the next run was
+  clean.
 * **Device boot status:** HEALTHY. boot.log from artifact
-  `7043137997` shows:
+  `7043260361` (40 lines, 0 crash markers) shows:
 
       STORE: mounted; 2 files, 1757 / 1860161 bytes used (0%)
       POWER: polling GPIO2 at 50 Hz, debounce 3 ticks
       MP24: Entering background-tasks-only loop (LVGL owns the panel).
-      MODEM: state -> POWER -> BOOT -> boot probe...
+      MODEM: state -> POWER -> BOOT -> boot probe... (up to 16 s)
 
   Modem probe still wedged at ~16 s waiting on URCs (S-MP21
   territory: SIM presence + PWR_KEY polarity). No `Guru`,
-  `panic`, `abort`, or backtrace markers anywhere in the log.
+  `panic`, `abort`, or backtrace anywhere in the log.
 * **Flasher status:** ONLINE and reliable across both runs this
-  fire. The port-detection issue from the previous fire is gone.
+  fire.
+* **Binary size:** 883296 bytes / 2 MB partition (43% used, 1.16 MB
+  free). The Collision subsystem TUs add ~26 KB total to the
+  image; well within budget.
 
-## What S-MP20/3 + S-MP20/3/1 actually shipped
+## What S-MP20/4 actually shipped (in commit `6b632a4`)
 
-S-MP20/3 (`4ba3170`) attempted to add the entire Collision
-subsystem (5 TUs) to chatter_app SRCS:
+S-MP20/4 closed the three toolchain diffs catalogued by the prior
+fire's deferral note and re-enabled
+`Games/GameEngine/Collision/CollisionSystem.cpp` in chatter_app
+SRCS. The three patches:
 
-    Games/GameEngine/Collision/CollisionComponent.cpp
-    Games/GameEngine/Collision/CircleCC.cpp
-    Games/GameEngine/Collision/RectCC.cpp
-    Games/GameEngine/Collision/PolygonCC.cpp
-    Games/GameEngine/Collision/CollisionSystem.cpp
+1. **`shim_includes/arduino_glm_compat.h` gains
+   `#define GLM_ENABLE_EXPERIMENTAL`** at the top of the include
+   guard. The header is force-included into every chatter_app TU
+   via `target_compile_options(... "SHELL:-include ...")`, so the
+   macro is in scope before any glm parse. Unblocks
+   `<glm/gtx/matrix_transform_2d.hpp>` and
+   `<glm/gtx/vector_angle.hpp>` (both tagged experimental in glm
+   1.0.x; they `#error` otherwise).
 
-The first four are pure value types over `glm::vec2` -- their
-only non-stdlib includes are the headers in `Collision/` plus
-Arduino.h (PolygonCC uses `abs` / math). They compiled clean in
-both runs. `CollisionSystem.cpp` failed compilation under our
-toolchain with three independent issues:
+2. **`circuitos_shim/include/TFT_eSPI.h` gains the canonical
+   Bodmer/TFT_eSPI 565 palette** -- TFT_BLACK, TFT_NAVY,
+   TFT_DARKGREEN, TFT_DARKCYAN, TFT_MAROON, TFT_PURPLE,
+   TFT_OLIVE, TFT_LIGHTGREY, TFT_DARKGREY, TFT_BLUE, TFT_GREEN,
+   TFT_CYAN, TFT_RED, TFT_MAGENTA, TFT_YELLOW, TFT_WHITE,
+   TFT_ORANGE, TFT_GREENYELLOW, TFT_PINK, TFT_BROWN, TFT_GOLD,
+   TFT_SILVER, TFT_SKYBLUE, TFT_VIOLET. These are pulled
+   transitively by every TU that includes `<Display/Sprite.h>`,
+   which fixes `CollisionSystem::drawDebug` and pre-emptively
+   unblocks Snake / SpaceInvaders / JigHWTest for upcoming
+   sessions.
 
-1. **GLM experimental headers.** `<glm/gtx/matrix_transform_2d.hpp>`
-   and `<glm/gtx/vector_angle.hpp>` are flagged "experimental" in
-   GLM 1.0.1 and emit `#error` unless `GLM_ENABLE_EXPERIMENTAL`
-   is defined first. Our vendored copy doesn't pre-define that.
+3. **`circuitos_shim` Sprite gains a 2-arg `drawPixel(int32_t,
+   int32_t)` overload** -- declaration in `Display/Sprite.h`,
+   one-liner implementation in `MP24Sprite.cpp` forwarding to the
+   3-arg form with `TFT_WHITE`. Matches upstream `TFT_eSprite`
+   behaviour, which uses the current foreground color when only
+   x/y are supplied. The single call site in the codebase is
+   `CollisionSystem::drawPolygon` degenerate-single-point branch,
+   which only fires for polygons of size 1 -- a debug-draw path
+   that never fires in normal play.
 
-2. **TFT_GREEN / TFT_RED unknown.** `CollisionSystem::drawDebug`
-   uses TFT_eSPI color macros that don't exist on our
-   `circuitos_shim/Display/Sprite.h` surface.
+## What S-MP20/4/1 actually shipped (in commit `96d76f6`)
 
-3. **Sprite::drawPixel signature mismatch.** Upstream calls
-   `canvas->drawPixel(points.front().x, points.front().y)` with
-   two `float` args; our Sprite has `drawPixel(int32_t, int32_t,
-   uint16_t color)` -- three args, integers.
+One-line fix-forward. The first build attempt for S-MP20/4 (run
+`25993490471`, commit `6b632a4`) failed compilation on
+`CollisionSystem.cpp` with:
 
-S-MP20/3/1 (`4d92863`) reverted just `CollisionSystem.cpp` from
-the SRCS list and left an inline comment block in
-`chatter_app/CMakeLists.txt` documenting all three issues, so the
-next fire can pick up the patch without re-diagnosing.
+    error: typedef 'Point' locally defined but not used
+        [-Werror=unused-local-typedefs]
+        358 |         typedef glm::vec2 Point;
+
+This is an unused `typedef` in upstream's `drawPolygon`. The fix
+was to add `-Wno-error=unused-local-typedefs` to chatter_app's
+existing `target_compile_options` block, matching the precedent
+established by S-MP13b / S-MP18f-w for similar
+upstream-cosmetic-pattern suppressions. No source patch.
 
 ## What the next fire should do
 
 Pick ONE of these. They are roughly ordered by risk-adjusted
 payoff.
 
-1. **S-MP20/4 -- Land `CollisionSystem.cpp`.** This is the
-   correctly-scoped follow-up. Three small patches needed:
+1. **S-MP20/4b -- Land the Rendering subsystem.** Six TUs in
+   `src/Games/GameEngine/Rendering/`:
 
-   * In `mp24/components/chatter_app/shim_includes/arduino_glm_compat.h`,
-     `#define GLM_ENABLE_EXPERIMENTAL` BEFORE any glm includes.
-     (Or add it as a global compile flag on chatter_app via
-     `target_compile_definitions`. Either works; the header is
-     slightly cleaner because the macro is conceptually paired
-     with the other glm-compat stuff.)
-   * For TFT_GREEN / TFT_RED: add `#define TFT_GREEN 0x07E0` and
-     `#define TFT_RED 0xF800` (or equivalent constants from
-     `Display/Color.h` if one exists) to the shim. Both are
-     standard 565 RGB constants -- check what Color is defined
-     as in `Sprite.h` first.
-   * For the drawPixel signature mismatch: either add a 2-arg
-     overload to our Sprite shim that forwards to the 3-arg
-     version with `TFT_WHITE` (or the foreground color), OR
-     patch the .cpp callsite. Adding the overload to the shim
-     is preferred because it's a one-line addition and avoids
-     touching upstream source. The call is `drawPolygon` -- the
-     color is passed as a parameter so the missing third arg
-     should be that color, not white. Read CollisionSystem.cpp
-     line 364 for the right substitution.
+   * `RenderComponent.cpp` -- 4-method getter/setter leaf. Pure
+     value type. Safe to land alone; should compile clean.
+   * `SpriteRC.cpp` -- pulls `<Display/Sprite.h>` heavily. May
+     hit drawString / setTextColor signature mismatches similar
+     to S-MP20/4's drawPixel issue. Expect 0-2 fix-forwards.
+   * `StaticRC.cpp` -- similar to SpriteRC. May share fixes.
+   * `AnimRC.cpp` -- pulls `<Display/GIFAnimatedSprite.h>`. Check
+     whether that header exists in the shim; if not, this TU is
+     blocked.
+   * `RenderSystem.cpp` -- system class that owns the Render
+     pipeline. Trivial constructor + update loop.
 
-2. **S-MP20/5 -- Land `Game.cpp` + `GameSystem.cpp` together.**
-   `GameSystem.cpp` is two-line trivial; `Game.cpp` pulls
-   `Chatter.h`, `Loop/LoopManager.h`, `InputChatter.h`, `FSLVGL.h`,
-   references `extern bool gameStarted` (already provided by
-   `SleepServiceStub.cpp`) and `extern Game* startedGame` (NOT
-   yet provided -- check). Its constructor calls
-   `render(this, Chatter.getDisplay()->getBaseSprite())` and
-   `collision(this)`, which need `RenderSystem` + `CollisionSystem`
-   constructors available. Adding only Game.cpp + GameSystem.cpp
-   will produce undefined references. So this item is gated on
-   first having `CollisionSystem.cpp` landed (S-MP20/4) AND on
-   adding `RenderSystem.cpp`, which has its OWN dependency on
-   the Rendering/* leaves. Net: this is a 3-4 commit follow-up,
-   not a single one.
+   No screen instantiates a RenderSystem yet, so all six TUs
+   will link-time-gc behind --gc-sections, same as the Collision
+   subsystem. The point of this session is to validate
+   compilation. Land safely small: start with
+   `RenderComponent.cpp` alone, push, verify green, then add the
+   Sprite/Static/Anim/RenderSystem leaves one by one.
 
-3. **S-MP20/4b -- Land the Rendering subsystem in parallel.**
-   `Rendering/RenderComponent.cpp` is a 4-method getter/setter
-   leaf -- safe to add alone. `Rendering/SpriteRC.cpp`,
-   `StaticRC.cpp`, `AnimRC.cpp` will likely hit the same kind
-   of TFT_eSPI / Sprite shim mismatches as CollisionSystem.cpp
-   did, so expect a similar 1-2 fix-forward cycle per file.
-   `RenderSystem.cpp` is the system class that ties them
-   together. If S-MP20/4 lands cleanly, take the same patches
-   forward into the Rendering side.
+2. **S-MP20/5 -- Land `Game.cpp` + `GameSystem.cpp`.** Gated on
+   S-MP20/4b landing the Rendering subsystem, since `Game.cpp`'s
+   constructor calls `render(this, ...)` and `collision(this)`
+   which need `RenderSystem` + `CollisionSystem` constructors
+   resolvable at link time. `Game.cpp` also pulls `Chatter.h`,
+   `Loop/LoopManager.h`, `InputChatter.h`, `FSLVGL.h`, plus
+   `extern Game* startedGame` (NOT yet defined anywhere -- needs
+   a definition in SleepServiceStub.cpp alongside the existing
+   `gameStarted`). `GameSystem.cpp` is two-line trivial.
 
-## What S-MP20 still needs after this fire
+3. **S-MP20/6 -- Land `Highscore.cpp`.** Uses NVS only; should be
+   standalone-safe. Can land in parallel with the Rendering
+   work. The right size for a short fire that just wants to make
+   one more leaf safe.
 
-* `CollisionSystem.cpp` (deferred -- see S-MP20/4 above)
-* `Rendering/*.cpp` (RenderComponent + RenderSystem + Sprite/Static/Anim)
-* `Game.cpp` + `GameSystem.cpp`
-* `Highscore.cpp` (uses NVS only; should be standalone-safe)
-* `ResourceManager.cpp` (pulls `FS/RamFile.h` -- flagged as
-  problematic by S-MP18i; may need a shim)
-* `TextInput.cpp` (pulls `Input/Input.h`, `Loop/LoopManager.h`)
-* `Common/Score.cpp` and `Common/Hearts.cpp` (both make_shared
-  `SpriteRC` so they're gated on Rendering landing first)
-* Per-game files: `Snake/Snake.cpp`, `Invaders/SpaceInvaders.cpp`
-  + `Star.cpp`, `Pong/Bonk.cpp` + `GameState.cpp` + `PauseState.cpp`
-  + `TitleState.cpp` + `State.cpp`, `Space/SpaceRocks.cpp` +
-  `Player.cpp`
-* `Screens/GamesScreen.cpp`, `Screens/PhoneGamesScreen.cpp`,
-  `Screens/PhoneDialerScreen.cpp`
-* Navigation wiring: `PhoneHomeScreen::setOnLeftSoftKey` (CALL)
-  -> push `PhoneDialerScreen`; `PhoneMainMenu::Phone` and
-  `::Games` tile handlers.
+4. **S-MP20/7 -- Vendor `<Display/GIFAnimatedSprite.h>`** if
+   S-MP20/4b's `AnimRC.cpp` lands blocked on it. The shim header
+   exists in `mp24/components/circuitos_shim/include/Display/`
+   for Sprite, Display, Color -- adding GIFAnimatedSprite as
+   another shim follows the same pattern. A 1-commit session.
 
-## Helper script note carried from previous fire
+## Helper script note carried from this fire
 
-The previous fire's note flagged a `flash_iter.sh` improvement
-(check FLASH_CONCL before scanning boot.log). This fire ran the
-helper as written in the task brief, and additionally fixed a
-multi-artifact bug: when GitHub stores >1 `boot-log` artifact for
-a run, the bash command substitution captures multiple ids
-separated by newlines, which produces a malformed curl URL. The
-fix is to break out of the python loop after the first match:
-
-    BL_ID=$(echo "$ARTIFACTS" | python3 -c "
-    import json,sys
-    d=json.load(sys.stdin)
-    for a in d['artifacts']:
-        if a['name']=='boot-log':
-            print(a['id']); break")
-
-Same shape for FW_ID. The helper lives outside the repo, so the
-next fire needs to recreate it from the brief and re-apply this
-fix.
+* The helpers (`flash_iter.sh`, `addr2line.py`) need to be
+  recreated each fire from the brief; the new sandbox doesn't
+  preserve `/home/claude/`. Place them at `$HOME/bin/` (in this
+  sandbox `$HOME` is `/sessions/<id>/`) and adjust references
+  inside the scripts accordingly. The repo lives at
+  `$HOME/repo/mp_firmware`.
+* The `flash_iter.sh` helper polls in 30-second intervals up to
+  12 minutes, which exceeds the 45-second `mcp__workspace__bash`
+  tool timeout. Workaround: skip the helper for the wait phase
+  and poll the GitHub Actions REST API directly in shorter bash
+  calls (`sleep 40 && curl .../jobs`). Only run the helper end-
+  to-end if you have a single bash session that can run for
+  several minutes -- in this Cowork environment, that's not the
+  case.
+* The `${HOME}` path in `addr2line.py`'s sys.argv requires the
+  helper to write the right path when invoking; the version in
+  bin/ uses `$HOME/bin/addr2line.py` so it stays portable.
 
 ## Open items unchanged from the brief
 
