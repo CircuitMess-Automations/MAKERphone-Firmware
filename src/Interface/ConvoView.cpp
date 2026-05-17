@@ -19,7 +19,7 @@ void ConvoView::load(size_t startIndex){
 	if(startIndex + Count >= convo.messages.size()){
 		startIndex = convo.messages.size() - Count;
 	}
-	this->startIndex = max(0, (int32_t) startIndex);
+	this->startIndex = max((int32_t) 0, (int32_t) startIndex);
 
 	latest = this->startIndex + Count >= convo.messages.size();
 
@@ -37,7 +37,7 @@ void ConvoView::loadLatest(){
 	Convo convo = Storage.Convos.get(convoUID);
 	if(convo.uid == 0) return;
 
-	int32_t index = max(0, (int32_t) convo.messages.size() - Count);
+	int32_t index = max((int32_t) 0, (int32_t) convo.messages.size() - Count);
 	load(index);
 }
 
