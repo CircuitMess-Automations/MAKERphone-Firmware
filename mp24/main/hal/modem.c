@@ -383,12 +383,37 @@ static void modem_sm_task(void *arg)
     modem_at_send("E0", NULL, 0, 1000);
 
     /* Query module name. Quectel returns one info line then OK. */
-    char resp[64];
+    char resp[96];
     if (modem_at_send("+CGMM", resp, sizeof(resp), 2000) == ESP_OK) {
         strncpy(s_model, resp, sizeof(s_model) - 1);
         ESP_LOGI(TAG, "model: %s", s_model);
     } else {
         ESP_LOGW(TAG, "AT+CGMM failed (continuing anyway)");
+    }
+
+    /* S-MP21: surface SIM + network state so common failure modes
+     * are visible in boot.log. Each probe is best-effort: a timeout
+     * or modem ERROR is logged but never aborts the boot. Order
+     * matters: CPIN first (cheapest -- says whether a SIM is even
+     * present), then CSQ (RF signal, no registration needed), then
+     * COPS (operator name, requires registration). */
+    if (modem_at_send("+CPIN?", resp, sizeof(resp), 3000) == ESP_OK) {
+        ESP_LOGI(TAG, "SIM: %s", resp[0] ? resp : "(empty)");
+    } else {
+        ESP_LOGW(TAG, "SIM: AT+CPIN? failed -- no SIM inserted "
+                      "(+CME ERROR 10) or SIM locked");
+    }
+
+    if (modem_at_send("+CSQ", resp, sizeof(resp), 2000) == ESP_OK) {
+        ESP_LOGI(TAG, "signal: %s", resp[0] ? resp : "(empty)");
+    } else {
+        ESP_LOGW(TAG, "AT+CSQ failed");
+    }
+
+    if (modem_at_send("+COPS?", resp, sizeof(resp), 8000) == ESP_OK) {
+        ESP_LOGI(TAG, "operator: %s", resp[0] ? resp : "(empty)");
+    } else {
+        ESP_LOGW(TAG, "AT+COPS? failed -- modem busy or unregistered");
     }
 
     /* Sit idle from here — S-MP09 will spawn additional logic on top
