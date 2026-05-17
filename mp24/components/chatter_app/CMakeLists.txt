@@ -600,6 +600,18 @@ idf_component_register(
         # lands in S-MP15 territory.
         "shim/SleepServiceStub.cpp"
 
+        # S-MP18y: three more screens. AutoPop.cpp is a tiny
+        # (22 LOC) root-level helper used by screens that
+        # auto-pop on BTN_BACK; PairScreen needs it.
+        # LockScreen now compiles because SleepService is
+        # stubbed (just above) and every Element it references
+        # (UnlockSlide, PhoneChargeBars, PhoneNotificationPreview,
+        # PhoneMissedCallFlash, UserWithMessage etc.) was added
+        # in earlier batches.
+        "${SRC_DIR}/AutoPop.cpp"
+        "${SRC_DIR}/Screens/LockScreen.cpp"
+        "${SRC_DIR}/Screens/PairScreen.cpp"
+
         # S-MP18d: first screen that USES the status bar + soft-key
         # bar + wallpaper combo. 113 LOC, takes an uppercase app
         # name in the ctor, renders 'NOT YET BUILT' under it. We're
