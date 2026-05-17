@@ -600,6 +600,17 @@ idf_component_register(
         # lands in S-MP15 territory.
         "shim/SleepServiceStub.cpp"
 
+        # S-MP19/1: MP24Piezo provides PiezoImpl class methods +
+        # the global `Piezo` instance that CircuitOS Audio/Piezo
+        # leaves undefined under our ESP-IDF v5 build (the impl
+        # picker in Piezo.cpp matches none of CIRCUITOS_TONE /
+        # CIRCUITOS_PIEZO_PWM / CIRCUITOS_PIEZO_DAC). Surfaced as
+        # link errors once S-MP19's nav wiring brought
+        # PhoneRingtoneEngine into the link graph.
+        # Routes to hal/piezo (the same backend boot chime + key
+        # click use).
+        "shim/MP24Piezo.cpp"
+
         # S-MP18y: three more screens. AutoPop.cpp is a tiny
         # (22 LOC) root-level helper used by screens that
         # auto-pop on BTN_BACK; PairScreen needs it.
