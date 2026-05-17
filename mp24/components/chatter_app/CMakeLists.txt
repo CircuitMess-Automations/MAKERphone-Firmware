@@ -230,6 +230,16 @@ idf_component_register(
         # stub + MessageService stub. Should now be clean.
         "${SRC_DIR}/Screens/ProfileScreen.cpp"
 
+        # S-MP18n: four more screens with strict-clean deps —
+        # each only pulls Status/SoftKey/Wallpaper + already-
+        # compiled services. Audited via grep over the explicit
+        # include lines (not the broad regex that mis-passed
+        # ConvoScreen earlier).
+        "${SRC_DIR}/Screens/PhoneHomeLayoutScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneLockWidgetScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneHapticsScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneImeiRevealScreen.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
