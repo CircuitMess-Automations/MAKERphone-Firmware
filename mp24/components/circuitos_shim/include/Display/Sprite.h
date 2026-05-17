@@ -24,7 +24,7 @@
 
 class Display;
 
-class Sprite {
+class Sprite : public TFT_eSprite {
 public:
     /* Match upstream Sprite constructors. The framebuffer is
      * allocated lazily on the first draw. */
@@ -44,6 +44,14 @@ public:
     int32_t getY() const { return y; }
     uint    getWidth()  const { return myWidth;  }
     uint    getHeight() const { return myHeight; }
+
+    /* S-MP20/4e: TFT_eSprite-style width()/height() accessors.
+     * Upstream SpriteRC.cpp calls sprite->width() / ->height()
+     * (not the CircuitOS getWidth() / getHeight() names). Real
+     * Bodmer/TFT_eSprite returns int16_t; we mirror that. The
+     * existing getWidth()/getHeight() callers stay unaffected. */
+    int16_t width()  const { return (int16_t)myWidth;  }
+    int16_t height() const { return (int16_t)myHeight; }
 
     Sprite &setTransparent(bool transparent);
     Sprite &setChroma(Color color);
@@ -89,6 +97,18 @@ public:
      * silent until Decision 9A vendors real TFT_eSPI. */
     void pushRotateZoomWithAA(int16_t x, int16_t y, float rot,
                               float sx, float sy, uint16_t chroma);
+
+    /* S-MP20/4e: 7-arg WITH-parent variant. Real impl pushes
+     * self onto the passed-in parent sprite (rather than the
+     * parent fixed at ctor) with rotation + per-axis zoom + a
+     * chroma key. Used by upstream SpriteRC::push() on the
+     * non-zero-rot branch (rotates the sprite around its own
+     * mid-point). No-op shim, same rationale as the 6-arg
+     * variant -- visual rendering through this path stays
+     * silent until Decision 9A vendors real TFT_eSPI. */
+    void pushRotateZoomWithAA(Sprite* parent, int16_t x, int16_t y,
+                              float rot, float sx, float sy,
+                              uint16_t chroma);
 
     /* Centered text helpers used by IntroScreen + friends. */
     void printCenter(const char *text);

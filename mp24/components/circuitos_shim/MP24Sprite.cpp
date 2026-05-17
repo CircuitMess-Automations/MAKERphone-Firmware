@@ -25,7 +25,8 @@
 /* -------- construction / destruction -------- */
 
 Sprite::Sprite(TFT_eSPI *spi, uint16_t w, uint16_t h)
-    : parentSPI(spi)
+    : TFT_eSprite(spi)            /* S-MP20/4e: init base */
+    , parentSPI(spi)
     , myWidth(w)
     , myHeight(h)
 {
@@ -51,7 +52,8 @@ Sprite::Sprite(Display &display, uint16_t w, uint16_t h)
 }
 
 Sprite::Sprite(Sprite *spr, uint16_t w, uint16_t h)
-    : parent(spr)
+    : TFT_eSprite(spr ? spr->parentSPI : nullptr) /* S-MP20/4e */
+    , parent(spr)
     , parentSPI(spr ? spr->parentSPI : nullptr)
     , myWidth(w)
     , myHeight(h)
@@ -186,6 +188,14 @@ void Sprite::drawIcon(File, int16_t, int16_t,
  * + zooms self onto the parent sprite (set at ctor); we don't have
  * a software rasteriser for that yet. */
 void Sprite::pushRotateZoomWithAA(int16_t, int16_t, float,
+                                  float, float, uint16_t) {}
+
+/* S-MP20/4e: 7-arg WITH-parent variant. Real call pushes self
+ * onto the explicit parent argument with rotation+zoom+chroma.
+ * Used by upstream SpriteRC::push() on the non-zero-rot
+ * branch. No-op shim. Argument names suppressed since none
+ * are used. */
+void Sprite::pushRotateZoomWithAA(Sprite*, int16_t, int16_t, float,
                                   float, float, uint16_t) {}
 
 /* -------- centred text stubs -------- */

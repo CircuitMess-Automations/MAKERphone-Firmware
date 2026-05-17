@@ -670,6 +670,40 @@ idf_component_register(
         # only validation, same pattern as the prior leaves.
         "${SRC_DIR}/Games/GameEngine/Rendering/StaticRC.cpp"
 
+        # S-MP20/4e: SpriteRC.cpp -- fourth Rendering leaf
+        # (18 lines). Owns a std::shared_ptr<Sprite> built
+        # via std::make_shared<Sprite>((Sprite*)nullptr,
+        # dim.x, dim.y); push() branches on rot == 0 to
+        # either a direct sprite->push(parent, x, y) or a
+        # pushRotateZoomWithAA(parent, mid_x, mid_y, rot, 1,
+        # 1, TFT_TRANSPARENT) self-blit. External deps
+        # (each addressed by the shim diff in this commit):
+        #   - class Sprite : public TFT_eSprite (Sprite.h
+        #     shim now inherits the TFT_eSprite base so the
+        #     `static_cast<TFT_eSprite*>(sprite.get())
+        #     ->setSwapBytes(false)` ctor body line
+        #     compiles. setSwapBytes is inherited from
+        #     TFT_eSPI and remains a no-op stub. The two
+        #     non-delegating Sprite ctors now also
+        #     forward their parent argument to the
+        #     TFT_eSprite base via the init list.
+        #   - int16_t Sprite::width() / Sprite::height()
+        #     (added to Sprite.h shim alongside the
+        #     existing getWidth() / getHeight() pair --
+        #     upstream SpriteRC.cpp calls the .width() /
+        #     .height() names to compute the rotation
+        #     mid-point).
+        #   - 7-arg Sprite::pushRotateZoomWithAA(Sprite*,
+        #     int16_t, int16_t, float, float, float,
+        #     uint16_t) -- declared in Sprite.h + defined
+        #     no-op in MP24Sprite.cpp, alongside the 6-arg
+        #     variant landed in S-MP20/4d.
+        # The TU is still gc'd at link time -- nothing in
+        # SRCS instantiates a SpriteRC yet (only Game.h
+        # chain does, and Game.h is not in SRCS). Compile-
+        # only validation, same pattern as the prior leaves.
+        "${SRC_DIR}/Games/GameEngine/Rendering/SpriteRC.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
