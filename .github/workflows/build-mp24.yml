@@ -255,3 +255,64 @@ jobs:
           echo ""
           echo "✓ Flash complete. The MAKERphone should now be running"
           echo "  the new firmware. Open USB-CDC serial to view logs."
+
+      - name: Capture boot serial log
+        shell: bash
+        working-directory: firmware
+        # Capture 20s of USB-Serial/JTAG console output starting
+        # immediately after the chip resets out of esptool. If the
+        # firmware crash-loops, the panic handler dumps backtrace +
+        # register state before each reset — those frames give us
+        # the PC to feed into addr2line for a function-name trace.
+        #
+        # The Mac may re-enumerate the device file when the chip
+        # resets, so wait ~1s for /dev/cu.usbmodem2101 to come
+        # back online before reading. timeout caps the read at
+        # 20s either way. The python one-liner sets the port to
+        # 115200 baud (matches CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+        # default) and tees output through to both the job log
+        # AND the captured file.
+        run: |
+          set -uo pipefail
+          sleep 2
+          echo "=== Capturing 20s from $MP24_PORT @ 115200 ==="
+          # Use python's pyserial to read; tolerant of disconnect
+          # mid-read (chip resets cycle the USB enumeration on
+          # crash-loop firmware).
+          timeout 20 python3 - <<'PYEOF' > boot.log 2>&1 || true
+          import sys, time
+          try:
+              import serial
+          except ImportError:
+              import subprocess
+              subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--quiet', 'pyserial'])
+              import serial
+          import os
+          port = os.environ.get('MP24_PORT', '/dev/cu.usbmodem2101')
+          end = time.time() + 19
+          while time.time() < end:
+              try:
+                  with serial.Serial(port, 115200, timeout=1) as s:
+                      while time.time() < end:
+                          chunk = s.read(256)
+                          if chunk:
+                              sys.stdout.write(chunk.decode('utf-8', errors='replace'))
+                              sys.stdout.flush()
+              except (serial.SerialException, OSError) as e:
+                  # Device went away — wait briefly and reconnect.
+                  print(f"\n[reconnect: {e}]", flush=True)
+                  time.sleep(0.5)
+          PYEOF
+          echo "=== boot.log (first 200 lines) ==="
+          head -200 boot.log
+          echo "=== ... ==="
+          echo "=== boot.log (last 100 lines) ==="
+          tail -100 boot.log
+
+      - name: Upload boot log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-log
+          path: firmware/boot.log
+          if-no-files-found: ignore
