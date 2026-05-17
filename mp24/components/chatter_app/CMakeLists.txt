@@ -191,33 +191,14 @@ idf_component_register(
         # provides the public ABI as no-ops.
         "shim/MessageServiceStub.cpp"
 
-        # S-MP18i: Storage layer. The Repo<T> template
-        # specializations + MessageRepo/ConvoRepo wrappers + the
-        # global `Storage` Repositories instance. Every message
-        # screen needs this to access stored conversations.
-        #
-        # Repo.cpp pulls FS/RamFile.h from CircuitOS which we
-        # excluded from circuitos build (libstdc++ + abstract
-        # FSImpl issues per the exclusion comment). Trying it
-        # in chatter_app build first — circuitos_shim already
-        # exposes the necessary FS infrastructure indirectly via
-        # arduino-esp32. If RamFile fails to compile, we
-        # fix-forward by either re-enabling FS/ in circuitos
-        # specifically for RamFile.cpp, or by writing a header-
-        # only RamFile stub.
-        "${SRC_DIR}/Storage/Storage.cpp"
-        "${SRC_DIR}/Storage/Repo.cpp"
-        "${SRC_DIR}/Storage/MessageRepo.cpp"
-        "${SRC_DIR}/Storage/ConvoRepo.cpp"
-        "${SRC_DIR}/Storage/PhoneContacts.cpp"
-
-        # RamFile.cpp from CircuitOS sits behind FS/ which is
-        # excluded from circuitos's own build (libstdc++ /
-        # abstract-FSImpl risk per its exclusion comment). Adding
-        # it here directly so the symbols Repo.cpp depends on
-        # resolve. If the libstdc++ issue is real on our current
-        # toolchain, this will surface in CI and we revisit.
-        "${CMAKE_CURRENT_LIST_DIR}/../circuitos/src/FS/RamFile.cpp"
+        # S-MP18i attempted to compile the upstream Storage chain
+        # (Repo<T> + MessageRepo + ConvoRepo + PhoneContacts +
+        # the RamFile dep) and confirmed the exclusion comment on
+        # circuitos/FS/ was right: RamFile inherits from FileImpl
+        # which has more pure virtuals in arduino-esp32 3.3.8
+        # than RamFile overrides — std::make_shared<RamFile>
+        # fails 'invalid new-expression of abstract class type'.
+        # Backed out; Storage layer needs its own stub session.
 
         # S-MP18d: first screen that USES the status bar + soft-key
         # bar + wallpaper combo. 113 LOC, takes an uppercase app
