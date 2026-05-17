@@ -521,6 +521,24 @@ idf_component_register(
         "${SRC_DIR}/Screens/PhoneWorldClock.cpp"
         "${SRC_DIR}/Screens/UserHWTest.cpp"
 
+        # S-MP18x: 13 more screens whose service / Element deps
+        # are all now in the chatter_app SRCS. Strict audit clean
+        # against current state (S-MP18w batch landed all
+        # required services + Elements).
+        "${SRC_DIR}/Screens/MainMenu.cpp"
+        "${SRC_DIR}/Screens/PhoneAlarmClock.cpp"
+        "${SRC_DIR}/Screens/PhoneAlarmTonePicker.cpp"
+        "${SRC_DIR}/Screens/PhoneBeatMaker.cpp"
+        "${SRC_DIR}/Screens/PhoneCallHistory.cpp"
+        "${SRC_DIR}/Screens/PhoneComposer.cpp"
+        "${SRC_DIR}/Screens/PhoneContactRingtonePicker.cpp"
+        "${SRC_DIR}/Screens/PhoneHangman.cpp"
+        "${SRC_DIR}/Screens/PhoneIncomingCall.cpp"
+        "${SRC_DIR}/Screens/PhoneMusicPlayer.cpp"
+        "${SRC_DIR}/Screens/PhoneProfileRingtoneScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneVirtualPet.cpp"
+        "${SRC_DIR}/Screens/PhoneWordle.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
