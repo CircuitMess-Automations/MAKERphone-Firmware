@@ -771,4 +771,13 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     # etc. resolve without each src .cpp having to remember to
     # include it. Same trick used for the circuitos build.
     -include Arduino.h
+    # S-MP20/3: Arduino.h's WMath.h defines `radians`, `degrees`,
+    # `sq`, `constrain`, `round`, `bit` as preprocessor macros
+    # that collide with glm's same-named template functions. This
+    # compat header is force-included AFTER Arduino.h, with the
+    # sole job of #undef-ing those colliding macros so any
+    # <glm/...> include parses cleanly. See the header file for
+    # the exhaustive rationale + which macros are intentionally
+    # left in place (abs, min, max).
+    "SHELL:-include ${CMAKE_CURRENT_LIST_DIR}/shim_includes/arduino_glm_compat.h"
 )
