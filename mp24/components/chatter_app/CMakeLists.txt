@@ -268,6 +268,13 @@ idf_component_register(
         "${SRC_DIR}/Screens/PhoneHapticsScreen.cpp"
         "${SRC_DIR}/Screens/PhoneImeiRevealScreen.cpp"
 
+        # S-MP18p: four screens whose service deps are now
+        # available after S-MP18o.
+        "${SRC_DIR}/Screens/PhoneOwnerEmojiScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneSoftKeyToneScreen.cpp"
+        "${SRC_DIR}/Screens/PhonePlaylistsScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneDiagScreen.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
