@@ -365,6 +365,55 @@ idf_component_register(
         "${SRC_DIR}/Screens/PhoneMagic8Ball.cpp"
         "${SRC_DIR}/Screens/PhoneMemoryAudit.cpp"
 
+        # S-MP18v: 39 more screens passing the strict-and-
+        # transitive audit (script /tmp/audit_screens.sh +
+        # transitive-includes-screen check). Every Element/Modal/
+        # Service include resolves to something already in SRCS,
+        # AND every #include of a sibling Screens/X.h points at
+        # something also being added in this batch.
+        #
+        # The bulk is utility/game screens that have entirely
+        # self-contained logic.
+        "${SRC_DIR}/Screens/PhoneMemoryMatch.cpp"
+        "${SRC_DIR}/Screens/PhoneMinesweeper.cpp"
+        "${SRC_DIR}/Screens/PhoneMoodLog.cpp"
+        "${SRC_DIR}/Screens/PhoneNotepad.cpp"
+        "${SRC_DIR}/Screens/PhoneOperatorScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneOwnerNameScreen.cpp"
+        "${SRC_DIR}/Screens/PhonePinball.cpp"
+        "${SRC_DIR}/Screens/PhonePomodoro.cpp"
+        "${SRC_DIR}/Screens/PhonePowerDown.cpp"
+        "${SRC_DIR}/Screens/PhonePowerOffMessageScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneProfileScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneRadio.cpp"
+        "${SRC_DIR}/Screens/PhoneReversi.cpp"
+        "${SRC_DIR}/Screens/PhoneScratchpad.cpp"
+        "${SRC_DIR}/Screens/PhoneSettingsScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneSimPinScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneSimon.cpp"
+        "${SRC_DIR}/Screens/PhoneSlidingPuzzle.cpp"
+        "${SRC_DIR}/Screens/PhoneSnakesLadders.cpp"
+        "${SRC_DIR}/Screens/PhoneSokoban.cpp"
+        "${SRC_DIR}/Screens/PhoneSolitaire.cpp"
+        "${SRC_DIR}/Screens/PhoneSoundScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneSpeedDialScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneSteps.cpp"
+        "${SRC_DIR}/Screens/PhoneStopwatch.cpp"
+        "${SRC_DIR}/Screens/PhoneStressReliever.cpp"
+        "${SRC_DIR}/Screens/PhoneSudoku.cpp"
+        "${SRC_DIR}/Screens/PhoneTetris.cpp"
+        "${SRC_DIR}/Screens/PhoneThemeScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneTicTacToe.cpp"
+        "${SRC_DIR}/Screens/PhoneTimer.cpp"
+        "${SRC_DIR}/Screens/PhoneTimers.cpp"
+        "${SRC_DIR}/Screens/PhoneTodo.cpp"
+        "${SRC_DIR}/Screens/PhoneTowerDefence.cpp"
+        "${SRC_DIR}/Screens/PhoneUnitConverter.cpp"
+        "${SRC_DIR}/Screens/PhoneWallpaperScreen.cpp"
+        "${SRC_DIR}/Screens/PhoneWhackAMole.cpp"
+        "${SRC_DIR}/Screens/PhoneWorldClock.cpp"
+        "${SRC_DIR}/Screens/UserHWTest.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
