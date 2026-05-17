@@ -611,6 +611,23 @@ idf_component_register(
         # just validates it compiles cleanly under our toolchain.
         "${SRC_DIR}/Games/GameEngine/Collision/CollisionSystem.cpp"
 
+        # S-MP20/4b: Rendering subsystem -- starting safe with
+        # RenderComponent.cpp, the 4-method getter/setter leaf at
+        # the base of the Rendering inheritance hierarchy
+        # (SpriteRC, StaticRC, AnimRC all derive from it). The
+        # only external includes are <Display/Sprite.h> (already
+        # shimmed and exercised by every chatter_app TU that
+        # uses Sprite directly) and PixelDim.hpp (already
+        # validated under glm via S-MP20/2's GameObject.cpp).
+        # RenderComponent itself is an abstract base -- the pure
+        # virtual push(Sprite*, PixelDim, float) ensures no one
+        # can instantiate it, and no screen in chatter_app
+        # references a RenderComponent yet, so this TU is still
+        # gc'd at link time. Compile-only validation, prepping
+        # the path for Sprite/Static/Anim RC + RenderSystem in
+        # subsequent fires.
+        "${SRC_DIR}/Games/GameEngine/Rendering/RenderComponent.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
