@@ -224,6 +224,24 @@ public:
      * rasterisation path itself is a no-op until Decision 9A
      * vendors real TFT_eSPI. */
     void setFreeFont(const GFXfont *font) { (void)font; }
+
+    /* S-MP20/10a: Bodmer/TFT_eSPI rounded-rectangle drawing.
+     * Upstream SpaceRocks.cpp draws its bullet sprites as
+     *   spriteRC->getSprite()->fillRoundRect(0, 0, 4, 4, 1, TFT_WHITE);
+     * which is the Bodmer 6-arg shape (x, y, w, h, radius, color).
+     * Real TFT_eSPI also exposes drawRoundRect with the same
+     * argument list; we provide both as silent no-ops for symmetry,
+     * even though only fillRoundRect is currently referenced. Visual
+     * rendering through this path remains silent until Decision 9A
+     * vendors real TFT_eSPI. */
+    void fillRoundRect(int32_t x, int32_t y, int32_t w, int32_t h,
+                       int32_t r, uint16_t color) {
+        (void)x; (void)y; (void)w; (void)h; (void)r; (void)color;
+    }
+    void drawRoundRect(int32_t x, int32_t y, int32_t w, int32_t h,
+                       int32_t r, uint16_t color) {
+        (void)x; (void)y; (void)w; (void)h; (void)r; (void)color;
+    }
 };
 
 class TFT_eSprite : public TFT_eSPI {
