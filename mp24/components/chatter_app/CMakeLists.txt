@@ -273,20 +273,21 @@ idf_component_register(
         "${SRC_DIR}/Elements/PhoneEnvelopeFly.cpp"
         "${SRC_DIR}/Elements/UserWithMessage.cpp"
 
-        # S-MP18s: Interface/ConvoView + the remaining message-
-        # composition Elements. ConvoView is the FIRST .cpp from
-        # Interface/ we compile beyond the base layer; it sits
-        # between MessageService and the visual ConvoBox.
+        # S-MP18s: composition Elements unblocked by what's
+        # already compiled. ConvoView.cpp / ConvoBox.cpp / and
+        # ConvoScreen.cpp were originally in this batch but
+        # ConvoView.cpp has type-mismatch issues with
+        # max(0, (int32_t)x) — needs upstream source patch which
+        # we're deferring. Without ConvoView, ConvoBox can't
+        # construct one, and without ConvoBox, ConvoScreen
+        # can't render. Pulled all three.
         #
         # ConvoMessage      pixel-bubble line in a conversation
-        # ConvoBox          scrolling list of ConvoMessages
         # PicMenu           sticker / canned-pic picker modal
         # PhoneT9Input      T9-keypad text composer (~730 LOC)
         # EmojiMenu         emoji picker
         # NotificationElement  unread badge over status bar
-        "${SRC_DIR}/Interface/ConvoView.cpp"
         "${SRC_DIR}/Elements/ConvoMessage.cpp"
-        "${SRC_DIR}/Elements/ConvoBox.cpp"
         "${SRC_DIR}/Elements/PicMenu.cpp"
         "${SRC_DIR}/Elements/PhoneT9Input.cpp"
         "${SRC_DIR}/Elements/EmojiMenu.cpp"
@@ -320,11 +321,6 @@ idf_component_register(
         "${SRC_DIR}/Screens/InboxScreen.cpp"
         "${SRC_DIR}/Screens/FriendsScreen.cpp"
         "${SRC_DIR}/Screens/PhoneCallEnded.cpp"
-
-        # S-MP18s: ConvoScreen — the messaging-flow workhorse —
-        # unblocked by ConvoView + ConvoBox + PicMenu + T9Input +
-        # the existing BuzzerService + LoRaService stubs.
-        "${SRC_DIR}/Screens/ConvoScreen.cpp"
 
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
