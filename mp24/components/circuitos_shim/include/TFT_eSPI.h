@@ -132,6 +132,29 @@ namespace fonts {
 }
 
 
+/*
+ * S-MP20/8a: Adafruit-GFX-style font selector stubs.
+ *
+ * Upstream SpaceInvaders.cpp uses Bodmer/TFT_eSPI's "FreeFont" API:
+ *   baseSprite->setFreeFont(&TomThumb);
+ * which expects a `const GFXfont*` argument and an externally
+ * defined `TomThumb` symbol (defined in
+ * mp24/components/circuitos/src/Devices/Matrix/Font.hpp, which
+ * is NOT compiled on MP2.4 because the Matrix device is absent).
+ *
+ * To let SpaceInvaders.cpp parse + link cleanly we provide empty
+ * Adafruit-GFX-shaped struct stubs here and an inline constexpr
+ * TomThumb symbol with external linkage (C++17 rule, same pattern
+ * as fonts::Font0 above). The shim never inspects the structs --
+ * SpaceInvaders just takes &TomThumb and hands it to a setFreeFont
+ * no-op. Visual rendering through this path remains silent until
+ * Decision 9A vendors real TFT_eSPI.
+ */
+struct GFXglyph {};
+struct GFXfont {};
+inline constexpr GFXfont TomThumb{};
+
+
 class TFT_eSPI {
 public:
     TFT_eSPI() = default;
@@ -193,6 +216,14 @@ public:
     void println(double n,        int digits = 2) { (void)n; (void)digits; }
     void println(const String &s) { (void)s; }
     void println() {}
+
+    /* S-MP20/8a: Bodmer/TFT_eSPI FreeFont selector. Upstream
+     * SpaceInvaders.cpp calls baseSprite->setFreeFont(&TomThumb)
+     * to switch to an Adafruit-GFX bitmap font. Our shim accepts
+     * any GFXfont* (including nullptr) and discards -- the text
+     * rasterisation path itself is a no-op until Decision 9A
+     * vendors real TFT_eSPI. */
+    void setFreeFont(const GFXfont *font) { (void)font; }
 };
 
 class TFT_eSprite : public TFT_eSPI {
@@ -229,6 +260,19 @@ public:
     void drawBitmap(int32_t x, int32_t y, const uint8_t *bitmap,
                     int32_t w, int32_t h, uint16_t color) {
         (void)x; (void)y; (void)bitmap; (void)w; (void)h; (void)color;
+    }
+    /* S-MP20/8a: 7-arg drawBitmap with a scale factor. Upstream
+     * SpaceInvaders.cpp's drawBitmap helper calls
+     *   baseSprite->drawBitmap(x, y, bitmap, w, h, color, scale);
+     * The trailing scale is the integer pixel-multiplier for
+     * blitting the monochrome bitmap. Real TFT_eSPI exposes this
+     * via the U8g2-style overload; our shim takes the same shape
+     * and discards. No-op for 9C. */
+    void drawBitmap(int32_t x, int32_t y, const uint8_t *bitmap,
+                    int32_t w, int32_t h, uint16_t color,
+                    uint8_t scale) {
+        (void)x; (void)y; (void)bitmap; (void)w; (void)h;
+        (void)color; (void)scale;
     }
 
 protected:
