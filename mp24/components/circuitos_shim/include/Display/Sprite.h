@@ -148,6 +148,19 @@ public:
     void setTextSize(uint8_t s);
     void setTextDatum(uint8_t datum);
     void setTextFont(uint8_t font);
+
+    /* S-MP20/7f2: extra TFT_eSprite-style methods Snake.cpp calls.
+     * Each is a no-op for the 9C shim (the 5 readPixel call sites
+     * in Snake drive collision detection, which will misbehave
+     * silently because we always return 0 -- fine for compile-
+     * and-link validation but visually broken; full implementation
+     * waits on Decision 9A). The three signatures match Bodmer/
+     * TFT_eSprite exactly so upstream code links cleanly. */
+    uint16_t readPixel(int32_t x, int32_t y);
+    int      printf(const char *fmt, ...);
+    void     drawFastHLine(int32_t x, int32_t y, int32_t w,
+                           uint16_t color);
+
     /* S-MP20/6d: LovyanGFX-style text API overloads.
      * Upstream Snake / SpaceInvaders / Pong pass a `textdatum_t`
      * enum value (defined in our TFT_eSPI shim) and the address

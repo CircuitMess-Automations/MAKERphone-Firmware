@@ -20,6 +20,7 @@
 #include <Display/Sprite.h>
 #include <Display/Display.h>
 #include <esp_heap_caps.h>
+#include <stdarg.h>
 #include <string.h>
 
 /* -------- construction / destruction -------- */
@@ -265,6 +266,41 @@ void Sprite::setTextColor(uint16_t)                                   {}
 void Sprite::setTextSize(uint8_t)                                     {}
 void Sprite::setTextDatum(uint8_t)                                    {}
 void Sprite::setTextFont(uint8_t)                                     {}
+
+/* -------- S-MP20/7f2: extra TFT_eSprite-style stubs for Snake --------
+ *
+ * Snake.cpp's collision-detect logic calls readPixel() 5 times to
+ * sample the framebuffer; the shim returns 0 (BLACK) unconditionally.
+ * Real implementation would read from `framebuffer[y*myWidth + x]`,
+ * but that demands the framebuffer to be allocated AND populated by
+ * the rest of the (currently-no-op) draw API. Returning 0 keeps the
+ * compile + link path clean; collision detection will misbehave
+ * silently until Decision 9A.
+ *
+ * printf() and drawFastHLine() are pure no-ops for the same reason.
+ * printf returns 0 (mimicking ::printf's "number of bytes printed"
+ * return) so callers that check the return value see "nothing
+ * written"; the va_list is consumed via va_start/va_end to avoid
+ * any host-toolchain undefined behaviour warnings.
+ */
+uint16_t Sprite::readPixel(int32_t /*x*/, int32_t /*y*/)
+{
+    return 0;
+}
+
+int Sprite::printf(const char* fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    va_end(ap);
+    (void)fmt;
+    return 0;
+}
+
+void Sprite::drawFastHLine(int32_t /*x*/, int32_t /*y*/,
+                           int32_t /*w*/, uint16_t /*color*/)
+{
+}
 
 /* -------- S-MP20/4f: GIFAnimatedSprite shim no-op impls --------
  *
