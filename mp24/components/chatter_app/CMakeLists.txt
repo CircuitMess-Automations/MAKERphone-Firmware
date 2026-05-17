@@ -789,6 +789,46 @@ idf_component_register(
         "${SRC_DIR}/Games/GameEngine/Game.cpp"
         "${SRC_DIR}/Games/GameEngine/GameSystem.cpp"
 
+        # S-MP20/6: Highscore.cpp -- the per-game high-score
+        # persistence leaf. Header is at
+        # src/Games/GameEngine/Highscore.h; .cpp is ~95 LOC.
+        # Wraps an NVS namespace (one per game name) and stores
+        # a single blob "HS" containing { uint8_t count;
+        # Score scores[HS_MAX_SCORES = 5]; }.
+        #
+        # Why it's parallel-safe (audit at S-MP20/6):
+        #   - Only files that #include "Highscore.h" are
+        #     Snake.h/.cpp, SpaceInvaders.h/.cpp, and
+        #     Highscore.cpp itself. Snake/Invaders are NOT in
+        #     SRCS yet. So nothing reachable references the
+        #     Highscore vtable / ctor / methods.
+        #   - PhoneCallHistoryStorage / PhoneBeatMakerStorage /
+        #     PhoneComposerStorage all mention "Highscore" in
+        #     their comments as a reference for the NVS-handle
+        #     lifetime pattern, but they don't #include the
+        #     header or reference the class. Verified by
+        #     grepping the .cpp/.h bodies -- only doc-comment
+        #     hits.
+        #   - --gc-sections drops Highscore.cpp the same way it
+        #     drops Game.cpp + GameSystem.cpp + every Rendering
+        #     and Collision .cpp from S-MP20/3 .. /5. Expected
+        #     binary delta: 0 bytes.
+        #
+        # Dependencies all resolve:
+        #   - Arduino.h, FS.h, nvs.h, esp_log.h -- already used
+        #     by PhoneComposerStorage.cpp (in SRCS) which also
+        #     does NVS blob read/write. FS.h is only included
+        #     by Highscore.cpp because the header relies on
+        #     Arduino's `uint` typedef and the upstream author
+        #     was conservative; we don't actually touch FS.
+        #   - No external symbol references back into anything
+        #     not in SRCS. Highscore is self-contained.
+        #
+        # Slot is between Game.cpp/GameSystem.cpp (the engine
+        # core, /5) and the S-MP18j Storage stub group, keeping
+        # all GameEngine .cpp's grouped.
+        "${SRC_DIR}/Games/GameEngine/Highscore.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
