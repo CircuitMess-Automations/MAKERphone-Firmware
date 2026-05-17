@@ -8,24 +8,15 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-17 ~21:42 UTC
-* **HEAD on `main`:** `29c6eeb` (`feat(mp24): S-MP20/14 -- wire
-  PhoneDialerScreen from home + menu`). This fire shipped TWO
-  commits, both on `main`, both GREEN on the first build with
-  zero fix-forwards:
-    - `c073518` -- feat(mp24): S-MP20/13 -- land
-      PhoneDialerScreen.cpp in SRCS (compile-only; binary
-      delta near-zero because no entry point references it).
-    - `29c6eeb` -- feat(mp24): S-MP20/14 -- wire
-      PhoneDialerScreen from home + menu. Binary GROWS
-      ~415 KB (firmware artifact size 11704867 -> 12119504
-      bytes) because HomeFactory.cpp now instantiates
-      PhoneDialerScreen, dragging it through --gc-sections.
-* **Build status:** GREEN at HEAD `29c6eeb` (run
-  `26003757848`, both `build` and `flash` jobs completed/
+* **Date (UTC):** 2026-05-18 ~22:11 UTC
+* **HEAD on `main`:** `abff9ed` (`feat(mp24): S-MP21/1 -- post-
+  READY SIM/signal/operator probes`). One feature commit, GREEN
+  on first build with zero fix-forwards.
+* **Build status:** GREEN at HEAD `abff9ed` (run
+  `26004109536`, both `build` and `flash` jobs completed/
   success).
 * **Device boot status:** HEALTHY. boot.log scan: 0 crash
-  markers. Same boot sequence as prior fires' green HEADs:
+  markers. Same boot sequence as prior fires:
 
       BATT: curve-fitting cal active
       STORE: mounted; 2 files, 1757 / 1860161 bytes used (0%)
@@ -33,146 +24,114 @@ does not consume a build.
       MP24: Entering background-tasks-only loop (LVGL owns the panel).
       MODEM: state -> POWER -> BOOT -> boot probe... (up to 16 s)
 
+  The new SIM/signal/operator probes do **not** appear in this
+  fire's boot.log because the modem is still stuck in BOOT --
+  never reaches READY -- so the post-`AT+CGMM` code path is
+  unreached. That's the expected current hardware state (bare
+  PCB, no SIM, modem-firmware probe never returns OK). The new
+  probes are in place and will fire the moment the modem comes
+  alive.
 * **Flasher status:** ONLINE and reliable.
-* **Binary size:** `mp24-firmware` artifact is 12,119,504 bytes
-  at HEAD `29c6eeb` (up from 11,704,867 at `c073518`). The
-  ~415 KB jump comes from PhoneDialerScreen + the seven
-  transitive screens it references being kept alive at link
-  time once `HomeFactory.cpp` instantiates it. Final firmware
-  payload (the `.bin` itself; the artifact zip also bundles
-  ELF + map) is still well under the 2 MB app partition.
+* **Binary size:** `mp24-firmware` artifact is 12,120,420 bytes
+  at HEAD `abff9ed` (up from 12,119,504 at `29c6eeb` -- a
+  +916 byte delta from the ~25 lines of new logic + format
+  strings). Still well under the 2 MB app partition.
 
 ## What this fire actually shipped (net)
 
-S-MP20 is **DONE** as of this fire. Two commits, both GREEN
-at the final HEAD (no fix-forwards):
+S-MP21 has its first incremental step landed.
 
-1. **`c073518` -- S-MP20/13.** Added one line to
-   `mp24/components/chatter_app/CMakeLists.txt`:
+1. **`abff9ed` -- S-MP21/1.** Extended `mp24/main/hal/modem.c`
+   `modem_sm_task()` to add three best-effort AT probes after
+   the existing `AT+CGMM` model query, before `vTaskDelete`:
 
-     * `${SRC_DIR}/Screens/PhoneDialerScreen.cpp` (784 LOC)
+     * `AT+CPIN?` (3s timeout) -- SIM state: `READY`, `SIM PIN`,
+       or `+CME ERROR: 10` (no SIM). Logged as `SIM: <state>`.
+       If `modem_at_send` returns non-OK, logs an explicit
+       hint that the modem likely returned no-SIM/locked.
+     * `AT+CSQ` (2s timeout) -- RSSI/BER, e.g. `+CSQ: 18,99`.
+       Logged as `signal: <value>`. Doesn't require
+       registration; only the modem firmware to be up.
+     * `AT+COPS?` (8s timeout) -- current operator name.
+       Logged as `operator: <value>`. The 8 s timeout
+       accommodates an in-progress network re-scan; if the
+       modem is unregistered it returns `+COPS: 0` quickly
+       anyway.
 
-   PhoneDialerScreen was the last upstream screen held back by
-   the games-engine blocker -- its `*#GAME` (76253) Easter-egg
-   cheat-code path does a direct `new Snake(...)` and pulls
-   `<Games/Snake/Snake.h>`. With Snake landed at /7f3 and
-   the games-engine wiring landed through /12, the entire
-   include chain now resolves. All seven additional screen
-   #includes (PhoneImeiRevealScreen, PhoneFirmwareInfoScreen,
-   PhoneFlashlight, PhoneFortuneCookie, PhoneDrumKitScreen,
-   PhoneBeatMaker, PhoneMemoryAudit) were already in SRCS
-   post-S-MP18; FSLVGL is provided by FSLVGLStub.cpp; Loop
-   Manager is in chatter_library. Binary delta near-zero
-   (--gc-sections drops the file because nothing instantiates
-   PhoneDialerScreen yet).
+   Each probe is wrapped in an `if (modem_at_send(...) == ESP_OK)`
+   block with a `else { ESP_LOGW(...) }` fallback so a single
+   ERROR / timeout never aborts the others. `resp` buffer
+   bumped 64 -> 96 bytes for longer operator-name responses
+   like `+COPS: 0,0,"T-Mobile Hrvatska",7`.
 
-2. **`29c6eeb` -- S-MP20/14.** Replaced
-   `mp24/components/chatter_app/screens/HomeFactory.cpp` to
-   add two new navigation hooks atop S-MP19's existing
-   PhoneMainMenu / LockScreen wiring:
+   The change is a strict superset of S-MP20's modem behavior:
+   if the modem never wakes up (today's case), the boot.log
+   looks identical. The moment AT starts responding, the next
+   three lines of boot.log will tell us EXACTLY which of the
+   "no SIM / no signal / unregistered" failure modes we're in.
 
-     * `s_home->setOnLeftSoftKey(on_call_softkey)` --
-       BTN_LEFT (CALL softkey) now pushes a fresh
-       `PhoneDialerScreen()`.
-     * `Icon::Phone` in `on_menu_select()` no longer hits
-       the "no compiled destination" branch -- it pushes
-       `PhoneDialerScreen()` exactly like Games / Messages /
-       etc. do.
+## Why this fire was uneventful
 
-   Same heap-leak caveat as every other handler in
-   HomeFactory.cpp: the pushed dialer becomes LVGL-owned and
-   is not freed on BACK; the deferred fix lives in S-MP25.
+The previous fire (S-MP20/14, HEAD `29c6eeb`) had already
+finished the games-engine compile validation. S-MP20 is
+structurally DONE. This fire moved to S-MP21 (modem hardware
+bring-up) from the roadmap and shipped the smallest useful
+diagnostic step: post-READY visibility.
 
-   Final navigation set after this fire:
+The 30-minute fire budget covered one CI cycle with room to
+spare. Audit-first approach: read `modem.h` + `modem.c`
+end-to-end (~5 minutes), confirmed PWR_KEY polarity matches
+Quectel V1.1 §3.4.1 in software (idle HIGH, 2.5 s LOW pulse,
+back to HIGH), confirmed UART pins match `pins.h`, identified
+the post-`AT+CGMM` insertion point, wrote the patch (25 lines),
+push -> wait for CI -> boot.log scan.
 
-     - BTN_LEFT  (CALL)        -> push PhoneDialerScreen
-     - BTN_RIGHT (MENU)        -> push PhoneMainMenu
-     - BTN_BACK hold (lock)    -> push LockScreen
-     - PhoneMainMenu Phone     -> push PhoneDialerScreen
-     - PhoneMainMenu Messages  -> push InboxScreen
-     - PhoneMainMenu Contacts  -> push FriendsScreen
-     - PhoneMainMenu Music     -> push PhoneMusicPlayer
-     - PhoneMainMenu Camera    -> push PhoneCameraScreen
-     - PhoneMainMenu Games     -> push PhoneGamesScreen
-     - PhoneMainMenu Settings  -> push PhoneSettingsScreen
-     - PhoneMainMenu Mail      -> push InboxScreen
+## Open hardware questions still outstanding
 
-   Every PhoneIconTile in the main-menu enum now has a real
-   compiled destination. Every PhoneHomeScreen softkey has a
-   real handler. S-MP20 is structurally done.
+Same as before -- none resolved this fire:
 
-## Why this fire could finish /10 cleanly in one push
-
-The 30-minute fire budget covered TWO CI cycles (build + flash)
-back-to-back with room to spare. The audit-first approach
-identified the entire delta in ~3-5 minutes of Reading:
-
-  * Player.h / Player.cpp / SpaceRocks.h / SpaceRocks.cpp --
-    read end-to-end.
-  * Hearts.h / Hearts.cpp / Score.h / Score.cpp -- read
-    end-to-end (Common helpers that SpaceRocks pulls in).
-  * Cross-checked every `display->` / `sprite->` / `obj->`
-    method call against the existing shim coverage. One missing
-    overload: fillRoundRect.
-  * Confirmed `<Pins.hpp>` provides BTN_4/5/6, RES_HEART /
-    RES_GOBLET / FILE_HEART / FILE_GOBLET come from upstream
-    ResourceManager.h (already a transitive header in SRCS).
-  * Cross-checked Game.h's API surface (getFile, addObject,
-    removeObject, Audio member, collision member, pop()) ==
-    a strict subset of what Snake exercises.
-
-All four upstream Chatter games (Snake, SpaceInvaders, Bonk,
-SpaceRocks) now compile + link cleanly inside chatter_app.
-S-MP20 has now landed the games-engine compile-validation
-phase end-to-end.
+* **Q2.** `uPOWER_OFF` GPIO1 polarity for power-off control
+  (currently Hi-Z).
+* **Q3.** Modem boot-FAIL triage. The new SIM/signal/operator
+  probes are the first half of the answer (visibility into
+  WHICH failure mode after AT works). The "AT never responds"
+  case still needs hardware-side triage: is the SIM physically
+  inserted? Does the PWR_KEY trace reach the modem? Is RESET_N
+  actually high? Is VBAT supplying the modem?
+* **Q4.** STATUS / NET_STATUS LED traces.
 
 ## What the next fire should do
 
-**S-MP21 -- modem hardware bring-up.** With S-MP20 done, the
-next non-trivial blocker is the cellular modem. Every fire so
-far has logged the same modem trace:
+Two viable paths, depending on hardware state:
 
-    MODEM: state -> POWER
-    MODEM: state -> BOOT
-    MODEM: boot probe... (0 s elapsed)
-    MODEM: boot probe... (1 s elapsed)
-    ...
-    MODEM: boot probe... (16 s elapsed)  <-- log capture ends here
+1. **If the user inserts a SIM into the test device before the
+   next fire**, the new probes will reveal SIM/signal/operator
+   state in boot.log, unblocking S-MP21 proper:
+     * Confirm `AT+CPIN?` returns `READY`.
+     * Confirm `AT+CSQ` shows real RSSI (not 99).
+     * Use `AT+CMGS` / SMS path to send a test message
+       (exercises `mp24/main/hal/sms.c`).
+     * Add an `AT+COPS?` follow-up that retries every 5s
+       in a background task until registered.
 
-i.e. the modem never leaves BOOT -- `AT` never returns a
-response. Two likely causes (already enumerated in the brief):
+2. **If still no SIM** (most likely -- this is a multi-fire
+   blocker on hardware action), pivot to **S-MP23 -- replace
+   `StorageStub.cpp` with NVS-backed `Repo<T>`**. This is
+   independent of modem bring-up and a small, well-scoped
+   change:
+     * Locate `StorageStub.cpp` in `mp24/components/chatter_app/
+       shim/`.
+     * For each `Repo<T>::add/remove/forEach`, key NVS records
+       by a per-type prefix (e.g. `cnt_` for contacts) + a
+       numeric id.
+     * Confirm via a single contact-add + reset-and-reboot
+       that the entry survives.
 
-1. SIM not physically inserted (the most likely answer; the
-   flasher Mac just has a bare PCB plugged in).
-2. PWR_KEY (GPIO 12) polarity wrong -- the Quectel datasheet
-   wants a 2.5 s LOW pulse with the line idle HIGH; double-
-   check `hal/modem.c` against the schematic.
-
-The next fire should:
-
-* Read `mp24/main/hal/modem.c` end-to-end, especially the
-  PWR_KEY pulse code.
-* Cross-check against `GSM_module.kicad_sch` -- verify the
-  PWR_KEY net polarity matches the code's assumption.
-* If polarity is correct, log an explicit `AT+CPIN?` /
-  `AT+COPS?` retry loop after the boot probe to make the
-  "no SIM" failure mode visible in boot.log (currently we
-  only see the silence).
-* Punt the actual SIM insertion to the user via a clear
-  log message + a memory note. This is the first feature
-  that's gated on the physical hardware state.
-
-**Smaller-budget alternatives** if S-MP21 looks too large for
-a single fire:
-
-* **Walk every menu destination once in chat** -- compile a
-  punch-list of which downstream screens visibly render vs.
-  which are still LVGL-blank-screen stubs. This is the
-  S-MP26 polish-and-verify pass and could be done now to
-  inform what gets fixed in S-MP22-25.
-* **Start S-MP23 -- StorageStub.cpp -> NVS-backed
-  Repo<T>.** This is independent of modem bring-up and a
-  small, well-scoped change.
+   Or, alternatively, **S-MP26 polish-and-verify** -- walk
+   every menu destination once in chat, compile a punch-list
+   of which downstream screens visibly render vs. which are
+   still LVGL-blank-screen stubs. Cheap, informational, and
+   informs what to prioritize in S-MP22-25.
 
 ## Helper script note carried from prior fires
 
@@ -182,129 +141,24 @@ a single fire:
   writable -- `mkdir: cannot create directory '/home/claude':
   Permission denied`). The brief's `if [[ ! -d /home/claude/
   repo/mp_firmware ]]` check therefore always fires and the
-  clone command fails on the missing parent. In this fire's
-  sandbox the user was `tender-magical-knuth`, `$HOME` was
-  `/sessions/tender-magical-knuth`, and `/sessions/...` was
-  100% full again (9.8G/9.8G -- it appears to be a shared
-  filesystem across all parallel sessions), so the writable
-  scratch path used was `/tmp/` (903 MB free under `/`).
-  The repo cloned to `/tmp/mp_firmware/`. `pyelftools` had
-  to be installed with `PYTHONUSERBASE=/tmp/pylocal pip
-  install --user --no-cache-dir pyelftools` to avoid the
-  default install path on the full `/sessions` filesystem. As before, the bash tool's
-  45-second timeout makes the helper scripts impractical to
-  run end-to-end; this fire used the chunked GH API approach
-  (poll jobs every 40s with a separate bash call each time)
-  and it worked smoothly.
+  clone command fails on the missing parent.
+* This fire's sandbox: user was `epic-admiring-pasteur`,
+  `$HOME` was `/sessions/epic-admiring-pasteur`, and
+  `/sessions/...` was 100% full again (9.8G/9.8G -- it
+  appears to be a shared filesystem across all parallel
+  sessions). Even `mkdir` inside `$HOME` fails on it.
+  `/tmp/` (the root-FS tmp) was owned by `nobody` from
+  a previous session and not writable for this user.
+  The writable scratch path used was `/var/tmp/` (885 MB
+  free under `/`). The repo cloned to
+  `/var/tmp/claude/repo/mp_firmware/` (16 MB).
+* As before, the bash tool's 45-second timeout makes the
+  helper scripts impractical to run end-to-end in one call;
+  this fire used the chunked GH API approach (poll jobs every
+  ~35-40s with a separate bash call each time) and it worked
+  smoothly.
 * The CI workflow triggers on push automatically via the
   `mp24/**` / `src/**` path filter -- no manual
-  `workflow_dispatch` needed. Updating
-  `docs/SESSION_CHECKPOINT.md` does NOT trigger a build (it's
-  outside the path filter), so the checkpoint commit at the end
-  of each fire is free.
-* `pyelftools` was not needed this fire (no device crash).
-* The Read/Write/Edit host-side tools cannot reach the repo
-  (it's inside the VM under `/tmp/work/...`), so all file
-  edits had to go through bash + python heredocs. The
-  multi-line-replacement pattern still works:
-  `python3 << 'PY'` blocks that load the file, assert the old
-  block is present, and replace it once.
+  `workflow_dispatch` is needed for code changes. Docs-only
+  commits (like this checkpoint) do NOT trigger a build.
 
-## Open items unchanged from the brief
-
-* Q2: `uPOWER_OFF` GPIO1 polarity (currently Hi-Z)
-* Q3: Modem boot-FAIL triage if PWR_KEY polarity fix is insufficient
-* Q4: STATUS / NET_STATUS LED traces
-
-## Roadmap status snapshot
-
-* **S-MP20** -- DONE. Games engine + glm + four games (Snake,
-  SpaceInvaders, Bonk, SpaceRocks) all compile + link;
-  PhoneGamesScreen wired via PhoneMainMenu Games tile;
-  PhoneDialerScreen wired via Home left softkey AND
-  PhoneMainMenu Phone tile. All eight menu tiles now have
-  real compiled destinations. (See /11-/14 below.)
-  * /1: glm vendoring (done in earlier fire)
-  * /2: GameObject.cpp in SRCS (commit `65572e3`)
-  * /2/1: undef Arduino radians/degrees macros (commit `dde74d9`)
-  * /3: Collision/* leaves in SRCS (commit `4ba3170`)
-  * /3/1: CollisionSystem.cpp held back (commit `4d92863`)
-  * /4: CollisionSystem.cpp landed via shim patches (commit
-    `6b632a4`)
-  * /4/1: soften `-Werror=unused-local-typedefs` (commit
-    `96d76f6`)
-  * /4b: RenderComponent.cpp in SRCS (commit `1fa9321`)
-  * /4c: RenderSystem.cpp in SRCS (commit `1109bb5`)
-  * /4d: StaticRC.cpp landed via shim patches (commit `853c344`)
-  * /4e: SpriteRC.cpp landed via three shim patches (commit
-    `19b8e1f`)
-  * /4f: AnimRC.cpp landed via new GIFAnimatedSprite shim
-    (commit `9fe4bf1`)
-  * /5: Game.cpp + GameSystem.cpp landed via SleepServiceStub
-    `Game* startedGame` definition (commit `c4ad2ed`)
-  * /6: Highscore.cpp landed via parallel-safe SRCS add
-    (commit `9b42710`)
-  * /6b: pre-emptive InputChatter + FSLVGL stubs (commit
-    `a1817c4`)
-  * /6c: TextInput.cpp landed via parallel-safe SRCS add
-    (commit `a1b60d1`)
-  * /6d: LovyanGFX-style text API stubs + <Pins.hpp> transitive
-    in shim Chatter.h (commit `fda498b`)
-  * /7: Snake.cpp landing attempt -- REVERTED (commits
-    `358bad7` shipped, `ffae1ba` reverted).
-  * /7e: Second Snake.cpp landing attempt -- REVERTED (commits
-    `4999a7b` shipped, `5cca539` reverted).
-  * /7f1: ContextTransition.h bracket-include patch (commit
-    `0109c89`).
-  * /7f2: shim Sprite readPixel/printf/drawFastHLine stubs
-    (commit `3a02c01`).
-  * /7f3: Snake.cpp lands via Element.h patch + SRCS add
-    (commit `6a71c4f`). Build initially RED -- five
-    `print()` overload errors.
-  * /7f3/1: shim TFT_eSPI gains Print-style overloads
-    (commit `a561c51`). Build GREEN. Snake.cpp compiles +
-    links + gc-section'd; binary delta 0.
-  * /8a: shim TFT_eSPI gains TomThumb / GFXfont /
-    setFreeFont + 7-arg drawBitmap (commit `b4b92c4`).
-  * /8b: SpaceInvaders.cpp + Star.cpp in SRCS (commit
-    `4c2f416`). Build initially RED -- one
-    -Werror=sequence-point error.
-  * /8b/1: soften -Werror=sequence-point (commit `75174b4`).
-    Build GREEN. SpaceInvaders.cpp compiles + links +
-    gc-section'd; binary delta 0.
-  * /9a: shim Sprite setTextWrap(bool,bool) + empty SD.h
-    (commit `b819c86`).
-  * /9b: State.cpp + TitleState.cpp + GameState.cpp +
-    PauseState.cpp + Bonk.cpp in SRCS (commit `1eeb9d0`).
-    Build GREEN on the first push -- no fix-forwards.
-    Bonk.cpp compiles + links + all five Pong TUs
-    gc-section'd; binary delta 0.
-  * **/10a: shim TFT_eSPI fillRoundRect + drawRoundRect
-    (commit `95d6745`) -- THIS FIRE.**
-  * **/10b: Common/Hearts.cpp + Common/Score.cpp +
-    Space/Player.cpp + Space/SpaceRocks.cpp in SRCS (commit
-    `cd0094d`). Build GREEN on the first push -- no
-    fix-forwards. All four TUs compile + link + gc-section'd;
-    binary delta 0. -- THIS FIRE.**
-  * /11: PhoneGamesScreen wired -- REVERTED (commit
-    `6907b78` shipped, `9b92e41` reverted). ResourceManager
-    undef references at link.
-  * /12a: ResourceManagerShim.cpp -- SPIFFS-only stub for
-    Game-engine resource loading (commit `b24ff16`).
-  * /12: re-land PhoneGamesScreen + PhoneMainMenu Games-tile
-    wiring atop ResourceManagerShim (commit `7a4c015`).
-    Build GREEN. Binary unchanged (still no PhoneDialerScreen
-    in SRCS, so HomeFactory's leftover stub branch keeps
-    things small).
-  * **/13: PhoneDialerScreen.cpp added to SRCS (commit
-    `c073518`). Build GREEN on the first push -- no
-    fix-forwards. Binary delta near-zero (no instantiation
-    site yet). -- THIS FIRE.**
-  * **/14: Wire PhoneDialerScreen from PhoneHomeScreen left
-    softkey + PhoneMainMenu Phone tile via HomeFactory.cpp
-    (commit `29c6eeb`). Build GREEN on the first push.
-    Binary grows ~415 KB as PhoneDialerScreen and its seven
-    Phone-feature dependency screens stop getting dropped
-    by --gc-sections. S-MP20 is DONE. -- THIS FIRE.**
-* **S-MP21** -- not started (modem hardware bring-up)
-* **S-MP22+** -- not started
