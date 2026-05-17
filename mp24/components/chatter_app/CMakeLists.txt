@@ -867,6 +867,44 @@ idf_component_register(
         # matching the /6b stubs' pattern.
         "${SRC_DIR}/Games/GameEngine/TextInput.cpp"
 
+        # S-MP20/7: first game implementation lands -- Snake.cpp.
+        # Snake's transitive dependencies are now ALL in SRCS or
+        # in shims:
+        #   - Game.cpp + GameSystem.cpp (S-MP20/5) so the Game
+        #     base class vtable + protected helpers (startUp /
+        #     tearDown / pause / unpause) link.
+        #   - InputChatter::getInputInstance + FSLVGL::loadCache /
+        #     unloadCache stubs (S-MP20/6b) so Game::start /
+        #     Game::stop bodies link when their TU gets pulled in.
+        #   - Highscore.cpp (S-MP20/6) so 'hs.begin("Snake")' in
+        #     Snake's constructor + 'hs.score(uint16_t)' /
+        #     'hs.add(String, uint16_t)' / 'hs.getName(int)' /
+        #     'hs.getScore(int)' link.
+        #   - TextInput.cpp (S-MP20/6c) so 'input->stop()' and
+        #     '~TextInput()' in Snake::onStop link.
+        #   - Sprite drawing API stubs (existing) + LovyanGFX-style
+        #     setTextDatum(textdatum_t) / setFont(const IFont*)
+        #     (S-MP20/6d) so all of Snake's draw() body parses.
+        #   - <Pins.hpp> transitive include in shim Chatter.h
+        #     (S-MP20/6d) so naked BTN_1..9 / BTN_LEFT / BTN_RIGHT
+        #     / BTN_A / BTN_B / BTN_UP in Snake's button-callback
+        #     setup resolve via Decision-E aliases.
+        #
+        # Important runtime note: nothing in the in-SRCS set
+        # currently does 'new Snake(...)' -- no GamesScreen entry
+        # routes to Snake yet. Without an instantiation site, the
+        # linker's --gc-sections drops Snake.cpp's TU at link
+        # time. Expected binary delta: 0 bytes. Compile-only
+        # validation; the runtime hookup is deferred to /7a or
+        # later (likely after we add GamesScreen.cpp + the four
+        # game-instantiating switch cases).
+        #
+        # If the linker DOES keep Snake.cpp (e.g. because some
+        # already-in-SRCS TU we didn't notice references Snake's
+        # static 'Snake::instance' or vtable), binary delta will
+        # show non-zero and the next fire investigates.
+        "${SRC_DIR}/Games/Snake/Snake.cpp"
+
         # S-MP20/6b: pre-emptive Game.cpp runtime stubs.
         # Defines the symbols Game.cpp's start() / stop() / loop()
         # bodies reference -- InputChatter::getInputInstance() and
