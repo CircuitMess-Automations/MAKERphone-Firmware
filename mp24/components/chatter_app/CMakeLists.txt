@@ -829,6 +829,41 @@ idf_component_register(
         # all GameEngine .cpp's grouped.
         "${SRC_DIR}/Games/GameEngine/Highscore.cpp"
 
+        # S-MP20/6b: pre-emptive Game.cpp runtime stubs.
+        # Defines the symbols Game.cpp's start() / stop() / loop()
+        # bodies reference -- InputChatter::getInputInstance() and
+        # FSLVGL::loadCache() / unloadCache() -- so that when the
+        # first game subclass (Snake / Bonk / SpaceInvaders /
+        # SpaceRocks) lands in S-MP20/7 and forces the linker to
+        # retain Game.cpp's TU, those externs resolve cleanly.
+        #
+        # Both stubs are currently DEAD: nothing in the in-SRCS
+        # set references the symbols they provide (Game.cpp's
+        # start / stop / loop bodies are gc-sections'd away
+        # because no game subclass is in SRCS yet). --gc-sections
+        # drops both TUs at link time. Expected binary delta: 0
+        # bytes.
+        #
+        # The audit at S-MP20/6 -> /6b confirmed:
+        #   - InputChatter.cpp is at src/InputChatter.cpp but
+        #     can NOT be compiled directly (its keyMap initialiser
+        #     uses BTN_UP/DOWN/A/B which our shim Chatter.h does
+        #     not transitively expose, and its buttonPressed/
+        #     Released bodies route to InputLVGL's indev which on
+        #     MP2.4 is owned by lvgl_glue, not InputLVGL).
+        #   - FSLVGL.cpp is at src/FSLVGL.cpp but can NOT be
+        #     compiled directly (it #includes FS/RamFile.h which
+        #     S-MP18i identified as having pure-virtual issues
+        #     under arduino-esp32 3.3.8).
+        # So shim stubs are the correct path -- mirrors the
+        # MessageServiceStub / LoRaServiceStub / StorageStub /
+        # SleepServiceStub pattern.
+        #
+        # File headers explain the rationale and the no-op
+        # semantics in detail.
+        "shim/InputChatterStub.cpp"
+        "shim/FSLVGLStub.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
