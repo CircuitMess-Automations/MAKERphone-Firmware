@@ -525,7 +525,13 @@ idf_component_register(
         # are all now in the chatter_app SRCS. Strict audit clean
         # against current state (S-MP18w batch landed all
         # required services + Elements).
-        "${SRC_DIR}/Screens/MainMenu.cpp"
+        #
+        # S-MP18x/1: MainMenu was originally in this batch but
+        # pulls GamesScreen.h which transitively pulls
+        # Games/GameEngine/Rendering/PixelDim.hpp -> <glm.h>.
+        # That's deeper than 'just header includes' — the header
+        # cascade can't be satisfied without vendoring glm or
+        # patching upstream. Deferred to a games-engine session.
         "${SRC_DIR}/Screens/PhoneAlarmClock.cpp"
         "${SRC_DIR}/Screens/PhoneAlarmTonePicker.cpp"
         "${SRC_DIR}/Screens/PhoneBeatMaker.cpp"
