@@ -357,6 +357,18 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     # Demoting to warning — the actual call sites pass values that
     # always fit in practice.
     -Wno-error=format-truncation
+    # S-MP18m/1: ProfileScreen.cpp printfs uint32_t with %lu / %d.
+    # The integer ABI between Linux and xtensa-esp-elf differs on
+    # the width of unsigned int vs unsigned long, so upstream code
+    # written against another platform's format specifiers triggers
+    # -Wformat=. Source isn't ours to fix.
+    -Wno-error=format
+    # S-MP18m/1: ProfileService.cpp at line 60 / 122 deletes a
+    # ProfileResponse / ProfilePacket via a base pointer where the
+    # base class has no virtual destructor. Upstream pattern,
+    # legitimate on the original toolchain but flagged as
+    # -Werror=delete-non-virtual-dtor in modern GCC. Demoting.
+    -Wno-error=delete-non-virtual-dtor
     # Arduino.h gets pre-included so 'String', 'pinMode', 'millis'
     # etc. resolve without each src .cpp having to remember to
     # include it. Same trick used for the circuitos build.
