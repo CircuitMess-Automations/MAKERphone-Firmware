@@ -575,6 +575,26 @@ idf_component_register(
         # time without further surprises in the glm path itself.
         "${SRC_DIR}/Games/GameEngine/GameObject.cpp"
 
+        # S-MP20/3: Collision subsystem -- 5 leaf files that
+        # together form the geometric-collision side of the
+        # GameEngine. CollisionComponent + CircleCC + RectCC +
+        # PolygonCC are pure value types over glm::vec2; the
+        # only external includes are Arduino.h (for PolygonCC's
+        # math) and the vendored <glm.h>. CollisionSystem
+        # inherits from GameSystem and owns four Walls
+        # (RectCC's). Nothing in the GameObject anchor reaches
+        # into CollisionSystem at link time, so as long as no
+        # screen instantiates a CollisionSystem these TUs are
+        # gc'd by -ffunction-sections + --gc-sections. The point
+        # of this commit is to validate the .cpp's compile
+        # cleanly under our toolchain + glm shim, building up
+        # the engine surface before the games themselves land.
+        "${SRC_DIR}/Games/GameEngine/Collision/CollisionComponent.cpp"
+        "${SRC_DIR}/Games/GameEngine/Collision/CircleCC.cpp"
+        "${SRC_DIR}/Games/GameEngine/Collision/RectCC.cpp"
+        "${SRC_DIR}/Games/GameEngine/Collision/PolygonCC.cpp"
+        "${SRC_DIR}/Games/GameEngine/Collision/CollisionSystem.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
