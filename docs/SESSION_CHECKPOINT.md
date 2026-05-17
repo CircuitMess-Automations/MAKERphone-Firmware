@@ -8,18 +8,18 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-17 ~16:42
-* **HEAD on `main`:** `c4ad2ed` (`feat(mp24): S-MP20/5 -- land
-  Game.cpp + GameSystem.cpp via shim patch`). A docs checkpoint
+* **Date (UTC):** 2026-05-17 ~16:52
+* **HEAD on `main`:** `9b42710` (`feat(mp24): S-MP20/6 -- land
+  Highscore.cpp via parallel-safe SRCS add`). A docs checkpoint
   commit on top of this one will be outside the CI path filter,
   so the green build state is preserved.
-* **Build status:** GREEN. Run `25996590264` -- build job
+* **Build status:** GREEN. Run `25996843156` -- build job
   `success`, flash job `success`. Zero fix-forwards this fire --
-  the feat commit landed clean on first try, making it six clean
-  landings in a row on the GameEngine subsystem (S-MP20/4b + /4c
-  + /4d + /4e + /4f + /5).
+  the feat commit landed clean on first try, making it seven
+  clean landings in a row on the GameEngine subsystem (S-MP20/4b
+  + /4c + /4d + /4e + /4f + /5 + /6).
 * **Device boot status:** HEALTHY. boot.log from artifact
-  `7044185429` (40 lines, 0 crash markers) shows the same shape
+  `7044260487` (40 lines, 0 crash markers) shows the same shape
   as the prior fires:
 
       STORE: mounted; 2 files, 1757 / 1860161 bytes used (0%)
@@ -32,101 +32,110 @@ does not consume a build.
   `panic`, `abort`, or backtrace anywhere in the log.
 * **Flasher status:** ONLINE and reliable.
 * **Binary size:** 883408 bytes / 2 MB partition (43% used, 1.16
-  MB free). **Identical to the prior fire's 883408** -- Game.cpp
-  + GameSystem.cpp TUs get gc'd at link time as predicted.
-  Nothing in the 229-entry SRCS list pulls Game.h directly or
-  transitively (audit verified), so --gc-sections drops both
-  TUs and all their external references (InputChatter::
-  getInputInstance, FSLVGL::loadCache, Chatter, ChirpSystem::
-  stop, the friend Game::objects access from GameSystem).
-  Compile-only validation pattern from S-MP20/2 -> /3 -> /4 ->
-  /4b -> /4c -> /4d -> /4e -> /4f -> /5 holds.
+  MB free). **Identical to the prior fire's 883408** -- Highscore.
+  cpp TU gets gc'd at link time as predicted. No file in the
+  230-entry SRCS list pulls Highscore.h (audit verified: only
+  Snake.h/.cpp + SpaceInvaders.h/.cpp + Highscore.cpp itself
+  include it, and Snake/Invaders are not in SRCS). Compile-only
+  validation pattern from S-MP20/2 -> /3 -> /4 -> /4b -> /4c ->
+  /4d -> /4e -> /4f -> /5 -> /6 holds. Ten consecutive clean
+  landings.
 
-## What S-MP20/5 actually shipped (in commit `c4ad2ed`)
+## What S-MP20/6 actually shipped (in commit `9b42710`)
 
-The engine core: `src/Games/GameEngine/Game.cpp` (~120 LOC) and
-`src/Games/GameEngine/GameSystem.cpp` (4 LOC). Together they
-provide the Game base class (LVScreen-host pattern + LoopListener
-ticking + load/start/stop/pop lifecycle + ResourceManager-backed
-asset loading + CollisionSystem + RenderSystem ownership) and
-the GameSystem base class (ctor + friend-accessed
-Game::objects getter).
+The per-game high-score persistence leaf: `src/Games/GameEngine/
+Highscore.cpp` (~95 LOC). Provides the `Highscore` class with
+NVS-backed save/load/add/clear/count/get semantics. One NVS
+namespace per game name; single "HS" blob containing a count +
+fixed-size Score[5] array.
 
-Two pieces in the commit:
+One piece in the commit:
 
-  - `chatter_app/CMakeLists.txt` -- adds Game.cpp + GameSystem.cpp
-    to SRCS with a comment block explaining the audit (only six
-    upstream files include Game.h: PhoneDialerScreen,
-    PhoneGamesScreen, MainMenu, GamesScreen, ShutdownService,
-    SleepService -- all six excluded from SRCS) and the gc-
-    sections gambit. Slot is between AnimRC.cpp (the /4f leaf)
-    and the S-MP18j Storage stub group.
+  - `chatter_app/CMakeLists.txt` -- adds Highscore.cpp to SRCS
+    immediately after Game.cpp + GameSystem.cpp, with a comment
+    block explaining the audit (only Snake.h/.cpp + SpaceInvaders.
+    h/.cpp + the file itself include Highscore.h; the three
+    in-SRCS storage TUs that mention "Highscore"
+    (PhoneCallHistory/BeatMaker/ComposerStorage) only reference
+    it in doc comments documenting the NVS-handle pattern, not
+    via #include) and the gc-sections gambit. Slot is between
+    GameSystem.cpp (the /5 leaf) and the S-MP18j Storage stub
+    group, keeping all GameEngine .cpp's grouped.
 
-  - `chatter_app/shim/SleepServiceStub.cpp` -- defines
-    `Game* startedGame = nullptr;` alongside the existing
-    `bool gameStarted = false;`. Forward-declared `class Game;`
-    is sufficient; the pointer is never derefed in this TU.
-    Belt-and-braces: if gc-sections ever fails to drop Game.cpp,
-    this satisfies the `extern Game* startedGame;` reference
-    from Game.cpp's start()/stop() bodies.
+Dependencies: Arduino.h, FS.h, nvs.h, esp_log.h. All reachable
+via existing in-SRCS files (PhoneComposerStorage.cpp pulls nvs.h
++ esp_log.h; FS.h is pulled by Repo.h / FSLVGL.h / ResourceManager.
+h via arduino-esp32 libraries/FS).
 
-Net diff: 2 files, +63 lines, -0 lines.
+Net diff: 1 file, +40 lines, -0 lines (one SRCS entry + 38 lines
+of comment).
 
 ## What the next fire should do
 
 Pick ONE of these. Roughly ordered by risk-adjusted payoff.
 
-1. **S-MP20/6 -- Land `Highscore.cpp`.** Parallel-safe leaf that
-   provides per-game high-score persistence. Header is at
-   `src/Games/GameEngine/Highscore.h`; the .cpp is small (~80
-   LOC). Audit its deps first: it likely pulls Settings.h
-   (chatter_library, available) and ResourceManager.h (already
-   reachable since Game.h pulls it). If the audit is clean it
-   compiles + gc's the same way the /4* leaves did.
-   **Recommended next.**
-
-2. **S-MP20/7 -- First game implementation (Snake).** Snake is
+1. **S-MP20/7 -- First game implementation (Snake).** Snake is
    the simplest of the four upstream games. Pulls Game.h
    transitively (via `Snake : public Game`). Once Snake.cpp is
    in SRCS, the linker *will* retain Game.cpp + GameSystem.cpp
-   + the Rendering + Collision leaves because Snake's ctor
-   chains into Game's ctor which in turn instantiates
-   RenderSystem + CollisionSystem. That's a much bigger leap
-   than /5 -- expect compile + link surprises (InputChatter::
+   + the Rendering + Collision leaves + Highscore.cpp because
+   Snake's ctor chains into Game's ctor which in turn
+   instantiates RenderSystem + CollisionSystem and (via Snake)
+   a Highscore field. This is a much bigger leap than /4-/6 --
+   expect compile + link surprises (InputChatter::
    getInputInstance not defined; FSLVGL::loadCache not defined;
-   etc.). Plan for a 30-min budget of audit + maybe one fix-
-   forward.
+   the Game::start / Game::stop / Game::pop bodies reaching
+   Chatter / Audio / ChirpSystem). Plan for a 30-min budget of
+   audit + maybe one fix-forward.
 
-3. **Audit InputChatter + FSLVGL availability before /7.** Game.
-   cpp's start() / stop() call `InputChatter::getInputInstance()`
-   and pop() calls `FSLVGL::loadCache()`. Neither InputChatter.cpp
-   nor FSLVGL.cpp is in SRCS. If Snake.cpp's link path retains
-   Game.cpp, those will be unresolved externals. Decide whether
-   to stub them (no-op shim, same pattern as the other Stubs)
-   or to land the real .cpp's first.
+   **Recommended next** -- but only after item 2 below.
+
+2. **Audit InputChatter + FSLVGL + Chatter availability before
+   /7.** Game.cpp's start()/stop() call `InputChatter::
+   getInputInstance()`, pop() calls `FSLVGL::loadCache()`,
+   ctor uses `Chatter.getDisplay()->getBaseSprite()`. Audit:
+   * Is InputChatter.cpp in SRCS? If not -- need to stub or
+     land it. Search `mp24/components/chatter_app/CMakeLists.txt`
+     for `InputChatter` and `Chatter\.cpp`.
+   * Is FSLVGL.cpp in SRCS?
+   * Is Chatter.cpp in SRCS or is the global `Chatter` provided
+     by a stub? (The brief mentions MP24Chatter.cpp in
+     circuitos_shim provides `Chatter.begin()` -- check that
+     also defines the `Chatter` global.)
+   Decision tree:
+   * If all three are in SRCS or already stubbed -> proceed to
+     /7 next fire.
+   * If any is missing -> land or stub it as S-MP20/6b before /7.
+
+3. **S-MP20/7b -- Smallest game first (Bonk).** If Snake feels
+   risky, audit the four games (Snake, SpaceInvaders, Bonk,
+   SpaceRocks) and pick the one with the fewest external
+   references. Bonk and Snake are usually the simplest.
 
 ## Helper script note carried from prior fires
 
 * The helpers (`flash_iter.sh`, `addr2line.py`) need to be
   recreated each fire from the brief; the new sandbox doesn't
   preserve `/home/claude/`. In this sandbox `$HOME` is
-  `/sessions/<id>/`. Place them at `$HOME/work/flash_iter.sh` +
-  `$HOME/work/addr2line.py` and adjust internal path
-  references.
+  `/sessions/<id>/`. Place them at `$HOME/flash_iter.sh` +
+  `$HOME/addr2line.py` (this fire's locations) and adjust
+  internal path references (`REPO_LOCAL=$HOME/repo/mp_firmware`).
 * `flash_iter.sh` polls in 30-second intervals up to 12 minutes,
   which exceeds the 45-second `mcp__workspace__bash` tool
   timeout. Workaround: poll the GitHub Actions REST API directly
   in shorter bash calls (`sleep 35 && curl .../jobs`). The full
   helper-script invocation is impractical -- do it manually in
-  chunks. This fire used the chunked approach successfully again
-  (build ~2.5 min, flash ~30 s, all polled in 35-40 s chunks).
+  chunks. This fire used the chunked approach (sleep 40 +
+  curl-jobs) and it worked cleanly: build was complete by the
+  second 40-second sleep, flash by the third.
 * The CI workflow triggers on push automatically via the
   `mp24/**` path filter -- no manual `workflow_dispatch` needed.
 * `pyelftools` must be installed each fire:
   `pip install --break-system-packages --quiet pyelftools`.
-  (Skip if no crash to decode -- this fire didn't need it.)
-* The repo lives at `$HOME/work/repo/mp_firmware`. `git clone`
-  (no --depth flag works fine on this sandbox; ~50 MB).
+  (This fire didn't need it -- no crash to decode -- but the
+  install was done at task start anyway for consistency.)
+* The repo lives at `$HOME/repo/mp_firmware`. `git clone --depth
+  50` works fine (~25 MB).
 
 ## Open items unchanged from the brief
 
@@ -155,10 +164,12 @@ Pick ONE of these. Roughly ordered by risk-adjusted payoff.
   * /4f: AnimRC.cpp landed via new GIFAnimatedSprite shim
     (commit `9fe4bf1`) -- Rendering subsystem .cpp coverage
     complete
-  * **/5: Game.cpp + GameSystem.cpp landed via SleepServiceStub
-    `Game* startedGame` definition (commit `c4ad2ed`) <-- THIS
-    FIRE -- GameEngine subsystem .cpp coverage complete**
-  * /6: Highscore.cpp (parallel-safe)
+  * /5: Game.cpp + GameSystem.cpp landed via SleepServiceStub
+    `Game* startedGame` definition (commit `c4ad2ed`) --
+    GameEngine subsystem .cpp coverage complete
+  * **/6: Highscore.cpp landed via parallel-safe SRCS add
+    (commit `9b42710`) <-- THIS FIRE -- per-game high-score
+    persistence leaf in SRCS**
   * /7+: four game implementations, GamesScreen wiring, dialer
 * **S-MP21** -- not started (modem hardware bring-up)
 * **S-MP22+** -- not started
