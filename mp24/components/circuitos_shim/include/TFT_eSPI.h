@@ -168,6 +168,31 @@ public:
     void setTextSize(uint8_t s) { (void)s; }
     void print(const char *s) { (void)s; }
     void println(const char *s) { (void)s; }
+    /* S-MP20/7f3/1: Snake.cpp's print() call sites pass uint16_t
+     * (score), char (a single character from `String name[i]`),
+     * and String objects. Real Bodmer/TFT_eSPI inherits Print's
+     * full overload set; our shim TFT_eSPI doesn't derive from
+     * Print, so we add minimum-viable no-op overloads here. All
+     * are silent stubs (rendering through this path stays
+     * silent until Decision 9A vendors real TFT_eSPI).
+     * The argument shapes mirror Print's print() family. */
+    void print(char c)         { (void)c; }
+    void print(unsigned char c, int base = 10) { (void)c; (void)base; }
+    void print(int n,           int base = 10) { (void)n; (void)base; }
+    void print(unsigned int n,  int base = 10) { (void)n; (void)base; }
+    void print(long n,          int base = 10) { (void)n; (void)base; }
+    void print(unsigned long n, int base = 10) { (void)n; (void)base; }
+    void print(double n,        int digits = 2) { (void)n; (void)digits; }
+    void print(const String &s) { (void)s; }
+    void println(char c)         { (void)c; }
+    void println(unsigned char c, int base = 10) { (void)c; (void)base; }
+    void println(int n,           int base = 10) { (void)n; (void)base; }
+    void println(unsigned int n,  int base = 10) { (void)n; (void)base; }
+    void println(long n,          int base = 10) { (void)n; (void)base; }
+    void println(unsigned long n, int base = 10) { (void)n; (void)base; }
+    void println(double n,        int digits = 2) { (void)n; (void)digits; }
+    void println(const String &s) { (void)s; }
+    void println() {}
 };
 
 class TFT_eSprite : public TFT_eSPI {
