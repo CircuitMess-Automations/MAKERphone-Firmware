@@ -1138,6 +1138,24 @@ idf_component_register(
         # header for the static-archive linking explanation.
         "shim/Anchor.cpp"
 
+        # S-MP20/12a: drop-in implementation of the four
+        # ResourceManager symbols Game.cpp's `resMan` member
+        # references (ctor / dtor / load / getResource). Same
+        # public API as upstream src/Games/GameEngine/
+        # ResourceManager.cpp but the inRam + compParams code
+        # paths are stripped so it does not depend on
+        # FS/RamFile.h or FS/CompressedFile.h (both of which
+        # are excluded from circuitos for reasons documented
+        # in circuitos/CMakeLists.txt). Unblocks landing
+        # PhoneGamesScreen / wiring the Games tile (S-MP20/12),
+        # whose four engine games (Snake, Bonk, SpaceInvaders,
+        # SpaceRocks) all inherit Game and therefore drag
+        # ResourceManager into the link graph.
+        # Currently dead code w.r.t. --gc-sections: no live
+        # caller until the Games wiring lands. Kept here so a
+        # build-only smoke test passes before the wiring commit.
+        "shim/ResourceManagerShim.cpp"
+
         # S-MP17c: first real LVScreen subclass that runs on
         # hardware. Replaces the temporary three-button boot UI
         # in app_main. Proves the LVScreen → SCREEN_LOADED →
