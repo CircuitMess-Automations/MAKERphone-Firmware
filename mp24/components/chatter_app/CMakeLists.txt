@@ -252,6 +252,27 @@ idf_component_register(
         "${SRC_DIR}/Elements/TextEntry.cpp"
         "${SRC_DIR}/Elements/ColorBox.cpp"
 
+        # S-MP18q: six more Elements that unblock messaging /
+        # friends / call screens. All clean against current SRCS.
+        #   User             — friend avatar + nickname tile;
+        #                      needs ProfileService (in S-MP18m)
+        #                      + Avatar.
+        #   ListItem         — generic list row.
+        #   PhonePixelAvatar — procedural pixel avatar; matches
+        #                      PhoneContacts::deriveSeed output.
+        #   PhoneMessageRow  — InboxScreen row with last message
+        #                      preview. Pulls MessageService +
+        #                      ProfileService + Storage (all
+        #                      stubbed or compiled).
+        #   PhoneEnvelopeFly — outbound-message animation.
+        #   UserWithMessage  — User + most-recent message preview.
+        "${SRC_DIR}/Elements/User.cpp"
+        "${SRC_DIR}/Elements/ListItem.cpp"
+        "${SRC_DIR}/Elements/PhonePixelAvatar.cpp"
+        "${SRC_DIR}/Elements/PhoneMessageRow.cpp"
+        "${SRC_DIR}/Elements/PhoneEnvelopeFly.cpp"
+        "${SRC_DIR}/Elements/UserWithMessage.cpp"
+
         # The original ProfileScreen target — compiles after all
         # the above land. Pulls ProfileService (just added) +
         # Modals (just added) + Elements (just added) + Storage
