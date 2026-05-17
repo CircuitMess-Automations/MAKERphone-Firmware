@@ -168,28 +168,15 @@ idf_component_register(
         "${SRC_DIR}/Screens/PhoneDrumKitScreen.cpp"
         "${SRC_DIR}/Screens/PhoneExpenses.cpp"
 
-        # S-MP18k: 13 more screens unblocked by the Storage stub
-        # (S-MP18j) + MessageService stub (S-MP18h). All
-        # dep-audited clean — every Element they include is
-        # already in the build.
-        #
-        # ProfileScreen.cpp was originally in this batch but
-        # transitively pulls Services/ProfileService.h ->
-        # Services/LoRaService.h -> <RadioLib.h>. Removed —
-        # needs a ProfileService stub session before it can
-        # join.
-        "${SRC_DIR}/Screens/FriendsScreen.cpp"
-        "${SRC_DIR}/Screens/InboxScreen.cpp"
-        "${SRC_DIR}/Screens/ConvoScreen.cpp"
-        "${SRC_DIR}/Screens/PhoneCallEnded.cpp"
-        "${SRC_DIR}/Screens/PhoneHomeLayoutScreen.cpp"
-        "${SRC_DIR}/Screens/PhoneOwnerEmojiScreen.cpp"
-        "${SRC_DIR}/Screens/PhoneLockWidgetScreen.cpp"
-        "${SRC_DIR}/Screens/PhonePlaylistsScreen.cpp"
-        "${SRC_DIR}/Screens/PhoneHapticsScreen.cpp"
-        "${SRC_DIR}/Screens/PhoneSoftKeyToneScreen.cpp"
-        "${SRC_DIR}/Screens/PhoneDiagScreen.cpp"
-        "${SRC_DIR}/Screens/PhoneImeiRevealScreen.cpp"
+        # S-MP18k attempted to bulk-add 13 screens that the
+        # Storage + MessageService stubs unblocked, but the dep
+        # audit was too permissive — didn't check Modals/,
+        # MAKERphoneConfig.h, or the full Element/ + Service/
+        # closure for each screen. CI found ConvoScreen,
+        # ProfileScreen, and possibly others pulling
+        # LoRaService.h → RadioLib transitively.
+        # Reverting the batch. Adding screens one-at-a-time with
+        # careful audit is the better pace going forward.
 
         # S-MP18h: Model layer + LoRaPacket struct data + the
         # MessageService stub. This is the gating step for every
