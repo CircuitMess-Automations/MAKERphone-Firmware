@@ -476,17 +476,8 @@ idf_component_register(
         "${SRC_DIR}/Screens/PhoneCountdown.cpp"
         "${SRC_DIR}/Screens/PhoneFindFriendsRadar.cpp"
         "${SRC_DIR}/Screens/PhoneGalleryScreen.cpp"
-        # S-MP20/11: PhoneGamesScreen.cpp now lands. The glm.h
-        # blocker is gone (glm is vendored under shim_includes/
-        # glm/, see S-MP20/1), and all 25 Phone-style games + 4
-        # engine games (Snake / SpaceInvaders / Bonk /
-        # SpaceRocks) + the GameEngine TUs are already in SRCS.
-        # This addition retains the four engine-game TUs at link
-        # time (their lambda-instantiation sites in
-        # PhoneGamesScreen::launchSelected reference them), so
-        # the binary will grow noticeably for the first time
-        # since the games session began.
-        "${SRC_DIR}/Screens/PhoneGamesScreen.cpp"
+        # PhoneGamesScreen.cpp also pulls Games/GameEngine →
+        # glm.h, same reason as MainMenu. Held back.
         "${SRC_DIR}/Screens/PhoneHabits.cpp"
         "${SRC_DIR}/Screens/PhoneHelicopter.cpp"
         "${SRC_DIR}/Screens/PhoneKaraokeScreen.cpp"

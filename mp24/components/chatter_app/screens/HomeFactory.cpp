@@ -30,7 +30,6 @@
 
 #include "Screens/PhoneHomeScreen.h"
 #include "Screens/PhoneMainMenu.h"
-#include "Screens/PhoneGamesScreen.h"
 #include "Screens/LockScreen.h"
 #include "Screens/InboxScreen.h"
 #include "Screens/FriendsScreen.h"
@@ -73,7 +72,7 @@ static void on_lock_hold(PhoneHomeScreen * /*self*/)
  *   Contacts  → FriendsScreen
  *   Music     → PhoneMusicPlayer
  *   Camera    → PhoneCameraScreen
- *   Games     → PhoneGamesScreen (S-MP20/11)
+ *   Games     → (no destination — GamesScreen needs glm)
  *   Settings  → PhoneSettingsScreen
  *   Mail      → InboxScreen (mail tile reuses inbox in MP2.4)
  *
@@ -90,7 +89,7 @@ static void on_menu_select(PhoneMainMenu *menu)
         case Icon::Contacts: target = new FriendsScreen();       break;
         case Icon::Music:    target = new PhoneMusicPlayer();    break;
         case Icon::Camera:   target = new PhoneCameraScreen();   break;
-        case Icon::Games:    target = new PhoneGamesScreen();    break;
+        case Icon::Games:    /* not compiled */                  break;
         case Icon::Settings: target = new PhoneSettingsScreen(); break;
         case Icon::Mail:     target = new InboxScreen();         break;
     }
