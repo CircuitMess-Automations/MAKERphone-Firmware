@@ -867,44 +867,6 @@ idf_component_register(
         # matching the /6b stubs' pattern.
         "${SRC_DIR}/Games/GameEngine/TextInput.cpp"
 
-        # S-MP20/7e: first game implementation lands -- Snake.cpp.
-        # Re-applies the failed S-MP20/7 attempt (`358bad7`) on top
-        # of an upstream-Element.h patch: the relative
-        # `#include "../Display/Sprite.h"` in
-        # `mp24/components/circuitos/src/UI/Element.h` is now a
-        # bracket `<Display/Sprite.h>`. Bracket resolution goes
-        # through INCLUDE_DIRS, and circuitos_shim is FIRST in this
-        # component's REQUIRES, so the shim Sprite class wins for
-        # Snake's TU (and for any other TU that pulls upstream
-        # UI/Element.h transitively). This eliminates the dual-
-        # Sprite class redefinition that blocked the /7 landing.
-        # See docs/SESSION_CHECKPOINT.md (S-MP20/7 diagnosis) and
-        # commit `ffae1ba` (the prior revert) for full background.
-        #
-        # The patch is risk-free for existing in-SRCS code: no
-        # in-SRCS .cpp currently pulls UI/Element.h transitively
-        # (the only three callers in src/ are Snake.h, Bonk.h,
-        # SpaceInvaders.h -- the upstream game headers, none of
-        # which are in SRCS yet).
-        #
-        # Snake's transitive dependencies are otherwise unchanged
-        # since the /7 attempt: Game.cpp + GameSystem.cpp
-        # (S-MP20/5), InputChatter + FSLVGL stubs (S-MP20/6b),
-        # Highscore.cpp (S-MP20/6), TextInput.cpp (S-MP20/6c),
-        # Sprite drawing API stubs + LovyanGFX-style text overloads
-        # (S-MP20/6d), <Pins.hpp> transitive in shim Chatter.h
-        # (S-MP20/6d).
-        #
-        # Important runtime note: nothing in the in-SRCS set
-        # currently does 'new Snake(...)' -- no GamesScreen entry
-        # routes to Snake yet. Without an instantiation site, the
-        # linker's --gc-sections drops Snake.cpp's TU at link
-        # time. Expected binary delta: 0 bytes. Compile-only
-        # validation; the runtime hookup is deferred to a later
-        # fire (after we add GamesScreen.cpp + the four
-        # game-instantiating switch cases).
-        "${SRC_DIR}/Games/Snake/Snake.cpp"
-
         # S-MP20/6b: pre-emptive Game.cpp runtime stubs.
         # Defines the symbols Game.cpp's start() / stop() / loop()
         # bodies reference -- InputChatter::getInputInstance() and
