@@ -30,6 +30,44 @@
 
 #include <Arduino.h>
 
+/*
+ * S-MP20/4: canonical TFT_eSPI RGB565 color macros.
+ *
+ * Upstream Chatter sources (Games/Snake, JigHWTest, the
+ * GameEngine debug-draw, etc.) reference TFT_BLACK / TFT_RED /
+ * TFT_GREEN / ... as preprocessor macros. The real
+ * Bodmer/TFT_eSPI library defines these in its TFT_eSPI.h public
+ * header; we vendor the canonical RGB565 values here so any TU
+ * that pulls our shim header gets the same constants. Values are
+ * byte-for-byte from Bodmer's library.
+ */
+#ifndef TFT_BLACK
+#define TFT_BLACK       0x0000
+#define TFT_NAVY        0x000F
+#define TFT_DARKGREEN   0x03E0
+#define TFT_DARKCYAN    0x03EF
+#define TFT_MAROON      0x7800
+#define TFT_PURPLE      0x780F
+#define TFT_OLIVE       0x7BE0
+#define TFT_LIGHTGREY   0xC618
+#define TFT_DARKGREY    0x7BEF
+#define TFT_BLUE        0x001F
+#define TFT_GREEN       0x07E0
+#define TFT_CYAN        0x07FF
+#define TFT_RED         0xF800
+#define TFT_MAGENTA     0xF81F
+#define TFT_YELLOW      0xFFE0
+#define TFT_WHITE       0xFFFF
+#define TFT_ORANGE      0xFDA0
+#define TFT_GREENYELLOW 0xB7E0
+#define TFT_PINK        0xFE19
+#define TFT_BROWN       0x9A60
+#define TFT_GOLD        0xFEA0
+#define TFT_SILVER      0xC618
+#define TFT_SKYBLUE     0x867D
+#define TFT_VIOLET      0x915C
+#endif
+
 class TFT_eSPI {
 public:
     TFT_eSPI() = default;

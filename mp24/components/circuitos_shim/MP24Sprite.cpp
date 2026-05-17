@@ -195,6 +195,15 @@ void Sprite::cleanup()
 
 /* -------- TFT_eSprite-style draw primitives -------- */
 
+/*
+ * S-MP20/4: 2-arg overload -- forwards to the 3-arg form with
+ * TFT_WHITE. See Sprite.h for the rationale.
+ */
+void Sprite::drawPixel(int32_t px, int32_t py)
+{
+    drawPixel(px, py, TFT_WHITE);
+}
+
 void Sprite::drawPixel(int32_t px, int32_t py, uint16_t color)
 {
     if (framebuffer == nullptr) return;

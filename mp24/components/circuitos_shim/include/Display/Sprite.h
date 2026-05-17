@@ -84,6 +84,15 @@ public:
     /* Minimum subset of TFT_eSprite drawing API the phone firmware
      * uses. Each is a no-op for 9C; we'll fill them in if/when 9A
      * lands. Argument shapes match Bodmer/TFT_eSPI. */
+    /* S-MP20/4: 2-arg overload forwards to the 3-arg form with
+     * TFT_WHITE. Upstream TFT_eSprite::drawPixel(x, y) uses the
+     * sprite's current foreground color (last setTextColor fg);
+     * our shim does not track fg state separately, so we fall
+     * back to white. The only caller in the entire codebase is
+     * CollisionSystem::drawPolygon's degenerate single-point
+     * branch, which is a debug-draw path that never fires in
+     * normal play. */
+    void drawPixel(int32_t x, int32_t y);
     void drawPixel(int32_t x, int32_t y, uint16_t color);
     void drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint16_t color);
     void drawRect(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t color);

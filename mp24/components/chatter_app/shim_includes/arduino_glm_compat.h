@@ -52,6 +52,25 @@
 #ifndef MP24_SHIM_ARDUINO_GLM_COMPAT_H
 #define MP24_SHIM_ARDUINO_GLM_COMPAT_H
 
+/*
+ * S-MP20/4: Opt into glm's "experimental" extensions.
+ *
+ * <glm/gtx/...> headers (e.g. matrix_transform_2d.hpp,
+ * vector_angle.hpp) are tagged experimental in glm 1.0.x and emit
+ * a hard #error unless GLM_ENABLE_EXPERIMENTAL is defined before
+ * they are parsed. Upstream Chatter source
+ * (Games/GameEngine/Collision/CollisionSystem.cpp) needs both, so
+ * we opt in globally here. This header is force-included via
+ * -include on chatter_app so the macro is in scope before any glm
+ * parse on any TU. The "experimental" tag is a glm-internal
+ * stability flag, not an indication of broken code; the
+ * extensions have been stable for many releases.
+ */
+#ifndef GLM_ENABLE_EXPERIMENTAL
+#define GLM_ENABLE_EXPERIMENTAL
+#endif
+
+
 #ifdef radians
 #undef radians
 #endif
