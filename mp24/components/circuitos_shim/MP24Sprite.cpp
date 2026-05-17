@@ -265,3 +265,74 @@ void Sprite::setTextColor(uint16_t)                                   {}
 void Sprite::setTextSize(uint8_t)                                     {}
 void Sprite::setTextDatum(uint8_t)                                    {}
 void Sprite::setTextFont(uint8_t)                                     {}
+
+/* -------- S-MP20/4f: GIFAnimatedSprite shim no-op impls --------
+ *
+ * Piggy-backs on this TU rather than spinning up a new
+ * MP24GIFAnimatedSprite.cpp for one ctor + six methods, all
+ * trivial. The class is declared in
+ * circuitos_shim/include/Display/GIFAnimatedSprite.h; this
+ * file owns the link-time definitions.
+ *
+ * Rationale: the upstream Display/GIFAnimatedSprite.cpp can't
+ * link in our build because the circuitos component's
+ * src/Display/ subtree is excluded (TFT_eSPI dep). AnimRC.cpp,
+ * which we add to SRCS in this same commit, needs all of these
+ * symbols to satisfy its `std::unique_ptr<GIFAnimatedSprite>`
+ * member. Since nothing in SRCS instantiates AnimRC yet (only
+ * Game.h's chain does, and Game.h is not in SRCS), the linker
+ * is free to gc-sections the AnimRC TU + everything referenced
+ * from it -- but it still needs concrete definitions to point
+ * at while making that decision. No-ops do the job.
+ *
+ * Header is pulled via angle-brackets so circuitos_shim's
+ * include/Display/GIFAnimatedSprite.h is found before any
+ * other Display/ search path.
+ */
+#include <Display/GIFAnimatedSprite.h>
+
+GIFAnimatedSprite::GIFAnimatedSprite(Sprite* /*parentSprite*/,
+                                     const fs::File& /*gifFile*/)
+{
+    /* No decoder, no LoopListener registration, no I/O.
+     * Upstream impl checks `if(!gif) { Serial.println(...); }`
+     * here; we skip that too because we never construct a real
+     * gif member. */
+}
+
+GIFAnimatedSprite::~GIFAnimatedSprite()
+{
+    /* Upstream calls stop() here; ours is a no-op anyway. */
+}
+
+void GIFAnimatedSprite::start() {}
+void GIFAnimatedSprite::stop()  {}
+void GIFAnimatedSprite::reset() {}
+
+void GIFAnimatedSprite::push(Sprite* /*sprite*/, int /*x*/, int /*y*/,
+                             Color /*maskingColor*/) const
+{
+    /* Real impl: pushes the current decoded frame into the parent
+     * sprite at (x, y), with maskingColor as the chroma key. No
+     * sprite has been allocated in the shim, so nothing to push. */
+}
+
+void GIFAnimatedSprite::pushRotate(Sprite* /*sprite*/,
+                                   int /*x*/, int /*y*/, float /*rot*/,
+                                   Color /*maskingColor*/) const
+{
+    /* Same as push(), with an additional rotation applied around
+     * (x, y). No-op in the shim. Upstream guards this body with
+     * #ifdef CIRCUITOS_LOVYANGFX -- we provide an unconditional
+     * symbol because AnimRC.cpp calls it unconditionally. */
+}
+
+void GIFAnimatedSprite::setLoopMode(GIF::LoopMode /*loopMode*/) {}
+
+void GIFAnimatedSprite::setLoopDoneCallback(
+        std::function<void(uint32_t)> /*cb*/)
+{
+    /* Real impl stores cb in a std::function member and invokes
+     * it from loop() when the GIF wraps. No loop() runs in the
+     * shim, so the callback is silently dropped. */
+}

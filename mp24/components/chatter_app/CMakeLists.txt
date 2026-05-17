@@ -704,6 +704,46 @@ idf_component_register(
         # only validation, same pattern as the prior leaves.
         "${SRC_DIR}/Games/GameEngine/Rendering/SpriteRC.cpp"
 
+        # S-MP20/4f: AnimRC.cpp -- fifth and last Rendering
+        # leaf (48 lines). Owns a std::unique_ptr<
+        # GIFAnimatedSprite> built via std::make_unique<
+        # GIFAnimatedSprite>(nullptr, file); push() branches
+        # on rot == 0 to either gif->push(parent, pos.x,
+        # pos.y) or gif->pushRotate(parent, pos.x, pos.y,
+        # rot). Also calls start() / stop() / reset() /
+        # setLoopMode() / setLoopDoneCallback() on the gif.
+        # External deps (addressed by the shim added in this
+        # same commit):
+        #   - class GIFAnimatedSprite (NEW shim header at
+        #     circuitos_shim/include/Display/
+        #     GIFAnimatedSprite.h -- forward-declares a
+        #     class with the ctor + six method signatures
+        #     AnimRC.cpp calls. Replaces the upstream
+        #     circuitos/src/Display/GIFAnimatedSprite.h
+        #     which would otherwise resolve via the
+        #     circuitos REQUIRES; circuitos_shim is FIRST
+        #     in chatter_app's REQUIRES so its include path
+        #     wins for <Display/...> lookups.
+        #   - GIFAnimatedSprite ctor + start/stop/reset/
+        #     push/pushRotate/setLoopMode/
+        #     setLoopDoneCallback -- declared no-op in
+        #     MP24Sprite.cpp (piggy-backed on the existing
+        #     TU for cohesion -- one ctor + six methods
+        #     don't warrant a new MP24GIFAnimatedSprite.cpp
+        #     yet).
+        #   - <Util/GIF.h> (unchanged upstream header in
+        #     circuitos, already on the include path)
+        #     supplies GIF::LoopMode { Auto, Single,
+        #     Infinite } that AnimRC + the shim both
+        #     reference.
+        # Same gc-sections gambit as /4d + /4e: nothing in
+        # SRCS instantiates AnimRC yet (only Game.h chain
+        # does, and Game.h is not in SRCS). With this leaf
+        # landed, the Rendering subsystem's .cpp coverage
+        # is complete and S-MP20/5 (Game.cpp + GameSystem.
+        # cpp) is unblocked from the Rendering-deps angle.
+        "${SRC_DIR}/Games/GameEngine/Rendering/AnimRC.cpp"
+
         # S-MP18j: Storage layer stub. Replaces upstream's
         # Storage.cpp + Repo.cpp + MessageRepo.cpp + ConvoRepo.cpp
         # + PhoneContacts.cpp, none of which we list in SRCS. The
