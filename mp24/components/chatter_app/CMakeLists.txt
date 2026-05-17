@@ -332,12 +332,18 @@ idf_component_register(
         # both gated by the source patch in this session.
         "${SRC_DIR}/Screens/ConvoScreen.cpp"
 
-        # S-MP18u: bulk batch of 20 screens that the strict audit
+        # S-MP18u: bulk batch of 19 screens that the strict audit
         # script (/tmp/audit.sh) shows have full include closure
         # in the current chatter_app SRCS. Top-level Element /
         # Service / Modal includes all resolve. Transitive issues
         # surface in CI if any.
-        "${SRC_DIR}/Screens/MainMenu.cpp"
+        #
+        # MainMenu was originally in this batch but pulls
+        # Screens/GamesScreen.h → Games/GameEngine/Rendering/
+        # PixelDim.hpp → glm.h (not vendored). The legacy Chatter
+        # main-menu would need either glm-port or a stubbed
+        # GamesScreen header. Held back for the games-engine
+        # session.
         "${SRC_DIR}/Screens/PhoneAboutScreen.cpp"
         "${SRC_DIR}/Screens/PhoneActiveCall.cpp"
         "${SRC_DIR}/Screens/PhoneBirthdayReminders.cpp"
