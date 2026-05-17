@@ -895,6 +895,27 @@ idf_component_register(
         # game-instantiating switch cases).
         "${SRC_DIR}/Games/Snake/Snake.cpp"
 
+        # S-MP20/8b: second game implementation lands -- SpaceInvaders
+        # (with Star.cpp helper). The shim TFT_eSPI additions in
+        # S-MP20/8a (TomThumb / GFXfont / setFreeFont / 7-arg
+        # drawBitmap) close the only gap vs Snake's transitive
+        # deps; everything else SpaceInvaders.h pulls (Arduino,
+        # CircuitOS, Input/I2cExpander, Input/InputI2C, Loop/
+        # LoopManager, Support/Context, UI/Image, Highscore.h,
+        # Game.h, TextInput.h) is already proven by Snake.cpp's
+        # /7f3 landing.
+        #
+        # Star.cpp is a tiny helper TU (randomize + update, ~20
+        # LOC) for the starfield background; SpaceInvaders.cpp
+        # includes Star.h.
+        #
+        # No instantiation site for SpaceInvaders in the in-SRCS
+        # set yet -- the GamesScreen wiring lands in /11 + /12 --
+        # so --gc-sections drops both TUs at link time. Expected
+        # binary delta: 0 bytes. Compile-and-link validation only.
+        "${SRC_DIR}/Games/Invaders/Star.cpp"
+        "${SRC_DIR}/Games/Invaders/SpaceInvaders.cpp"
+
         # S-MP20/6b: pre-emptive Game.cpp runtime stubs.
         # Defines the symbols Game.cpp's start() / stop() / loop()
         # bodies reference -- InputChatter::getInputInstance() and
