@@ -338,13 +338,17 @@ static void modem_sm_task(void *arg)
     set_state(MODEM_BOOTING);
 
     /* Probe for AT response. Modem typically takes 8-15 s to come
-     * up; we wait up to 30 s. Sending "AT" every 500 ms gives clear
-     * boot-progress logging without flooding. */
+     * up; we wait up to 30 s. Sending "AT" every 500 ms keeps the
+     * pulse rate high without flooding the log -- the log line
+     * itself only fires once every 5 s (or on the final timeout)
+     * so a healthy boot.log shows at most ~7 boot-probe lines
+     * instead of ~60. */
     const TickType_t start = xTaskGetTickCount();
     const TickType_t cap   = start + pdMS_TO_TICKS(30000);
     bool got_response = false;
+    uint32_t last_logged_s = (uint32_t) -1;
     while (xTaskGetTickCount() < cap) {
-        /* Direct UART write — can't use modem_at_send yet because
+        /* Direct UART write -- can't use modem_at_send yet because
          * the mutex would be held by ourselves and other tasks
          * might race in. Probe is fire-and-forget; we look at the
          * AT queue manually. */
@@ -363,13 +367,25 @@ static void modem_sm_task(void *arg)
         }
         if (got_response) break;
 
-        ESP_LOGI(TAG, "boot probe... (%lu s elapsed)",
-                 (unsigned long)((xTaskGetTickCount() - start) /
-                                 configTICK_RATE_HZ));
+        uint32_t elapsed_s = (uint32_t)
+            ((xTaskGetTickCount() - start) / configTICK_RATE_HZ);
+        /* Log on entry (last_logged_s sentinel) or once every 5 s.
+         * Using >= last + 5 instead of % 5 so a one-second scheduler
+         * delay can't make us skip a logging boundary. */
+        if (last_logged_s == (uint32_t) -1 ||
+            elapsed_s >= last_logged_s + 5) {
+            ESP_LOGI(TAG, "boot probe... (%lu s elapsed)",
+                     (unsigned long) elapsed_s);
+            last_logged_s = elapsed_s;
+        }
     }
 
     if (!got_response) {
-        ESP_LOGE(TAG, "no response in 30 s — modem absent or unpowered");
+        ESP_LOGE(TAG, "no response in 30 s -- modem absent or unpowered");
+        ESP_LOGE(TAG, "  triage: 1) VBAT_RF / VBAT_BB rails 3.4-4.2 V?");
+        ESP_LOGE(TAG, "          2) PWR_KEY trace reaches modem PWRKEY pad?");
+        ESP_LOGE(TAG, "          3) RESET_N idle HIGH (GPIO16)?");
+        ESP_LOGE(TAG, "          4) UART1 TX/RX wired to modem RXD/TXD?");
         set_state(MODEM_FAILED);
         vTaskDelete(NULL);
         return;
