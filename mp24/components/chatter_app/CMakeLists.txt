@@ -226,6 +226,26 @@ idf_component_register(
         # fails 'invalid new-expression of abstract class type'.
         # Backed out; Storage layer needs its own stub session.
 
+        # S-MP18l: LoRaService stub. Upstream LoRaService.cpp
+        # drives a SX1278/LLCC68 LoRa radio via RadioLib. MP2.4
+        # Decision B replaces LoRa with the Quectel EG912U-GL
+        # cellular modem; we're not vendoring RadioLib. The stub
+        # provides every public symbol LoRaService.h declares as
+        # a no-op (send/getMessage/getProfile/getPair*/rand*/etc.)
+        # plus the `LoRaService LoRa;` global.
+        #
+        # The header has 'LLCC68 radio' as a private member, so
+        # the header itself needs LLCC68 to be a complete type.
+        # shim_includes/RadioLib.h (added via PRIV_INCLUDE_DIRS
+        # above) provides an empty LLCC68 class to satisfy that.
+        #
+        # This is the biggest remaining unblocker for
+        # message/profile/pair/call screens. Combined with the
+        # MessageService stub (S-MP18h) and Storage stub
+        # (S-MP18j), most upstream screens should now have all
+        # their service deps satisfied.
+        "shim/LoRaServiceStub.cpp"
+
         # S-MP18d: first screen that USES the status bar + soft-key
         # bar + wallpaper combo. 113 LOC, takes an uppercase app
         # name in the ctor, renders 'NOT YET BUILT' under it. We're
@@ -268,6 +288,17 @@ idf_component_register(
     PRIV_INCLUDE_DIRS
         # So shim/InputLVGL.cpp can find src/InputLVGL.h.
         "${SRC_DIR}"
+
+        # S-MP18l: shim_includes provides drop-in headers that
+        # replace unavailable third-party libraries. Currently:
+        #   RadioLib.h  - empty LLCC68 class to satisfy
+        #                 LoRaService.h's 'LLCC68 radio' member.
+        # Listed after src/ in case any future shim header has
+        # the same name as a src/ file — src/ wins by being
+        # first. The current RadioLib.h has no upstream copy on
+        # any include path, so ordering doesn't actually matter
+        # for it.
+        "${CMAKE_CURRENT_LIST_DIR}/shim_includes"
 
     REQUIRES
         circuitos_shim           # FIRST: <Pins.hpp> override
