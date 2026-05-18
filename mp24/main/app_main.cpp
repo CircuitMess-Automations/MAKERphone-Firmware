@@ -392,12 +392,33 @@ static void sms_boot_task(void *arg)
      * exposed via clock_source_epoch_utc(). On no-modem or no-NITZ
      * hardware this returns ESP_ERR_TIMEOUT / ESP_FAIL and the
      * firmware keeps running on PhoneClock's synthetic 2026-01-01
-     * anchor. A future fire wires clock_source -> PhoneClock so the
-     * status bar + Date&Time picker pick this up live. */
+     * anchor.
+     *
+     * S-MP24/2: on success, hand the cached (epoch_utc,
+     * tz_offset_sec) pair to clock_source_bridge_apply() so
+     * PhoneClock (and through it the status bar, Date&Time
+     * picker, PhoneAlarmService, PhoneVirtualPet, ...) flip
+     * over to the network-supplied wall clock. The bridge
+     * lives in chatter_app's shim/ClockSourceBridge.cpp; we
+     * forward-declare its extern-"C" entry point here so we
+     * don't have to drag a new header into the main component.
+     * On clock_source_init() failure we skip the bridge call;
+     * PhoneClock stays on its 2026-01-01 synthetic anchor. */
     r = clock_source_init(5000);
     if (r != ESP_OK) {
         ESP_LOGI(TAG, "Network clock not available (err: %s) -- using anchor",
                  esp_err_to_name(r));
+    } else if (clock_source_have_time()) {
+        /* Defined in chatter_app's shim/ClockSourceBridge.cpp. The
+         * extern-"C" linkage is what lets a C++ implementation in
+         * chatter_app expose a stable symbol that any caller --
+         * including the pure-C HAL on the main side -- can link
+         * against. Declared locally so we don't have to pull a new
+         * header into the main component just for one symbol. */
+        extern "C" void clock_source_bridge_apply(uint32_t epoch_utc,
+                                                  int32_t  tz_offset_sec);
+        clock_source_bridge_apply(clock_source_epoch_utc(),
+                                  clock_source_tz_offset_seconds());
     }
     vTaskDelete(NULL);
 }

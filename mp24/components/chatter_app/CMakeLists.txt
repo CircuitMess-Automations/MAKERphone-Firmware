@@ -1183,6 +1183,18 @@ idf_component_register(
         # build-only smoke test passes before the wiring commit.
         "shim/ResourceManagerShim.cpp"
 
+        # S-MP24/2: thin C++/C glue that takes
+        # (utc_epoch, tz_offset_sec) -- the cached output of
+        # hal/clock_source -- and feeds it into PhoneClock via
+        # buildEpoch() so the firmware's status bar / Date&Time
+        # picker / PhoneAlarmService / PhoneVirtualPet pick up
+        # the network-supplied wall clock. Symbol
+        # clock_source_bridge_apply() is referenced from
+        # sms_boot_task in app_main.cpp; that external reference
+        # keeps this TU alive past --gc-sections without us
+        # needing to add it to shim/Anchor.cpp.
+        "shim/ClockSourceBridge.cpp"
+
         # S-MP17c: first real LVScreen subclass that runs on
         # hardware. Replaces the temporary three-button boot UI
         # in app_main. Proves the LVScreen → SCREEN_LOADED →
