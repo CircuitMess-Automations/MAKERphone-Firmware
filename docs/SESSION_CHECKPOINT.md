@@ -256,3 +256,30 @@ the directive above."
   recovery at the bench. Abstaining from new feature/fix
   commits per checkpoint directive; appending this docs-only
   log line for timeline continuity.
+
+* 2026-05-18 04:30 UTC -- fire ran. Departed slightly from the
+  prior three fires' "passive re-read" pattern: dispatched a
+  fresh `workflow_dispatch` on `main` (current tip `46e3361`,
+  which is a docs-only commit atop `2fc34c9` so the `mp24/`
+  binary is byte-identical to the green `2fc34c9` baseline).
+  The dispatch produced run `26013477042` -- `build=success`
+  in ~2 min, then `flash=failure` after the same 8x
+  `Failed to connect to ESP32-S3: No serial data received.`
+  sequence ending in the same `All 8 flash attempts failed --
+  device is unrecoverable ... Physical recovery needed (SW24
+  BOOT pin)` message. Confirmation that the device is still
+  bricked is now *current* (probed 2026-05-18T04:28-04:30Z)
+  rather than inferred from the stale `26011760480` run. The
+  `boot-log` artifact attached to run 26013477042 has SHA256
+  `335a8e4e75e5ea054de65499bdedd7bdaef3c2c4bd274d81889ab5faa5a8e9e8`
+  -- byte-identical to the previous run's stale artifact, so
+  no new boot evidence was captured (the boot-capture step is
+  skipped because the flash step exited 2). Functional
+  baseline on `mp24/` remains `2fc34c9`. Device still bricked,
+  awaiting physical SW24 BOOT recovery at the bench.
+  Abstaining from new feature/fix commits per checkpoint
+  directive. Future fires can reuse the workflow_dispatch
+  probe-and-confirm pattern when the most recent run is more
+  than ~30 min stale; it costs ~2.5 min of CI but provides
+  current evidence of brick state rather than re-reporting a
+  cached observation.
