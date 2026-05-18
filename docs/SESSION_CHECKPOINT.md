@@ -385,3 +385,43 @@ the directive above."
   bench. Abstaining from new feature/fix commits per
   checkpoint directive; appending this docs-only entry for
   timeline continuity.
+
+* 2026-05-18 05:46 UTC -- fire ran. Active probe (the previous
+  active probe at 2026-05-18T05:10:18Z was ~36 min stale, just
+  past the ~30 min staleness threshold from the 04:30 entry).
+  Dispatched a fresh `workflow_dispatch` on `main` (HEAD
+  `90ad035`, prior fire's docs-only commit atop `2fc34c9` -- so
+  the `mp24/` binary inputs are byte-identical to the green
+  baseline). The dispatch produced run `26015891956` (run
+  number 185) -- `build=success` (completed
+  2026-05-18T05:49:xxZ), `flash=failure` (completed
+  2026-05-18T05:50:29Z, ~4 min wall time from dispatch).
+  Flash-step log tail confirms the same 8x `A fatal error
+  occurred: Failed to connect to ESP32-S3: No serial data
+  received.` sequence terminating in `All 8 flash attempts
+  failed -- device is unrecoverable` and `Physical recovery
+  needed (SW24 BOOT pin)`. The `boot-log` artifact attached to
+  run 26015891956 has size 1490 B and SHA256 prefix
+  `335a8e4e75e5ea054de65499b...` -- byte-identical (by prefix)
+  to the boot-log artifacts attached to the prior 4 fires'
+  active-probe runs (26011760480 / 26013477042 / 26014627881).
+  No new boot evidence captured; the boot-capture step is
+  skipped when flash exits 2 and the artifact is the stale
+  pre-brick stub preserved by `if-no-files-found: ignore`.
+  Side observation: the flash job's runner-emitted log
+  timestamps show as `2026-05-17T13:17:xxZ` (one day + 16 hours
+  behind wall-clock) -- the flasher Mac appears to have a
+  drifting / mis-set clock, but the runner identity is
+  unambiguous (run id, job id 76465948798, and run conclusion
+  all confirm this is a fresh job; only the per-line log
+  timestamps are anomalous). Workspace setup note: this fire's
+  session VM had `/sessions` at 100% used (9.8G/9.8G) AND `/`
+  at 97% used (only 361 MB free), and the bindfs-mounted
+  `outputs` rejected git's config-lock unlinks. Successfully
+  used `/dev/shm` (tmpfs, 2 GB) for a `--depth 5` clone (about
+  16 MB) -- worth documenting for future fires hitting the
+  same dual-disk-pressure failure mode. Functional baseline on
+  `mp24/` remains `2fc34c9`. Device still bricked, awaiting
+  physical SW24 BOOT recovery at the bench. Abstaining from
+  new feature/fix commits per checkpoint directive; appending
+  this docs-only entry for timeline continuity.
