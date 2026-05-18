@@ -698,3 +698,69 @@ the directive above."
   appending this docs-only entry for timeline continuity.
   Next fire should repeat the runner-status probe first
   (same decision rule).
+
+* 2026-05-18 07:45 UTC -- fire ran. Runner-status probe pattern,
+  no dispatch (same decision rule the 07:04 fire codified and the
+  07:23 fire re-applied: "re-query `/repos/$REPO/actions/runners`
+  BEFORE dispatching"). GET `/repos/$REPO/actions/runners` returns
+  `total_count=2`: the `flasher`-labelled runner
+  `AlberttekiMacBook-Pro` (id 23, labels `self-hosted,macOS,ARM64,
+  flasher`) is still `status=offline busy=False`, and the
+  `bit-flash` build runner (id 22, labels `self-hosted,macOS,ARM64,
+  bit-flash`) is `status=online busy=False`. The flasher state is
+  **unchanged** from both the 07:04 and 07:23 queries -- offline
+  duration is now ~75 min counting from the 06:30 last-known-online
+  flash conclusion (2026-05-18T06:30:01Z flash job end on run
+  `26017210952`). The (a)/(b)/(c) interpretation set the 07:04
+  entry enumerated still applies; (a) "user is at the bench
+  performing SW24 BOOT recovery" remains plausible but unconfirmed
+  -- a successful recovery would require the user to also restart
+  the `actions-runner` agent on `AlberttekiMacBook-Pro` for it to
+  re-register as online, which has not happened yet. No newer
+  `build-mp24` workflow runs have been triggered since the 07:04
+  cancellation (run `26018657455`, `flash=completed/cancelled`,
+  HEAD `d5663d6`); the most recent run that actually reached a
+  flash conclusion on the device side remains run `26017210952`
+  from 06:30 (`flash=completed/failure`, S-MP25/3/1 brick
+  signature). The cross-check `?status=queued` / `?status=
+  in_progress` API queries also confirm no MP2.4 jobs are
+  currently pending -- the build queue is idle. Per the locked-in
+  decision rule, abstaining from dispatch this fire as well: the
+  build runner alone can't flash, so a fresh dispatch would just
+  burn ~2 min of `bit-flash` capacity to produce another
+  build-success/flash-cancelled (or flash-failure if the dispatch
+  doesn't get cancelled in time) outcome with zero new device-side
+  information. Workspace setup note: this fire's session VM had
+  `/sessions` at **100% used** (9.8G/9.8G full -- the
+  `HOME=/sessions/<uid>` path could not be used as a clone
+  destination because `mkdir repo` returned ENOSPC; same condition
+  as the 07:23 fire) and `/` at **89% used** (~1.2 GB free).
+  Tried the bindfs-mounted `outputs` path
+  `/sessions/<uid>/mnt/outputs/mp24/mp_firmware`: clone failed
+  immediately with `unable to unlink '.git/config.lock'` plus
+  cascading `Operation not permitted` on every `.git/`-internal
+  file -- the bindfs layer rejects unlink even by the owning uid
+  (same failure mode every prior fire documented; not specific
+  to leftover dirs, the fresh path failed the same way). Did
+  NOT re-use any leftover `/tmp/repo` or `/tmp/cl_*` from prior
+  fires this run (those are owned by earlier fires' uids and
+  read-only from this uid, same EACCES condition the 07:23 entry
+  documented). Successful path: `/tmp/mp_work/mp_firmware`
+  (`--depth 50`, ~16 MB working tree, fresh subdir owned by this
+  fire's uid). The `/tmp` stale-dir accumulation flagged by the
+  07:04 and 07:23 entries continues to grow (this fire added
+  one more `/tmp/mp_work/` to the pile of per-fire dirs already
+  there); did not sweep them since the 1.2 GB root-disk headroom
+  remains comfortable and `allow_cowork_file_delete` is not
+  available unattended. Functional baseline on `mp24/` remains
+  `2fc34c9`. Device boot state remains **UNKNOWN as of this
+  fire** -- offline flasher means CI cannot confirm
+  bricked-vs-recovered. Abstaining from new feature/fix commits
+  per checkpoint directive; appending this docs-only entry for
+  timeline continuity. Next fire should repeat the runner-status
+  probe first (same decision rule); if the flasher is back
+  online, dispatch a single probe at HEAD `2fc34c9`'s tree to
+  read device state, and if that flash succeeds proceed with the
+  S-MP25/4 retry path (Option A: snprintf into 160-byte buf
+  then single-arg ESP_LOGI) documented in the "What the next
+  fire should try (post device recovery)" section above.
