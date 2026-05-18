@@ -147,6 +147,16 @@ extern "C" {
 #include "hal/clock_source.h"
 }
 
+/* S-MP24/2 forward-decl. Defined in chatter_app's
+ * shim/ClockSourceBridge.cpp with extern-"C" linkage; pulled into
+ * the link graph the moment sms_boot_task references it. We
+ * declare the prototype here rather than introducing a one-line
+ * header in chatter_app so the dependency direction stays
+ * main -> chatter_app and chatter_app does not have to export
+ * anything via INCLUDE_DIRS. */
+extern "C" void clock_source_bridge_apply(uint32_t epoch_utc,
+                                          int32_t  tz_offset_sec);
+
 static const char *TAG = "MP24";
 
 /* ----------------------------------------------------------------- */
@@ -409,14 +419,12 @@ static void sms_boot_task(void *arg)
         ESP_LOGI(TAG, "Network clock not available (err: %s) -- using anchor",
                  esp_err_to_name(r));
     } else if (clock_source_have_time()) {
-        /* Defined in chatter_app's shim/ClockSourceBridge.cpp. The
-         * extern-"C" linkage is what lets a C++ implementation in
-         * chatter_app expose a stable symbol that any caller --
-         * including the pure-C HAL on the main side -- can link
-         * against. Declared locally so we don't have to pull a new
-         * header into the main component just for one symbol. */
-        extern "C" void clock_source_bridge_apply(uint32_t epoch_utc,
-                                                  int32_t  tz_offset_sec);
+        /* clock_source_bridge_apply() is defined in chatter_app's
+         * shim/ClockSourceBridge.cpp with extern-"C" linkage. The
+         * prototype lives at file scope (just below the existing
+         * extern "C" { ... } HAL includes, since C++ forbids
+         * extern-"C" linkage specifications in block scope) so
+         * this call resolves to that symbol. */
         clock_source_bridge_apply(clock_source_epoch_utc(),
                                   clock_source_tz_offset_seconds());
     }
