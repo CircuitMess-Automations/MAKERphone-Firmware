@@ -963,3 +963,176 @@ the directive above."
   S-MP25/4 retry path (Option A: snprintf into 160-byte buf
   then single-arg ESP_LOGI) documented in the "What the next
   fire should try (post device recovery)" section above.
+
+* 2026-05-18 09:04 UTC -- fire ran. Runner-status probe pattern,
+  no dispatch (7th consecutive fire applying the decision rule the
+  07:04 entry codified and the 07:23 / 07:45 / 08:04 / 08:24 /
+  09:00 fires re-applied: "re-query `/repos/$REPO/actions/runners`
+  BEFORE dispatching"). GET `/repos/$REPO/actions/runners` returns
+  `total_count=2`: the `flasher`-labelled runner
+  `AlberttekiMacBook-Pro` (id 23, labels `self-hosted,macOS,ARM64,
+  flasher`) is still `status=offline busy=False`, and the
+  `bit-flash` build runner (id 22, labels `self-hosted,macOS,ARM64,
+  bit-flash`) is `status=online busy=False`. The flasher state is
+  **unchanged** across all seven 07:04 / 07:23 / 07:45 / 08:04 /
+  08:24 / 09:00 / 09:04 queries -- offline duration is now
+  **~154 min** (2 h 34 min) counting from the 06:30:01Z
+  last-known-online flash job end on run `26017210952`
+  (`flash=completed/failure`, S-MP25/3/1 brick signature, the
+  bricking flash attempt itself). No newer `build-mp24` workflow
+  runs have been triggered since the 07:04 cancellation
+  (`26018657455`, HEAD `d5663d6`, `flash=completed/cancelled`);
+  the GET `/actions/runs?per_page=5` listing shows the same five
+  completed runs the 08:24 / 09:00 entries enumerated:
+  `26018657455` (`cancelled`), `26017210952` (`failure`, the
+  brick), `26015891956` (`failure`), `26014627881` (`failure`),
+  `26013477042` (`failure`). Cross-check `?status=queued` /
+  `?status=in_progress` API queries also confirm no MP2.4 jobs
+  are currently pending (`total_count=0` for both). The
+  (a)/(b)/(c) interpretation set the 07:04 entry enumerated still
+  applies; (a) "user is at the bench performing SW24 BOOT
+  recovery" is now substantially less likely after a 2.5 h+
+  offline window with zero actions-runner re-registration --
+  (b) "user is asleep / away from the bench" or (c) "flasher Mac
+  is powered off / disconnected from network" are looking more
+  probable. Per the locked-in decision rule, abstaining from
+  dispatch this fire as well: the build runner alone can't flash,
+  so a fresh dispatch would just burn ~2 min of `bit-flash`
+  capacity to produce another build-success/flash-cancelled
+  outcome with zero new device-side information. Workspace setup
+  note: this fire's session VM had `/sessions` at **100% used**
+  (9.8G/9.8G full -- the `HOME=/sessions/<uid>` path could not
+  be used as a clone destination because `pip install`'s default
+  `--user` target returned ENOSPC on `.local/`; same condition as
+  07:23 / 07:45 / 08:04 / 08:24 / 09:00 fires) and `/` at
+  **89% used** (~1.1 GB free). The brief's `/home/claude/...`
+  paths are not writable (`mkdir /home/claude` returned EACCES,
+  `/home` owned by `nobody:nogroup`); same condition prior fires
+  worked around with `/tmp/...` paths. Successful setup path:
+  `pip install --target=/sessions/<uid>/mnt/outputs/mp24_work/pylibs
+  pyelftools` (the bindfs-mounted outputs dir is the only volume
+  with multi-GB free space; ~79 GB available); `git clone --depth=20`
+  into `/tmp/mp24/mp_firmware` (~16 MB working tree, fresh subdir
+  owned by this fire's uid). Did NOT attempt the bindfs outputs
+  path for the git clone itself -- a prior `git clone` attempt
+  into `/sessions/<uid>/mnt/outputs/mp24_work/mp_firmware` failed
+  with "could not lock config file ... Operation not permitted"
+  (the macOS-passthrough bindfs mount does not honour the
+  `unlink()` semantics git needs for `.git/config.lock`
+  rename-replace), so reverted to the `/tmp` pattern the prior
+  fires used. The `/tmp` stale-dir accumulation flagged by the
+  07:04 / 07:23 / 07:45 / 08:04 / 08:24 / 09:00 entries continues
+  to grow (this fire added `/tmp/mp24/` to the pile); did not
+  sweep them since the 1.1 GB root-disk headroom remains
+  comfortable and `allow_cowork_file_delete` is not available
+  unattended. Functional baseline on `mp24/` remains `2fc34c9`
+  (every commit after that is a docs-only `SESSION_CHECKPOINT.md`
+  append, this one included). Device boot state remains
+  **UNKNOWN as of this fire** -- offline flasher means CI cannot
+  confirm bricked-vs-recovered.
+
+  **Forward-progress note (new this fire):** Pre-composed the
+  S-MP25/4 Option A patch so the post-recovery fire can apply
+  it via one `Edit`/`patch` call instead of re-deriving the
+  shape from prose in the "What the next fire should try"
+  section above. The exact patch, ready to drop into
+  `mp24/main/app_main.cpp` between the S-MP25/2 4-arg shape and
+  the `vTaskDelay(pdMS_TO_TICKS(3000));` close-of-loop line, is:
+
+  ```c
+  static void heap_watchdog_task(void * /*arg*/)
+  {
+      /* One-second delay so the print_banner + bring-up logs come
+       * out first and the first HEAP line lands clearly after the
+       * "Entering background-tasks-only loop" line. */
+      vTaskDelay(pdMS_TO_TICKS(1000));
+
+      /* S-MP25/4 (Option A) -- format into a local buffer first,
+       * then a single-arg ESP_LOGI. Collapses the ESP_LOG va_list
+       * scratch into one snprintf() with a bounded sink, instead
+       * of letting esp_log_writev() build a 5-arg vsnprintf frame
+       * on the heap_wd task stack (the shape that overflowed in
+       * S-MP25/3 and S-MP25/3/1). Buffer 160 B is sized for the
+       * worst case (five 10-digit %lu fields + the literal "HEAP:
+       * free= B  min-free= B  free-internal= B  min-internal= B
+       *  largest-internal= B" prefix == ~135 B). */
+      char buf[160];
+
+      for (;;) {
+          uint32_t free_total =
+              (uint32_t) esp_get_free_heap_size();
+          uint32_t min_free =
+              (uint32_t) esp_get_minimum_free_heap_size();
+          uint32_t free_int =
+              (uint32_t) heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+          uint32_t min_int =
+              (uint32_t) heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+          uint32_t largest_int =
+              (uint32_t) heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+          snprintf(buf, sizeof(buf),
+                   "HEAP: free=%lu B  min-free=%lu B  "
+                   "free-internal=%lu B  min-internal=%lu B  "
+                   "largest-internal=%lu B",
+                   (unsigned long) free_total,
+                   (unsigned long) min_free,
+                   (unsigned long) free_int,
+                   (unsigned long) min_int,
+                   (unsigned long) largest_int);
+          ESP_LOGI(TAG, "%s", buf);
+          vTaskDelay(pdMS_TO_TICKS(3000));
+      }
+  }
+  ```
+
+  Verified pre-conditions for this patch (all checked against the
+  HEAD `9cf5c1f` tree this fire cloned):
+   - `<cstdio>` already included at `app_main.cpp:27` so the
+     `snprintf` prototype is in scope without a new `#include`.
+   - `esp_system.h` is already included at `app_main.cpp:130`,
+     which is the canonical header for
+     `esp_get_minimum_free_heap_size()` in ESP-IDF v5.5
+     (Decision A). No further include required.
+   - `TAG` is `static const char *TAG = "MP24";` at line 161 --
+     unchanged from the S-MP25/2 shape; the new `ESP_LOGI(TAG,
+     "%s", buf)` resolves correctly.
+   - The heap_wd `xTaskCreate` at line 839 leaves the stack at
+     2048 -- the S-MP25/3 bump to 3072 is reverted in `2fc34c9`,
+     and the Option A shape is the one chosen because it works
+     within the 2 KB stack (no need to re-bump). If the resulting
+     boot.log shows another heap_wd overflow with this shape,
+     escalate to Option B (two 3-arg ESP_LOGI calls), NOT to a
+     stack bump -- the bump didn't help last time.
+   - Line-length math: longest realistic line is
+     `"HEAP: free=4294967295 B  min-free=4294967295 B  ` ...
+     `largest-internal=4294967295 B"` == 134 bytes plus NUL ==
+     135 bytes, comfortably under the 160-byte buf with 25 B
+     margin. (`esp_get_free_heap_size()` returns `size_t` -- on
+     ESP32-S3 that's 32-bit so 10 digits max; the cast to
+     `unsigned long` is correct because `unsigned long` is also
+     32-bit on xtensa-esp-elf.)
+   - Snprintf trunc behaviour is benign here: if a future ESP-IDF
+     bump widens the heap counters past 32 bits, `snprintf` will
+     truncate at byte 159 and NUL-terminate; the worst case is a
+     mangled tail on the log line, not a memory smash.
+
+  Per the "Critically: do not re-test heap_wd changes without
+  first confirming the most recent flash succeeded" rule, NOT
+  pushing this patch this fire. The patch sits in this docs
+  entry only; mp24/** is untouched. Once a future fire observes
+  the flasher back online AND a successful re-flash of HEAD
+  `2fc34c9`, it should: (i) apply this patch byte-for-byte,
+  (ii) commit as `feat(mp24): S-MP25/4 -- snprintf-into-buf
+  shape for HEAP log line (Option A)`, (iii) push, (iv) wait
+  for CI, (v) read boot.log, (vi) confirm five HEAP: lines land
+  cleanly (i.e. the line ends at "largest-internal=... B"
+  rather than truncated mid-token like S-MP25/3/1 did), and
+  (vii) confirm no heap_wd stack-overflow backtrace.
+
+  Abstaining from new feature/fix commits per checkpoint
+  directive; appending this docs-only entry for timeline
+  continuity AND for the pre-composed patch. Next fire should
+  repeat the runner-status probe first (same decision rule); if
+  the flasher is back online, dispatch a single probe at HEAD
+  `2fc34c9`'s tree to read device state, and if that flash
+  succeeds proceed with the S-MP25/4 retry path Option A as
+  pre-composed above.
