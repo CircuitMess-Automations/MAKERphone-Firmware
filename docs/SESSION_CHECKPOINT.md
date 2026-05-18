@@ -199,3 +199,24 @@ The effective end-state of `mp24/main/app_main.cpp` (post-
 revert) is byte-identical to its `63a4451` shape, but
 `5834b87`, `474e4e4`, `2fc34c9` are visible in `git log` for
 traceability.
+
+## Subsequent fire log (post-brick observation)
+
+Each subsequent scheduled-task fire that runs while the device
+remains bricked appends one line here so future fires (and the
+user, when they come back to the bench) can see the timeline.
+A line here means "the fire ran, confirmed the device is still
+bricked via CI run inspection, and abstained from new commits per
+the directive above."
+
+* 2026-05-18 03:34 UTC -- fire ran. Inspected latest workflow
+  run `26011760480` (HEAD `2fc34c9`): `build=success`,
+  `flash=failure`. Flash-step log contains 8x
+  `A fatal error occurred: Failed to connect to ESP32-S3: No
+  serial data received.` plus `All 8 flash attempts failed --
+  device is unrecoverable`. No newer runs exist (the docs
+  commit `a8f553f` is outside the `mp24/**`, `src/**`,
+  `libraries/Chatter-Library/**`, `.github/workflows/build-mp24.yml`
+  CI path filter so it did not trigger CI). Functional baseline
+  on `mp24/` remains `2fc34c9`. Device still bricked. Abstaining
+  from new feature/fix commits per checkpoint directive.
