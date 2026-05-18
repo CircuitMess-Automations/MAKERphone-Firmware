@@ -283,3 +283,28 @@ the directive above."
   than ~30 min stale; it costs ~2.5 min of CI but provides
   current evidence of brick state rather than re-reporting a
   cached observation.
+
+* 2026-05-18 04:47 UTC -- fire ran. Passive re-read pattern (last
+  active probe was 2026-05-18 04:30 - ish, still well under the
+  ~30 min staleness threshold called out in the prior entry).
+  Re-inspected workflow run `26013477042` (HEAD `46e3361`)
+  via the GitHub API: `build=success` (completed
+  2026-05-18T04:28:42Z), `flash=failure` (completed
+  2026-05-18T04:30:28Z). Flash-step log tail confirms the same
+  8x `A fatal error occurred: Failed to connect to ESP32-S3:
+  No serial data received.` sequence terminating in
+  `All 8 flash attempts failed -- device is unrecoverable`
+  and `Physical recovery needed (SW24 BOOT pin)`. The
+  `boot-log` artifact attached to the run is the same
+  1490 B stub with SHA256 `335a8e4e...` documented in the
+  prior entry -- no new boot evidence captured (boot-capture
+  step is skipped when flash exits 2). No newer `build-mp24`
+  runs since the 04:30 active probe; HEAD `df00d0b` is the
+  prior fire's docs commit, which is outside the
+  `mp24/**`, `src/**`, `libraries/Chatter-Library/**`,
+  `.github/workflows/build-mp24.yml` CI path filter and so
+  did not dispatch a fresh run. Functional baseline on
+  `mp24/` remains `2fc34c9`. Device still bricked.
+  Abstaining from new feature/fix commits per checkpoint
+  directive; appending this docs-only entry for timeline
+  continuity.
