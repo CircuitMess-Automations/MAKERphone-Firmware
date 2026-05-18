@@ -752,6 +752,373 @@ void Repo<PhoneContact>::clear()
     cache.clear();
 }
 
+
+/* ------------------------------------------------------------------
+ * Repo<Message> NVS-backed (S-MP23/5)
+ *
+ * Unlike Friend (POD) and PhoneContact (POD), Message holds non-POD
+ * state: a `void* content` that points at a heap-allocated
+ * `std::string` (TEXT) or `uint8_t` (PIC). Raw nvs_set_blob over
+ * &Message would persist the pointer value, not the payload, and
+ * round-trip into garbage. So we serialise to a packed wire format
+ * with an explicit variable-length tail:
+ *
+ *     [ uid:8 | convo:8 | flags:1 | type:1 | len:2 | data:N ]
+ *
+ *   flags bit0 = outgoing, bit1 = received    (remaining bits zero)
+ *   type  matches Message::Type enum:
+ *     0 = TEXT, 1 = PIC, 2 = NONE              (cast-stable)
+ *   len   = N (uint16 LE)
+ *   data  = N bytes:
+ *     TEXT  → std::string contents, no NUL terminator
+ *     PIC   → 1 byte picIndex
+ *     NONE  → no bytes, len=0
+ *
+ * Fixed header is 20 bytes; total blob is 20 + N. NVS blob size is
+ * comfortably bounded — N is capped at kMsgTextCap below to keep us
+ * safely under the per-blob limit on the ESP-IDF NVS partition.
+ *
+ * Records live in NVS namespace "msg", keyed by 14-char base32
+ * ('m' + 13 chars). A separate "__idx" blob holds the packed array
+ * of UID_t's needed by Repo<Message>::all().
+ *
+ * MessageRepo::write / MessageRepo::read remain no-op overrides
+ * below — our specializations of Repo<Message>::add/update/get/etc.
+ * never reach them. Same arrangement as Friend / PhoneContact.
+ *
+ * Repo<Convo> stays the all-no-op primary template; it ships in
+ * the follow-up sub-step (S-MP23/6) because Convo's variable-length
+ * messages-vector needs its own serialisation.
+ * ------------------------------------------------------------------ */
+
+namespace {
+
+// NVS namespace for Repo<Message>. Distinct from "frd" (Friend),
+// "pc" (PhoneContact + the PhoneContacts namespace), and any
+// future "cnv" / "msg" namespaces, so no key prefix collisions
+// are possible.
+constexpr const char *kMsgRepoNamespace = "msg";
+
+// Index key inside kMsgRepoNamespace. The reserved underscore
+// prefix can't collide with a record key (all record keys start
+// with 'm').
+constexpr const char *kMsgRepoIndexKey = "__idx";
+
+// Cap on the serialised TEXT payload. NVS blobs on ESP-IDF v5.5
+// can in principle grow to ~4000 bytes, but the chat UI tops out
+// long before that. 2048 leaves comfortable headroom and refuses
+// to persist absurd payloads silently.
+constexpr size_t kMsgTextCap = 2048;
+
+// Fixed header size on the wire (see comment above).
+constexpr size_t kMsgHdrSize = 8 /*uid*/ + 8 /*convo*/ + 1 /*flags*/
+                             + 1 /*type*/ + 2 /*len*/;  // = 20
+
+// 'm' + 13 base32 chars = 14-char key, under
+// NVS_KEY_NAME_MAX_SIZE-1 = 15.
+static void msgKey(UID_t uid, char out[16])
+{
+    static const char alphabet[] = "0123456789abcdefghijklmnopqrstuv";
+    out[0] = 'm';
+    for (int i = 0; i < 13; ++i) {
+        unsigned shift = i * 5;
+        out[1 + (12 - i)] = alphabet[(uid >> shift) & 0x1F];
+    }
+    out[14] = '\0';
+}
+
+// Serialise Message → packed blob. Returns false if the message
+// is in a corrupt state (TEXT with null content, length over cap)
+// rather than persist garbage.
+static bool msgSerialize(const Message &m, std::vector<uint8_t> &out)
+{
+    Message::Type t = m.getType();
+    uint16_t len = 0;
+    const uint8_t *body = nullptr;
+    uint8_t picByte = 0;
+    std::string textCopy;
+
+    if (t == Message::TEXT) {
+        textCopy = m.getText();
+        if (textCopy.size() > kMsgTextCap) return false;
+        len = static_cast<uint16_t>(textCopy.size());
+        body = reinterpret_cast<const uint8_t *>(textCopy.data());
+    } else if (t == Message::PIC) {
+        picByte = m.getPic();
+        len = 1;
+        body = &picByte;
+    } else {
+        // NONE — no body.
+        len = 0;
+        body = nullptr;
+    }
+
+    out.resize(kMsgHdrSize + len);
+    uint8_t *p = out.data();
+
+    UID_t uid = m.uid;
+    UID_t convo = m.convo;
+    for (int i = 0; i < 8; ++i) { p[i]     = static_cast<uint8_t>(uid   >> (i * 8)); }
+    for (int i = 0; i < 8; ++i) { p[8 + i] = static_cast<uint8_t>(convo >> (i * 8)); }
+    uint8_t flags = 0;
+    if (m.outgoing) flags |= 0x1;
+    if (m.received) flags |= 0x2;
+    p[16] = flags;
+    p[17] = static_cast<uint8_t>(t);
+    p[18] = static_cast<uint8_t>(len & 0xFF);
+    p[19] = static_cast<uint8_t>((len >> 8) & 0xFF);
+    if (len && body) {
+        std::memcpy(p + kMsgHdrSize, body, len);
+    }
+    return true;
+}
+
+// Deserialise packed blob → Message. Returns false on any format
+// violation (short blob, unknown type, len mismatch). On success
+// `out` is freshly populated; any prior content is cleared by
+// Message's setText / setPic / =Message{}.
+static bool msgDeserialize(const uint8_t *buf, size_t sz, Message &out)
+{
+    if (sz < kMsgHdrSize) return false;
+    UID_t uid = 0, convo = 0;
+    for (int i = 0; i < 8; ++i) { uid   |= static_cast<UID_t>(buf[i])     << (i * 8); }
+    for (int i = 0; i < 8; ++i) { convo |= static_cast<UID_t>(buf[8 + i]) << (i * 8); }
+    uint8_t flags = buf[16];
+    uint8_t typeByte = buf[17];
+    uint16_t len = static_cast<uint16_t>(buf[18]) |
+                   (static_cast<uint16_t>(buf[19]) << 8);
+    if (kMsgHdrSize + len != sz) return false;
+
+    Message fresh;
+    if (typeByte == Message::TEXT) {
+        if (len > kMsgTextCap) return false;
+        std::string text(reinterpret_cast<const char *>(buf + kMsgHdrSize), len);
+        fresh.setText(text);
+    } else if (typeByte == Message::PIC) {
+        if (len != 1) return false;
+        fresh.setPic(buf[kMsgHdrSize]);
+    } else if (typeByte == Message::NONE) {
+        if (len != 0) return false;
+        // type stays NONE by default-construction.
+    } else {
+        return false;  // unknown type byte
+    }
+    fresh.uid = uid;
+    fresh.convo = convo;
+    fresh.outgoing = (flags & 0x1) != 0;
+    fresh.received = (flags & 0x2) != 0;
+    out = fresh;  // operator= deep-copies the content
+    return true;
+}
+
+static bool msgLoad(UID_t uid, Message &out)
+{
+    nvs_handle_t h;
+    if (nvs_open(kMsgRepoNamespace, NVS_READONLY, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    msgKey(uid, key);
+    size_t sz = 0;
+    esp_err_t err = nvs_get_blob(h, key, nullptr, &sz);
+    if (err != ESP_OK || sz < kMsgHdrSize || sz > kMsgHdrSize + kMsgTextCap) {
+        nvs_close(h);
+        return false;
+    }
+    std::vector<uint8_t> buf(sz);
+    err = nvs_get_blob(h, key, buf.data(), &sz);
+    nvs_close(h);
+    if (err != ESP_OK) return false;
+    if (!msgDeserialize(buf.data(), sz, out)) return false;
+    if (out.uid != uid) return false;  // defensive: key/blob mismatch
+    return true;
+}
+
+static bool msgSave(const Message &m)
+{
+    std::vector<uint8_t> buf;
+    if (!msgSerialize(m, buf)) return false;
+    nvs_handle_t h;
+    if (nvs_open(kMsgRepoNamespace, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    msgKey(m.uid, key);
+    esp_err_t err = nvs_set_blob(h, key, buf.data(), buf.size());
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    return err == ESP_OK;
+}
+
+static bool msgErase(UID_t uid)
+{
+    nvs_handle_t h;
+    if (nvs_open(kMsgRepoNamespace, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    msgKey(uid, key);
+    esp_err_t err = nvs_erase_key(h, key);
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    return err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND;
+}
+
+static bool msgIdxLoad(std::vector<UID_t> &out)
+{
+    out.clear();
+    nvs_handle_t h;
+    esp_err_t open = nvs_open(kMsgRepoNamespace, NVS_READONLY, &h);
+    if (open == ESP_ERR_NVS_NOT_FOUND) {
+        return true;  // namespace doesn't exist yet → empty repo
+    }
+    if (open != ESP_OK) return false;
+    size_t sz = 0;
+    esp_err_t err = nvs_get_blob(h, kMsgRepoIndexKey, nullptr, &sz);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        nvs_close(h);
+        return true;  // empty index
+    }
+    if (err != ESP_OK) {
+        nvs_close(h);
+        return false;
+    }
+    if (sz == 0 || (sz % sizeof(UID_t)) != 0) {
+        nvs_close(h);
+        return false;  // corrupt blob
+    }
+    out.resize(sz / sizeof(UID_t));
+    err = nvs_get_blob(h, kMsgRepoIndexKey, out.data(), &sz);
+    nvs_close(h);
+    if (err != ESP_OK) {
+        out.clear();
+        return false;
+    }
+    return true;
+}
+
+static bool msgIdxSave(const std::vector<UID_t> &v)
+{
+    nvs_handle_t h;
+    if (nvs_open(kMsgRepoNamespace, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    esp_err_t err;
+    if (v.empty()) {
+        err = nvs_erase_key(h, kMsgRepoIndexKey);
+        if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+    } else {
+        err = nvs_set_blob(h, kMsgRepoIndexKey, v.data(),
+                           v.size() * sizeof(UID_t));
+    }
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    return err == ESP_OK;
+}
+
+static bool msgIdxContains(const std::vector<UID_t> &v, UID_t uid)
+{
+    for (UID_t u : v) {
+        if (u == uid) return true;
+    }
+    return false;
+}
+
+}  // anonymous namespace (S-MP23/5)
+
+/* ------------------------------------------------------------------
+ * Per-method specializations for Repo<Message>.
+ *
+ * Mirrors Repo<PhoneContact> in shape, with msgSave/msgLoad in
+ * place of pcRepoSave/pcRepoLoad — those route through the
+ * serialiser instead of a raw blob copy. Non-specialized members
+ * (begin/reserve/write/read/getPath) fall through to the primary
+ * template, same as Friend / PhoneContact.
+ * ------------------------------------------------------------------ */
+
+template <>
+bool Repo<Message>::add(const Message &object)
+{
+    std::vector<UID_t> idx;
+    if (!msgIdxLoad(idx)) return false;
+    if (!msgIdxContains(idx, object.uid)) {
+        idx.push_back(object.uid);
+        if (!msgIdxSave(idx)) return false;
+    }
+    return msgSave(object);
+}
+
+template <>
+bool Repo<Message>::update(const Message &object)
+{
+    std::vector<UID_t> idx;
+    if (!msgIdxLoad(idx)) return false;
+    if (!msgIdxContains(idx, object.uid)) return false;
+    return msgSave(object);
+}
+
+template <>
+bool Repo<Message>::remove(UID_t uid)
+{
+    std::vector<UID_t> idx;
+    if (!msgIdxLoad(idx)) return false;
+    if (!msgIdxContains(idx, uid)) return false;
+    if (!msgErase(uid)) return false;
+    idx.erase(std::remove(idx.begin(), idx.end(), uid), idx.end());
+    return msgIdxSave(idx);
+}
+
+template <>
+Message Repo<Message>::get(UID_t uid, bool /*bypassCache*/)
+{
+    Message m;
+    if (msgLoad(uid, m)) {
+        return m;
+    }
+    // Match the no-op stub: default-constructed Message on miss.
+    // uid stays 0, type stays NONE, content stays nullptr.
+    return Message{};
+}
+
+template <>
+std::vector<UID_t> Repo<Message>::all(bool /*bypassCache*/)
+{
+    std::vector<UID_t> idx;
+    if (!msgIdxLoad(idx)) {
+        return std::vector<UID_t>{};
+    }
+    return idx;
+}
+
+template <>
+bool Repo<Message>::exists(UID_t uid)
+{
+    std::vector<UID_t> idx;
+    if (!msgIdxLoad(idx)) return false;
+    return msgIdxContains(idx, uid);
+}
+
+template <>
+void Repo<Message>::clear()
+{
+    std::vector<UID_t> idx;
+    if (msgIdxLoad(idx)) {
+        for (UID_t u : idx) {
+            (void)msgErase(u);
+        }
+    }
+    std::vector<UID_t> empty;
+    (void)msgIdxSave(empty);
+    cache.clear();
+}
+
+
 /* Explicit instantiation — the linker needs each symbol concrete. */
 template class Repo<Friend>;
 template class Repo<PhoneContact>;
