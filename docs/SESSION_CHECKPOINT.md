@@ -344,3 +344,44 @@ the directive above."
   stack overflow during `min-free` log formatting) -- not a new
   failure mode -- which strengthens the "no firmware change can
   fix this without physical recovery" conclusion.
+
+* 2026-05-18 05:25 UTC -- fire ran. Passive re-read pattern (last
+  active probe at 2026-05-18T05:10:18Z is ~15 min stale, well
+  under the ~30 min staleness threshold called out in the 04:30
+  entry). Re-inspected workflow run `26014627881` (HEAD
+  `89ec3a2`) via the GitHub API: `build=success` (completed
+  2026-05-18T05:08:27Z), `flash=failure` (completed
+  2026-05-18T05:10:13Z). Flash-step log tail confirms the same
+  8x `A fatal error occurred: Failed to connect to ESP32-S3:
+  No serial data received.` sequence terminating in
+  `All 8 flash attempts failed -- device is unrecoverable` and
+  `Physical recovery needed (SW24 BOOT pin)`. Downloaded the
+  `boot-log` artifact attached to run 26014627881 to confirm
+  staleness: zip SHA256
+  `335a8e4e75e5ea054de65499bdedd7bdaef3c2c4bd274d81889ab5faa5a8e9e8`
+  -- byte-identical to the 05:10 fire's recorded SHA256. The
+  3473 B boot.log inside (SHA256
+  `83edb0b7ba92ccc4a1f7af3779a7ce96492fb01b454107d17643920c2056f4f8`)
+  is also unchanged from prior probes; it still records the
+  S-MP25/3/1 firmware's `heap_wd` stack-overflow crash at the
+  fifth `MP24: HEAP: free=2245980 B  min-free` line, then
+  `Rebooting...` into a fresh second-stage bootloader that
+  truncates at "Disabling RNG early entropy source..." and
+  never reaches user code (boot.log records exactly the
+  second-stage bootloader's partition-table prints and the load
+  of the factory app, with no `app_main` markers afterwards).
+  No newer `build-mp24` runs since the 05:10 active probe;
+  HEAD `5cd2037` is the prior fire's docs-only commit, outside
+  the `mp24/**`, `src/**`, `libraries/Chatter-Library/**`,
+  `.github/workflows/build-mp24.yml` CI path filter, so no
+  fresh run was dispatched. Workspace setup note: this fire's
+  session VM had `/sessions` at 100% used and the bindfs-
+  mounted `outputs` couldn't host a git clone (config-lock
+  unlink fails on bindfs), so the clone went to `/var/tmp` on
+  the root partition with `--depth 50` (~16 MB) -- worth
+  documenting for future fires hitting the same disk pressure.
+  Functional baseline on `mp24/` remains `2fc34c9`. Device
+  still bricked, awaiting physical SW24 BOOT recovery at the
+  bench. Abstaining from new feature/fix commits per
+  checkpoint directive; appending this docs-only entry for
+  timeline continuity.
