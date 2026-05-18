@@ -366,6 +366,65 @@ static void update_dashboard(void)
 
 /* ----------------------------------------------------------------- */
 
+/* S-MP24/3: periodic AT+CCLK? refresh task.
+ *
+ * Spawned by sms_boot_task ONLY after the initial clock_source_init()
+ * succeeded and clock_source_have_time() returned true -- i.e. we
+ * have a real anchor to drift-check against. On hardware where the
+ * modem never reaches READY (Q3 still open in docs/MP24_OPEN_HW_QUESTIONS.md)
+ * this task is never spawned; the firmware behaves exactly as it did
+ * before S-MP24/3 landed (PhoneClock keeps running on its synthetic
+ * 2026-01-01 anchor, +/- whatever uptime has accumulated).
+ *
+ * Cadence: 3600 seconds. The drift threshold is 60 seconds, which:
+ *   - is comfortably larger than the worst-case modem RTC drift we
+ *     can expect over a 1-hour window (sub-second on a TCXO-backed
+ *     Quectel part), so the "no-op, drift within gate" branch is
+ *     the common case once both clocks are sync'd to NITZ;
+ *   - is small enough that a real network correction (e.g. a fresh
+ *     NITZ update after a tower handoff that crosses a leap-second
+ *     boundary) actually fires;
+ *   - is large enough that a user who entered a time in the
+ *     Date&Time picker isn't immediately stomped on by the next
+ *     refresh cycle. (The picker writes through to PhoneClock
+ *     directly today, not back into hal/clock_source. A future
+ *     S-MP24/+ can wire the picker through hal/clock_source so the
+ *     user value becomes the new "extrapolation anchor" and survives
+ *     refresh -- not in scope for this session.)
+ *
+ * On a successful refresh apply, the new cached values are pushed
+ * through clock_source_bridge_apply() so PhoneClock + everything
+ * downstream of it (status bar, alarms, virtual pet) re-sync. */
+static void clock_refresh_task(void *arg)
+{
+    (void) arg;
+    const TickType_t period       = pdMS_TO_TICKS(3600 * 1000);
+    const uint32_t   drift_thresh = 60;  /* seconds */
+
+    for (;;) {
+        vTaskDelay(period);
+
+        esp_err_t rr = clock_source_refresh(drift_thresh);
+        if (rr == ESP_OK) {
+            /* Cache was updated past the drift gate; propagate to
+             * PhoneClock so the displayed wall clock catches up. */
+            clock_source_bridge_apply(clock_source_epoch_utc(),
+                                      clock_source_tz_offset_seconds());
+        } else if (rr == ESP_ERR_NOT_FOUND) {
+            /* The fresh +CCLK landed inside the drift gate -- the
+             * local extrapolation is good enough, nothing to do.
+             * This is the common steady-state outcome and is
+             * already logged at DEBUG inside the HAL. */
+        } else {
+            /* Modem dropped to BOOTING/FAILED, parse error, or
+             * never had an anchor (shouldn't happen here -- we
+             * only spawn this task once have_time is true). All
+             * three already log at WARN inside the HAL; we just
+             * keep ticking on the next cycle. */
+        }
+    }
+}
+
 /* One-shot worker: waits up to 35 s for the modem to enter READY,
  * then runs sms_init() + calls_init() to configure text mode +
  * +CMTI routing + RING/CONNECT/NO_CARRIER call URCs. Keeps
@@ -428,6 +487,17 @@ static void sms_boot_task(void *arg)
         clock_source_bridge_apply(clock_source_epoch_utc(),
                                   clock_source_tz_offset_seconds());
     }
+
+    /* S-MP24/3: now that the initial anchor is set (or we know
+     * it isn't going to be set on this hardware), spawn the
+     * periodic refresh task -- but only if we actually have an
+     * anchor to refresh. On no-modem / no-NITZ hardware we just
+     * skip the spawn and behave identically to S-MP24/2. */
+    if (clock_source_have_time()) {
+        xTaskCreate(clock_refresh_task, "clk_refresh", 4096, NULL,
+                    tskIDLE_PRIORITY + 1, NULL);
+    }
+
     vTaskDelete(NULL);
 }
 

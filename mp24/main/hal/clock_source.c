@@ -63,6 +63,17 @@ static _Atomic int32_t  s_tz_offset_seconds = 0;
 static _Atomic bool     s_have_time        = false;
 static _Atomic bool     s_inited           = false;
 
+/* S-MP24/3: tick-count at the moment s_epoch_utc was last set
+ * (either by clock_source_init() or by a successful
+ * clock_source_refresh() apply). Used by refresh() to compute
+ * the locally-extrapolated wall clock and compare against a
+ * fresh +CCLK reply for the drift gate. xTaskGetTickCount()
+ * is a uint32_t that wraps every (configTICK_RATE_HZ * 2^32)
+ * seconds; for a 1 kHz tick that's ~49 days, well above our
+ * 1-hour refresh cadence, so unsigned-subtraction modulo wrap
+ * gives the correct elapsed delta. */
+static _Atomic uint32_t s_set_at_ticks     = 0;
+
 /* Wait for the modem to reach READY (or FAILED). Returns true if
  * READY before deadline, false on timeout / FAILED. */
 static bool wait_for_ready(uint32_t deadline_ms)
@@ -230,6 +241,7 @@ esp_err_t clock_source_init(uint32_t ready_wait_ms)
     int32_t tz_seconds = zone_qh * 15 * 60;
     atomic_store(&s_epoch_utc, utc);
     atomic_store(&s_tz_offset_seconds, tz_seconds);
+    atomic_store(&s_set_at_ticks, (uint32_t) xTaskGetTickCount());
     atomic_store(&s_have_time, true);
 
     ESP_LOGI(TAG,
@@ -252,4 +264,109 @@ bool clock_source_have_time(void)
 int32_t clock_source_tz_offset_seconds(void)
 {
     return atomic_load(&s_tz_offset_seconds);
+}
+
+/* S-MP24/3: shared between init and refresh. Sends AT+CCLK?,
+ * parses the reply, validates, and converts to UTC epoch + TZ
+ * offset. Returns true on success and fills *utc_out / *tz_out;
+ * false on any modem / parse / validation failure (the caller
+ * decides how to react). Does NOT update any cached state -- the
+ * caller does that. */
+static bool query_and_parse_cclk(uint32_t timeout_ms,
+                                 uint32_t *utc_out,
+                                 int32_t  *tz_out)
+{
+    char resp[96];
+    esp_err_t r = modem_at_send("+CCLK?", resp, sizeof(resp), timeout_ms);
+    if (r != ESP_OK) {
+        ESP_LOGW(TAG, "AT+CCLK? failed: %s", esp_err_to_name(r));
+        return false;
+    }
+
+    int year, mon, day, hour, minute, second, zone_qh;
+    if (!parse_cclk(resp, &year, &mon, &day, &hour, &minute, &second,
+                    &zone_qh)) {
+        ESP_LOGW(TAG, "AT+CCLK? unparseable / out-of-range; resp=\"%s\"",
+                 resp);
+        return false;
+    }
+
+    uint32_t utc = local_fields_to_utc_epoch(year, mon, day, hour, minute,
+                                             second, zone_qh);
+    if (utc == 0) return false;
+
+    if (utc_out) *utc_out = utc;
+    if (tz_out)  *tz_out  = (int32_t) zone_qh * 15 * 60;
+    return true;
+}
+
+esp_err_t clock_source_refresh(uint32_t drift_threshold_sec)
+{
+    /* Gate: no anchor means refresh has nothing to compare against
+     * and -- by contract -- this function never establishes the
+     * first cached value (clock_source_init owns that). The caller
+     * should have checked clock_source_have_time() before asking. */
+    if (!atomic_load(&s_have_time)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    /* Gate: only attempt the AT exchange when the modem is READY.
+     * sms_boot_task may have reached READY hours ago and then the
+     * modem could have crashed back to FAILED or restarted into
+     * BOOTING; in either case sending an AT command now would just
+     * time out the modem_at_send mutex for 3 s. */
+    if (modem_state() != MODEM_READY) {
+        return ESP_ERR_TIMEOUT;
+    }
+
+    uint32_t fresh_utc = 0;
+    int32_t  fresh_tz  = 0;
+    if (!query_and_parse_cclk(3000, &fresh_utc, &fresh_tz)) {
+        return ESP_FAIL;
+    }
+
+    /* Compute the locally-extrapolated wall clock: cached_utc plus
+     * the elapsed wall-clock seconds since the cache was last set.
+     * xTaskGetTickCount is a uint32_t that wraps; unsigned subtraction
+     * modulo 2^32 still gives the correct delta as long as the actual
+     * elapsed time is below the wrap period (~49 days at 1 kHz). */
+    const uint32_t cached_utc    = atomic_load(&s_epoch_utc);
+    const uint32_t set_at_ticks  = atomic_load(&s_set_at_ticks);
+    const uint32_t now_ticks     = (uint32_t) xTaskGetTickCount();
+    const uint32_t elapsed_ticks = now_ticks - set_at_ticks;
+    const uint32_t elapsed_secs  = elapsed_ticks / configTICK_RATE_HZ;
+
+    const uint32_t extrapolated_utc = cached_utc + elapsed_secs;
+    int64_t delta = (int64_t) fresh_utc - (int64_t) extrapolated_utc;
+    int64_t abs_delta = delta < 0 ? -delta : delta;
+
+    if (abs_delta <= (int64_t) drift_threshold_sec) {
+        /* No-op: the network agrees with us within the threshold.
+         * Log at DEBUG so production boot.logs don't fill up with
+         * "refresh: drift 3 s, no update" lines every hour. */
+        ESP_LOGD(TAG,
+                 "refresh: drift %lld s within +/- %u s threshold, "
+                 "no update",
+                 (long long) delta,
+                 (unsigned) drift_threshold_sec);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    /* The drift exceeds the gate -- adopt the fresh value. Order
+     * matches clock_source_init: data fields before the
+     * have-time flag, so a concurrent reader either sees the old
+     * snapshot or the new snapshot but never a torn mix. */
+    atomic_store(&s_epoch_utc, fresh_utc);
+    atomic_store(&s_tz_offset_seconds, fresh_tz);
+    atomic_store(&s_set_at_ticks, now_ticks);
+
+    ESP_LOGI(TAG,
+             "refresh: drift %+lld s exceeded %u s gate -- "
+             "epoch %u UTC (tz %+d s)",
+             (long long) delta,
+             (unsigned) drift_threshold_sec,
+             (unsigned) fresh_utc,
+             (int) fresh_tz);
+
+    return ESP_OK;
 }

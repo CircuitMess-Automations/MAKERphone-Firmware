@@ -19,18 +19,23 @@
  * means we never got a successful CCLK response (modem not ready,
  * SIM not registered, no NITZ from the network, parse failure).
  *
- * Architecture note: this module is intentionally read-once at
- * boot. A future session can wire periodic re-queries + listener
- * fan-out for drift correction (S-MP24/2+), but the first cut is
- * single-shot so the rest of the firmware can incrementally adopt
- * a real wall-clock source without us paying for a polling task
- * we don't need yet.
- *
  * S-MP24/1: this module ships compiled and called from
  * sms_boot_task. On hardware where the modem never reaches READY
  * (no SIM, no battery, hardware regression) clock_source_init()
  * times out cleanly and the firmware behaves exactly as before --
  * PhoneClock falls back to its synthetic anchor.
+ *
+ * S-MP24/3: clock_source_refresh() re-queries AT+CCLK? and -- when
+ * the result differs from the locally-extrapolated wall clock by
+ * more than a caller-supplied threshold -- updates the cache. The
+ * refresh path is driven from a low-priority FreeRTOS task in
+ * app_main.cpp on a ~1-hour cadence so the displayed wall clock
+ * stays bounded vs. NITZ updates from the network. The drift gate
+ * means a user who edited the time in the Date&Time picker won't
+ * have their edit silently overwritten an hour later by a
+ * sub-minute network correction. (The picker writes through to
+ * PhoneClock directly today, not back into this HAL, so without
+ * the gate every refresh would clobber the user's value.)
  */
 #pragma once
 
@@ -51,6 +56,43 @@ extern "C" {
  * similar pre-NITZ defaults that we reject as bogus). Idempotent
  * within a single boot; later calls just return the cached state. */
 esp_err_t clock_source_init(uint32_t ready_wait_ms);
+
+/* Re-query AT+CCLK? and refresh the cached UTC epoch / TZ offset
+ * if the new value differs from locally-extrapolated wall time by
+ * more than drift_threshold_sec.
+ *
+ * Returns:
+ *   ESP_OK                 a fresh +CCLK reply was parsed and the
+ *                          delta vs. the extrapolated wall clock
+ *                          exceeded drift_threshold_sec, so the
+ *                          cache was updated. Callers should now
+ *                          re-read clock_source_epoch_utc() /
+ *                          _tz_offset_seconds() and propagate the
+ *                          new values (e.g. through
+ *                          clock_source_bridge_apply()).
+ *   ESP_ERR_NOT_FOUND      the new value parsed cleanly but the
+ *                          drift was within the threshold, so the
+ *                          cache was left alone. Treat as "no-op,
+ *                          success". This is the common refresh
+ *                          outcome for hardware running on a
+ *                          steady oscillator with periodic NITZ
+ *                          delivery.
+ *   ESP_ERR_INVALID_STATE  no successful clock_source_init has
+ *                          ever happened (no anchor to drift-check
+ *                          against). Caller should not have asked
+ *                          for a refresh; gate on
+ *                          clock_source_have_time() first.
+ *   ESP_ERR_TIMEOUT        the modem is not in READY state (it
+ *                          dropped back to BOOTING / FAILED, or
+ *                          was never up). No AT command was sent.
+ *   ESP_FAIL               the modem responded but the +CCLK
+ *                          reply could not be parsed / fell
+ *                          outside the validation ranges.
+ *
+ * Safe to call from any task: the underlying AT exchange is
+ * serialised by the modem-layer mutex. Does not need to run on
+ * the same task that called clock_source_init(). */
+esp_err_t clock_source_refresh(uint32_t drift_threshold_sec);
 
 /* Latest known UTC epoch second from the modem, or 0 if we haven't
  * successfully fetched one yet. Lock-free; safe from any context. */
