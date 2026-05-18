@@ -425,3 +425,53 @@ the directive above."
   physical SW24 BOOT recovery at the bench. Abstaining from
   new feature/fix commits per checkpoint directive; appending
   this docs-only entry for timeline continuity.
+
+* 2026-05-18 06:07 UTC -- fire ran. Passive re-read pattern (last
+  active probe at 2026-05-18T05:50:28Z is ~17 min stale, well
+  under the ~30 min staleness threshold called out in the 04:30
+  entry). Re-inspected workflow run `26015891956` (HEAD
+  `90ad035`) via the GitHub API: `build=completed/success`
+  (2026-05-18T05:46:31Z -> 2026-05-18T05:48:42Z),
+  `flash=completed/failure` (2026-05-18T05:48:45Z ->
+  2026-05-18T05:50:28Z). Run is the 05:46 active probe; no newer
+  `build-mp24` runs since then because the four intervening fires
+  (05:25, 05:10 active, 05:46 active, 06:07 this one) and their
+  docs commits `5cd2037` and `f12901e` are outside the
+  `mp24/**`, `src/**`, `libraries/Chatter-Library/**`,
+  `.github/workflows/build-mp24.yml` CI path filter, so no fresh
+  dispatch was needed. Downloaded the `boot-log` artifact
+  (id 7050413363) attached to the run: zip is 1490 B with
+  SHA256 `335a8e4e75e5ea054de65499bdedd7bdaef3c2c4bd274d81889ab5faa5a8e9e8`,
+  byte-identical (full SHA, not just prefix) to the boot-log
+  artifacts attached to the 26011760480 / 26013477042 /
+  26014627881 runs. The inner boot.log is 3473 B with SHA256
+  `83edb0b7ba92ccc4a1f7af3779a7ce96492fb01b454107d17643920c2056f4f8`,
+  also byte-identical to the prior probes' inner boot.log. The
+  log content is unchanged: ESP-IDF v5.5 2nd-stage bootloader
+  prints the partition table and loads the factory app at
+  0x10000, then truncates at `Disabling RNG early entropy
+  source...` with no `app_main` markers afterwards -- consistent
+  with the S-MP25/3/1 firmware crashing too early for the
+  USB-Serial/JTAG to respond, which has been the brick's
+  signature since the original `a8f553f` checkpoint.
+  Workspace setup note: this fire's session VM had both
+  `/sessions` at 100% used (9.8G/9.8G) and `/` at 97% used
+  (~345 MB free after clone), and the bindfs-mounted `outputs`
+  rejected git's config-lock unlinks (same dual-disk-pressure
+  failure mode the 05:46 fire documented). The `/dev/shm`
+  approach the 05:46 fire suggested does NOT survive across
+  bash invocations in this VM (each `mcp__workspace__bash` call
+  apparently gets a fresh `/dev` namespace and `/dev/shm` is
+  empty on call N+1 even after writing to it on call N). What
+  worked here: `/tmp/fire_2015/` (a fresh subdir owned by the
+  current fire's uid 2015 user, sibling to the stale
+  `/tmp/mp_firmware` left behind by an earlier fire's uid; the
+  earlier dir is owned by nobody:nogroup and read-only from
+  this uid, but `/tmp` itself is world-writable so a fresh
+  subdir works). Documented for future fires: prefer
+  `/tmp/fire_<uid>/` over `/dev/shm/` when both `/sessions` and
+  `/var/tmp` paths are obstructed.  Functional baseline on
+  `mp24/` remains `2fc34c9`. Device still bricked, awaiting
+  physical SW24 BOOT recovery at the bench. Abstaining from
+  new feature/fix commits per checkpoint directive; appending
+  this docs-only entry for timeline continuity.
