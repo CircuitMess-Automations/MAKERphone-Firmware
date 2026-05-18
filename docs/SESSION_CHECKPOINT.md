@@ -236,3 +236,23 @@ the directive above."
   -- not evidence of a current boot. Functional baseline on
   `mp24/` remains `2fc34c9`. Device still bricked. Abstaining
   from new feature/fix commits per checkpoint directive.
+
+* 2026-05-18 04:05 UTC -- fire ran. Inspected latest workflow
+  run `26011760480` (HEAD `2fc34c9`) via the GitHub API. State
+  unchanged from the two prior fires: `build=success`,
+  `flash=failure`, flash-step log has the same 8x
+  `A fatal error occurred: Failed to connect to ESP32-S3: No
+  serial data received.` sequence ending in `All 8 flash
+  attempts failed -- device is unrecoverable` and `Physical
+  recovery needed (SW24 BOOT pin)`. No newer `build-mp24` runs
+  have been triggered since 2026-05-18T03:23Z (the prior fire's
+  docs commit `8dc9a3d` is outside the `mp24/**`, `src/**`,
+  `libraries/Chatter-Library/**`,
+  `.github/workflows/build-mp24.yml` CI path filter, so it did
+  not dispatch a new run). The `boot-log` artifact attached to
+  run 26011760480 is still the stale 1490 B copy from the last
+  pre-brick flash. Functional baseline on `mp24/` remains
+  `2fc34c9`. Device still bricked, awaiting physical SW24 BOOT
+  recovery at the bench. Abstaining from new feature/fix
+  commits per checkpoint directive; appending this docs-only
+  log line for timeline continuity.
