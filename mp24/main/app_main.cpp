@@ -847,8 +847,18 @@ extern "C" void app_main(void)
                 tskIDLE_PRIORITY + 1, NULL);
 
     /* S-MP25/1: heap watermark logger. Cheap, low-priority,
-     * always-on -- see heap_watchdog_task() comment above. */
-    xTaskCreate(heap_watchdog_task, "heap_wd", 2048, NULL,
+     * always-on -- see heap_watchdog_task() comment above.
+     *
+     * S-MP25/3/1: bumped stack 2048 -> 3072. The five-number HEAP
+     * line we now print (vs the original three) pushes vfprintf's
+     * va_list + the internal libc snprintf scratch over the 2 KB
+     * budget on the very first iteration -- the previous fire's
+     * boot.log shows the task hit "stack overflow in task
+     * heap_wd" exactly when the new format string was first
+     * formatted. 3072 leaves comfortable headroom for any
+     * future log-line additions while staying well below the
+     * ~8 KB sweet spot for utility tasks. */
+    xTaskCreate(heap_watchdog_task, "heap_wd", 3072, NULL,
                 tskIDLE_PRIORITY, NULL);
 
     ESP_LOGI(TAG, "Entering background-tasks-only loop (LVGL owns the panel).");
