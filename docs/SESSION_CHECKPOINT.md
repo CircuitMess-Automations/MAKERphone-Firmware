@@ -892,3 +892,74 @@ the directive above."
   S-MP25/4 retry path (Option A: snprintf into 160-byte buf
   then single-arg ESP_LOGI) documented in the "What the next
   fire should try (post device recovery)" section above.
+
+* 2026-05-18 09:00 UTC -- fire ran. Runner-status probe pattern,
+  no dispatch (6th consecutive fire applying the decision rule the
+  07:04 entry codified and the 07:23 / 07:45 / 08:04 / 08:24 fires
+  re-applied: "re-query `/repos/$REPO/actions/runners` BEFORE
+  dispatching"). GET `/repos/$REPO/actions/runners` returns
+  `total_count=2`: the `flasher`-labelled runner
+  `AlberttekiMacBook-Pro` (id 23, labels `self-hosted,macOS,ARM64,
+  flasher`) is still `status=offline busy=False`, and the
+  `bit-flash` build runner (id 22, labels `self-hosted,macOS,ARM64,
+  bit-flash`) is `status=online busy=False`. The flasher state is
+  **unchanged** across all six 07:04 / 07:23 / 07:45 / 08:04 /
+  08:24 / 09:00 queries -- offline duration is now **~150 min**
+  (2 h 30 min) counting from the 06:30:01Z last-known-online flash
+  job end on run `26017210952` (confirmed via `/actions/runs/.../
+  jobs` -- `flash` `completed_at=2026-05-18T06:30:01Z`,
+  `concl=failure`, S-MP25/3/1 brick signature). No newer
+  `build-mp24` workflow runs have been triggered since the 07:04
+  cancellation (run `26018657455`, `flash=completed/cancelled`,
+  HEAD `d5663d6`); the GET `/actions/runs?per_page=5` listing shows
+  the same five completed runs as the 08:24 entry. Cross-check
+  `?status=queued` / `?status=in_progress` API queries also confirm
+  no MP2.4 jobs are currently pending (`total_count=0` for both).
+  Per the locked-in decision rule, abstaining from dispatch this
+  fire as well: the build runner alone can't flash, so a fresh
+  dispatch would just burn ~2 min of `bit-flash` capacity to
+  produce another build-success/flash-cancelled outcome with zero
+  new device-side information. The (a)/(b)/(c) interpretation set
+  the 07:04 entry enumerated still applies; (a) "user is at the
+  bench performing SW24 BOOT recovery" is now substantially less
+  likely after a 2.5 h offline window with zero actions-runner
+  re-registration -- (b) "user is asleep / away from the bench"
+  or (c) "flasher Mac is powered off / disconnected from network"
+  are looking more probable. Workspace setup note: this fire's
+  session VM had `/sessions` at **100% used** (9.8G/9.8G full --
+  the `HOME=/sessions/<uid>` path could not be used as a clone
+  destination because `pip install` returned ENOSPC and
+  `git clone` into `/sessions/<uid>` would have failed for the
+  same reason; same condition as 07:23 / 07:45 / 08:04 / 08:24
+  fires) and `/` at **89% used** (~1.1 GB free). The brief's
+  `/home/claude/...` paths are not writable (`/home` owned by
+  `nobody:nogroup`; `mkdir /home/claude` returned EACCES); same
+  condition prior fires worked around with `/tmp/...` paths. Did
+  NOT re-use the 07:02-leftover `/tmp/repo/mp_firmware` (its
+  `.git/` is owned by `nobody:nogroup`, `git fetch` returned
+  `cannot open .git/FETCH_HEAD: Permission denied` on this uid's
+  attempt). Successful setup path: `pip install --target=/tmp/pylib
+  pyelftools` for the addr2line decoder; `git clone --depth 60`
+  into `/tmp/work/mp_firmware` (~16 MB working tree, fresh subdir
+  owned by this fire's uid) with `HOME=/tmp` and
+  `safe.directory=/tmp/work/mp_firmware` in `/tmp/.gitconfig` to
+  work around the read-only `/sessions/<uid>/.gitconfig.lock`
+  ENOSPC failure. The `/tmp` stale-dir accumulation flagged by
+  07:04 / 07:23 / 07:45 / 08:04 / 08:24 entries continues to grow
+  (this fire added one more `/tmp/work/` plus `/tmp/pylib/` to
+  the pile of per-fire dirs already there); did not sweep them
+  since the 1.1 GB root-disk headroom remains comfortable and
+  `allow_cowork_file_delete` is not available unattended.
+  Functional baseline on `mp24/` remains `2fc34c9` (every commit
+  after that is a docs-only `SESSION_CHECKPOINT.md` append, this
+  one included). Device boot state remains **UNKNOWN as of this
+  fire** -- offline flasher means CI cannot confirm
+  bricked-vs-recovered. Abstaining from new feature/fix commits
+  per checkpoint directive; appending this docs-only entry for
+  timeline continuity. Next fire should repeat the runner-status
+  probe first (same decision rule); if the flasher is back
+  online, dispatch a single probe at HEAD `2fc34c9`'s tree to
+  read device state, and if that flash succeeds proceed with the
+  S-MP25/4 retry path (Option A: snprintf into 160-byte buf
+  then single-arg ESP_LOGI) documented in the "What the next
+  fire should try (post device recovery)" section above.
