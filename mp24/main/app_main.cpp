@@ -128,6 +128,7 @@ extern "C" {
 #include "esp_err.h"
 #include "esp_chip_info.h"
 #include "esp_system.h"
+#include "esp_heap_caps.h"
 
 #include "hal/display.h"
 #include "hal/i2c_bus.h"
@@ -501,6 +502,60 @@ static void sms_boot_task(void *arg)
     vTaskDelete(NULL);
 }
 
+/* S-MP25/1 -- periodic heap-watermark logging. Diagnostic prep for
+ * the upcoming S-MP25 HomeFactory heap-leak cleanup: we need a
+ * baseline measurement of free heap over time before the
+ * refactor lands, so the *delta* between "with leaks" and
+ * "without leaks" is measurable rather than guessed at.
+ *
+ * Period: 3000 ms. The flasher captures 20 s of serial after
+ * boot, so each boot.log will contain ~5-6 HEAP lines covering
+ * the post-bringup steady state. Future fires (and the
+ * forthcoming S-MP25 audit) can grep "HEAP:" out of the artifact
+ * and trend it across commits without any extra plumbing.
+ *
+ * Why three numbers rather than just esp_get_free_heap_size():
+ *   - free (total) shows aggregate across internal + PSRAM. The
+ *     phone has 2 MB octal PSRAM so the headline number is
+ *     dominated by PSRAM availability, which is mostly irrelevant
+ *     to LVGL screen/widget churn (LVGL allocates in internal
+ *     unless CONFIG_LV_USE_PSRAM is set, which we don't).
+ *   - free-internal is the number that matters for screen
+ *     pushes/pops: LVScreen + LVObject + lv_obj_t structures all
+ *     come out of internal RAM.
+ *   - min-internal is the all-time low watermark since boot. If
+ *     this trends downward over a long boot log, we're leaking;
+ *     if it stays flat, we're not (or we're at steady state).
+ *
+ * Task stack: 2 KB is plenty -- snprintf + heap_caps queries are
+ * the only stack consumers. Priority: tskIDLE_PRIORITY (no
+ * starvation risk; nothing else depends on this task).
+ * Anchor: spawned alongside sms_boot_task so a missing modem
+ * doesn't gate heap visibility. */
+static void heap_watchdog_task(void * /*arg*/)
+{
+    /* One-second delay so the print_banner + bring-up logs come
+     * out first and the first HEAP line lands clearly after the
+     * "Entering background-tasks-only loop" line. */
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    for (;;) {
+        uint32_t free_total =
+            (uint32_t) esp_get_free_heap_size();
+        uint32_t free_int =
+            (uint32_t) heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        uint32_t min_int =
+            (uint32_t) heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+        ESP_LOGI(TAG,
+                 "HEAP: free=%lu B  free-internal=%lu B  "
+                 "min-internal=%lu B",
+                 (unsigned long) free_total,
+                 (unsigned long) free_int,
+                 (unsigned long) min_int);
+        vTaskDelay(pdMS_TO_TICKS(3000));
+    }
+}
+
 extern "C" void app_main(void)
 {
     print_banner();
@@ -768,6 +823,11 @@ extern "C" void app_main(void)
      * Putting the wait in a task keeps app_main non-blocking. */
     xTaskCreate(sms_boot_task, "sms_boot", 4096, NULL,
                 tskIDLE_PRIORITY + 1, NULL);
+
+    /* S-MP25/1: heap watermark logger. Cheap, low-priority,
+     * always-on -- see heap_watchdog_task() comment above. */
+    xTaskCreate(heap_watchdog_task, "heap_wd", 2048, NULL,
+                tskIDLE_PRIORITY, NULL);
 
     ESP_LOGI(TAG, "Entering background-tasks-only loop (LVGL owns the panel).");
 
