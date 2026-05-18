@@ -1136,3 +1136,156 @@ the directive above."
   `2fc34c9`'s tree to read device state, and if that flash
   succeeds proceed with the S-MP25/4 retry path Option A as
   pre-composed above.
+
+* 2026-05-18 09:27 UTC -- fire ran. Runner-status probe pattern,
+  no dispatch (8th consecutive fire applying the decision rule
+  the 07:04 entry codified). GET `/repos/$REPO/actions/runners`
+  returns `total_count=2`: `AlberttekiMacBook-Pro` (id 23,
+  labels `self-hosted,macOS,ARM64,flasher`) is still
+  `status=offline busy=False`; `bit-flash` (id 22, labels
+  `self-hosted,macOS,ARM64,bit-flash`) is `status=online
+  busy=False`. Flasher offline duration now **~177 min** (2 h
+  57 min) counting from the 06:30:01Z end-of-flash on run
+  `26017210952` (the S-MP25/3/1 bricking flash). No newer
+  `build-mp24` workflow runs since 07:04 cancellation; cross-
+  check `?status=queued` and `?status=in_progress` API queries
+  both return `total_count=0`. The same five completed MP2.4
+  runs the 08:24 / 09:00 / 09:04 entries enumerated remain the
+  five most recent (`26018657455` cancelled, `26017210952` the
+  brick-failure, plus three earlier failures). Functional
+  baseline on `mp24/` remains `2fc34c9`; HEAD is now `e077563`
+  (the 09:04 docs append). Device boot state remains
+  **UNKNOWN as of this fire**. Setup pattern: same `/sessions`
+  100%-full / `/` 89%-full / `/home/claude/...` EACCES
+  conditions as 07:23..09:04 fires; this fire's working clone
+  is `/tmp/cwhome/repo/mp_firmware` (uid-owned subdir under
+  `$HOME=/tmp/cwhome` to avoid the `nobody:nogroup` ownership
+  of prior fires' `/tmp/...` clones, which would have blocked
+  `git pull`'s FETCH_HEAD write); the `/tmp` stale-dir
+  accumulation continues (this fire added `/tmp/cwhome/`); did
+  not sweep stale dirs.
+
+  **Forward-progress note (new this fire):** Pre-composed the
+  S-MP25/4 Option B fallback patch as the escalation step the
+  09:04 Option A note flagged ("if the resulting boot.log shows
+  another heap_wd overflow with this shape, escalate to Option
+  B (two 3-arg ESP_LOGI calls), NOT to a stack bump -- the bump
+  didn't help last time"). Option B's design rationale: the
+  S-MP25/2 4-numeric-arg shape worked (no heap_wd overflow),
+  S-MP25/3's 5-numeric-arg shape overflowed, so the boundary is
+  between 4 and 5 ESP_LOGI numeric va_args. Splitting into two
+  back-to-back ESP_LOGI calls with at most 3 numeric va_args
+  each is well under the working 4-arg boundary, while still
+  capturing all five counters per 3-second tick. Snapshot
+  consistency: the 5 `heap_caps_*` / `esp_get_*` calls are
+  taken up front into locals before the first log call -- the
+  skew window between the two ESP_LOGI calls is fixed at the
+  esp_log_writev printing time (microseconds), not a full
+  vTaskDelay tick. The exact patch, ready to drop into
+  `mp24/main/app_main.cpp` line 535..570 as a complete
+  replacement of the `heap_watchdog_task` body (and to be
+  applied AFTER the S-MP25/4 Option A patch has been observed
+  to overflow heap_wd in a CI boot.log):
+
+  ```c
+  static void heap_watchdog_task(void * /*arg*/)
+  {
+      /* One-second delay so the print_banner + bring-up logs come
+       * out first and the first HEAP-A / HEAP-B pair lands
+       * cleanly after the "Entering background-tasks-only loop"
+       * line. */
+      vTaskDelay(pdMS_TO_TICKS(1000));
+
+      for (;;) {
+          /* S-MP25/4 (Option B fallback) -- take all 5 counter
+           * snapshots up front into locals, then emit them across
+           * two back-to-back ESP_LOGI calls with at most 3
+           * numeric va_args each. The S-MP25/2 4-arg shape worked
+           * (no heap_wd overflow); S-MP25/3's 5-arg shape
+           * overflowed -- 3 args per call is well under the
+           * working boundary. */
+          uint32_t free_total =
+              (uint32_t) esp_get_free_heap_size();
+          uint32_t min_free =
+              (uint32_t) esp_get_minimum_free_heap_size();
+          uint32_t free_int =
+              (uint32_t) heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+          uint32_t min_int =
+              (uint32_t) heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+          uint32_t largest_int =
+              (uint32_t) heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+
+          ESP_LOGI(TAG,
+                   "HEAP-A: free=%lu B  min-free=%lu B  "
+                   "free-internal=%lu B",
+                   (unsigned long) free_total,
+                   (unsigned long) min_free,
+                   (unsigned long) free_int);
+          ESP_LOGI(TAG,
+                   "HEAP-B: min-internal=%lu B  "
+                   "largest-internal=%lu B",
+                   (unsigned long) min_int,
+                   (unsigned long) largest_int);
+
+          vTaskDelay(pdMS_TO_TICKS(3000));
+      }
+  }
+  ```
+
+  Verified pre-conditions for this Option B patch (all re-
+  checked against the live HEAD `e077563` tree this fire
+  cloned, NOT trusting the 09:04 entry's prose alone):
+   - `#include <cstdio>` confirmed at `app_main.cpp:27`
+     (the 09:04 prose cited line 27; awk-verified this fire).
+     Note: Option B does not use `snprintf` so `<cstdio>` is
+     not strictly required for Option B specifically, but it's
+     already present and the include set is shared with Option
+     A if both shapes coexist mid-debug.
+   - `#include "esp_system.h"` confirmed at line 130 -- still
+     the canonical header for `esp_get_minimum_free_heap_size()`
+     in ESP-IDF v5.5 (Decision A).
+   - `static const char *TAG = "MP24";` confirmed at line 161.
+   - `static void heap_watchdog_task(void * /*arg*/)` confirmed
+     at line 535; closing `}` of the body confirmed at line
+     567 (line 567 is the lone `}` ending the for-loop body,
+     line 568 is empty, line 569 is `extern "C" void app_main`).
+     The Option B patch replaces lines 535..567 (33 lines)
+     with the 36-line body above.
+   - `xTaskCreate(heap_watchdog_task, "heap_wd", 2048, NULL,`
+     confirmed at line 839 -- stack remains 2048 (the S-MP25/3
+     bump to 3072 stays reverted in `2fc34c9` and downstream).
+     Option B is the chosen escalation precisely because it
+     fits the 2 KB stack budget WITHOUT a stack bump.
+   - Line-length math: longest HEAP-A line is
+     `"HEAP-A: free=4294967295 B  min-free=4294967295 B  ` ...
+     `free-internal=4294967295 B"` == 78 bytes plus NUL.
+     Longest HEAP-B line is
+     `"HEAP-B: min-internal=4294967295 B  ` ...
+     `largest-internal=4294967295 B"` == 64 bytes plus NUL.
+     Both fit the ESP_LOG default 128-byte putchar buffer with
+     comfortable margin; no truncation risk under
+     `CONFIG_LOG_DEFAULT_LEVEL=ESP_LOG_INFO`.
+   - All five counters are still captured per 3-second tick --
+     the only externally visible change vs. Option A's single
+     line is that boot.log parsing must concatenate consecutive
+     `HEAP-A:` + `HEAP-B:` pairs (timestamps will differ by
+     microseconds within the same tick).
+
+  Per the same "do not re-test heap_wd changes without first
+  confirming the most recent flash succeeded" rule, NOT
+  applying this patch this fire -- the prerequisite (Option A
+  observed to overflow in a flashed boot.log) does not yet
+  exist, and applying Option B speculatively would skip the
+  Option A evidence step. Both Options A and B now sit
+  pre-composed in this checkpoint; the post-recovery fire
+  should: (i) apply Option A first, push, flash, observe; (ii)
+  if Option A boot.log shows clean 5-counter HEAP: lines, mark
+  S-MP25/4 done and discard Option B; (iii) if Option A
+  boot.log shows another heap_wd overflow, replace Option A's
+  `heap_watchdog_task` body with Option B above, commit as
+  `feat(mp24): S-MP25/4/1 -- split HEAP log into two ESP_LOGI
+  calls (Option B fallback)`, push, flash, observe again.
+
+  Abstaining from new feature/fix commits per checkpoint
+  directive; appending this docs-only entry for timeline
+  continuity AND for the pre-composed Option B patch.
