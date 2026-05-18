@@ -8,16 +8,18 @@ does not consume a build.
 
 ## Latest fire
 
-* **Date (UTC):** 2026-05-18 ~00:30 UTC
-* **HEAD on `main`:** `99027c0` (`feat(mp24): S-MP23/5 -- Repo<Message>
+* **Date (UTC):** 2026-05-18 ~00:35 UTC
+* **HEAD on `main`:** `0c1f74d` (`feat(mp24): S-MP23/6 -- Repo<Convo>
   NVS-backed with packed serialisation`). One feature commit, GREEN
   on first build with zero fix-forwards.
-* **Build status:** GREEN at HEAD `99027c0` (run `26006713866`, both
+* **Build status:** GREEN at HEAD `0c1f74d` (run `26007175574`, both
   `build` and `flash` jobs completed/success).
 * **Device boot status:** HEALTHY. boot.log scan: 0 crash markers
   (panic/Guru/abort/Backtrace count = 0). Boot shape unchanged from
-  the previous green baseline (`a276dfb`):
+  the previous green baseline (`99027c0`):
 
+      BATT: curve-fitting cal active
+      BATT: first sample: 1218 mV (1.22 V)
       STORE:   README.txt                       919 B
       STORE:   hello.txt                        140 B
       STORE: sentinel hello.txt missing or unreadable
@@ -28,139 +30,135 @@ does not consume a build.
       MODEM: state -> BOOT
       MODEM: boot probe... (0 s elapsed) ... (15 s elapsed)
 
-  No Repo<Message> code path is exercised at boot -- the live
-  binary runs MessageServiceStub.cpp instead of upstream
-  MessageService.cpp, so the only call sites for Storage.Messages
-  are dead code today. The meaningful evidence this fire shipped
-  is a clean link of the 367-line specialisation block (including
-  serialise/deserialise helpers + 7 explicit template
+  No Repo<Convo> code path is exercised at boot -- the live binary
+  runs MessageServiceStub.cpp instead of upstream MessageService.cpp,
+  and the only call sites for Storage.Convos.* live inside the
+  ConvoScreen / ConvoView screens. The meaningful evidence this fire
+  shipped is a clean link of the 334-line specialisation block
+  (including serialise/deserialise helpers + 7 explicit template
   specialisations) with no symbol conflicts and a byte-identical
   boot shape.
 * **Flasher status:** ONLINE and reliable.
-* **Binary size:** within noise of the prior baseline. The new
-  code is mostly comments and the seven Repo<Message>
-  specialisations + serialiser pair share the existing nvs.h
-  surface; no new components or managed dependencies.
+* **Binary size:** 1.22 MB / 2 MB partition (~60%). Within noise of
+  the prior baseline. The new code is mostly comments and the seven
+  Repo<Convo> specialisations + serialiser pair share the existing
+  nvs.h surface; no new components or managed dependencies.
 
 ## What this fire actually shipped (net)
 
-1. **`99027c0` -- S-MP23/5.** `mp24/components/chatter_app/shim/
-   StorageStub.cpp` now provides per-method specialisations for
-   Repo<Message>::add/update/remove/get/all/exists/clear. Records
-   live in NVS namespace `"msg"`, one packed-blob per Message
-   keyed by `'m' + 13 base32 chars` (14 chars, under the
+1. **`0c1f74d` -- S-MP23/6.** `mp24/components/chatter_app/shim/
+   StorageStub.cpp` now provides per-method specializations for
+   Repo<Convo>::add/update/remove/get/all/exists/clear. Records
+   live in NVS namespace `"cnv"`, one packed-blob per Convo keyed
+   by `'c' + 13 base32 chars` (14 chars, under the
    `NVS_KEY_NAME_MAX_SIZE-1 = 15` limit). A separate `"__idx"`
    blob holds the packed array of `UID_t`s for all().
 
-   Unlike Friend and PhoneContact, Message is **not** POD --
-   `class Message : Entity` holds a `void* content` pointing at a
-   heap-allocated `std::string` (TEXT) or `uint8_t` (PIC). A raw
-   `nvs_set_blob(&m, sizeof(Message))` would persist the pointer
-   value and round-trip into garbage, so this sub-step ships a
-   custom wire format:
+   Unlike Friend and PhoneContact, Convo is **not** POD -- `struct
+   Convo : Entity` holds a `std::vector<UID_t> messages` whose
+   `data()` lives on the heap. A raw `nvs_set_blob(&c,
+   sizeof(Convo))` would persist the vector's internal pointer /
+   size / capacity fields and round-trip into garbage, so this
+   sub-step ships a custom wire format:
 
-       [ uid:8 | convo:8 | flags:1 | type:1 | len:2 | data:N ]
+       [ uid:8 | unread:1 | count:2 | uids:count*8 ]
 
-   - flags bit0 = outgoing, bit1 = received   (remaining bits zero)
-   - type   matches Message::Type enum  -- TEXT=0, PIC=1, NONE=2
-   - len    uint16 LE byte length of the body
-   - data   N bytes:
-       * TEXT -- string contents, no NUL terminator
-       * PIC  -- 1 byte picIndex
-       * NONE -- empty (len=0)
+   - count = uint16 LE number of UID_t entries
+   - uids  = count * 8 bytes (little-endian-natural UID_t)
 
-   20-byte fixed header + N bytes total. TEXT length capped at
-   `kMsgTextCap = 2048` bytes to stay well under the ESP-IDF NVS
-   per-blob limit and refuse absurd payloads silently.
+   11-byte fixed header + 8*count bytes total. count is capped at
+   `kConvoMsgCap = 1024` messages per conversation to keep blobs
+   comfortably under the multi-page NVS blob ceiling and refuse
+   absurd payloads silently -- matches the kMsgTextCap discipline
+   from S-MP23/5.
 
-   NVS namespace allocation now:
+   NVS namespace allocation now (all four repos NVS-backed):
 
        Friend             "frd"  (S-MP23/3, prefix 'f')
        PhoneContacts ns   "pc"   (S-MP23/2, prefix 'c')
        Repo<PhoneContact> "pc"   (S-MP23/4, prefix 'p')
        Repo<Message>      "msg"  (S-MP23/5, prefix 'm')
+       Repo<Convo>        "cnv"  (S-MP23/6, prefix 'c')
 
-   The `"pc"` namespace is shared between two layers using
-   different prefixes -- no key collisions are possible.
+   The `'c'` prefix in `"cnv"` cannot collide with the
+   PhoneContacts namespace `'c<base32>'` records because the NVS
+   namespaces are different (`"cnv"` != `"pc"`).
 
-   Anonymous-namespace helpers (mirroring S-MP23/3 / S-MP23/4 plus
-   the new serialiser):
+   Anonymous-namespace helpers (mirroring S-MP23/5 plus the new
+   serialiser):
 
-       msgKey(uid, out)        -- 14-char base32 NVS key, prefix 'm'
-       msgSerialize(m, &vec)   -- Message -> packed blob, refuses
-                                  TEXT longer than kMsgTextCap
-       msgDeserialize(p, sz,   -- packed blob -> Message, refuses
-                      &out)       short blobs, unknown types,
-                                  len-sz mismatches
-       msgLoad(uid, &Message)  -- READONLY open + size probe +
-                                  nvs_get_blob + msgDeserialize +
+       cvKey(uid, out)        -- 14-char base32 NVS key, prefix 'c'
+       cvSerialize(c, &vec)   -- Convo -> packed blob, refuses
+                                  messages vectors larger than
+                                  kConvoMsgCap
+       cvDeserialize(p, sz,   -- packed blob -> Convo, refuses
+                      &out)       short blobs, count overflow,
+                                  len-size mismatches
+       cvLoad(uid, &Convo)    -- READONLY open + size probe +
+                                  nvs_get_blob + cvDeserialize +
                                   uid match (defensive)
-       msgSave(m)              -- msgSerialize + READWRITE open +
+       cvSave(c)              -- cvSerialize + READWRITE open +
                                   nvs_set_blob + nvs_commit
-       msgErase(uid)           -- READWRITE open + nvs_erase_key +
+       cvErase(uid)           -- READWRITE open + nvs_erase_key +
                                   nvs_commit (NOT_FOUND -> success)
-       msgIdxLoad(&vec)        -- read __idx into vector; empty
+       cvIdxLoad(&vec)        -- read __idx into vector; empty
                                   namespace / empty blob -> empty
                                   vec + true
-       msgIdxSave(vec)         -- write vector to __idx (empty
+       cvIdxSave(vec)         -- write vector to __idx (empty
                                   vector erases the key)
-       msgIdxContains          -- linear scan
+       cvIdxContains          -- linear scan
 
-   Partial-failure semantics match Repo<Friend> / Repo<PhoneContact>:
-   if blob erase succeeds but index save fails, the index briefly
-   references a missing record; msgLoad() returns false for the
-   size/uid checks, so the orphan degrades to "Message looks
-   missing" rather than corruption.
+   Partial-failure semantics match Repo<Friend> / Repo<PhoneContact>
+   / Repo<Message>: if blob erase succeeds but index save fails,
+   the index briefly references a missing record; cvLoad() returns
+   false for the size/uid checks, so the orphan degrades to "Convo
+   looks missing" rather than corruption.
 
    Non-specialised members (begin/reserve/write/read/getPath) fall
    through to the primary template -- same arrangement as Friend
-   and PhoneContact. `MessageRepo::write` / `MessageRepo::read`
+   / PhoneContact / Message. `ConvoRepo::write` / `ConvoRepo::read`
    remain the explicit no-op overrides below the new section
    (never reached because add/get path no longer routes through
    them).
 
    Files: `mp24/components/chatter_app/shim/StorageStub.cpp`
-   (+367). One-file commit.
+   (+334). One-file commit.
 
-## Why this fire shipped Repo<Message> only
+## Why this fire shipped Repo<Convo> only
 
-The previous fire's checkpoint named S-MP23/5 as the next step and
-described it as "MessageRepo NVS-backed. Custom serialisation:
-Message has Type type, std::string text for TEXT, or a single
-uint8_t picIndex for PIC. Serialise to a packed blob: [uid:8 |
-convo:8 | flags:1 | type:1 | len:2 | data:N] with N=0 for NONE,
-N=string.size() for TEXT, N=1 for PIC." That sized cleanly to a
-single 30-minute fire:
+The previous fire's checkpoint named S-MP23/6 as the next step and
+described it as "Repo<Convo> NVS-backed. Convo holds
+`vector<UID_t> messages` (variable length) plus `bool unread`.
+Serialise as `[uid:8 | unread:1 | count:2 | uids:count*8]`. UID
+matches the Friend UID by convention. Namespace `"cnv"` keyed by
+prefix `'c' + 13 base32 chars`." That sized cleanly to a single
+30-minute fire:
 
 * The blob format was already designed in the prior checkpoint,
   so no design work was needed in this fire.
-* The Repo specialisations follow the Friend / PhoneContact
-  pattern verbatim apart from msgSave/msgLoad routing through
-  the new serialiser. Pattern-match coding.
-* Repo<Convo> (the last all-no-op repo, with its own non-POD
-  variable-length `messages` vector) needed its own packed
-  format and is therefore its own fire (S-MP23/6).
-* Repo<Message> isn't exercised at boot today (MessageServiceStub
-  short-circuits all call sites) so this fire's success criterion
-  is a clean link + unchanged boot shape, which the build + flash
-  artefacts confirmed.
+* The Repo specialisations follow the Friend / PhoneContact /
+  Message pattern verbatim apart from cvSave/cvLoad routing
+  through the new serialiser. Pattern-match coding.
+* All four repos (Friend, PhoneContact, Message, Convo) are now
+  NVS-backed, completing the S-MP23 four-repo migration. The
+  remaining S-MP23/7 audit fire is independent.
+* Repo<Convo> isn't exercised at boot today (MessageServiceStub
+  short-circuits all call sites that would touch Storage.Convos)
+  so this fire's success criterion is a clean link + unchanged
+  boot shape, which the build + flash artefacts confirmed.
 
 ## Remaining S-MP23 sub-steps
 
-* **S-MP23/6.** Repo<Convo> NVS-backed. Convo holds
-  `vector<UID_t> messages` (variable length) plus `bool unread`.
-  Serialise as `[uid:8 | unread:1 | count:2 | uids:count*8]`. UID
-  matches the Friend UID by convention. Namespace `"cnv"` keyed
-  by prefix `'c' + 13 base32 chars` (no collision with the
-  PhoneContacts ns `'c<base32>'` records because `"cnv"` != `"pc"`).
 * **S-MP23/7.** Audit every call site of `Storage.*` and
-  `PhoneContacts::*` for "now-true" assertions that the all-
-  no-op stub previously masked. Contact-list screens may now see a
-  populated list where they previously saw empty; recents sort may
-  now matter. Worth doing once all four Repos are NVS-backed.
+  `PhoneContacts::*` for "now-true" assertions that the all-no-op
+  stub previously masked. Contact-list screens may now see a
+  populated list where they previously saw empty; recents sort
+  may now matter; ConvoBox / ConvoView may now render real
+  message bodies. Worth doing now that all four Repos are
+  NVS-backed.
 
-A side option for an interleave fire: unify Repo<PhoneContact> and
-the PhoneContacts namespace so the latter's `upsert`/`remove`
+A side option for an interleave fire: unify Repo<PhoneContact>
+and the PhoneContacts namespace so the latter's `upsert`/`remove`
 auto-maintain the Repo's index. Not required by any current call
 site (the two layers are read by disjoint screens) but tidies up
 the dual-prefix-in-shared-namespace arrangement carried from
@@ -181,20 +179,26 @@ Same as before -- none resolved this fire:
 
 ## What the next fire should do
 
-Pick the next S-MP23 sub-step. Most natural continuation is
-**S-MP23/6 -- Repo<Convo> NVS-backed**, which completes the four-
-repo NVS migration. The pattern is now well-established (S-MP23/3
-+ S-MP23/4 give the POD template; S-MP23/5 gives the
-custom-serialisation template). Convo serialisation:
+Pick the most natural follow-up. Two options:
 
-    [ uid:8 | unread:1 | count:2 | uids:count*8 ]
-
-Cap `count` at, say, 1024 messages per conversation. Namespace
-`"cnv"`, prefix `'c' + 13 base32 chars` for record keys, `"__idx"`
-for the conversation-uid index.
-
-Alt path if a SIM gets inserted between fires: pivot to S-MP21/3
-(post-READY probes will surface SIM state once AT works).
+* **S-MP23/7 (audit) -- recommended.** With all four Repos now
+  NVS-backed, walk every Storage.* / PhoneContacts.* / Friend
+  / Convo / Message call site for assumptions the all-no-op stub
+  previously masked. Likely scope: a careful read pass over
+  src/Storage/*.cpp, src/Services/*Service.cpp, and the
+  contacts-/conversations-/inbox-related screens. The output is
+  a short note in the next checkpoint listing any "now-true" cases
+  found and any small fixes shipped (e.g. a defensive guard, an
+  empty-list rendering tweak) plus a list of cases that are still
+  guarded by MessageServiceStub and therefore don't need work yet.
+  This fire should be small (~1-3 surgical commits).
+* **S-MP21/3 (modem triage)** if a SIM is inserted between fires
+  and AT starts responding (the post-READY probes from S-MP21/1
+  will print SIM/signal/operator status). Pivot to this if the
+  boot.log shape changes.
+* **S-MP24 (real clock)** is the natural next "feature" after
+  S-MP23/7. Try AT+CCLK? first; fall back to SNTP over the
+  cellular data connection. PhoneClock consumes the source.
 
 ## Helper script note carried from prior fires
 
@@ -203,15 +207,15 @@ Alt path if a SIM gets inserted between fires: pivot to S-MP21/3
   preserve `/home/claude/` (in fact, `/home/claude/` is not
   writable -- `mkdir: cannot create directory '/home/claude':
   Permission denied`).
-* This fire's sandbox: user was `jolly-vigilant-mayer`, `$HOME`
-  was `/sessions/jolly-vigilant-mayer`, and `/sessions/...` was
-  100% full (9.8G/9.8G -- shared across parallel sessions).
-  `~/repo` write fails on no-space; used `/tmp/mp_jolly/`
-  instead, with the root FS having ~700 MB free.
+* This fire's sandbox: user was `awesome-focused-ramanujan`,
+  `$HOME` was `/sessions/awesome-focused-ramanujan`, and
+  `/sessions/...` was 100% full (9.8G/9.8G -- shared across
+  parallel sessions). `~/repo` write fails on no-space; used
+  `/tmp/mp24_$$/` with the root FS having ~700 MB free.
 * The bash tool's 45-second timeout makes the helper scripts
   impractical to run end-to-end in one call; this fire used
   chunked GH API polling (each `sleep 40` + status call in its
-  own bash call) and it worked smoothly. Build job took ~2 min,
+  own bash call) and it worked smoothly. Build job took ~2.5 min,
   flash + boot capture ~1 min total for this commit.
 * The CI workflow triggers on push automatically via the
   `mp24/**` / `src/**` path filter -- no manual
@@ -219,10 +223,14 @@ Alt path if a SIM gets inserted between fires: pivot to S-MP21/3
   commits (like this checkpoint) do NOT trigger a build.
 * /tmp from prior sessions can have files owned by `nobody`;
   either rm what you can or use a fresh dir name like
-  `/tmp/mp_$(whoami)/`.
+  `/tmp/mp24_$$/`.
 * `git config --global` will fail when `/sessions/...` is full
   (cannot write `~/.gitconfig.lock`). Use `git -c user.name=...
   -c user.email=... commit` or `git config --local` instead.
 * The Read tool's connected-folders rule blocks `/tmp/...` reads
   even when bash can reach them; use `sed -n` / `cat` via bash
   instead, or use a python heredoc for in-place edits.
+* Cloning the repo into the outputs mount
+  (`/sessions/<user>/mnt/outputs/`) fails on `.git/config`
+  unlinking due to bindfs semantics. Stick to `/tmp` even when
+  it's tight on space.
