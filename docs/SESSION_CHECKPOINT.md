@@ -220,3 +220,19 @@ the directive above."
   CI path filter so it did not trigger CI). Functional baseline
   on `mp24/` remains `2fc34c9`. Device still bricked. Abstaining
   from new feature/fix commits per checkpoint directive.
+
+* 2026-05-18 03:45 UTC -- fire ran. Re-inspected latest
+  workflow run `26011760480` (HEAD `2fc34c9`) directly via
+  the GitHub API (no clone -- session VM had a full disk).
+  Flash job log unchanged: 8x
+  `A fatal error occurred: Failed to connect to ESP32-S3: No
+  serial data received.` followed by `All 8 flash attempts
+  failed -- device is unrecoverable` and `Physical recovery
+  needed (SW24 BOOT pin)`. No newer build-mp24 runs since the
+  previous fire (the prior fire's docs commit `75e6415` is also
+  outside the CI path filter). The boot-log artifact attached
+  to run 26011760480 is a stale 1490 B copy from a prior
+  successful flash (uploaded by `if-no-files-found: ignore`)
+  -- not evidence of a current boot. Functional baseline on
+  `mp24/` remains `2fc34c9`. Device still bricked. Abstaining
+  from new feature/fix commits per checkpoint directive.
