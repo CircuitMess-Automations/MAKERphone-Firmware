@@ -546,12 +546,22 @@ static void heap_watchdog_task(void * /*arg*/)
             (uint32_t) heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
         uint32_t min_int =
             (uint32_t) heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+        /* S-MP25/2: also report the largest free contiguous block
+         * in internal RAM. free-internal can stay constant while
+         * largest-block falls as the heap fragments -- exactly the
+         * footprint we expect from a screen-cycle leak (small
+         * lv_obj_t / LVObject allocations sprayed across freed
+         * holes). The gap between free-internal and largest-block
+         * is the fragmentation in bytes. */
+        uint32_t largest_int =
+            (uint32_t) heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
         ESP_LOGI(TAG,
                  "HEAP: free=%lu B  free-internal=%lu B  "
-                 "min-internal=%lu B",
+                 "min-internal=%lu B  largest-internal=%lu B",
                  (unsigned long) free_total,
                  (unsigned long) free_int,
-                 (unsigned long) min_int);
+                 (unsigned long) min_int,
+                 (unsigned long) largest_int);
         vTaskDelay(pdMS_TO_TICKS(3000));
     }
 }
