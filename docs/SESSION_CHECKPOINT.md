@@ -475,3 +475,62 @@ the directive above."
   physical SW24 BOOT recovery at the bench. Abstaining from
   new feature/fix commits per checkpoint directive; appending
   this docs-only entry for timeline continuity.
+
+* 2026-05-18 06:30 UTC -- fire ran. Active probe (the previous
+  active probe finished at 2026-05-18T05:50:28Z, ~40 min stale,
+  past the ~30 min staleness threshold from the 04:30 entry).
+  Dispatched a fresh `workflow_dispatch` on `main` (HEAD
+  `7d72421`, prior fire's docs-only commit atop `2fc34c9` -- so
+  the `mp24/` binary inputs are byte-identical to the green
+  baseline). The dispatch produced run `26017210952` (run
+  number 186) -- `build=completed/success` (2026-05-18T06:26:01Z
+  -> 2026-05-18T06:28:16Z, ~2 min 15 s), `flash=completed/failure`
+  (2026-05-18T06:28:19Z -> 2026-05-18T06:30:01Z, ~1 min 42 s,
+  total wall time from dispatch to flash-conclusion ~4 min 4 s).
+  Flash-step log tail confirms the same 8x `A fatal error
+  occurred: Failed to connect to ESP32-S3: No serial data
+  received.` sequence terminating in `All 8 flash attempts
+  failed -- device is unrecoverable` and `Physical recovery
+  needed (SW24 BOOT pin)`, exit code 2. The `boot-log` artifact
+  attached to run 26017210952 (id 7050908177, size 1490 B) has
+  zip SHA256
+  `335a8e4e75e5ea054de65499bdedd7bdaef3c2c4bd274d81889ab5faa5a8e9e8`
+  -- byte-identical (full SHA, not just prefix) to the boot-log
+  artifacts attached to runs 26011760480 / 26013477042 /
+  26014627881 / 26015891956. The inner boot.log is 3473 B with
+  SHA256 `83edb0b7ba92ccc4a1f7af3779a7ce96492fb01b454107d17643920c2056f4f8`,
+  also byte-identical to the prior probes' inner boot.log. The
+  log content is unchanged: the captured S-MP25/3/1 firmware
+  boot truncates at the fifth `MP24: HEAP: free=2245980 B
+  min-free` line into `***ERROR*** A stack overflow in task
+  heap_wd has been detected.`, followed by a corrupted backtrace
+  and `Rebooting...` into a second-stage bootloader print
+  sequence that loads the factory app at 0x10000 but never
+  emits any `app_main` markers -- consistent with the firmware
+  in flash crashing too early for the USB-Serial/JTAG to respond,
+  the brick signature since `a8f553f`. The boot-capture step in
+  the flash workflow is skipped on exit 2; `if-no-files-found:
+  ignore` preserves the pre-brick stub from upload-time, so the
+  artifact persists across runs but does not represent a fresh
+  capture. Workspace setup note: this fire's session VM had
+  `/sessions` at 100% used (9.8G/9.8G full -- no headroom) AND
+  `/` at 97% used (~321 MB free), and the bindfs-mounted
+  `outputs` rejected git's config-lock unlinks (the same
+  dual-disk-pressure failure mode the 05:46 and 06:07 fires
+  documented). Successful path: `/tmp/cl_<session-uid>/` (a
+  fresh subdir owned by the current fire's uid, sibling to the
+  numerous stale `/tmp/mp24*`, `/tmp/cmp24`, `/tmp/work_mp24`,
+  etc. directories left behind by earlier fires' uids that are
+  now owned by nobody:nogroup and read-only from this uid).
+  Each scheduled-task fire gets a distinct uid (this one ran
+  as 2016) and so a fresh subdir under `/tmp` reliably works;
+  17+ stale per-fire dirs are currently visible in `/tmp`,
+  cumulatively pinning ~250+ MB of root-disk space. A future
+  fire (or an out-of-band sweep) reclaiming these would help,
+  but this fire stayed under the 321 MB headroom comfortably
+  with `--depth 5 --filter=blob:none` (~16 MB working clone).
+  Documented here for cross-fire continuity. Functional baseline
+  on `mp24/` remains `2fc34c9`. Device still bricked, awaiting
+  physical SW24 BOOT recovery at the bench. Abstaining from new
+  feature/fix commits per checkpoint directive; appending this
+  docs-only entry for timeline continuity.
