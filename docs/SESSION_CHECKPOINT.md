@@ -308,3 +308,39 @@ the directive above."
   Abstaining from new feature/fix commits per checkpoint
   directive; appending this docs-only entry for timeline
   continuity.
+
+* 2026-05-18 05:10 UTC -- fire ran. Active probe (the previous
+  active probe at 2026-05-18 04:30Z had aged out at ~36 min, past
+  the ~30 min staleness threshold called out in the 04:30 entry).
+  Dispatched a fresh `workflow_dispatch` on `main` (HEAD
+  `89ec3a2`, prior fire's docs-only commit atop `2fc34c9` -- so
+  the `mp24/` binary inputs are byte-identical to the green
+  baseline). The dispatch produced run `26014627881` --
+  `build=success` (completed 2026-05-18T05:08:34Z), `flash=failure`
+  (completed 2026-05-18T05:10:18Z). Flash-step log tail confirms
+  the same 8x `A fatal error occurred: Failed to connect to
+  ESP32-S3: No serial data received.` sequence terminating in
+  `All 8 flash attempts failed -- device is unrecoverable` and
+  `Physical recovery needed (SW24 BOOT pin)`. The `boot-log`
+  artifact attached to run 26014627881 has zip SHA256
+  `335a8e4e75e5ea054de65499bdedd7bdaef3c2c4bd274d81889ab5faa5a8e9e8`
+  -- byte-identical to the 26013477042 (04:30 active probe) and
+  26011760480 (03:23 prior baseline) artifacts. The boot.log
+  inside the zip (3473 B) is unchanged from prior probes; it
+  records the S-MP25/3/1 firmware's `heap_wd` stack-overflow
+  crash that originally bricked the device (truncated at the
+  fifth `MP24: HEAP: free=2245980 B  min-free` line, then
+  `***ERROR*** A stack overflow in task heap_wd has been
+  detected.` and corrupted backtrace, then `Rebooting...` into a
+  fresh second-stage bootloader that never reaches user code
+  again -- the ROM USB-Serial/JTAG no longer responds because
+  the app crashes too early). No newer `build-mp24` runs since
+  this active probe. Functional baseline on `mp24/` remains
+  `2fc34c9`. Device still bricked, awaiting physical SW24 BOOT
+  recovery at the bench. Abstaining from new feature/fix
+  commits per checkpoint directive; appending this docs-only
+  entry for timeline continuity. The boot.log evidence confirms
+  the brick root-cause is what `a8f553f` documented (heap_wd
+  stack overflow during `min-free` log formatting) -- not a new
+  failure mode -- which strengthens the "no firmware change can
+  fix this without physical recovery" conclusion.
