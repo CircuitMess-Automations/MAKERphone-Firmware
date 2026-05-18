@@ -542,6 +542,16 @@ static void heap_watchdog_task(void * /*arg*/)
     for (;;) {
         uint32_t free_total =
             (uint32_t) esp_get_free_heap_size();
+        /* S-MP25/3: total-pool all-time watermark. min-internal
+         * (S-MP25/1) only covers MALLOC_CAP_INTERNAL; a leak in
+         * the PSRAM-backed allocator (LVGL display buffers,
+         * lv_img caches, the 2 MB PSRAM heap pool) shows up in
+         * min-free without affecting min-internal. The pair
+         * (min-free, min-internal) lets us separate "internal
+         * RAM leak" from "PSRAM leak" without adding a third
+         * heap_caps query for SPIRAM specifically. */
+        uint32_t min_free =
+            (uint32_t) heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
         uint32_t free_int =
             (uint32_t) heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
         uint32_t min_int =
@@ -556,9 +566,11 @@ static void heap_watchdog_task(void * /*arg*/)
         uint32_t largest_int =
             (uint32_t) heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
         ESP_LOGI(TAG,
-                 "HEAP: free=%lu B  free-internal=%lu B  "
-                 "min-internal=%lu B  largest-internal=%lu B",
+                 "HEAP: free=%lu B  min-free=%lu B  "
+                 "free-internal=%lu B  min-internal=%lu B  "
+                 "largest-internal=%lu B",
                  (unsigned long) free_total,
+                 (unsigned long) min_free,
                  (unsigned long) free_int,
                  (unsigned long) min_int,
                  (unsigned long) largest_int);
