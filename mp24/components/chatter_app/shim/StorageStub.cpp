@@ -1599,7 +1599,27 @@ static bool saveRecord(const PhoneContact &c)
         err = nvs_commit(h);
     }
     nvs_close(h);
-    return err == ESP_OK;
+    if (err != ESP_OK) return false;
+
+    // S-MP23/7: also maintain Repo<PhoneContact>'s index so screens
+    // that walk Storage.PhoneContacts.all() (e.g.
+    // PhoneBirthdayReminders) see UIDs created via the PhoneContacts::
+    // setters. Without this, the Repo index stays empty and the
+    // screen never finds the birthdays / favourites the user just
+    // saved. The two layers still keep separate per-record blobs
+    // ('c<base32>' for the PhoneContacts namespace, 'p<base32>' for
+    // Repo<PhoneContact>), but the shared '__idx' is now the union
+    // of UIDs touched by either path. Partial-failure semantics
+    // match the rest of the shim: if the record persisted but the
+    // index update fails, the next mutating call retries, and reads
+    // via PhoneContacts::* keep working because they consult the
+    // per-record blob directly, not the index.
+    std::vector<UID_t> idx;
+    if (pcRepoIdxLoad(idx) && !pcRepoIdxContains(idx, c.uid)) {
+        idx.push_back(c.uid);
+        (void)pcRepoIdxSave(idx);
+    }
+    return true;
 }
 
 static bool eraseRecord(UID_t uid)
@@ -1618,7 +1638,28 @@ static bool eraseRecord(UID_t uid)
     // NOT_FOUND is treated as success — the contract is "record is
     // gone after this call", which is already the case if it was
     // never written.
-    return err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND;
+    if (!(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND)) {
+        return false;
+    }
+
+    // S-MP23/7: drop the uid from Repo<PhoneContact>'s shared index
+    // so PhoneBirthdayReminders + any future enumeration through
+    // Storage.PhoneContacts.all() stop surfacing the removed
+    // contact. A failed index update is non-fatal: the per-record
+    // blob is gone, so PhoneContacts::displayNameOf / birthdayOf /
+    // etc. return falsy, and a future eraseRecord(uid) on the same
+    // (now-orphan) index entry retries the prune.
+    std::vector<UID_t> idx;
+    if (pcRepoIdxLoad(idx)) {
+        for (auto it = idx.begin(); it != idx.end(); ++it) {
+            if (*it == uid) {
+                idx.erase(it);
+                (void)pcRepoIdxSave(idx);
+                break;
+            }
+        }
+    }
+    return true;
 }
 
 }  // anonymous namespace
