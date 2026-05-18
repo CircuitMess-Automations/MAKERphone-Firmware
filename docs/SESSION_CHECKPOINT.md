@@ -764,3 +764,68 @@ the directive above."
   S-MP25/4 retry path (Option A: snprintf into 160-byte buf
   then single-arg ESP_LOGI) documented in the "What the next
   fire should try (post device recovery)" section above.
+
+* 2026-05-18 08:04 UTC -- fire ran. Runner-status probe pattern,
+  no dispatch (4th consecutive fire applying the decision rule
+  the 07:04 entry codified: "re-query `/repos/$REPO/actions/runners`
+  BEFORE dispatching"). GET `/repos/$REPO/actions/runners` returns
+  `total_count=2`: the `flasher`-labelled runner
+  `AlberttekiMacBook-Pro` (id 23, labels `self-hosted,macOS,ARM64,
+  flasher`) is still `status=offline busy=False`, and the
+  `bit-flash` build runner (id 22, labels `self-hosted,macOS,ARM64,
+  bit-flash`) is `status=online busy=False`. The flasher state is
+  **unchanged** across all four 07:04 / 07:23 / 07:45 / 08:04
+  queries -- offline duration is now ~94 min counting from the
+  06:30 last-known-online flash conclusion
+  (2026-05-18T06:30:01Z flash job end on run `26017210952`).
+  The (a)/(b)/(c) interpretation set the 07:04 entry enumerated
+  still applies; (a) "user is at the bench performing SW24 BOOT
+  recovery" is increasingly less likely as the offline window
+  has now exceeded 1.5 h with no actions-runner re-registration.
+  No newer `build-mp24` workflow runs have been triggered since
+  the 07:04 cancellation (run `26018657455`,
+  `flash=completed/cancelled`, HEAD `d5663d6`); the most recent
+  run that actually reached a flash conclusion on the device side
+  remains run `26017210952` from 06:30
+  (`flash=completed/failure`, S-MP25/3/1 brick signature). The
+  cross-check `?status=queued` / `?status=in_progress` API queries
+  also confirm no MP2.4 jobs are currently pending -- the build
+  queue is idle. Per the locked-in decision rule, abstaining from
+  dispatch this fire as well: the build runner alone can't flash,
+  so a fresh dispatch would just burn ~2 min of `bit-flash`
+  capacity to produce another build-success/flash-cancelled (or
+  flash-failure if the dispatch doesn't get cancelled in time)
+  outcome with zero new device-side information. Workspace setup
+  note: this fire's session VM had `/sessions` at **100% used**
+  (9.8G/9.8G full -- the `HOME=/sessions/<uid>` path could not
+  be used as a clone destination because `mkdir repo` returned
+  ENOSPC; same condition as the 07:23 and 07:45 fires) and `/`
+  at **89% used** (~1.2 GB free). Also note the brief's
+  `/home/claude/...` paths cannot be used (the `/home` directory
+  is owned by `nobody:nogroup` with only a `ubuntu` subdir
+  readable to this fire's uid -- `mkdir /home/claude` returned
+  EACCES); same condition prior fires implicitly worked around
+  by using `/tmp/...`. Successful clone path:
+  `/tmp/claude/repo/mp_firmware` (`git clone --depth 1` then
+  `git fetch --unshallow`, ~16 MB working tree, fresh subdir
+  owned by this fire's uid). Did NOT re-use any leftover
+  `/tmp/repo`, `/tmp/cl_*`, `/tmp/mp_work/`, or `/tmp/cmp24`
+  dirs from prior fires (still owned by earlier fires' uids,
+  read-only from this uid). The `/tmp` stale-dir accumulation
+  flagged by the 07:04 / 07:23 / 07:45 entries continues to
+  grow; did not sweep this fire either since the 1.2 GB
+  root-disk headroom remains comfortable and
+  `allow_cowork_file_delete` is not available unattended.
+  Functional baseline on `mp24/` remains `2fc34c9` (every commit
+  after that is a docs-only `SESSION_CHECKPOINT.md` append, this
+  one included). Device boot state remains **UNKNOWN as of this
+  fire** -- offline flasher means CI cannot confirm
+  bricked-vs-recovered. Abstaining from new feature/fix commits
+  per checkpoint directive; appending this docs-only entry for
+  timeline continuity. Next fire should repeat the runner-status
+  probe first (same decision rule); if the flasher is back
+  online, dispatch a single probe at HEAD `2fc34c9`'s tree to
+  read device state, and if that flash succeeds proceed with the
+  S-MP25/4 retry path (Option A: snprintf into 160-byte buf
+  then single-arg ESP_LOGI) documented in the "What the next
+  fire should try (post device recovery)" section above.
