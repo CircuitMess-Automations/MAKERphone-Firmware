@@ -584,3 +584,67 @@ the directive above."
   recovery at the bench. Abstaining from new feature/fix commits
   per checkpoint directive; appending this docs-only entry for
   timeline continuity.
+
+* 2026-05-18 07:04 UTC -- fire ran. Active probe (the previous
+  active probe finished at 2026-05-18T06:30:01Z, ~33 min stale,
+  just past the ~30 min staleness threshold from the 04:30
+  entry). Dispatched a fresh `workflow_dispatch` on `main` (HEAD
+  `d5663d6`, prior fire's docs-only commit atop `2fc34c9` -- so
+  the `mp24/` binary inputs are byte-identical to the green
+  baseline). The dispatch produced run `26018657455` (run number
+  187) -- `build=completed/success` (2026-05-18T07:04:07Z ->
+  2026-05-18T07:06:23Z, ~2 min 16 s wall time), then `flash` was
+  immediately enqueued at 2026-05-18T07:06:24Z but **stayed in
+  `queued` status for 6+ minutes** instead of running within the
+  ~10-30 s the prior probes observed. Queried
+  `/repos/$REPO/actions/runners` at 2026-05-18T07:09:54Z to
+  diagnose: the `flasher`-labelled runner
+  `AlberttekiMacBook-Pro` (id 23) is reporting
+  **`status=offline busy=False`**, while the `bit-flash`
+  build runner (id 22) is `status=online busy=False`. This is a
+  STATE CHANGE from every prior probe in this brick episode --
+  runs 26011760480 / 26013477042 / 26014627881 / 26015891956 /
+  26017210952 all ran their flash job to a `flash=failure`
+  conclusion within ~1-2 min wall, which means the flasher
+  runner was online for all of them. Between the 06:30 flash
+  conclusion (2026-05-18T06:30:01Z) and the 07:09:54 runner
+  status query, the flasher Mac transitioned offline. Cancelled
+  run 26018657455 at 2026-05-18T07:12:39Z (POST .../cancel
+  returned HTTP 202; final job state is `flash=completed/cancelled`)
+  rather than waiting indefinitely on an offline runner.
+  Possible interpretations of the flasher going offline, in
+  decreasing plausibility:
+    (a) the user took the flasher Mac offline deliberately to
+        perform the SW24 BOOT recovery procedure documented
+        under "Recovery path" at the top of this checkpoint --
+        which is exactly what we've been waiting for, so this
+        would be GOOD news;
+    (b) the flasher Mac lost network or rebooted independently
+        of any recovery work -- which is neutral news, the
+        bricked device just stops getting fresh probes for a
+        while;
+    (c) the GitHub Actions self-hosted runner agent process on
+        the flasher Mac crashed while the Mac itself stayed up
+        -- which is also neutral, recoverable by `actions-runner
+        start` next time the user is at the bench.
+  No way to distinguish (a)/(b)/(c) from CI alone. The next
+  fire should re-query `/repos/$REPO/actions/runners` BEFORE
+  dispatching: if the flasher runner is back online, dispatch
+  a fresh probe to determine current device state (recovery may
+  have completed, the flash might now succeed); if still
+  offline, abstain from dispatch (the build runner alone can't
+  flash, so dispatching just burns ~2 min of `bit-flash`
+  capacity for no signal). Workspace setup note: this fire's
+  session VM had `/sessions` at 100% used (9.8G/9.8G) and `/`
+  at 88% used (1.2 GB free); the bindfs-mounted `outputs`
+  rejected git's config-lock unlinks (same dual-disk-pressure
+  failure mode prior fires documented). Successful path:
+  `/tmp/repo/` (a fresh subdir owned by this fire's uid).
+  Working clone is `--depth 50` (~16 MB) under root-disk
+  headroom. Functional baseline on `mp24/` remains `2fc34c9`.
+  Device boot state is **UNKNOWN as of this fire** -- the
+  offline flasher means we cannot confirm bricked-vs-recovered.
+  Abstaining from new feature/fix commits per checkpoint
+  directive; appending this docs-only entry for timeline
+  continuity and to flag the flasher-runner state change for
+  the next fire's decision-making.
