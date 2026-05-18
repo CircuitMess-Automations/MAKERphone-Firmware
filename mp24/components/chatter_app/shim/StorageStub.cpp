@@ -1119,6 +1119,340 @@ void Repo<Message>::clear()
 }
 
 
+/* ------------------------------------------------------------------
+ * Repo<Convo> NVS-backed (S-MP23/6)
+ *
+ * Like Repo<Message>, Convo can't be raw-blob-persisted: it holds a
+ * `std::vector<UID_t> messages` whose data() lives on the heap.
+ * `nvs_set_blob(&convo, sizeof(Convo))` would persist the vector's
+ * internal pointer/size/capacity fields and round-trip into garbage.
+ * So we serialise to a packed wire format with an explicit
+ * variable-length tail:
+ *
+ *     [ uid:8 | unread:1 | count:2 | uids:count*8 ]
+ *
+ *   count = uint16 LE number of UID_t entries in the messages vector
+ *   uids  = count * 8 little-endian-natural UID_t bytes
+ *
+ * Fixed header is 11 bytes; total blob is 11 + count*8. We cap
+ * count at kConvoMsgCap (1024) to keep blobs comfortably under the
+ * multi-page NVS blob ceiling and to refuse absurd payloads
+ * silently — matches the kMsgTextCap discipline from S-MP23/5.
+ *
+ * Records live in NVS namespace "cnv", keyed by 14-char base32
+ * ('c' + 13 chars). The 'c' prefix here cannot collide with the
+ * PhoneContacts namespace (its records live in NVS namespace "pc",
+ * not "cnv") nor with Repo<PhoneContact> (also "pc"). The "__idx"
+ * blob in "cnv" holds the packed array of UID_t's needed by
+ * Repo<Convo>::all().
+ *
+ * ConvoRepo::write / ConvoRepo::read remain no-op overrides below —
+ * our specializations of Repo<Convo>::add/update/get/etc. never
+ * reach them. Same arrangement as Friend / PhoneContact / Message.
+ * ------------------------------------------------------------------ */
+
+namespace {
+
+// NVS namespace for Repo<Convo>. Distinct from "frd" (Friend),
+// "pc" (PhoneContact + the PhoneContacts namespace), and "msg"
+// (Message). No key prefix collisions are possible.
+constexpr const char *kConvoRepoNamespace = "cnv";
+
+// Index key inside kConvoRepoNamespace. The reserved underscore
+// prefix can't collide with a record key (all record keys start
+// with 'c').
+constexpr const char *kConvoRepoIndexKey = "__idx";
+
+// Cap on the serialised messages vector. 1024 * 8 = 8192 data
+// bytes + 11-byte header = 8203 bytes per blob. Well within
+// ESP-IDF's multi-page NVS blob ceiling, and refuses absurd
+// payloads silently.
+constexpr size_t kConvoMsgCap = 1024;
+
+// Fixed header size on the wire (see comment above).
+constexpr size_t kConvoHdrSize = 8 /*uid*/ + 1 /*unread*/
+                               + 2 /*count*/;  // = 11
+
+// 'c' + 13 base32 chars = 14-char key, under
+// NVS_KEY_NAME_MAX_SIZE-1 = 15.
+static void cvKey(UID_t uid, char out[16])
+{
+    static const char alphabet[] = "0123456789abcdefghijklmnopqrstuv";
+    out[0] = 'c';
+    for (int i = 0; i < 13; ++i) {
+        unsigned shift = i * 5;
+        out[1 + (12 - i)] = alphabet[(uid >> shift) & 0x1F];
+    }
+    out[14] = '\0';
+}
+
+// Serialise Convo → packed blob. Returns false if the message
+// vector exceeds kConvoMsgCap.
+static bool cvSerialize(const Convo &c, std::vector<uint8_t> &out)
+{
+    if (c.messages.size() > kConvoMsgCap) return false;
+    const uint16_t count = static_cast<uint16_t>(c.messages.size());
+    out.resize(kConvoHdrSize + size_t(count) * sizeof(UID_t));
+    uint8_t *p = out.data();
+    UID_t uid = c.uid;
+    for (int i = 0; i < 8; ++i) {
+        p[i] = static_cast<uint8_t>((uid >> (i * 8)) & 0xFF);
+    }
+    p[8] = c.unread ? 0x1 : 0x0;
+    p[9]  = static_cast<uint8_t>(count & 0xFF);
+    p[10] = static_cast<uint8_t>((count >> 8) & 0xFF);
+    uint8_t *body = p + kConvoHdrSize;
+    for (uint16_t i = 0; i < count; ++i) {
+        UID_t m = c.messages[i];
+        for (int j = 0; j < 8; ++j) {
+            body[size_t(i) * 8 + j] =
+                static_cast<uint8_t>((m >> (j * 8)) & 0xFF);
+        }
+    }
+    return true;
+}
+
+// Deserialise packed blob → Convo. Returns false on any format
+// inconsistency: short header, count overflow, len-size mismatch,
+// or count exceeding kConvoMsgCap.
+static bool cvDeserialize(const uint8_t *buf, size_t sz, Convo &out)
+{
+    if (sz < kConvoHdrSize) return false;
+    UID_t uid = 0;
+    for (int i = 0; i < 8; ++i) {
+        uid |= static_cast<UID_t>(buf[i]) << (i * 8);
+    }
+    bool unread = (buf[8] & 0x1) != 0;
+    uint16_t count = static_cast<uint16_t>(buf[9])
+                   | (static_cast<uint16_t>(buf[10]) << 8);
+    if (count > kConvoMsgCap) return false;
+    if (sz != kConvoHdrSize + size_t(count) * sizeof(UID_t)) {
+        return false;
+    }
+    Convo fresh;
+    fresh.uid = uid;
+    fresh.unread = unread;
+    fresh.messages.reserve(count);
+    const uint8_t *body = buf + kConvoHdrSize;
+    for (uint16_t i = 0; i < count; ++i) {
+        UID_t m = 0;
+        for (int j = 0; j < 8; ++j) {
+            m |= static_cast<UID_t>(body[size_t(i) * 8 + j]) << (j * 8);
+        }
+        fresh.messages.push_back(m);
+    }
+    out = fresh;
+    return true;
+}
+
+static bool cvLoad(UID_t uid, Convo &out)
+{
+    nvs_handle_t h;
+    if (nvs_open(kConvoRepoNamespace, NVS_READONLY, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    cvKey(uid, key);
+    size_t sz = 0;
+    esp_err_t err = nvs_get_blob(h, key, nullptr, &sz);
+    if (err != ESP_OK || sz < kConvoHdrSize
+        || sz > kConvoHdrSize + kConvoMsgCap * sizeof(UID_t)) {
+        nvs_close(h);
+        return false;
+    }
+    std::vector<uint8_t> buf(sz);
+    err = nvs_get_blob(h, key, buf.data(), &sz);
+    nvs_close(h);
+    if (err != ESP_OK) return false;
+    if (!cvDeserialize(buf.data(), sz, out)) return false;
+    if (out.uid != uid) return false;  // defensive: key/blob mismatch
+    return true;
+}
+
+static bool cvSave(const Convo &c)
+{
+    std::vector<uint8_t> buf;
+    if (!cvSerialize(c, buf)) return false;
+    nvs_handle_t h;
+    if (nvs_open(kConvoRepoNamespace, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    cvKey(c.uid, key);
+    esp_err_t err = nvs_set_blob(h, key, buf.data(), buf.size());
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    return err == ESP_OK;
+}
+
+static bool cvErase(UID_t uid)
+{
+    nvs_handle_t h;
+    if (nvs_open(kConvoRepoNamespace, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    char key[16];
+    cvKey(uid, key);
+    esp_err_t err = nvs_erase_key(h, key);
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    return err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND;
+}
+
+static bool cvIdxLoad(std::vector<UID_t> &out)
+{
+    out.clear();
+    nvs_handle_t h;
+    esp_err_t open = nvs_open(kConvoRepoNamespace, NVS_READONLY, &h);
+    if (open == ESP_ERR_NVS_NOT_FOUND) {
+        return true;  // namespace doesn't exist yet → empty repo
+    }
+    if (open != ESP_OK) return false;
+    size_t sz = 0;
+    esp_err_t err = nvs_get_blob(h, kConvoRepoIndexKey, nullptr, &sz);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        nvs_close(h);
+        return true;  // empty index
+    }
+    if (err != ESP_OK) {
+        nvs_close(h);
+        return false;
+    }
+    if (sz == 0 || (sz % sizeof(UID_t)) != 0) {
+        nvs_close(h);
+        return false;  // corrupt blob
+    }
+    out.resize(sz / sizeof(UID_t));
+    err = nvs_get_blob(h, kConvoRepoIndexKey, out.data(), &sz);
+    nvs_close(h);
+    if (err != ESP_OK) {
+        out.clear();
+        return false;
+    }
+    return true;
+}
+
+static bool cvIdxSave(const std::vector<UID_t> &v)
+{
+    nvs_handle_t h;
+    if (nvs_open(kConvoRepoNamespace, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    esp_err_t err;
+    if (v.empty()) {
+        err = nvs_erase_key(h, kConvoRepoIndexKey);
+        if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+    } else {
+        err = nvs_set_blob(h, kConvoRepoIndexKey, v.data(),
+                           v.size() * sizeof(UID_t));
+    }
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    return err == ESP_OK;
+}
+
+static bool cvIdxContains(const std::vector<UID_t> &v, UID_t uid)
+{
+    for (UID_t u : v) {
+        if (u == uid) return true;
+    }
+    return false;
+}
+
+}  // anonymous namespace (S-MP23/6)
+
+/* ------------------------------------------------------------------
+ * Per-method specializations for Repo<Convo>.
+ *
+ * Mirrors Repo<Message> in shape, with cvSave/cvLoad routing
+ * through the Convo serialiser instead of the Message one.
+ * Non-specialized members (begin/reserve/write/read/getPath) fall
+ * through to the primary template, same as Friend / PhoneContact /
+ * Message.
+ * ------------------------------------------------------------------ */
+
+template <>
+bool Repo<Convo>::add(const Convo &object)
+{
+    std::vector<UID_t> idx;
+    if (!cvIdxLoad(idx)) return false;
+    if (!cvIdxContains(idx, object.uid)) {
+        idx.push_back(object.uid);
+        if (!cvIdxSave(idx)) return false;
+    }
+    return cvSave(object);
+}
+
+template <>
+bool Repo<Convo>::update(const Convo &object)
+{
+    std::vector<UID_t> idx;
+    if (!cvIdxLoad(idx)) return false;
+    if (!cvIdxContains(idx, object.uid)) return false;
+    return cvSave(object);
+}
+
+template <>
+bool Repo<Convo>::remove(UID_t uid)
+{
+    std::vector<UID_t> idx;
+    if (!cvIdxLoad(idx)) return false;
+    if (!cvIdxContains(idx, uid)) return false;
+    if (!cvErase(uid)) return false;
+    idx.erase(std::remove(idx.begin(), idx.end(), uid), idx.end());
+    return cvIdxSave(idx);
+}
+
+template <>
+Convo Repo<Convo>::get(UID_t uid, bool /*bypassCache*/)
+{
+    Convo c;
+    if (cvLoad(uid, c)) {
+        return c;
+    }
+    // Match the no-op stub: default-constructed Convo on miss.
+    // uid stays 0, unread stays false, messages stays empty.
+    return Convo{};
+}
+
+template <>
+std::vector<UID_t> Repo<Convo>::all(bool /*bypassCache*/)
+{
+    std::vector<UID_t> idx;
+    if (!cvIdxLoad(idx)) {
+        return std::vector<UID_t>{};
+    }
+    return idx;
+}
+
+template <>
+bool Repo<Convo>::exists(UID_t uid)
+{
+    std::vector<UID_t> idx;
+    if (!cvIdxLoad(idx)) return false;
+    return cvIdxContains(idx, uid);
+}
+
+template <>
+void Repo<Convo>::clear()
+{
+    std::vector<UID_t> idx;
+    if (cvIdxLoad(idx)) {
+        for (UID_t u : idx) {
+            (void)cvErase(u);
+        }
+    }
+    std::vector<UID_t> empty;
+    (void)cvIdxSave(empty);
+    cache.clear();
+}
+
 /* Explicit instantiation — the linker needs each symbol concrete. */
 template class Repo<Friend>;
 template class Repo<PhoneContact>;
