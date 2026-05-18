@@ -144,6 +144,7 @@ extern "C" {
 #include "hal/sms.h"
 #include "hal/calls.h"
 #include "hal/audio_i2s2.h"
+#include "hal/clock_source.h"
 }
 
 static const char *TAG = "MP24";
@@ -383,6 +384,19 @@ static void sms_boot_task(void *arg)
     r = audio_i2s2_init(5000);
     if (r != ESP_OK) {
         ESP_LOGW(TAG, "I²S2 modem audio not started (err: %s)",
+                 esp_err_to_name(r));
+    }
+
+    /* S-MP24/1: query AT+CCLK? for a network-supplied wall clock.
+     * Single-shot: on success the parsed UTC epoch is cached and
+     * exposed via clock_source_epoch_utc(). On no-modem or no-NITZ
+     * hardware this returns ESP_ERR_TIMEOUT / ESP_FAIL and the
+     * firmware keeps running on PhoneClock's synthetic 2026-01-01
+     * anchor. A future fire wires clock_source -> PhoneClock so the
+     * status bar + Date&Time picker pick this up live. */
+    r = clock_source_init(5000);
+    if (r != ESP_OK) {
+        ESP_LOGI(TAG, "Network clock not available (err: %s) -- using anchor",
                  esp_err_to_name(r));
     }
     vTaskDelete(NULL);

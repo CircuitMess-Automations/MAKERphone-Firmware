@@ -34,6 +34,7 @@ idf_component_register(
         "hal/sms.c"
         "hal/calls.c"
         "hal/audio_i2s2.c"
+        "hal/clock_source.c"
         # S-MP16b: LVGL ↔ hal/display glue. Initialises LVGL,
         # registers the flush callback (pixels go through
         # display_blit_rect), wires the esp_timer-based tick.
