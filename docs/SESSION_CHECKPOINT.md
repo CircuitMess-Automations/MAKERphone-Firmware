@@ -534,3 +534,53 @@ the directive above."
   physical SW24 BOOT recovery at the bench. Abstaining from new
   feature/fix commits per checkpoint directive; appending this
   docs-only entry for timeline continuity.
+
+* 2026-05-18 06:50 UTC -- fire ran. Passive re-read pattern (last
+  active probe at 2026-05-18T06:30:01Z is ~20 min stale, under
+  the ~30 min staleness threshold from the 04:30 entry).
+  Re-inspected workflow run `26017210952` (HEAD `7d72421`) via
+  the GitHub API: `build=completed/success` (2026-05-18T06:26:01Z
+  -> 2026-05-18T06:28:16Z, ~2 min 15 s wall), `flash=completed/
+  failure` (2026-05-18T06:28:19Z -> 2026-05-18T06:30:01Z, ~1 min
+  42 s wall). No newer `build-mp24` runs since the 06:30 active
+  probe; HEAD `81527bb` is the prior fire's docs-only commit,
+  outside the `mp24/**`, `src/**`, `libraries/Chatter-Library/**`,
+  `.github/workflows/build-mp24.yml` CI path filter, so no fresh
+  dispatch was needed. Downloaded the `boot-log` artifact
+  (id 7050908177) attached to the run: zip is 1490 B with SHA256
+  `335a8e4e75e5ea054de65499bdedd7bdaef3c2c4bd274d81889ab5faa5a8e9e8`,
+  byte-identical (full SHA, not just prefix) to the boot-log
+  artifacts attached to the 26011760480 / 26013477042 /
+  26014627881 / 26015891956 / 26017210952 runs. The inner
+  boot.log is 3473 B with SHA256
+  `83edb0b7ba92ccc4a1f7af3779a7ce96492fb01b454107d17643920c2056f4f8`,
+  also byte-identical to the prior probes' inner boot.log. The
+  log content is unchanged: the captured S-MP25/3/1 firmware
+  boot truncates at the fifth `MP24: HEAP: free=2245980 B
+  min-free` line (the same `MP24: HEAP: free=2245980 B  min-free`
+  string seen in every prior probe), the next line being
+  `***ERROR*** A stack overflow in task heap_wd has been
+  detected.`, then a corrupted backtrace and `Rebooting...` into
+  a fresh second-stage bootloader print sequence that loads the
+  factory app at 0x10000 but never emits any `app_main` markers
+  -- consistent with the firmware in flash crashing too early
+  for the USB-Serial/JTAG to respond, the brick signature since
+  `a8f553f`. The boot-capture step in the flash workflow is
+  skipped on exit 2; `if-no-files-found: ignore` preserves the
+  pre-brick stub from upload-time, so the artifact persists
+  across runs but does not represent a fresh capture. Workspace
+  setup note: this fire's session VM had `/sessions` at 100%
+  used (9.8G/9.8G full -- no headroom) AND `/` at 88% used
+  (~1.2 GB free), and the bindfs-mounted `outputs` rejected
+  git's config-lock unlinks (same dual-disk-pressure failure
+  mode prior fires documented). Successful path: `/var/tmp/
+  zalous-work/` (a fresh subdir owned by the current fire's
+  user, sibling to the stale `/var/tmp/claude/` left behind by
+  an earlier fire's uid that is now owned by nobody:nogroup and
+  read-only from this user). Working clone is `--depth 50`
+  (~30 MB), well under the root-disk headroom. Documented for
+  cross-fire continuity. Functional baseline on `mp24/` remains
+  `2fc34c9`. Device still bricked, awaiting physical SW24 BOOT
+  recovery at the bench. Abstaining from new feature/fix commits
+  per checkpoint directive; appending this docs-only entry for
+  timeline continuity.
