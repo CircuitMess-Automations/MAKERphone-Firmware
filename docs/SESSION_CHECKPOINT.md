@@ -648,3 +648,53 @@ the directive above."
   directive; appending this docs-only entry for timeline
   continuity and to flag the flasher-runner state change for
   the next fire's decision-making.
+
+* 2026-05-18 07:23 UTC -- fire ran. Runner-status probe pattern,
+  no dispatch (executing the explicit decision rule the 07:04
+  fire left: "re-query `/repos/$REPO/actions/runners` BEFORE
+  dispatching"). GET `/repos/$REPO/actions/runners` returns
+  `total_count=2`: the `flasher`-labelled runner
+  `AlberttekiMacBook-Pro` (id 23) is still
+  `status=offline busy=False`, and the `bit-flash` build runner
+  (id 22) is `status=online busy=False`. The flasher state is
+  **unchanged** from the 07:04 query (~19 min ago) -- so among
+  the (a)/(b)/(c) interpretations the 07:04 entry enumerated,
+  (a) "user is at the bench performing SW24 BOOT recovery"
+  remains plausible but unconfirmed; the offline duration is
+  now ~53+ min counting from the 06:30 last-known-online flash
+  conclusion. No newer `build-mp24` workflow runs have been
+  triggered since the 07:04 cancellation (run `26018657455`,
+  `flash=completed/cancelled`); the most recent run that
+  actually reached a flash conclusion on the device side
+  remains run `26017210952` from 06:30
+  (`flash=completed/failure`, S-MP25/3/1 brick signature).
+  Per the 07:04 fire's decision rule -- "if still offline,
+  abstain from dispatch (the build runner alone can't flash,
+  so dispatching just burns ~2 min of `bit-flash` capacity for
+  no signal)" -- abstaining from dispatch this fire. Workspace
+  setup note: this fire's session VM had `/sessions` at **100%
+  used** (9.8G/9.8G full, zero headroom -- so the default
+  `HOME=/sessions/<uid>` could not even hold git's per-user
+  config lock files) AND `/` at 88% used (~1.2 GB free).
+  Attempted to re-use the existing `/tmp/repo/mp_firmware`
+  left behind by an earlier fire's uid; it pulled cleanly
+  after `git config --global --add safe.directory ...` (with
+  `HOME=/tmp/claude-home` to redirect the config write), but
+  appending to a file owned by `nobody:nogroup` failed with
+  EACCES (the dir was clone-time `0755 nobody:nogroup`, not
+  group-writable). Successful path: fresh shallow clone in
+  `/tmp/cl_$$/mp_firmware` (`--depth 5 --filter=blob:none`,
+  ~16 MB working tree) -- same pattern the 05:46 / 06:07 /
+  06:30 fires used to dodge the cross-uid file-ownership
+  issue. The `/tmp` stale-dir accumulation flagged by the
+  07:04 entry continues (multiple per-fire `/tmp/cl_*`,
+  `/tmp/mp24*`, `/tmp/cmp24`, `/tmp/work_mp24`, etc. dirs
+  from earlier fires' uids); this fire did not sweep them,
+  staying under the 1.2 GB root-disk headroom comfortably.
+  Functional baseline on `mp24/` remains `2fc34c9`. Device
+  boot state is **UNKNOWN as of this fire** -- offline flasher
+  means CI cannot confirm bricked-vs-recovered. Abstaining
+  from new feature/fix commits per checkpoint directive;
+  appending this docs-only entry for timeline continuity.
+  Next fire should repeat the runner-status probe first
+  (same decision rule).
